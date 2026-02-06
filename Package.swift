@@ -1,15 +1,22 @@
 // swift-tools-version: 6.2
-// The swift-tools-version declares the minimum version of Swift required to build this package.
+// ABOUTME: Swift package manifest for the iPhone Mirroring MCP server.
+// ABOUTME: Targets macOS 14+ for AXUIElement, CGEvent, and CGWindowImage APIs.
 
 import PackageDescription
 
 let package = Package(
     name: "iphone-mirroir-mcp",
+    platforms: [
+        .macOS(.v14)
+    ],
     targets: [
-        // Targets are the basic building blocks of a package, defining a module or a test suite.
-        // Targets can depend on other targets in this package and products from dependencies.
         .executableTarget(
-            name: "iphone-mirroir-mcp"
+            name: "iphone-mirroir-mcp",
+            linkerSettings: [
+                .linkedFramework("ApplicationServices"),
+                .linkedFramework("CoreGraphics"),
+                .linkedFramework("AppKit"),
+            ]
         ),
     ]
 )
