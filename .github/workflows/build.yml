@@ -1,0 +1,71 @@
+name: Build
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  build:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build (debug)
+        run: swift build
+
+      - name: Build (release)
+        run: swift build -c release
+
+      - name: Binary info
+        run: |
+          ls -lh .build/release/iphone-mirroir-mcp
+          file .build/release/iphone-mirroir-mcp
+
+      - name: Test MCP initialize
+        run: |
+          echo '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}' \
+            | .build/release/iphone-mirroir-mcp 2>/dev/null \
+            | python3 -c "
+          import sys, json
+          obj = json.loads(sys.stdin.readline())
+          assert obj['result']['serverInfo']['name'] == 'iphone-mirroir-mcp'
+          print('MCP initialize: OK')
+          "
+
+      - name: Test tools/list
+        run: |
+          printf '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}\n{"jsonrpc":"2.0","id":2,"method":"tools/list","params":{}}\n' \
+            | .build/release/iphone-mirroir-mcp 2>/dev/null \
+            | python3 -c "
+          import sys, json
+          lines = sys.stdin.readlines()
+          obj = json.loads(lines[1])
+          tools = [t['name'] for t in obj['result']['tools']]
+          expected = {'screenshot','tap','swipe','type_text','press_home','press_app_switcher','spotlight','status'}
+          assert set(tools) == expected, f'Missing tools: {expected - set(tools)}'
+          print(f'tools/list: {len(tools)} tools registered')
+          "
+
+  release:
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: macos-15
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build release binary
+        run: swift build -c release
+
+      - name: Create release archive
+        run: |
+          cd .build/release
+          tar czf ../../iphone-mirroir-mcp-macos-arm64.tar.gz iphone-mirroir-mcp
+
+      - name: Upload release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: iphone-mirroir-mcp-macos-arm64.tar.gz
