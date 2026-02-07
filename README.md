@@ -1,30 +1,78 @@
 # iphone-mirroir-mcp
 
-An MCP (Model Context Protocol) server that lets AI assistants control a real iPhone through macOS iPhone Mirroring. Take screenshots, tap, swipe, type, and navigate — all through the standard MCP stdio transport.
+An MCP server that gives AI agents direct control of a real iPhone through macOS iPhone Mirroring. Screenshot, tap, swipe, type, navigate — over standard MCP stdio transport.
+
+Any MCP-compatible agent (Claude, OpenClaw, custom agents) can use this to drive an iPhone without jailbreaking, without physical access to the device, and without any app installed on the phone.
+
+## Security Warning
+
+**This tool gives an AI agent the ability to perform any action on your iPhone that you could perform by touching the screen.** Read this section before installing.
+
+### What this can do
+
+- See everything on your iPhone screen (screenshots)
+- Tap anywhere, type anything, swipe in any direction
+- Open any app, navigate any UI, interact with any content
+- Do all of this autonomously without human-in-the-loop confirmation
+
+### What this means
+
+If you connect this to an AI agent, that agent can:
+- Send messages, emails, or payments on your behalf
+- Access your banking apps, health data, photos, and private conversations
+- Install apps, change settings, or delete data
+- Do anything you can do by tapping the screen
+
+### Who should use this
+
+- Developers testing mobile apps with AI-driven automation
+- Researchers building agentic systems that interact with real mobile UIs
+- People who understand MCP, trust the agent they're connecting, and accept the risk
+
+### Who should not use this
+
+- Anyone who doesn't understand what MCP tool permissions mean
+- Anyone connecting untrusted or unreviewed agents to their personal phone
+
+### Mitigations
+
+- The MCP server only works while iPhone Mirroring is active and the Mac is unlocked
+- Closing the iPhone Mirroring window or locking the phone stops all input
+- The MCP server has zero network access — it only communicates via stdin/stdout
+- The helper daemon only accepts connections from the local Unix socket (no remote access)
+- All agent actions are visible in real-time on the iPhone Mirroring window
+
+### The helper daemon runs as root
+
+The Karabiner helper (`iphone-mirroir-helper`) runs as a LaunchDaemon with root privileges. This is required because Karabiner's virtual HID device sockets are in a root-only directory. The helper:
+- Listens on `/var/run/iphone-mirroir-helper.sock` (mode 0666, any local user can connect)
+- Can move the mouse cursor and simulate keyboard/mouse input via Karabiner's virtual HID
+- Cannot read files, access the network, or do anything beyond cursor/keyboard control
+- Source code is ~500 lines across 3 files — audit it yourself before installing
 
 ## How it works
 
-iPhone Mirroring (macOS Sequoia+) streams your iPhone's screen to a window on your Mac. This MCP server bridges that window to AI assistants like Claude:
+iPhone Mirroring (macOS Sequoia+) streams your iPhone screen to a window on your Mac. This MCP server bridges that window:
 
-1. **Screenshots** via macOS `screencapture` targeting the mirroring window
-2. **Taps and swipes** via Karabiner virtual HID device (preferred) or `CGEvent` fallback
-3. **Keyboard input** via Karabiner virtual HID keyboard (preferred) or `CGEvent` fallback
-4. **Navigation** (Home, App Switcher, Spotlight) via accessibility menu actions
+1. **Screenshots** — macOS `screencapture` targeting the mirroring window by CGWindowID
+2. **Taps and swipes** — Karabiner virtual HID (preferred) or CGEvent fallback
+3. **Keyboard input** — Karabiner virtual HID keyboard (preferred) or CGEvent fallback
+4. **Navigation** — macOS accessibility APIs triggering iPhone Mirroring's menu bar actions
 
-The mirrored iPhone content is an opaque video surface — there's no accessibility tree for the iPhone's UI elements. The AI assistant uses its vision capabilities to understand what's on screen and decide where to tap.
+The iPhone screen is an opaque DRM-protected video surface with no accessibility tree. The AI agent uses vision to understand what's on screen and decide where to tap.
 
 ### Why Karabiner?
 
-iPhone Mirroring's DRM-protected surface can block regular `CGEvent` input in some macOS configurations. The Karabiner virtual HID approach bypasses this by sending input through a DriverKit virtual keyboard/mouse, which macOS treats as real hardware input. The MCP server automatically falls back to CGEvent when the Karabiner helper is not installed.
+iPhone Mirroring's DRM surface blocks regular CGEvent mouse input in many macOS configurations. The Karabiner DriverKit virtual HID device bypasses this — macOS treats its input as real hardware events. The MCP server falls back to CGEvent automatically when the helper isn't installed.
 
 ## Requirements
 
 - macOS 14 (Sonoma) or later
-- iPhone Mirroring set up and working
-- Xcode Command Line Tools (for Swift compiler)
-- **Screen Recording** permission for the parent process (terminal or Claude Code)
-- **Accessibility** permission for the parent process
-- **Karabiner-Elements** (optional but recommended — enables reliable input on DRM surfaces)
+- iPhone Mirroring set up and connected
+- Xcode Command Line Tools (`xcode-select --install`)
+- **Screen Recording** permission for the terminal/agent process
+- **Accessibility** permission for the terminal/agent process
+- **Karabiner-Elements** (optional, recommended for reliable input)
 
 ## Build
 
@@ -32,117 +80,79 @@ iPhone Mirroring's DRM-protected surface can block regular `CGEvent` input in so
 swift build -c release
 ```
 
-This produces two binaries:
-- `.build/release/iphone-mirroir-mcp` — the MCP server (runs as your user)
-- `.build/release/iphone-mirroir-helper` — the Karabiner helper daemon (runs as root)
+Two binaries:
+- `.build/release/iphone-mirroir-mcp` — MCP server (runs as your user)
+- `.build/release/iphone-mirroir-helper` — Karabiner daemon (runs as root)
 
-## Karabiner Helper Setup (recommended)
+## Setup
 
-The helper daemon communicates with Karabiner's virtual HID device to deliver input that works reliably on iPhone Mirroring's DRM-protected surface.
+### 1. macOS Permissions
 
-### Prerequisites
+Grant these to whatever process runs the MCP server (your terminal app, Claude Code, etc.):
 
-1. Install Karabiner-Elements: `brew install --cask karabiner-elements`
-2. Open Karabiner-Elements Settings and approve the DriverKit system extension
-3. Verify the virtual HID daemon is running:
-   ```bash
-   ls /Library/Application\ Support/org.pqrs/tmp/rootonly/vhidd_server/*.sock
-   ```
+**System Settings > Privacy & Security > Screen Recording** — add the app, restart it.
 
-### Install the helper
+**System Settings > Privacy & Security > Accessibility** — add the app.
 
+### 2. Karabiner Helper (optional, recommended)
+
+Without the helper, taps and typing may not register on the DRM-protected iPhone Mirroring surface. With it, input works reliably.
+
+**Install Karabiner-Elements:**
+```bash
+brew install --cask karabiner-elements
+```
+Open Karabiner-Elements Settings and approve the DriverKit system extension when prompted.
+
+**Verify the virtual HID daemon is running:**
+```bash
+ls /Library/Application\ Support/org.pqrs/tmp/rootonly/vhidd_server/*.sock
+```
+You should see a `.sock` file. If the directory is empty, open Karabiner-Elements Settings and check that the DriverKit extension is activated.
+
+**Install the helper daemon:**
 ```bash
 ./scripts/install-helper.sh
 ```
+This builds the helper, copies it to `/usr/local/bin/`, and loads it as a LaunchDaemon.
 
-This builds the helper, copies it to `/usr/local/bin/`, and installs a LaunchDaemon that keeps it running.
-
-### Verify
-
+**Verify:**
 ```bash
-# Check the daemon is running
-sudo launchctl list | grep iphone-mirroir
-
-# Check logs
-cat /var/log/iphone-mirroir-helper.log
+sudo launchctl list | grep iphone-mirroir   # should show the daemon
+cat /var/log/iphone-mirroir-helper.log       # check for errors
 ```
 
-### Uninstall
-
+**Uninstall:**
 ```bash
 ./scripts/uninstall-helper.sh
 ```
 
-### Without the helper
+### 3. Connect to your agent
 
-The MCP server works without the helper — it falls back to CGEvent-based input. The `status` tool reports whether the helper is connected.
-
-## Usage with Claude Code
-
-Add to your `.mcp.json`:
+Add to `.mcp.json` (Claude Code, OpenClaw, or any MCP client):
 
 ```json
 {
   "mcpServers": {
     "iphone-mirroring": {
-      "command": "/path/to/iphone-mirroir-mcp"
+      "command": "/absolute/path/to/.build/release/iphone-mirroir-mcp"
     }
   }
 }
 ```
 
-Then Claude can interact with your iPhone:
-
-> "Take a screenshot of my iPhone"
-> "Open the Settings app"
-> "Type 'hello' in the search field"
-
 ## Tools
 
 | Tool | Description | Parameters |
 |------|-------------|------------|
-| `screenshot` | Capture the mirroring window as PNG | none |
-| `tap` | Tap at coordinates on the iPhone | `x`, `y` |
-| `swipe` | Swipe gesture between two points | `from_x`, `from_y`, `to_x`, `to_y`, `duration_ms` |
-| `type_text` | Type text via keyboard events | `text` |
-| `press_home` | Go to iPhone home screen | none |
-| `press_app_switcher` | Open the app switcher | none |
+| `screenshot` | Capture the iPhone screen as PNG | none |
+| `tap` | Tap at coordinates | `x`, `y` (relative to mirroring window) |
+| `swipe` | Swipe between two points | `from_x`, `from_y`, `to_x`, `to_y`, `duration_ms` |
+| `type_text` | Type text into focused field | `text` |
+| `press_home` | Go to home screen | none |
+| `press_app_switcher` | Open app switcher | none |
 | `spotlight` | Open Spotlight search | none |
-| `status` | Check mirroring and helper connection state | none |
-
-## Protocol
-
-The server communicates via **JSON-RPC 2.0 over stdin/stdout** (MCP stdio transport). One JSON object per line.
-
-Example session:
-
-```
--> {"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}
-<- {"jsonrpc":"2.0","id":1,"result":{"protocolVersion":"2024-11-05","capabilities":{"tools":{}},"serverInfo":{"name":"iphone-mirroir-mcp","version":"0.1.0"}}}
-
--> {"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"status","arguments":{}}}
-<- {"jsonrpc":"2.0","id":2,"result":{"content":[{"type":"text","text":"Connected — mirroring active (window: 318x701)\nHelper: connected (keyboard=true, pointing=true)"}],"isError":false}}
-
--> {"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"screenshot","arguments":{}}}
-<- {"jsonrpc":"2.0","id":3,"result":{"content":[{"type":"image","data":"iVBOR...","mimeType":"image/png"}],"isError":false}}
-```
-
-## Permissions setup
-
-### Screen Recording
-
-The process running the MCP server needs Screen Recording permission:
-
-1. Open **System Settings > Privacy & Security > Screen Recording**
-2. Add your terminal app (iTerm, Terminal.app, etc.) or Claude Code
-3. **Restart the app** after toggling the permission
-
-### Accessibility
-
-The process also needs Accessibility permission for window detection and menu actions:
-
-1. Open **System Settings > Privacy & Security > Accessibility**
-2. Add your terminal app or Claude Code
+| `status` | Check mirroring + helper status | none |
 
 ## Architecture
 
@@ -157,34 +167,43 @@ stdin (JSON-RPC) -> MCPServer      (JSON IPC)     iphone-mirroir-helper
                                     (CGEvent fb)    Virtual HID Device
 ```
 
-### Components
+**MCP Server** (your user):
+- **MCPServer** — JSON-RPC 2.0 over stdio, tool registry
+- **MirroringBridge** — Finds iPhone Mirroring window via AXUIElement, triggers menu actions
+- **ScreenCapture** — Captures window via `screencapture -l <windowID>`
+- **InputSimulation** — Tries Karabiner helper, falls back to CGEvent
+- **HelperClient** — Unix socket client to helper daemon
 
-**MCP Server** (user process):
-- **MCPServer** — JSON-RPC 2.0 protocol handler, tool registry
-- **MirroringBridge** — Finds iPhone Mirroring window via `AXMainWindow`, detects connection state, triggers menu actions
-- **ScreenCapture** — Captures the mirroring window via `screencapture -l <windowID>`
-- **InputSimulation** — Delegates input to HelperClient (Karabiner), falls back to CGEvent
-- **HelperClient** — Unix socket client communicating with the helper daemon
+**Helper Daemon** (root):
+- **KarabinerClient** — Wire protocol to Karabiner vhidd over Unix DGRAM sockets
+- **CommandServer** — Unix STREAM socket server, dispatches JSON commands, handles CGWarp + Karabiner click/type/swipe
 
-**Helper Daemon** (root process):
-- **KarabinerClient** — Implements the Karabiner vhidd wire protocol over Unix datagram sockets
-- **CommandServer** — Unix stream socket server accepting JSON commands, dispatches to KarabinerClient with CGWarp cursor positioning
+### IPC between MCP server and helper
 
-### IPC Protocol
+Newline-delimited JSON over Unix stream socket at `/var/run/iphone-mirroir-helper.sock`:
 
-The MCP server and helper communicate via newline-delimited JSON over a Unix stream socket at `/var/run/iphone-mirroir-helper.sock`.
+```
+-> {"action":"click","x":1537,"y":444}\n
+<- {"ok":true}\n
 
-Request: `{"action":"click","x":1537,"y":444}\n`
-Response: `{"ok":true}\n`
+-> {"action":"type","text":"hello"}\n
+<- {"ok":true}\n
 
-### Technical notes
+-> {"action":"status"}\n
+<- {"ok":true,"keyboard_ready":true,"pointing_ready":true}\n
+```
 
-- iPhone Mirroring's window is hidden from `AXWindows` but accessible via `AXMainWindow`
-- The mirrored content is a DRM-protected video surface with zero accessibility children
-- `CGWindowListCreateImage` is unavailable on macOS 15+; we use `screencapture` CLI instead
-- The window may report `isOnScreen: false` even when visible
-- The Karabiner helper uses `SOCK_DGRAM` Unix sockets to communicate with `vhidd_server`
-- Click sequence: save cursor -> CGWarp to target -> Karabiner nudge -> button down -> 80ms -> button up -> restore cursor
+### MCP protocol
+
+JSON-RPC 2.0 over stdin/stdout, one JSON object per line:
+
+```
+-> {"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}
+<- {"jsonrpc":"2.0","id":1,"result":{"protocolVersion":"2024-11-05",...}}
+
+-> {"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"tap","arguments":{"x":160,"y":400}}}
+<- {"jsonrpc":"2.0","id":2,"result":{"content":[{"type":"text","text":"Tapped at (160, 400)"}],"isError":false}}
+```
 
 ## License
 
