@@ -1,4 +1,4 @@
-// swift-tools-version: 6.2
+// swift-tools-version: 6.0
 // ABOUTME: Swift package manifest for the iPhone Mirroring MCP server.
 // ABOUTME: Targets macOS 14+ for AXUIElement, CGEvent, and CGWindowImage APIs.
 
