@@ -260,8 +260,9 @@ struct IPhoneMirroirMCP {
         server.registerTool(MCPToolDefinition(
             name: "status",
             description: """
-                Get the current status of the iPhone Mirroring connection. \
-                Returns whether the app is running, connected, paused, or has no window.
+                Get the current status of the iPhone Mirroring connection and Karabiner helper. \
+                Returns whether the app is running, connected, paused, or has no window. \
+                Also reports whether the Karabiner helper daemon is available for input.
                 """,
             inputSchema: [
                 "type": .string("object"),
@@ -269,19 +270,32 @@ struct IPhoneMirroirMCP {
             ],
             handler: { _ in
                 let state = bridge.getState()
+                let mirroringStatus: String
                 switch state {
                 case .connected:
                     let info = bridge.getWindowInfo()
                     let sizeDesc =
                         info.map { "\(Int($0.size.width))x\(Int($0.size.height))" } ?? "unknown"
-                    return .text("Connected — mirroring active (window: \(sizeDesc))")
+                    mirroringStatus = "Connected — mirroring active (window: \(sizeDesc))"
                 case .paused:
-                    return .text("Paused — connection paused, can resume")
+                    mirroringStatus = "Paused — connection paused, can resume"
                 case .notRunning:
-                    return .text("Not running — iPhone Mirroring app is not open")
+                    mirroringStatus = "Not running — iPhone Mirroring app is not open"
                 case .noWindow:
-                    return .text("No window — app is running but no mirroring window found")
+                    mirroringStatus = "No window — app is running but no mirroring window found"
                 }
+
+                // Check Karabiner helper status
+                let helperStatus: String
+                if let status = input.helperClient.status() {
+                    let kb = status["keyboard_ready"] as? Bool ?? false
+                    let pt = status["pointing_ready"] as? Bool ?? false
+                    helperStatus = "Helper: connected (keyboard=\(kb), pointing=\(pt))"
+                } else {
+                    helperStatus = "Helper: not running (tap/type/swipe use CGEvent fallback)"
+                }
+
+                return .text("\(mirroringStatus)\n\(helperStatus)")
             }
         ))
     }

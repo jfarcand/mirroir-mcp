@@ -18,5 +18,12 @@ let package = Package(
                 .linkedFramework("AppKit"),
             ]
         ),
+        .executableTarget(
+            name: "iphone-mirroir-helper",
+            linkerSettings: [
+                .linkedFramework("CoreGraphics"),
+                .linkedFramework("CoreFoundation"),
+            ]
+        ),
     ]
 )
