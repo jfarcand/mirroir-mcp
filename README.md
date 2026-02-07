@@ -1,8 +1,10 @@
 # iphone-mirroir-mcp
 
-An MCP server that gives AI agents direct control of a real iPhone through macOS iPhone Mirroring. Screenshot, tap, swipe, type, navigate — over standard MCP stdio transport.
+An MCP server for testing and automating real iOS apps on a real iPhone through macOS iPhone Mirroring. Screenshot, tap, swipe, type, navigate — over standard MCP stdio transport.
 
-Any MCP-compatible agent (Claude, OpenClaw, custom agents) can use this to drive an iPhone without jailbreaking, without physical access to the device, and without any app installed on the phone.
+No simulator. No jailbreak. No app installed on the phone. Your actual iPhone, driven by any MCP-compatible agent.
+
+Built for testing iOS apps the way users actually use them — on real hardware, with real performance, real push notifications, real sensors, and real app store builds. But it's a general-purpose iPhone automation bridge, so the use cases go well beyond testing: accessibility auditing, workflow automation, app demos, data extraction, or anything else you can do by touching a screen.
 
 ## Security Warning
 
@@ -25,14 +27,15 @@ If you connect this to an AI agent, that agent can:
 
 ### Who should use this
 
-- Developers testing mobile apps with AI-driven automation
+- Developers who need to test iOS apps on real hardware with AI-driven automation
+- Teams running end-to-end tests against real devices instead of simulators
 - Researchers building agentic systems that interact with real mobile UIs
-- People who understand MCP, trust the agent they're connecting, and accept the risk
+- Anyone building MCP-based automation who understands the tools they're connecting
 
 ### Who should not use this
 
 - Anyone who doesn't understand what MCP tool permissions mean
-- Anyone connecting untrusted or unreviewed agents to their personal phone
+- Anyone connecting untrusted or unreviewed agents to a phone with sensitive data
 
 ### Mitigations
 
@@ -88,7 +91,7 @@ Two binaries:
 
 ### 1. macOS Permissions
 
-Grant these to whatever process runs the MCP server (your terminal app, Claude Code, etc.):
+Grant these to whatever process runs the MCP server (your terminal app, IDE, etc.):
 
 **System Settings > Privacy & Security > Screen Recording** — add the app, restart it.
 
@@ -129,7 +132,7 @@ cat /var/log/iphone-mirroir-helper.log       # check for errors
 
 ### 3. Connect to your agent
 
-Add to `.mcp.json` (Claude Code, OpenClaw, or any MCP client):
+Add to your MCP client config (`.mcp.json` or equivalent):
 
 ```json
 {
