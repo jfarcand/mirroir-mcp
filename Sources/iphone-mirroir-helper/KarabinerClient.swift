@@ -7,8 +7,20 @@ import HelperLib
 
 // MARK: - Protocol Constants
 
-/// Karabiner vhidd client protocol version (matches client_protocol_version.hpp).
+/// Karabiner vhidd client protocol version (uint16_t, matches client_protocol_version.hpp).
 private let protocolVersion: UInt16 = 5
+
+/// The local_datagram framing layer prepends a type byte to every datagram.
+/// 0 = heartbeat, 1 = user_data (matches send_entry::type in send_entry.hpp).
+private let heartbeatTypeByte: UInt8 = 0
+private let userDataTypeByte: UInt8 = 1
+
+/// Heartbeat deadline in milliseconds. The server considers the client dead
+/// if no heartbeat arrives within this window (matches C++ client default).
+private let heartbeatDeadlineMs: UInt32 = 5000
+
+/// Heartbeat interval in seconds (matches C++ local_datagram::client default).
+private let heartbeatIntervalSec: TimeInterval = 3.0
 
 /// Request types sent to the vhidd server (matches request.hpp).
 private enum KarabinerRequest: UInt8 {
@@ -42,28 +54,29 @@ private enum KarabinerResponse: UInt8 {
 /// Communicates with the Karabiner DriverKit virtual HID daemon over Unix datagram sockets.
 /// Manages device initialization, heartbeat, and HID report submission.
 ///
-/// The protocol uses raw packed structs over Unix DGRAM sockets:
-/// - Header: ['c', 'p', version(LE u16), request(u8)]
-/// - Payload: packed C struct appended directly after header
+/// The protocol uses the pqrs::local_datagram framing layer over Unix DGRAM sockets:
+/// - Heartbeat: [0x00] [deadline_ms uint32 LE] (5 bytes, sent every 3s)
+/// - User data: [0x01] ['c'] ['p'] [version LE uint16] [request uint8] [...payload]
+///
+/// The client must connect() to the server socket before sending (matching the C++
+/// local_datagram::client behavior). Responses arrive on the same client socket from
+/// a server-created response socket in the vhidd_response directory.
 final class KarabinerClient {
     private(set) var isKeyboardReady = false
     private(set) var isPointingReady = false
     private(set) var isConnected = false
 
     private var socketFd: Int32 = -1
-    private var serverAddress: sockaddr_un?
     private var clientSocketPath: String?
-    private var responseSocketFd: Int32 = -1
-    private var responseSocketPath: String?
 
     private let serverSocketDir = "/Library/Application Support/org.pqrs/tmp/rootonly/vhidd_server"
     private let clientSocketDir = "/Library/Application Support/org.pqrs/tmp/rootonly/vhidd_client"
-    private let responseSocketDir = "/Library/Application Support/org.pqrs/tmp/rootonly/vhidd_response"
+
+    private var heartbeatTimer: DispatchSourceTimer?
+    private var monitorTimer: DispatchSourceTimer?
 
     /// Interval between server liveness checks.
     private let serverCheckIntervalSec: TimeInterval = 3.0
-    private var lastServerCheck = Date.distantPast
-    private var monitorTimer: DispatchSourceTimer?
 
     deinit {
         shutdown()
@@ -72,8 +85,8 @@ final class KarabinerClient {
     // MARK: - Connection Management
 
     /// Initialize the connection to the Karabiner vhidd daemon.
-    /// Discovers the server socket, creates client/response sockets, and
-    /// initializes both keyboard and pointing virtual devices.
+    /// Discovers the server socket, creates and connects the client socket,
+    /// starts heartbeat, and initializes both keyboard and pointing virtual devices.
     func initialize() throws {
         // Discover server socket
         guard let serverPath = discoverServerSocket() else {
@@ -81,23 +94,34 @@ final class KarabinerClient {
         }
         log("Found server socket: \(serverPath)")
 
-        // Create client datagram socket
+        // Create client datagram socket and bind to client directory
         try createClientSocket()
 
-        // Create response socket for receiving device-ready notifications
-        try createResponseSocket()
+        // Connect to server (required by local_datagram protocol).
+        // On macOS, connect() on Unix DGRAM sets the default destination for send()
+        // but does not filter incoming datagrams (unlike Linux UDP sockets).
+        try connectToServer(path: serverPath)
 
-        // Store server address for sendto()
-        serverAddress = makeUnixAddress(path: serverPath)
+        // Set receive timeout for polling responses
+        var tv = timeval(tv_sec: 0, tv_usec: 200_000) // 200ms
+        setsockopt(socketFd, SOL_SOCKET, SO_RCVTIMEO, &tv, socklen_t(MemoryLayout<timeval>.size))
 
         isConnected = true
 
+        // Start heartbeat before sending requests (matches C++ client startup order).
+        // The server uses heartbeats to track active clients and manage response sockets.
+        sendHeartbeat()
+        startHeartbeat()
+
+        // Small delay to let the server process the heartbeat and create our response socket
+        usleep(100_000) // 100ms
+
         // Initialize virtual devices
-        try initializeKeyboard()
-        try initializePointing()
+        initializeKeyboard()
+        initializePointing()
 
         // Wait for devices to become ready
-        try waitForDevicesReady(timeoutSec: 5.0)
+        try waitForDevicesReady(timeoutSec: 10.0)
 
         // Start periodic server monitoring
         startServerMonitor()
@@ -107,11 +131,12 @@ final class KarabinerClient {
 
     /// Cleanly shut down: terminate virtual devices, close sockets, remove socket files.
     func shutdown() {
+        heartbeatTimer?.cancel()
+        heartbeatTimer = nil
         monitorTimer?.cancel()
         monitorTimer = nil
 
         if isConnected {
-            // Terminate virtual devices
             sendRequest(.virtualHidKeyboardTerminate)
             sendRequest(.virtualHidPointingTerminate)
         }
@@ -120,19 +145,10 @@ final class KarabinerClient {
             Darwin.close(socketFd)
             socketFd = -1
         }
-        if responseSocketFd >= 0 {
-            Darwin.close(responseSocketFd)
-            responseSocketFd = -1
-        }
 
-        // Clean up socket files
         if let path = clientSocketPath {
             unlink(path)
             clientSocketPath = nil
-        }
-        if let path = responseSocketPath {
-            unlink(path)
-            responseSocketPath = nil
         }
 
         isKeyboardReady = false
@@ -188,13 +204,17 @@ final class KarabinerClient {
         var downReport = KeyboardInput()
         downReport.modifiers = modifiers.rawValue
         downReport.insertKey(keycode)
-        postKeyboardReport(downReport)
+        let downBytes = downReport.toBytes()
+        log("typeKey DOWN: keycode=0x\(String(keycode, radix: 16)), mods=0x\(String(modifiers.rawValue, radix: 16)), payload=\(downBytes.count) bytes")
+        let downOk = sendRequest(.postKeyboardInputReport, payload: downBytes)
+        log("typeKey DOWN send: \(downOk)")
 
         usleep(20_000) // 20ms hold
 
         // Key up (empty report releases all keys)
         let upReport = KeyboardInput()
-        postKeyboardReport(upReport)
+        let upOk = sendRequest(.postKeyboardInputReport, payload: upReport.toBytes())
+        log("typeKey UP send: \(upOk)")
     }
 
     // MARK: - Private: Socket Management
@@ -206,7 +226,7 @@ final class KarabinerClient {
 
         guard glob(pattern, 0, nil, &gt) == 0 else { return nil }
 
-        // Use the most recently created socket (last one alphabetically since names are timestamps)
+        // Use the most recently created socket (last one alphabetically since names are hex timestamps)
         var latestPath: String?
         for i in 0..<Int(gt.gl_pathc) {
             if let cPath = gt.gl_pathv[i] {
@@ -229,6 +249,9 @@ final class KarabinerClient {
         let timestamp = DispatchTime.now().uptimeNanoseconds
         let path = clientSocketDir + "/\(String(timestamp, radix: 16)).sock"
 
+        // Remove stale socket file if it exists
+        unlink(path)
+
         var addr = makeUnixAddress(path: path)
         let bindResult = withUnsafePointer(to: &addr) { ptr in
             ptr.withMemoryRebound(to: sockaddr.self, capacity: 1) { sockPtr in
@@ -236,129 +259,189 @@ final class KarabinerClient {
             }
         }
         guard bindResult == 0 else {
+            let e = errno
             Darwin.close(socketFd)
             socketFd = -1
-            throw KarabinerError.bindFailed(errno: errno, path: path)
+            throw KarabinerError.bindFailed(errno: e, path: path)
         }
 
         clientSocketPath = path
         log("Client socket bound: \(path)")
     }
 
-    private func createResponseSocket() throws {
-        responseSocketFd = socket(AF_UNIX, SOCK_DGRAM, 0)
-        guard responseSocketFd >= 0 else {
-            throw KarabinerError.socketCreationFailed(errno: errno)
-        }
-
-        let timestamp = DispatchTime.now().uptimeNanoseconds + 1
-        let path = responseSocketDir + "/\(String(timestamp, radix: 16)).sock"
-
+    /// Connect the DGRAM socket to the server. Required by the local_datagram protocol.
+    /// The C++ client always calls connect() before sending. This sets the default
+    /// destination for send() and lets the server identify our client socket path.
+    private func connectToServer(path: String) throws {
         var addr = makeUnixAddress(path: path)
-        let bindResult = withUnsafePointer(to: &addr) { ptr in
+        let result = withUnsafePointer(to: &addr) { ptr in
             ptr.withMemoryRebound(to: sockaddr.self, capacity: 1) { sockPtr in
-                bind(responseSocketFd, sockPtr, socklen_t(MemoryLayout<sockaddr_un>.size))
+                Darwin.connect(socketFd, sockPtr, socklen_t(MemoryLayout<sockaddr_un>.size))
             }
         }
-        guard bindResult == 0 else {
-            Darwin.close(responseSocketFd)
-            responseSocketFd = -1
-            throw KarabinerError.bindFailed(errno: errno, path: path)
+        guard result == 0 else {
+            let e = errno
+            throw KarabinerError.connectFailed(errno: e, path: path)
+        }
+        log("Connected to server socket: \(path)")
+    }
+
+    // MARK: - Private: Heartbeat
+
+    /// Send a heartbeat datagram: [0x00 (type::heartbeat)] [deadline_ms (uint32 LE)].
+    /// The deadline tells the server how long to wait before considering this client dead.
+    /// Format matches local_datagram::send_entry with type::heartbeat.
+    private func sendHeartbeat() {
+        guard socketFd >= 0 else { return }
+
+        var message = [UInt8](repeating: 0, count: 5)
+        message[0] = heartbeatTypeByte
+        var deadline = heartbeatDeadlineMs.littleEndian
+        withUnsafeBytes(of: &deadline) { src in
+            for i in 0..<4 { message[1 + i] = src[i] }
         }
 
-        responseSocketPath = path
+        let sent = message.withUnsafeBufferPointer { buf in
+            Darwin.send(socketFd, buf.baseAddress, buf.count, 0)
+        }
+        if sent != message.count {
+            log("Heartbeat send failed: \(String(cString: strerror(errno)))")
+        }
+    }
 
-        // Set receive timeout for polling responses
-        var tv = timeval(tv_sec: 0, tv_usec: 100_000) // 100ms
-        setsockopt(responseSocketFd, SOL_SOCKET, SO_RCVTIMEO, &tv, socklen_t(MemoryLayout<timeval>.size))
-
-        log("Response socket bound: \(path)")
+    /// Start periodic heartbeat timer (matches C++ local_datagram::client behavior).
+    private func startHeartbeat() {
+        let timer = DispatchSource.makeTimerSource(queue: .global(qos: .utility))
+        timer.schedule(deadline: .now() + heartbeatIntervalSec,
+                       repeating: heartbeatIntervalSec)
+        timer.setEventHandler { [weak self] in
+            self?.sendHeartbeat()
+        }
+        timer.resume()
+        heartbeatTimer = timer
     }
 
     // MARK: - Private: Device Initialization
 
-    private func initializeKeyboard() throws {
+    private func initializeKeyboard() {
         let params = KeyboardParameters()
         sendRequest(.virtualHidKeyboardInitialize, payload: params.toBytes())
     }
 
-    private func initializePointing() throws {
+    private func initializePointing() {
         sendRequest(.virtualHidPointingInitialize)
     }
 
-    /// Poll the response socket until both devices report ready or timeout.
+    /// Poll the client socket until both devices report ready or timeout.
+    /// The server sends responses to our client socket from its response socket.
     private func waitForDevicesReady(timeoutSec: TimeInterval) throws {
         let deadline = Date().addingTimeInterval(timeoutSec)
         var buf = [UInt8](repeating: 0, count: 1024)
+        var attempt = 0
 
         while Date() < deadline {
-            let bytesRead = recv(responseSocketFd, &buf, buf.count, 0)
-            if bytesRead >= 5 {
-                // Parse response header: ['c', 'p', version_le16, response_type, ...]
-                guard buf[0] == 0x63, buf[1] == 0x70 else { continue }
-                let responseType = buf[4]
-
-                if responseType == KarabinerResponse.driverVersionMismatched.rawValue {
-                    throw KarabinerError.driverVersionMismatch
-                } else if responseType == KarabinerResponse.virtualHidKeyboardReady.rawValue, bytesRead >= 6 {
-                    isKeyboardReady = buf[5] != 0
-                    log("Keyboard ready: \(isKeyboardReady)")
-                } else if responseType == KarabinerResponse.virtualHidPointingReady.rawValue, bytesRead >= 6 {
-                    isPointingReady = buf[5] != 0
-                    log("Pointing ready: \(isPointingReady)")
-                }
-
+            let bytesRead = recv(socketFd, &buf, buf.count, 0)
+            if bytesRead > 0 {
+                let hexBytes = buf[0..<bytesRead].map { String(format: "%02x", $0) }.joined(separator: " ")
+                log("Received \(bytesRead) bytes: \(hexBytes)")
+                try parseResponse(buf: buf, bytesRead: bytesRead)
                 if isKeyboardReady && isPointingReady { return }
+            } else if bytesRead < 0 && errno != EAGAIN && errno != EWOULDBLOCK {
+                log("recv error: \(String(cString: strerror(errno)))")
             }
 
-            // recv timed out, re-send init requests to prompt responses
+            attempt += 1
+            // Re-send init requests periodically to prompt responses
             if !isKeyboardReady {
                 let params = KeyboardParameters()
-                sendRequest(.virtualHidKeyboardInitialize, payload: params.toBytes())
+                let sent = sendRequest(.virtualHidKeyboardInitialize, payload: params.toBytes())
+                if attempt <= 5 { log("Sent keyboard init (attempt \(attempt)): \(sent)") }
             }
             if !isPointingReady {
-                sendRequest(.virtualHidPointingInitialize)
+                let sent = sendRequest(.virtualHidPointingInitialize)
+                if attempt <= 5 { log("Sent pointing init (attempt \(attempt)): \(sent)") }
             }
         }
 
-        // Partial success is acceptable — some operations may still work
         if !isKeyboardReady && !isPointingReady {
             throw KarabinerError.devicesNotReady
         }
     }
 
+    /// Parse a response from the Karabiner vhidd server.
+    /// Wire format: [type(u8)] [response_type(u8)] [...payload]
+    /// The type byte is the local_datagram framing prefix (0x00=heartbeat, 0x01=user_data).
+    private func parseResponse(buf: [UInt8], bytesRead: Int) throws {
+        guard bytesRead >= 1 else { return }
+
+        let framingType = buf[0]
+
+        // Heartbeat responses from the server
+        if framingType == heartbeatTypeByte {
+            log("Received heartbeat from server")
+            return
+        }
+
+        guard framingType == userDataTypeByte else {
+            log("Unexpected framing type: \(framingType)")
+            return
+        }
+
+        guard bytesRead >= 2 else { return }
+        let responseType = buf[1]
+        log("Response type: \(responseType)")
+
+        if responseType == KarabinerResponse.driverVersionMismatched.rawValue, bytesRead >= 3 {
+            // The value byte indicates whether versions ARE mismatched (1=yes, 0=no).
+            // This is a periodic status report, not an error — only throw if truly mismatched.
+            let mismatched = buf[2] != 0
+            log("Driver version mismatched: \(mismatched)")
+            if mismatched {
+                throw KarabinerError.driverVersionMismatch
+            }
+        } else if responseType == KarabinerResponse.virtualHidKeyboardReady.rawValue, bytesRead >= 3 {
+            isKeyboardReady = buf[2] != 0
+            log("Keyboard ready: \(isKeyboardReady)")
+        } else if responseType == KarabinerResponse.virtualHidPointingReady.rawValue, bytesRead >= 3 {
+            isPointingReady = buf[2] != 0
+            log("Pointing ready: \(isPointingReady)")
+        } else if responseType == KarabinerResponse.driverActivated.rawValue, bytesRead >= 3 {
+            log("Driver activated: \(buf[2])")
+        } else if responseType == KarabinerResponse.driverConnected.rawValue, bytesRead >= 3 {
+            log("Driver connected: \(buf[2])")
+        }
+    }
+
     // MARK: - Private: Message Framing
 
-    /// Build and send a Karabiner protocol message.
-    /// Frame: ['c'(0x63), 'p'(0x70), version(LE u16), request(u8), ...payload]
+    /// Build and send a Karabiner protocol message via the connected socket.
+    /// Wire format: [0x01] ['c'(0x63)] ['p'(0x70)] [version(LE u16)] [request(u8)] [...payload]
+    /// Uses send() on the connected socket (not sendto()), matching C++ local_datagram::client.
     @discardableResult
     private func sendRequest(_ request: KarabinerRequest, payload: [UInt8] = []) -> Bool {
-        guard socketFd >= 0, var addr = serverAddress else { return false }
+        guard socketFd >= 0 else { return false }
 
         var message = [UInt8]()
-        message.reserveCapacity(5 + payload.count)
+        message.reserveCapacity(6 + payload.count)
 
-        // Header
+        // local_datagram framing: type byte (1 = user_data)
+        message.append(userDataTypeByte)
+        // Karabiner header: 'c', 'p', protocol_version (uint16_t LE), request_type (uint8_t)
         message.append(0x63) // 'c'
         message.append(0x70) // 'p'
-
-        // Protocol version (little-endian uint16)
-        var version = protocolVersion
+        var version = protocolVersion.littleEndian
         withUnsafeBytes(of: &version) { message.append(contentsOf: $0) }
-
-        // Request type
         message.append(request.rawValue)
 
         // Payload
         message.append(contentsOf: payload)
 
         let sent = message.withUnsafeBufferPointer { buf in
-            withUnsafePointer(to: &addr) { addrPtr in
-                addrPtr.withMemoryRebound(to: sockaddr.self, capacity: 1) { sockPtr in
-                    sendto(socketFd, buf.baseAddress, buf.count, 0, sockPtr,
-                           socklen_t(MemoryLayout<sockaddr_un>.size))
-                }
-            }
+            Darwin.send(socketFd, buf.baseAddress, buf.count, 0)
+        }
+
+        if sent != message.count {
+            log("Send failed for \(request) (errno \(errno)): \(String(cString: strerror(errno)))")
         }
 
         return sent == message.count
@@ -389,13 +472,11 @@ final class KarabinerClient {
     private func makeUnixAddress(path: String) -> sockaddr_un {
         var addr = sockaddr_un()
         addr.sun_family = sa_family_t(AF_UNIX)
-        // Copy path bytes into sun_path tuple
         let pathBytes = Array(path.utf8)
         withUnsafeMutableBytes(of: &addr.sun_path) { sunPath in
             for i in 0..<min(pathBytes.count, sunPath.count - 1) {
                 sunPath[i] = pathBytes[i]
             }
-            // Null-terminate
             sunPath[min(pathBytes.count, sunPath.count - 1)] = 0
         }
         return addr
@@ -408,6 +489,7 @@ enum KarabinerError: Error, CustomStringConvertible {
     case noServerSocket
     case socketCreationFailed(errno: Int32)
     case bindFailed(errno: Int32, path: String)
+    case connectFailed(errno: Int32, path: String)
     case devicesNotReady
     case driverVersionMismatch
 
@@ -419,10 +501,12 @@ enum KarabinerError: Error, CustomStringConvertible {
             return "Failed to create Unix socket: \(String(cString: strerror(e)))"
         case .bindFailed(let e, let path):
             return "Failed to bind socket at \(path): \(String(cString: strerror(e)))"
+        case .connectFailed(let e, let path):
+            return "Failed to connect to server at \(path): \(String(cString: strerror(e)))"
         case .devicesNotReady:
             return "Virtual HID devices did not become ready within timeout"
         case .driverVersionMismatch:
-            return "Karabiner driver version mismatch. The helper's protocol version (\(protocolVersion)) does not match the installed Karabiner DriverKit extension. Reinstall Karabiner-Elements or rebuild the helper."
+            return "Karabiner driver version mismatch — reinstall Karabiner-Elements or rebuild the helper"
         }
     }
 }

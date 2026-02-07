@@ -88,9 +88,12 @@ final class InputSimulation: @unchecked Sendable {
 
     /// Type text by sending keyboard events.
     /// Delegates to Karabiner helper when available, falls back to CGEvent.
+    ///
+    /// Clicks on the iPhone Mirroring title bar first to ensure it has keyboard
+    /// focus. AppleScript/AX activation alone isn't reliable from a subprocess,
+    /// but clicking the window reliably makes it the key window.
     func typeText(_ text: String) -> Bool {
-        bridge.activate()
-        usleep(100_000)
+        focusWindowViaClick()
 
         // Try Karabiner helper first
         if helperClient.type(text: text) {
@@ -103,8 +106,8 @@ final class InputSimulation: @unchecked Sendable {
 
     /// Send a special key press (e.g., Return, Escape, Delete).
     func pressKey(_ keyCode: CGKeyCode) -> Bool {
-        bridge.activate()
-        usleep(100_000)
+        activateWindow()
+        usleep(300_000) // 300ms for focus to settle
 
         guard let keyDown = CGEvent(keyboardEventSource: eventSource, virtualKey: keyCode, keyDown: true),
               let keyUp = CGEvent(keyboardEventSource: eventSource, virtualKey: keyCode, keyDown: false)
@@ -242,6 +245,22 @@ final class InputSimulation: @unchecked Sendable {
             var error: NSDictionary?
             appleScript.executeAndReturnError(&error)
         }
+    }
+
+    /// Give iPhone Mirroring keyboard focus by clicking its title bar.
+    /// A click on the title bar makes the window the key window without
+    /// triggering any iPhone touch input. More reliable than AX/AppleScript
+    /// activation from a subprocess.
+    private func focusWindowViaClick() {
+        guard let info = bridge.getWindowInfo() else { return }
+
+        // Click the center of the title bar (14 points below the top of the
+        // window frame, which is above the iPhone content area).
+        let titleBarX = Double(info.position.x) + Double(info.size.width) / 2.0
+        let titleBarY = Double(info.position.y) + 14.0
+
+        _ = helperClient.click(x: titleBarX, y: titleBarY)
+        usleep(200_000) // 200ms for focus to settle
     }
 }
 

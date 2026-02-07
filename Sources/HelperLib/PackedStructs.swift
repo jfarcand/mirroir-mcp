@@ -3,12 +3,17 @@
 
 import Foundation
 
-/// Keyboard initialization parameters (12 bytes, packed).
+/// Keyboard initialization parameters (24 bytes).
 /// Matches virtual_hid_keyboard_parameters in parameters.hpp.
+/// Fields are uint64_t strong_typedefs in C++ (vendor_id, product_id, country_code).
+///
+/// Uses Apple vendor ID (0x5ac) so macOS attaches AppleHIDKeyboardEventDriver
+/// to the virtual device. Non-Apple vendor IDs get AppleUserHIDEventService
+/// which does not generate keyboard CGEvents.
 public struct KeyboardParameters: Sendable {
-    public var vendorID: UInt32 = 0x16c0
-    public var productID: UInt32 = 0x27db
-    public var countryCode: UInt32 = 0
+    public var vendorID: UInt64 = 0x05ac
+    public var productID: UInt64 = 0x0250
+    public var countryCode: UInt64 = 0
 
     public init() {}
 
@@ -35,7 +40,9 @@ public struct PointingInput: Sendable {
     }
 }
 
-/// Keyboard input report (67 bytes, packed).
+/// Keyboard input report (67 bytes when packed, matching C++ __attribute__((packed))).
+/// Swift MemoryLayout is 68 bytes due to alignment padding before the keys tuple.
+/// The toBytes() method produces the correct 67-byte packed layout.
 /// Matches keyboard_input in keyboard_input.hpp.
 public struct KeyboardInput: Sendable {
     public var reportID: UInt8 = 1
@@ -76,9 +83,18 @@ public struct KeyboardInput: Sendable {
         )
     }
 
+    /// Serialize to 67 bytes matching C++ packed layout (no alignment padding).
+    /// C++ layout: [reportID(1), modifiers(1), reserved(1), keys(64)] = 67 bytes.
+    /// Swift adds 1 byte padding before keys for UInt16 alignment — we skip it.
     public func toBytes() -> [UInt8] {
-        var copy = self
-        return withUnsafeBytes(of: &copy) { Array($0) }
+        var bytes = [UInt8]()
+        bytes.reserveCapacity(67)
+        bytes.append(reportID)
+        bytes.append(modifiers)
+        bytes.append(reserved)
+        var keysCopy = keys
+        withUnsafeBytes(of: &keysCopy) { bytes.append(contentsOf: $0) }
+        return bytes
     }
 }
 

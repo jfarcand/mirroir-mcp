@@ -160,7 +160,9 @@ final class CommandServer {
     // MARK: - Command Handlers
 
     /// Click at screen-absolute coordinates.
-    /// Saves cursor position, warps to target, sends Karabiner click, restores cursor.
+    /// Disconnects physical mouse, warps to target, sends Karabiner click, restores cursor.
+    /// CGAssociateMouseAndMouseCursorPosition(false) prevents the user's physical mouse
+    /// from interfering with the programmatic cursor placement during the operation.
     private func handleClick(_ json: [String: Any]) -> Data {
         guard let x = (json["x"] as? NSNumber)?.doubleValue,
               let y = (json["y"] as? NSNumber)?.doubleValue
@@ -176,6 +178,9 @@ final class CommandServer {
 
         // Save current cursor position
         let savedPosition = CGEvent(source: nil)?.location ?? .zero
+
+        // Disconnect physical mouse so user movement doesn't interfere
+        CGAssociateMouseAndMouseCursorPosition(boolean_t(0))
 
         // Warp system cursor to target
         CGWarpMouseCursorPosition(target)
@@ -204,8 +209,9 @@ final class CommandServer {
         karabiner.postPointingReport(up)
         usleep(10_000)
 
-        // Restore cursor position
+        // Restore cursor position and reconnect physical mouse
         CGWarpMouseCursorPosition(savedPosition)
+        CGAssociateMouseAndMouseCursorPosition(boolean_t(1))
 
         return makeOkResponse()
     }
@@ -246,7 +252,7 @@ final class CommandServer {
     }
 
     /// Swipe from one screen-absolute point to another.
-    /// Warps cursor, holds button, interpolates movement, releases.
+    /// Disconnects physical mouse, warps cursor, interpolates movement, restores cursor.
     private func handleSwipe(_ json: [String: Any]) -> Data {
         guard let fromX = (json["from_x"] as? NSNumber)?.doubleValue,
               let fromY = (json["from_y"] as? NSNumber)?.doubleValue,
@@ -263,6 +269,9 @@ final class CommandServer {
         }
 
         let savedPosition = CGEvent(source: nil)?.location ?? .zero
+
+        // Disconnect physical mouse so user movement doesn't interfere
+        CGAssociateMouseAndMouseCursorPosition(boolean_t(0))
 
         // Warp to start position
         CGWarpMouseCursorPosition(CGPoint(x: fromX, y: fromY))
@@ -314,8 +323,9 @@ final class CommandServer {
         karabiner.postPointingReport(up)
         usleep(10_000)
 
-        // Restore cursor
+        // Restore cursor and reconnect physical mouse
         CGWarpMouseCursorPosition(savedPosition)
+        CGAssociateMouseAndMouseCursorPosition(boolean_t(1))
 
         return makeOkResponse()
     }
