@@ -75,7 +75,11 @@ iPhone Mirroring's DRM surface blocks regular CGEvent mouse input in many macOS 
 - Xcode Command Line Tools (`xcode-select --install`)
 - **Screen Recording** permission for the terminal/agent process
 - **Accessibility** permission for the terminal/agent process
-- **Karabiner-Elements** (optional, recommended for reliable input)
+
+For the Karabiner helper (optional, recommended):
+- [Homebrew](https://brew.sh) (to install Karabiner-Elements)
+- [Karabiner-Elements](https://karabiner-elements.pqrs.org/) — installs a DriverKit system extension (requires admin password during install)
+- **Admin password** — the helper install script uses `sudo` to copy the binary to `/usr/local/bin/` and register a LaunchDaemon
 
 ## Build
 
@@ -101,23 +105,25 @@ Grant these to whatever process runs the MCP server (your terminal app, IDE, etc
 
 Without the helper, taps and typing may not register on the DRM-protected iPhone Mirroring surface. With it, input works reliably.
 
-**Install Karabiner-Elements:**
+**Step 1: Install Karabiner-Elements** (requires admin password):
 ```bash
 brew install --cask karabiner-elements
 ```
-Open Karabiner-Elements Settings and approve the DriverKit system extension when prompted.
+This installs a `.pkg` that registers a DriverKit system extension. macOS will prompt you to approve the extension in System Settings.
 
-**Verify the virtual HID daemon is running:**
+**Step 2: Approve the DriverKit extension:**
+
+Open **Karabiner-Elements Settings**. macOS will show a system dialog asking you to allow the extension. Approve it, then verify the virtual HID daemon started:
 ```bash
 ls /Library/Application\ Support/org.pqrs/tmp/rootonly/vhidd_server/*.sock
 ```
-You should see a `.sock` file. If the directory is empty, open Karabiner-Elements Settings and check that the DriverKit extension is activated.
+You should see a `.sock` file. If the directory is empty or doesn't exist, the extension isn't active — reopen Karabiner-Elements Settings and check.
 
-**Install the helper daemon:**
+**Step 3: Install the helper daemon** (requires sudo password):
 ```bash
 ./scripts/install-helper.sh
 ```
-This builds the helper, copies it to `/usr/local/bin/`, and loads it as a LaunchDaemon.
+This will prompt for your password. It builds the helper binary, copies it to `/usr/local/bin/`, and registers a LaunchDaemon that runs the helper as root on boot.
 
 **Verify:**
 ```bash
@@ -125,7 +131,7 @@ sudo launchctl list | grep iphone-mirroir   # should show the daemon
 cat /var/log/iphone-mirroir-helper.log       # check for errors
 ```
 
-**Uninstall:**
+**Uninstall** (requires sudo password):
 ```bash
 ./scripts/uninstall-helper.sh
 ```
