@@ -12,7 +12,7 @@ No simulator. No jailbreak. No app on the phone. Your actual device.
 - **Typing** — type text into any focused text field (US QWERTY)
 - **Navigation** — Home, App Switcher, Spotlight via menu bar actions
 
-All input goes through a Karabiner DriverKit virtual HID device, which bypasses iPhone Mirroring's DRM-protected surface. Without Karabiner, taps and typing won't register.
+All input goes through a Karabiner DriverKit virtual HID device, which bypasses iPhone Mirroring's DRM-protected surface.
 
 ## Security Warning
 
@@ -24,49 +24,35 @@ The MCP server only works while iPhone Mirroring is active. Closing the window o
 
 - macOS 15+ with iPhone Mirroring
 - iPhone connected via iPhone Mirroring
+- [Karabiner-Elements](https://karabiner-elements.pqrs.org/) installed and activated
 - Xcode Command Line Tools (`xcode-select --install`)
 - **Screen Recording** + **Accessibility** permissions for your terminal
-- [Karabiner-Elements](https://karabiner-elements.pqrs.org/) installed and activated
 
 ## Install
 
-### Prerequisites
-
-1. [Karabiner-Elements](https://karabiner-elements.pqrs.org/) installed and activated:
+### Homebrew (recommended)
 
 ```bash
-brew install --cask karabiner-elements
-```
-
-Open Karabiner-Elements, approve the DriverKit system extension when macOS prompts.
-
-2. Xcode Command Line Tools:
-
-```bash
-xcode-select --install
-```
-
-### Option A: Homebrew
-
-```bash
+brew install --cask karabiner-elements   # if not already installed
 brew tap jfarcand/tap
 brew install iphone-mirroir-mcp
 sudo brew services start iphone-mirroir-mcp
 ```
 
-Follow the caveats printed after install (`brew info iphone-mirroir-mcp`).
+Open Karabiner-Elements and approve the DriverKit extension when prompted. Then run `brew info iphone-mirroir-mcp` and follow the caveats to configure the Karabiner ignore rule and set up your MCP client.
 
-### Option B: From source
+### From source
 
 ```bash
+brew install --cask karabiner-elements   # if not already installed
 git clone https://github.com/jfarcand/iphone-mirroir-mcp.git
 cd iphone-mirroir-mcp
 ./install.sh
 ```
 
-The installer builds both binaries, configures the Karabiner ignore rule, and installs the helper daemon. It prompts for sudo once.
+The installer checks prerequisites, builds both binaries, configures the Karabiner ignore rule automatically, and installs the helper daemon. Prompts for sudo once.
 
-### Add to your MCP client
+### MCP client config
 
 Add to your `.mcp.json` (Claude Code, Cursor, etc.):
 
@@ -74,19 +60,19 @@ Add to your `.mcp.json` (Claude Code, Cursor, etc.):
 {
   "mcpServers": {
     "iphone-mirroring": {
-      "command": "/path/to/iphone-mirroir-mcp"
+      "command": "iphone-mirroir-mcp"
     }
   }
 }
 ```
 
-For Homebrew: use the path printed by `brew info iphone-mirroir-mcp`.
-For source: use `.build/release/iphone-mirroir-mcp` in the cloned directory.
+Homebrew installs to `$(brew --prefix)/bin/iphone-mirroir-mcp`.
+Source installs to `<repo>/.build/release/iphone-mirroir-mcp` — use the full path.
 
-### Grant permissions
+### Permissions
 
-Open iPhone Mirroring, then run a `screenshot` tool call. macOS will prompt for:
-- **Screen Recording** — needed for `screencapture`
+The first time you run a `screenshot`, macOS prompts for:
+- **Screen Recording** — needed to capture the mirroring window
 - **Accessibility** — needed for window discovery and menu bar actions
 
 Grant both to your terminal app.
@@ -134,34 +120,40 @@ The helper runs as root because Karabiner's virtual HID sockets are in a root-on
 
 ## Updating
 
-After pulling new code:
-
 ```bash
-# Rebuild and reinstall helper
-sudo ./scripts/reinstall-helper.sh
+# Homebrew
+brew upgrade iphone-mirroir-mcp
+sudo brew services restart iphone-mirroir-mcp
 
-# Reconnect the MCP server in your client
+# From source
+git pull
+sudo ./scripts/reinstall-helper.sh
 ```
 
 ## Uninstall
 
 ```bash
+# Homebrew
+sudo brew services stop iphone-mirroir-mcp
+brew uninstall iphone-mirroir-mcp
+
+# From source
 ./scripts/uninstall-helper.sh
 ```
 
-Removes the helper binary, LaunchDaemon plist, socket, and log file.
-
 ## Troubleshooting
 
-**`keyboard_ready: false`** — Karabiner's DriverKit extension isn't running. Open Karabiner-Elements Settings and make sure the extension is approved.
+**`keyboard_ready: false`** — Karabiner's DriverKit extension isn't running. Open Karabiner-Elements and approve the extension.
 
-**Typing goes to terminal instead of iPhone** — The Karabiner ignore rule is missing. Add the `devices` entry from step 2 to your `karabiner.json`.
+**Typing goes to terminal instead of iPhone** — The Karabiner ignore rule is missing. Run `brew info iphone-mirroir-mcp` for the config snippet, or re-run `./install.sh` (source install configures it automatically).
 
-**Taps don't register** — Check that the helper is running (`echo '{"action":"status"}' | nc -U /var/run/iphone-mirroir-helper.sock`). If not, reinstall with `sudo ./scripts/reinstall-helper.sh`.
+**Taps don't register** — Check that the helper is running:
+```bash
+echo '{"action":"status"}' | nc -U /var/run/iphone-mirroir-helper.sock
+```
+If not responding, restart: `sudo brew services restart iphone-mirroir-mcp` or `sudo ./scripts/reinstall-helper.sh`.
 
 **"Mirroring paused" screenshots** — The MCP server auto-resumes paused sessions. If it persists, click the iPhone Mirroring window manually once.
-
-**Helper won't start after reinstall** — Run `sudo launchctl bootout system/com.jfarcand.iphone-mirroir-helper` first, then `sudo ./scripts/reinstall-helper.sh`.
 
 ## License
 
