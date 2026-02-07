@@ -150,18 +150,62 @@ Add to your MCP client config (`.mcp.json` or equivalent):
 }
 ```
 
-## Tools
+## MCP Tools
 
-| Tool | Description | Parameters |
-|------|-------------|------------|
-| `screenshot` | Capture the iPhone screen as PNG | none |
-| `tap` | Tap at coordinates | `x`, `y` (relative to mirroring window) |
-| `swipe` | Swipe between two points | `from_x`, `from_y`, `to_x`, `to_y`, `duration_ms` |
-| `type_text` | Type text into focused field | `text` |
-| `press_home` | Go to home screen | none |
-| `press_app_switcher` | Open app switcher | none |
-| `spotlight` | Open Spotlight search | none |
-| `status` | Check mirroring + helper status | none |
+These are the tools exposed to any MCP client via `tools/list`. The agent calls them through `tools/call` with JSON-RPC 2.0.
+
+### `screenshot`
+Capture the iPhone screen as a PNG image. Returns base64-encoded image data. If the mirroring session is paused, automatically resumes it before capturing.
+
+No parameters.
+
+### `tap`
+Tap at a specific position on the iPhone screen. Coordinates are relative to the mirroring window content area — `(0,0)` is the top-left corner.
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `x` | number | yes | X coordinate (0 = left edge) |
+| `y` | number | yes | Y coordinate (0 = top edge) |
+
+Use `screenshot` first to see what's on screen and determine tap coordinates.
+
+### `swipe`
+Perform a swipe gesture between two points. Used for scrolling, navigating between pages, pulling to refresh, dismissing sheets, etc.
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `from_x` | number | yes | Start X coordinate |
+| `from_y` | number | yes | Start Y coordinate |
+| `to_x` | number | yes | End X coordinate |
+| `to_y` | number | yes | End Y coordinate |
+| `duration_ms` | number | no | Duration in milliseconds (default: 300) |
+
+### `type_text`
+Type text into the currently focused text field on the iPhone. The mirroring window must be active and a text input must be focused.
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `text` | string | yes | The text to type |
+
+### `press_home`
+Navigate to the iPhone home screen. Equivalent to swiping up from the bottom on Face ID devices. Uses the iPhone Mirroring app's View > Home Screen menu action.
+
+No parameters.
+
+### `press_app_switcher`
+Open the iPhone app switcher showing recently used apps. From the app switcher, use `swipe` to browse apps or swipe up to close them.
+
+No parameters.
+
+### `spotlight`
+Open Spotlight search on the iPhone. After opening, use `type_text` to enter a search query, then `tap` to select a result.
+
+No parameters.
+
+### `status`
+Report the current state of the mirroring connection and the Karabiner helper daemon. Returns both the mirroring state (connected, paused, not running, no window) and whether the helper is available with keyboard/pointing device readiness.
+
+No parameters.
 
 ## Architecture
 
