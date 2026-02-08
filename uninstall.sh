@@ -80,7 +80,7 @@ if [ "$KARABINER_INSTALLED" = true ]; then
             # Uninstall via Homebrew if installed that way
             if brew list --cask karabiner-elements >/dev/null 2>&1; then
                 echo "Removing Homebrew cask..."
-                brew uninstall --cask karabiner-elements 2>/dev/null || true
+                brew uninstall --zap --cask karabiner-elements 2>/dev/null || true
             fi
 
             # Quit the GUI app

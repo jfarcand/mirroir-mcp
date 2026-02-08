@@ -49,7 +49,19 @@ if ! sudo bash -c "ls '$KARABINER_SOCK_DIR'/*.sock" >/dev/null 2>&1; then
         case "$answer" in
             [nN]*) echo "Skipping. Install manually: brew install --cask karabiner-elements"; exit 1 ;;
         esac
-        brew install --cask karabiner-elements
+        # Use reinstall to handle stale brew state from incomplete uninstalls
+        if brew list --cask karabiner-elements >/dev/null 2>&1; then
+            brew reinstall --cask karabiner-elements
+        else
+            brew install --cask karabiner-elements
+        fi
+
+        if [ ! -d "/Applications/Karabiner-Elements.app" ]; then
+            echo "Error: Karabiner-Elements.app not found after install."
+            echo "Try manually: brew reinstall --cask karabiner-elements"
+            exit 1
+        fi
+
         echo ""
         echo "Karabiner-Elements installed. Opening it now..."
         open -a "Karabiner-Elements"
