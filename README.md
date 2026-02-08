@@ -2,13 +2,7 @@
 
 MCP server that controls a real iPhone through macOS iPhone Mirroring. Screenshot, tap, swipe, type — from any MCP client.
 
-**Test your Expo and React Native apps on a real device, driven by an AI agent.** No simulator limitations. No jailbreak. No app installed on the phone. Your actual device, with real push notifications, real GPS, real camera — everything the simulator can't do.
-
-## Why Real Device Testing?
-
-Simulators miss real-world issues: push notifications don't fire, GPS is faked, camera APIs are stubbed, performance differs, and native modules behave differently. With `iphone-mirroir-mcp`, an AI agent can drive your actual iPhone — tap through flows, type into fields, verify screens — exactly as your users experience it.
-
-Works with any app visible on the iPhone screen: Expo Go, React Native dev builds, TestFlight builds, or production apps from the App Store.
+Works with any app visible on the iPhone screen: App Store apps, TestFlight builds, Expo Go, React Native dev builds — anything you can see in the mirroring window.
 
 ## What Works
 
@@ -21,18 +15,16 @@ Works with any app visible on the iPhone screen: Expo Go, React Native dev build
 
 Taps and swipes use a Karabiner DriverKit virtual pointing device because iPhone Mirroring routes input through a protected compositor layer that doesn't accept standard CGEvent injection. Typing and key presses use AppleScript to activate the window and send keystrokes through System Events.
 
-## Example: Testing an Expo App
+## Example
 
 ```
-You:  "Open my Expo app and test the login flow"
+You:  "Open Messages and send 'hello' to Alice"
 
-Agent: spotlight → type_text "Expo Go" → press_key return
-       → screenshot (sees the app list)
-       → tap on your project
-       → screenshot (sees login screen)
-       → tap email field → type_text "test@example.com"
-       → tap password field → type_text "hunter2"
-       → tap "Sign In" → screenshot (verify dashboard loaded)
+Agent: spotlight → type_text "Messages" → press_key return
+       → screenshot (sees conversation list)
+       → tap on Alice's conversation
+       → tap text field → type_text "hello"
+       → press_key return → screenshot (verify message sent)
 ```
 
 ## Security Warning

@@ -1,5 +1,5 @@
 // ABOUTME: Simulates user input (tap, swipe, keyboard) on the iPhone Mirroring window.
-// ABOUTME: Delegates to the privileged Karabiner helper daemon for all DRM-protected input.
+// ABOUTME: Delegates to the privileged Karabiner helper daemon for taps and swipes.
 
 import AppKit
 import CoreGraphics
