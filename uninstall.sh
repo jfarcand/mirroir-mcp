@@ -59,15 +59,31 @@ fi
 
 # --- Step 3: Optionally remove Karabiner-Elements ---
 
-echo ""
+# Detect Karabiner by app, brew cask, or running processes
+KARABINER_INSTALLED=false
 if [ -d "/Applications/Karabiner-Elements.app" ]; then
+    KARABINER_INSTALLED=true
+elif brew list --cask karabiner-elements >/dev/null 2>&1; then
+    KARABINER_INSTALLED=true
+elif ps aux | grep -i "Karabiner" | grep -v grep >/dev/null 2>&1; then
+    KARABINER_INSTALLED=true
+fi
+
+echo ""
+if [ "$KARABINER_INSTALLED" = true ]; then
     read -p "Also uninstall Karabiner-Elements? [y/N] " answer
     case "$answer" in
         [yY]*)
             echo ""
             echo "--- Removing Karabiner-Elements ---"
 
-            # Quit the GUI app first
+            # Uninstall via Homebrew if installed that way
+            if brew list --cask karabiner-elements >/dev/null 2>&1; then
+                echo "Removing Homebrew cask..."
+                brew uninstall --cask karabiner-elements 2>/dev/null || true
+            fi
+
+            # Quit the GUI app
             osascript -e 'quit app "Karabiner-Elements"' 2>/dev/null || true
             sleep 1
 
