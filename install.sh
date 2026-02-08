@@ -1,6 +1,6 @@
 #!/bin/bash
 # ABOUTME: One-step installer for iphone-mirroir-mcp.
-# ABOUTME: Builds both binaries, installs the helper daemon, and configures Karabiner.
+# ABOUTME: Installs Karabiner if needed, builds both binaries, configures everything, and verifies the setup.
 
 set -e
 
@@ -9,6 +9,8 @@ PLIST_NAME="com.jfarcand.iphone-mirroir-helper"
 HELPER_BIN="iphone-mirroir-helper"
 MCP_BIN="iphone-mirroir-mcp"
 KARABINER_CONFIG="$HOME/.config/karabiner/karabiner.json"
+KARABINER_SOCK_DIR="/Library/Application Support/org.pqrs/tmp/rootonly/vhidd_server"
+KARABINER_WAIT_TIMEOUT=120
 
 cd "$SCRIPT_DIR"
 
@@ -22,17 +24,54 @@ if ! command -v swift >/dev/null 2>&1; then
     exit 1
 fi
 
-if ! ls /Library/Application\ Support/org.pqrs/tmp/rootonly/vhidd_server/*.sock >/dev/null 2>&1; then
-    echo "Error: Karabiner-Elements not running."
-    echo "  brew install --cask karabiner-elements"
-    echo "  Then open Karabiner-Elements and approve the DriverKit extension."
+echo "Swift: $(swift --version 2>&1 | head -1)"
+
+if ! command -v brew >/dev/null 2>&1; then
+    echo "Error: Homebrew not found. Install it from https://brew.sh"
     exit 1
 fi
 
-echo "Swift: $(swift --version 2>&1 | head -1)"
+# --- Step 2: Install Karabiner-Elements if missing ---
+
+if ! ls "$KARABINER_SOCK_DIR"/*.sock >/dev/null 2>&1; then
+    if [ -d "/Applications/Karabiner-Elements.app" ]; then
+        echo ""
+        echo "Karabiner-Elements is installed but the DriverKit extension is not running."
+        echo "Open Karabiner-Elements and approve the system extension when prompted."
+    else
+        echo ""
+        echo "Karabiner-Elements is required for tap and swipe input."
+        read -p "Install it now via Homebrew? [Y/n] " answer
+        case "$answer" in
+            [nN]*) echo "Skipping. Install manually: brew install --cask karabiner-elements"; exit 1 ;;
+        esac
+        brew install --cask karabiner-elements
+        echo ""
+        echo "Karabiner-Elements installed. Opening it now..."
+        open -a "Karabiner-Elements"
+        echo "Approve the system extension when macOS prompts you."
+    fi
+
+    echo ""
+    echo "Waiting for Karabiner DriverKit extension (up to ${KARABINER_WAIT_TIMEOUT}s)..."
+    elapsed=0
+    while ! ls "$KARABINER_SOCK_DIR"/*.sock >/dev/null 2>&1; do
+        if [ "$elapsed" -ge "$KARABINER_WAIT_TIMEOUT" ]; then
+            echo ""
+            echo "Timed out waiting for Karabiner DriverKit extension."
+            echo "Open Karabiner-Elements, approve the extension, and re-run this script."
+            exit 1
+        fi
+        sleep 2
+        elapsed=$((elapsed + 2))
+        printf "\r  waiting... %ds" "$elapsed"
+    done
+    printf "\r  ready.            \n"
+fi
+
 echo "Karabiner: running"
 
-# --- Step 2: Build ---
+# --- Step 3: Build ---
 
 echo ""
 echo "=== Building ==="
@@ -41,7 +80,7 @@ swift build -c release
 echo "Built: .build/release/$MCP_BIN"
 echo "Built: .build/release/$HELPER_BIN"
 
-# --- Step 3: Configure Karabiner ignore rule ---
+# --- Step 4: Configure Karabiner ignore rule ---
 
 echo ""
 echo "=== Configuring Karabiner ==="
@@ -93,7 +132,7 @@ KARABINER_EOF
     echo "Created Karabiner config with device ignore rule."
 fi
 
-# --- Step 4: Install helper daemon ---
+# --- Step 5: Install helper daemon ---
 
 echo ""
 echo "=== Installing helper daemon (requires sudo) ==="
@@ -114,15 +153,52 @@ sudo launchctl bootstrap system "/Library/LaunchDaemons/$PLIST_NAME.plist"
 
 # Wait for helper to start and verify
 sleep 2
-STATUS=$(echo '{"action":"status"}' | nc -U /var/run/iphone-mirroir-helper.sock 2>/dev/null || echo '{"ok":false}')
-echo "Helper status: $STATUS"
+STATUS=$(echo '{"action":"status"}' | nc -U /var/run/iphone-mirroir-helper.sock 2>/dev/null || echo "")
 
-# --- Done ---
-
-MCP_PATH="$(pwd)/.build/release/$MCP_BIN"
+# --- Step 6: Verify setup ---
 
 echo ""
-echo "=== Done ==="
+echo "=== Verifying setup ==="
+
+PASS=0
+FAIL=0
+
+# Check helper daemon
+if [ -n "$STATUS" ] && echo "$STATUS" | python3 -c "import json,sys; d=json.load(sys.stdin); sys.exit(0 if d.get('ok') else 1)" 2>/dev/null; then
+    echo "  [ok] Helper daemon is running"
+    PASS=$((PASS + 1))
+else
+    echo "  [FAIL] Helper daemon not responding"
+    FAIL=$((FAIL + 1))
+fi
+
+# Check Karabiner pointing device
+if [ -n "$STATUS" ] && echo "$STATUS" | python3 -c "import json,sys; d=json.load(sys.stdin); sys.exit(0 if d.get('pointing_ready') else 1)" 2>/dev/null; then
+    echo "  [ok] Karabiner virtual pointing device ready"
+    PASS=$((PASS + 1))
+else
+    echo "  [FAIL] Karabiner virtual pointing device not ready"
+    FAIL=$((FAIL + 1))
+fi
+
+# Check MCP binary
+MCP_PATH="$(pwd)/.build/release/$MCP_BIN"
+if [ -x "$MCP_PATH" ]; then
+    echo "  [ok] MCP server binary built"
+    PASS=$((PASS + 1))
+else
+    echo "  [FAIL] MCP server binary not found"
+    FAIL=$((FAIL + 1))
+fi
+
+echo ""
+if [ "$FAIL" -eq 0 ]; then
+    echo "=== All $PASS checks passed ==="
+else
+    echo "=== $FAIL check(s) failed, $PASS passed ==="
+    echo "See Troubleshooting in README.md"
+fi
+
 echo ""
 echo "Add to your MCP client config (.mcp.json):"
 echo ""
@@ -134,4 +210,5 @@ echo "      }"
 echo "    }"
 echo "  }"
 echo ""
-echo "Then grant Screen Recording + Accessibility permissions to your terminal."
+echo "The first time you take a screenshot, macOS will prompt for"
+echo "Screen Recording and Accessibility permissions. Grant both."
