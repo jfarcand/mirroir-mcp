@@ -64,7 +64,7 @@ if ! sudo bash -c "ls '$KARABINER_SOCK_DIR'/*.sock" >/dev/null 2>&1; then
 
         echo ""
         echo "Karabiner-Elements installed. Opening it now..."
-        open -a "Karabiner-Elements"
+        open /Applications/Karabiner-Elements.app
         echo ""
         echo "To approve the DriverKit system extension:"
         echo "  1. Select ANSI keyboard type when Karabiner prompts you"
