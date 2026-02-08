@@ -2,7 +2,13 @@
 
 MCP server that controls a real iPhone through macOS iPhone Mirroring. Screenshot, tap, swipe, type — from any MCP client.
 
-No simulator. No jailbreak. No app on the phone. Your actual device.
+**Test your Expo and React Native apps on a real device, driven by an AI agent.** No simulator limitations. No jailbreak. No app installed on the phone. Your actual device, with real push notifications, real GPS, real camera — everything the simulator can't do.
+
+## Why Real Device Testing?
+
+Simulators miss real-world issues: push notifications don't fire, GPS is faked, camera APIs are stubbed, performance differs, and native modules behave differently. With `iphone-mirroir-mcp`, an AI agent can drive your actual iPhone — tap through flows, type into fields, verify screens — exactly as your users experience it.
+
+Works with any app visible on the iPhone screen: Expo Go, React Native dev builds, TestFlight builds, or production apps from the App Store.
 
 ## What Works
 
@@ -10,10 +16,24 @@ No simulator. No jailbreak. No app on the phone. Your actual device.
 - **Taps** — click anywhere on the iPhone screen via Karabiner virtual pointing device
 - **Swipes** — drag between two points with configurable duration
 - **Typing** — type text into any focused field via AppleScript System Events
-- **Keyboard shortcuts** — Cmd+N, Return, etc. work through iPhone Mirroring
+- **Key presses** — Return, Escape, Tab, arrows, with modifier support (Cmd, Shift, etc.)
 - **Navigation** — Home, App Switcher, Spotlight via macOS menu bar actions
 
-Taps and swipes use a Karabiner DriverKit virtual pointing device to bypass iPhone Mirroring's DRM-protected surface. Typing uses AppleScript to activate the iPhone Mirroring window and send keystrokes through System Events.
+Taps and swipes use a Karabiner DriverKit virtual pointing device because iPhone Mirroring routes input through a protected compositor layer that doesn't accept standard CGEvent injection. Typing and key presses use AppleScript to activate the window and send keystrokes through System Events.
+
+## Example: Testing an Expo App
+
+```
+You:  "Open my Expo app and test the login flow"
+
+Agent: spotlight → type_text "Expo Go" → press_key return
+       → screenshot (sees the app list)
+       → tap on your project
+       → screenshot (sees login screen)
+       → tap email field → type_text "test@example.com"
+       → tap password field → type_text "hunter2"
+       → tap "Sign In" → screenshot (verify dashboard loaded)
+```
 
 ## Security Warning
 
@@ -86,6 +106,7 @@ Grant both to your terminal app.
 | `tap` | `x`, `y` | Tap at coordinates (relative to mirroring window) |
 | `swipe` | `from_x`, `from_y`, `to_x`, `to_y`, `duration_ms`? | Swipe between two points (default 300ms) |
 | `type_text` | `text` | Type text — activates iPhone Mirroring and sends keystrokes |
+| `press_key` | `key`, `modifiers`? | Send a special key (return, escape, tab, delete, space, arrows) with optional modifiers (command, shift, option, control) |
 | `press_home` | — | Go to home screen |
 | `press_app_switcher` | — | Open app switcher |
 | `spotlight` | — | Open Spotlight search |
@@ -101,7 +122,11 @@ Coordinates are in points relative to the mirroring window's top-left corner. Sc
 - Works with any keyboard layout (not limited to US QWERTY)
 - iOS autocorrect applies — type carefully or disable it on the iPhone
 
-For navigating within apps, combine `spotlight` + `type_text` + keyboard shortcuts (via `osascript`). For example, Cmd+N in Messages opens a new conversation.
+### Key press workflow
+
+`press_key` sends special keys that `type_text` can't handle — navigation keys, Return to submit forms, Escape to dismiss dialogs, Tab to switch fields, arrows to move through lists. Add modifiers for shortcuts like Cmd+N (new message) or Cmd+Z (undo).
+
+For navigating within apps, combine `spotlight` + `type_text` + `press_key`. For example: `spotlight` → `type_text "Messages"` → `press_key return` → `press_key {"key":"n","modifiers":["command"]}` to open a new conversation.
 
 ## Architecture
 
@@ -112,8 +137,9 @@ MCP Client (stdin/stdout JSON-RPC)
 iphone-mirroir-mcp (user process)
     ├── MirroringBridge    — AXUIElement window discovery + menu actions
     ├── ScreenCapture      — screencapture -l <windowID>
-    ├── InputSimulation    — AppleScript typing, coordinate mapping
+    ├── InputSimulation    — AppleScript typing/key presses, coordinate mapping
     │       ├── type_text  → System Events: set frontmost + keystroke
+    │       ├── press_key  → System Events: set frontmost + key code
     │       └── tap/swipe  → HelperClient (Unix socket IPC)
     └── HelperClient       — Unix socket client
             │
@@ -129,9 +155,9 @@ iphone-mirroir-helper (root LaunchDaemon)
     macOS HID System → iPhone Mirroring
 ```
 
-**Taps/swipes**: The helper warps the system cursor to the target coordinates, sends a Karabiner virtual pointing device button press, then restores the cursor. This bypasses iPhone Mirroring's DRM surface which blocks regular CGEvent input.
+**Taps/swipes**: The helper warps the system cursor to the target coordinates, sends a Karabiner virtual pointing device button press, then restores the cursor. iPhone Mirroring's compositor layer requires input through the system HID path rather than programmatic CGEvent injection.
 
-**Typing**: The MCP server uses AppleScript to set iPhone Mirroring as frontmost via System Events, then sends `keystroke` commands. This routes keystrokes to iPhone Mirroring without needing the Karabiner virtual keyboard.
+**Typing/key presses**: The MCP server uses AppleScript to set iPhone Mirroring as frontmost via System Events, then sends `keystroke` or `key code` commands. This routes input to iPhone Mirroring without needing the Karabiner virtual keyboard.
 
 **Navigation**: Home, Spotlight, and App Switcher use macOS Accessibility APIs to trigger iPhone Mirroring's menu bar actions directly (no window focus needed).
 
