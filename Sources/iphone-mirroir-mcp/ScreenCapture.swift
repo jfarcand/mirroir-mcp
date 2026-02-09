@@ -1,3 +1,6 @@
+// Copyright 2026 jfarcand
+// Licensed under the Apache License, Version 2.0
+//
 // ABOUTME: Captures screenshots of the iPhone Mirroring window using screencapture CLI.
 // ABOUTME: Returns base64-encoded PNG data suitable for MCP image responses.
 

@@ -68,6 +68,20 @@ final class HelperClient: @unchecked Sendable {
         return response?["ok"] as? Bool ?? false
     }
 
+    /// Drag from one point to another with sustained contact.
+    func drag(fromX: Double, fromY: Double, toX: Double, toY: Double,
+              durationMs: Int = 1000) -> Bool {
+        let response = sendCommandWithReconnect([
+            "action": "drag",
+            "from_x": fromX,
+            "from_y": fromY,
+            "to_x": toX,
+            "to_y": toY,
+            "duration_ms": durationMs,
+        ])
+        return response?["ok"] as? Bool ?? false
+    }
+
     /// Trigger a shake gesture on the mirrored iPhone.
     func shake() -> Bool {
         let response = sendCommandWithReconnect(["action": "shake"])

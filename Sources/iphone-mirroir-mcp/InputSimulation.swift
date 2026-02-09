@@ -118,6 +118,33 @@ final class InputSimulation: @unchecked Sendable {
         return "Helper double tap failed"
     }
 
+    /// Drag from one point to another relative to the mirroring window.
+    /// Unlike swipe (quick flick), drag maintains sustained contact for
+    /// rearranging icons, adjusting sliders, and drag-and-drop operations.
+    /// Returns nil on success, or an error message on failure.
+    func drag(fromX: Double, fromY: Double, toX: Double, toY: Double,
+              durationMs: Int = 1000) -> String? {
+        guard let info = bridge.getWindowInfo() else {
+            return "iPhone Mirroring window not found"
+        }
+
+        guard helperClient.isAvailable else {
+            return helperClient.unavailableMessage
+        }
+
+        let startX = Double(info.position.x) + fromX
+        let startY = Double(info.position.y) + fromY
+        let endX = Double(info.position.x) + toX
+        let endY = Double(info.position.y) + toY
+
+        if helperClient.drag(fromX: startX, fromY: startY,
+                             toX: endX, toY: endY,
+                             durationMs: durationMs) {
+            return nil
+        }
+        return "Helper drag failed"
+    }
+
     /// Trigger a shake gesture on the mirrored iPhone.
     /// Sends Ctrl+Cmd+Z which triggers shake-to-undo in iOS apps.
     func shake() -> TypeResult {
@@ -157,6 +184,41 @@ final class InputSimulation: @unchecked Sendable {
         let keyResult = pressKey(keyName: "return")
         guard keyResult.success else {
             return keyResult.error ?? "Failed to press Return"
+        }
+
+        return nil
+    }
+
+    /// Open a URL on the mirrored iPhone by launching Safari and navigating to it.
+    /// Opens Safari via Spotlight, selects the address bar with Cmd+L, types the URL,
+    /// and presses Return to navigate.
+    /// Returns nil on success, or an error message on failure.
+    func openURL(_ url: String) -> String? {
+        // Step 1: Launch Safari
+        if let error = launchApp(name: "Safari") {
+            return error
+        }
+        usleep(1_500_000) // 1.5s for Safari to fully load
+
+        // Step 2: Select the address bar with Cmd+L (works whether Safari was
+        // already open or just launched, and clears any existing URL)
+        let selectResult = pressKey(keyName: "l", modifiers: ["command"])
+        guard selectResult.success else {
+            return selectResult.error ?? "Failed to select address bar"
+        }
+        usleep(500_000) // 500ms for address bar to activate
+
+        // Step 3: Type the URL
+        let typeResult = typeText(url)
+        guard typeResult.success else {
+            return typeResult.error ?? "Failed to type URL"
+        }
+        usleep(300_000) // 300ms before pressing Return
+
+        // Step 4: Press Return to navigate
+        let goResult = pressKey(keyName: "return")
+        guard goResult.success else {
+            return goResult.error ?? "Failed to press Return"
         }
 
         return nil

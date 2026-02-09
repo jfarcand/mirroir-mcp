@@ -1,8 +1,17 @@
+// Copyright 2026 jfarcand
+// Licensed under the Apache License, Version 2.0
+//
 // ABOUTME: Bridge to the macOS iPhone Mirroring app (com.apple.ScreenContinuity).
 // ABOUTME: Uses AXUIElement APIs to find the window, detect state, and trigger menu actions.
 
 import AppKit
 import ApplicationServices
+
+/// Device orientation based on mirroring window dimensions.
+enum DeviceOrientation: String, Sendable {
+    case portrait
+    case landscape
+}
 
 /// Connection state of the iPhone Mirroring session.
 enum MirroringState: Sendable {
@@ -184,6 +193,13 @@ final class MirroringBridge: @unchecked Sendable {
             }
         }
         return false
+    }
+
+    /// Determine device orientation from the mirroring window dimensions.
+    /// When the iPhone rotates, the mirroring window resizes accordingly.
+    func getOrientation() -> DeviceOrientation? {
+        guard let info = getWindowInfo() else { return nil }
+        return info.size.height > info.size.width ? .portrait : .landscape
     }
 
     /// Activate (bring to front) the iPhone Mirroring app and raise its window.

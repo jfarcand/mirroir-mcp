@@ -12,10 +12,12 @@ struct IPhoneMirroirMCP {
         // Redirect stderr for logging (stdout is reserved for MCP JSON-RPC)
         let bridge = MirroringBridge()
         let capture = ScreenCapture(bridge: bridge)
+        let recorder = ScreenRecorder(bridge: bridge)
         let input = InputSimulation(bridge: bridge)
         let server = MCPServer()
 
-        registerTools(server: server, bridge: bridge, capture: capture, input: input)
+        registerTools(server: server, bridge: bridge, capture: capture,
+                      recorder: recorder, input: input)
 
         // Start the MCP server loop
         server.run()
@@ -25,6 +27,7 @@ struct IPhoneMirroirMCP {
         server: MCPServer,
         bridge: MirroringBridge,
         capture: ScreenCapture,
+        recorder: ScreenRecorder,
         input: InputSimulation
     ) {
         // screenshot — capture the mirroring window
@@ -56,6 +59,59 @@ struct IPhoneMirroirMCP {
                 }
 
                 return .image(base64)
+            }
+        ))
+
+        // start_recording — begin video recording of the mirroring window
+        server.registerTool(MCPToolDefinition(
+            name: "start_recording",
+            description: """
+                Start recording a video of the mirrored iPhone screen. \
+                Records the iPhone Mirroring window as a .mov file. \
+                Use stop_recording to end the recording and get the file path. \
+                Requires Screen Recording permission in System Preferences.
+                """,
+            inputSchema: [
+                "type": .string("object"),
+                "properties": .object([
+                    "output_path": .object([
+                        "type": .string("string"),
+                        "description": .string(
+                            "Optional file path for the recording (default: temp directory)"),
+                    ])
+                ]),
+            ],
+            handler: { args in
+                let outputPath = args["output_path"]?.asString()
+
+                if let error = recorder.startRecording(outputPath: outputPath) {
+                    return .error(error)
+                }
+                return .text("Recording started")
+            }
+        ))
+
+        // stop_recording — stop video recording and return the file path
+        server.registerTool(MCPToolDefinition(
+            name: "stop_recording",
+            description: """
+                Stop the current video recording and return the file path. \
+                Must be called after start_recording. Returns the path to \
+                the recorded .mov file.
+                """,
+            inputSchema: [
+                "type": .string("object"),
+                "properties": .object([:]),
+            ],
+            handler: { _ in
+                let result = recorder.stopRecording()
+                if let error = result.error {
+                    return .error(error)
+                }
+                guard let path = result.filePath else {
+                    return .error("Recording stopped but no file was produced")
+                }
+                return .text("Recording saved to: \(path)")
             }
         ))
 
@@ -160,6 +216,71 @@ struct IPhoneMirroirMCP {
             }
         ))
 
+        // drag — slow deliberate drag from point A to point B
+        server.registerTool(MCPToolDefinition(
+            name: "drag",
+            description: """
+                Drag from one point to another on the mirrored iPhone screen \
+                with sustained contact. Unlike swipe (quick flick), drag is a \
+                slow deliberate movement for rearranging icons, adjusting sliders, \
+                and drag-and-drop operations. Coordinates are relative to the \
+                iPhone Mirroring window.
+                """,
+            inputSchema: [
+                "type": .string("object"),
+                "properties": .object([
+                    "from_x": .object([
+                        "type": .string("number"),
+                        "description": .string("Start X coordinate"),
+                    ]),
+                    "from_y": .object([
+                        "type": .string("number"),
+                        "description": .string("Start Y coordinate"),
+                    ]),
+                    "to_x": .object([
+                        "type": .string("number"),
+                        "description": .string("End X coordinate"),
+                    ]),
+                    "to_y": .object([
+                        "type": .string("number"),
+                        "description": .string("End Y coordinate"),
+                    ]),
+                    "duration_ms": .object([
+                        "type": .string("number"),
+                        "description": .string(
+                            "Duration of drag in milliseconds (default: 1000, minimum: 200)"),
+                    ]),
+                ]),
+                "required": .array([
+                    .string("from_x"), .string("from_y"),
+                    .string("to_x"), .string("to_y"),
+                ]),
+            ],
+            handler: { args in
+                guard let fromX = args["from_x"]?.asNumber(),
+                    let fromY = args["from_y"]?.asNumber(),
+                    let toX = args["to_x"]?.asNumber(),
+                    let toY = args["to_y"]?.asNumber()
+                else {
+                    return .error(
+                        "Missing required parameters: from_x, from_y, to_x, to_y (numbers)")
+                }
+
+                let duration = args["duration_ms"]?.asInt() ?? 1000
+
+                if let error = input.drag(
+                    fromX: fromX, fromY: fromY,
+                    toX: toX, toY: toY,
+                    durationMs: duration
+                ) {
+                    return .error(error)
+                }
+                return .text(
+                    "Dragged from (\(Int(fromX)),\(Int(fromY))) to (\(Int(toX)),\(Int(toY))) over \(duration)ms"
+                )
+            }
+        ))
+
         // type_text — send keyboard input
         server.registerTool(MCPToolDefinition(
             name: "type_text",
@@ -204,11 +325,12 @@ struct IPhoneMirroirMCP {
         server.registerTool(MCPToolDefinition(
             name: "press_key",
             description: """
-                Send a special key press to the mirrored iPhone with optional modifiers. \
+                Send a key press to the mirrored iPhone with optional modifiers. \
                 Automatically activates the iPhone Mirroring window if needed (one-time Space switch). \
-                Supported keys: return, escape, tab, delete, space, up, down, left, right. \
+                Supported keys: return, escape, tab, delete, space, up, down, left, right, \
+                or any single character (a-z, 0-9, etc.) for shortcuts. \
                 Optional modifiers: command, shift, option, control. \
-                Examples: press Return to confirm, Escape to cancel, Cmd+N for new.
+                Examples: press Return to confirm, Escape to cancel, Cmd+L for address bar.
                 """,
             inputSchema: [
                 "type": .string("object"),
@@ -216,7 +338,7 @@ struct IPhoneMirroirMCP {
                     "key": .object([
                         "type": .string("string"),
                         "description": .string(
-                            "Key name: return, escape, tab, delete, space, up, down, left, right"),
+                            "Key name: return, escape, tab, delete, space, up, down, left, right, or a single character"),
                     ]),
                     "modifiers": .object([
                         "type": .string("array"),
@@ -385,6 +507,37 @@ struct IPhoneMirroirMCP {
             }
         ))
 
+        // open_url — open a URL in Safari on the iPhone
+        server.registerTool(MCPToolDefinition(
+            name: "open_url",
+            description: """
+                Open a URL in Safari on the mirrored iPhone. \
+                Launches Safari, selects the address bar, types the URL, \
+                and navigates to it. Works with any URL including http, https, \
+                and deep links.
+                """,
+            inputSchema: [
+                "type": .string("object"),
+                "properties": .object([
+                    "url": .object([
+                        "type": .string("string"),
+                        "description": .string("The URL to open (e.g., https://example.com)"),
+                    ])
+                ]),
+                "required": .array([.string("url")]),
+            ],
+            handler: { args in
+                guard let url = args["url"]?.asString() else {
+                    return .error("Missing required parameter: url (string)")
+                }
+
+                if let error = input.openURL(url) {
+                    return .error(error)
+                }
+                return .text("Opened URL: \(url)")
+            }
+        ))
+
         // press_home — navigate to iPhone home screen
         server.registerTool(MCPToolDefinition(
             name: "press_home",
@@ -445,6 +598,35 @@ struct IPhoneMirroirMCP {
             }
         ))
 
+        // get_orientation — report device orientation
+        server.registerTool(MCPToolDefinition(
+            name: "get_orientation",
+            description: """
+                Get the current device orientation of the mirrored iPhone. \
+                Returns "portrait" or "landscape" based on the mirroring \
+                window dimensions. Useful for adapting touch coordinates \
+                and understanding the current screen layout.
+                """,
+            inputSchema: [
+                "type": .string("object"),
+                "properties": .object([:]),
+            ],
+            handler: { _ in
+                guard let orientation = bridge.getOrientation() else {
+                    return .error(
+                        "Cannot determine orientation. Is iPhone Mirroring running?")
+                }
+
+                let info = bridge.getWindowInfo()
+                let sizeDesc = info.map {
+                    "\(Int($0.size.width))x\(Int($0.size.height))"
+                } ?? "unknown"
+
+                return .text(
+                    "Orientation: \(orientation.rawValue) (window: \(sizeDesc))")
+            }
+        ))
+
         // status — get the current mirroring connection state
         server.registerTool(MCPToolDefinition(
             name: "status",
@@ -467,7 +649,8 @@ struct IPhoneMirroirMCP {
                         info.map { "\(Int($0.size.width))x\(Int($0.size.height))" } ?? "unknown"
                     let posDesc =
                         info.map { "pos=(\(Int($0.position.x)),\(Int($0.position.y)))" } ?? "pos=unknown"
-                    mirroringStatus = "Connected — mirroring active (window: \(sizeDesc), \(posDesc))"
+                    let orientDesc = bridge.getOrientation()?.rawValue ?? "unknown"
+                    mirroringStatus = "Connected — mirroring active (window: \(sizeDesc), \(posDesc), \(orientDesc))"
                 case .paused:
                     mirroringStatus = "Paused — connection paused, can resume"
                 case .notRunning:

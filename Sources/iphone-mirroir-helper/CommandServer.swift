@@ -19,6 +19,7 @@ let helperSocketPath = "/var/run/iphone-mirroir-helper.sock"
 /// - click: CGWarp to (x,y), Karabiner button down/up, restore cursor
 /// - long_press: CGWarp to (x,y), Karabiner button down, hold for duration, button up
 /// - double_tap: CGWarp to (x,y), two rapid Karabiner click cycles
+/// - drag: CGWarp + button down, hold for drag recognition, slow interpolated move, button up
 /// - type: Map characters to HID keycodes, send via Karabiner keyboard
 /// - press_key: Send a special key (return, escape, arrows) via Karabiner keyboard
 /// - shake: Send Ctrl+Cmd+Z via Karabiner keyboard (triggers iOS shake gesture)
@@ -155,6 +156,8 @@ final class CommandServer {
             return handleLongPress(json)
         case "double_tap":
             return handleDoubleTap(json)
+        case "drag":
+            return handleDrag(json)
         case "type":
             return handleType(json)
         case "swipe":
@@ -337,6 +340,86 @@ final class CommandServer {
         var up2 = PointingInput()
         up2.buttons = 0x00
         karabiner.postPointingReport(up2)
+        usleep(10_000)
+
+        CGWarpMouseCursorPosition(savedPosition)
+        CGAssociateMouseAndMouseCursorPosition(boolean_t(1))
+
+        return makeOkResponse()
+    }
+
+    /// Drag from one screen-absolute point to another with sustained contact.
+    /// Unlike swipe (quick flick), drag uses a longer initial hold to trigger iOS
+    /// drag recognition (~150ms), then moves slowly with fine interpolation.
+    /// Default duration is 1000ms. Minimum is 200ms to distinguish from swipe.
+    private func handleDrag(_ json: [String: Any]) -> Data {
+        guard let fromX = (json["from_x"] as? NSNumber)?.doubleValue,
+              let fromY = (json["from_y"] as? NSNumber)?.doubleValue,
+              let toX = (json["to_x"] as? NSNumber)?.doubleValue,
+              let toY = (json["to_y"] as? NSNumber)?.doubleValue
+        else {
+            return makeErrorResponse("drag requires from_x, from_y, to_x, to_y (numbers)")
+        }
+
+        let durationMs = max((json["duration_ms"] as? NSNumber)?.intValue ?? 1000, 200)
+
+        guard karabiner.isPointingReady else {
+            return makeErrorResponse("Karabiner pointing device not ready")
+        }
+
+        let savedPosition = CGEvent(source: nil)?.location ?? .zero
+
+        CGAssociateMouseAndMouseCursorPosition(boolean_t(0))
+
+        // Warp to start position
+        CGWarpMouseCursorPosition(CGPoint(x: fromX, y: fromY))
+        usleep(10_000)
+
+        // Sync Karabiner with nudge
+        var nudgeRight = PointingInput()
+        nudgeRight.x = 1
+        karabiner.postPointingReport(nudgeRight)
+        usleep(5_000)
+
+        var nudgeBack = PointingInput()
+        nudgeBack.x = -1
+        karabiner.postPointingReport(nudgeBack)
+        usleep(10_000)
+
+        // Button down with initial hold for iOS drag recognition
+        var down = PointingInput()
+        down.buttons = 0x01
+        karabiner.postPointingReport(down)
+        usleep(150_000) // 150ms hold to trigger drag mode
+
+        // Slow interpolated movement with fine steps
+        let steps = 60
+        let totalDx = toX - fromX
+        let totalDy = toY - fromY
+        let moveDurationMs = durationMs - 150 // subtract initial hold time
+        let stepDelayUs = UInt32(max(moveDurationMs, 1) * 1000 / steps)
+
+        for i in 1...steps {
+            let progress = Double(i) / Double(steps)
+            let targetX = fromX + totalDx * progress
+            let targetY = fromY + totalDy * progress
+
+            CGWarpMouseCursorPosition(CGPoint(x: targetX, y: targetY))
+
+            let dx = Int8(clamping: Int(totalDx / Double(steps)))
+            let dy = Int8(clamping: Int(totalDy / Double(steps)))
+            var move = PointingInput()
+            move.buttons = 0x01
+            move.x = dx
+            move.y = dy
+            karabiner.postPointingReport(move)
+            usleep(stepDelayUs)
+        }
+
+        // Button up
+        var up = PointingInput()
+        up.buttons = 0x00
+        karabiner.postPointingReport(up)
         usleep(10_000)
 
         CGWarpMouseCursorPosition(savedPosition)
@@ -528,8 +611,10 @@ final class CommandServer {
         return makeOkResponse()
     }
 
-    /// Press a special key (return, escape, arrows, etc.) with optional modifiers.
-    /// Uses `HIDSpecialKeyMap` to look up the USB HID keycode, then sends via Karabiner.
+    /// Press a key with optional modifiers.
+    /// Supports special keys (return, escape, arrows, etc.) via `HIDSpecialKeyMap`,
+    /// and single printable characters (a-z, 0-9, etc.) via `HIDKeyMap`.
+    /// This enables shortcuts like Cmd+A, Cmd+L, Cmd+C.
     private func handlePressKey(_ json: [String: Any]) -> Data {
         guard let keyName = json["key"] as? String else {
             return makeErrorResponse("press_key requires key (string)")
@@ -539,13 +624,23 @@ final class CommandServer {
             return makeErrorResponse("Karabiner keyboard device not ready")
         }
 
-        guard let hidKeyCode = HIDSpecialKeyMap.hidKeyCode(for: keyName) else {
-            let supported = HIDSpecialKeyMap.supportedKeys.joined(separator: ", ")
-            return makeErrorResponse("Unknown key: \"\(keyName)\". Supported: \(supported)")
-        }
-
         let modifierNames = json["modifiers"] as? [String] ?? []
-        let modifiers = HIDSpecialKeyMap.modifiers(from: modifierNames)
+        var modifiers = HIDSpecialKeyMap.modifiers(from: modifierNames)
+
+        // Try special key names first, then fall back to single printable characters
+        let hidKeyCode: UInt16
+        if let specialCode = HIDSpecialKeyMap.hidKeyCode(for: keyName) {
+            hidKeyCode = specialCode
+        } else if keyName.count == 1, let char = keyName.first,
+                  let mapping = HIDKeyMap.lookup(char) {
+            hidKeyCode = mapping.keycode
+            // Merge any modifiers the character itself requires (e.g., shift for uppercase)
+            modifiers.insert(mapping.modifiers)
+        } else {
+            let supported = HIDSpecialKeyMap.supportedKeys.joined(separator: ", ")
+            return makeErrorResponse(
+                "Unknown key: \"\(keyName)\". Supported: \(supported), or a single character (a-z, 0-9, etc.)")
+        }
 
         karabiner.typeKey(keycode: hidKeyCode, modifiers: modifiers)
         return makeOkResponse()
