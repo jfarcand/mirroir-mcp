@@ -48,8 +48,8 @@ jobs:
           lines = sys.stdin.readlines()
           obj = json.loads(lines[1])
           tools = [t['name'] for t in obj['result']['tools']]
-          expected = {'screenshot','tap','swipe','type_text','press_home','press_app_switcher','spotlight','status'}
-          assert set(tools) == expected, f'Missing tools: {expected - set(tools)}'
+          expected = {'screenshot','start_recording','stop_recording','tap','swipe','drag','type_text','press_key','long_press','double_tap','shake','launch_app','open_url','press_home','press_app_switcher','spotlight','get_orientation','status'}
+          assert set(tools) == expected, f'Expected: {expected}\nGot: {set(tools)}\nMissing: {expected - set(tools)}\nExtra: {set(tools) - expected}'
           print(f'tools/list: {len(tools)} tools registered')
           "
 
@@ -131,9 +131,10 @@ jobs:
       - name: Create release archive
         run: |
           cd .build/release
-          tar czf ../../iphone-mirroir-mcp-macos-arm64.tar.gz iphone-mirroir-mcp iphone-mirroir-helper
+          cp ../../Resources/com.jfarcand.iphone-mirroir-helper.plist .
+          tar czf ../../iphone-mirroir-mcp-darwin-arm64.tar.gz iphone-mirroir-mcp iphone-mirroir-helper com.jfarcand.iphone-mirroir-helper.plist
 
       - name: Upload release
         uses: softprops/action-gh-release@v2
         with:
-          files: iphone-mirroir-mcp-macos-arm64.tar.gz
+          files: iphone-mirroir-mcp-darwin-arm64.tar.gz

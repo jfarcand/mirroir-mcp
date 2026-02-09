@@ -288,8 +288,8 @@ struct IPhoneMirroirMCP {
                 Type text on the mirrored iPhone. Automatically activates the \
                 iPhone Mirroring window if needed (one-time Space switch). \
                 A text field must be active on the iPhone. \
-                Copies text to the Mac clipboard and pastes via Cmd+V, \
-                which works with any keyboard layout or locale.
+                Sends keystrokes through the Karabiner virtual HID keyboard \
+                with automatic keyboard layout translation for non-US layouts.
                 """,
             inputSchema: [
                 "type": .string("object"),

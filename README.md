@@ -7,11 +7,19 @@ Works with any app visible on the iPhone screen: App Store apps, TestFlight buil
 ## What Works
 
 - **Screenshots** — captures the mirrored iPhone screen as PNG
+- **Video recording** — record the mirrored screen as .mov files
 - **Taps** — click anywhere on the iPhone screen via Karabiner virtual pointing device
 - **Swipes** — drag between two points with configurable duration
-- **Typing** — type text into any focused field via Karabiner virtual HID keyboard
+- **Long press** — hold tap for context menus and drag initiation
+- **Double tap** — two rapid taps for zoom and text selection
+- **Drag** — slow sustained drag for rearranging icons, adjusting sliders
+- **Typing** — type text into any focused field via Karabiner virtual HID keyboard with non-US keyboard layout support
 - **Key presses** — Return, Escape, Tab, arrows, with modifier support (Cmd, Shift, etc.)
 - **Navigation** — Home, App Switcher, Spotlight via macOS menu bar actions
+- **App launch** — open any app by name via Spotlight search
+- **URL opening** — navigate to any URL in Safari
+- **Shake gesture** — trigger shake-to-undo and developer menus
+- **Orientation detection** — report portrait/landscape and window dimensions
 
 All touch and keyboard input flows through Karabiner DriverKit virtual HID devices because iPhone Mirroring routes input through a protected compositor layer that doesn't accept standard CGEvent injection. The MCP server activates iPhone Mirroring once when keyboard input begins (triggering a macOS Space switch if needed) and stays there — no back-and-forth switching between apps.
 
@@ -105,13 +113,22 @@ The installer handles everything: installs Karabiner if missing (with confirmati
 | Tool | Parameters | Description |
 |------|-----------|-------------|
 | `screenshot` | — | Capture the iPhone screen as base64 PNG |
+| `start_recording` | `output_path`? | Start video recording of the mirrored screen |
+| `stop_recording` | — | Stop recording and return the .mov file path |
 | `tap` | `x`, `y` | Tap at coordinates (relative to mirroring window) |
+| `double_tap` | `x`, `y` | Two rapid taps for zoom/text selection |
+| `long_press` | `x`, `y`, `duration_ms`? | Hold tap for context menus (default 500ms) |
 | `swipe` | `from_x`, `from_y`, `to_x`, `to_y`, `duration_ms`? | Swipe between two points (default 300ms) |
+| `drag` | `from_x`, `from_y`, `to_x`, `to_y`, `duration_ms`? | Slow sustained drag for icons, sliders (default 1000ms) |
 | `type_text` | `text` | Type text — activates iPhone Mirroring and sends keystrokes |
 | `press_key` | `key`, `modifiers`? | Send a special key (return, escape, tab, delete, space, arrows) with optional modifiers (command, shift, option, control) |
+| `shake` | — | Trigger shake gesture (Ctrl+Cmd+Z) for undo/dev menus |
+| `launch_app` | `name` | Open app by name via Spotlight search |
+| `open_url` | `url` | Open URL in Safari |
 | `press_home` | — | Go to home screen |
 | `press_app_switcher` | — | Open app switcher |
 | `spotlight` | — | Open Spotlight search |
+| `get_orientation` | — | Report portrait/landscape and window dimensions |
 | `status` | — | Connection state, window geometry, and device readiness |
 
 Coordinates are in points relative to the mirroring window's top-left corner. Screenshots are Retina 2x — divide pixel coordinates by 2 to get tap coordinates.
@@ -120,8 +137,7 @@ Coordinates are in points relative to the mirroring window's top-left corner. Sc
 
 `type_text` and `press_key` route keyboard input through the Karabiner virtual HID keyboard via the helper daemon. If iPhone Mirroring isn't already frontmost, the MCP server activates it once (which may trigger a macOS Space switch) and stays there. Subsequent keyboard tool calls reuse the active window without switching again.
 
-- Characters are mapped to USB HID keycodes (US QWERTY layout)
-- Characters without a US QWERTY mapping are skipped and reported in the response
+- Characters are mapped to USB HID keycodes with automatic keyboard layout translation — non-US layouts (French AZERTY, German QWERTZ, etc.) are supported via UCKeyTranslate
 - iOS autocorrect applies — type carefully or disable it on the iPhone
 
 ### Key press workflow
