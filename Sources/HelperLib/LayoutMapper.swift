@@ -214,7 +214,49 @@ public enum LayoutMapper {
             }
         }
 
+        // iOS interprets HID 0x64 (ISO section key) and HID 0x35 (grave accent)
+        // swapped compared to macOS for non-US layouts. Swap the substitution
+        // values for the characters on these two keys so the correct HID keycode
+        // reaches the iPhone.
+        applyISOKeySwap(&map, usLayoutData: usLayoutData,
+                         targetLayoutData: targetLayoutData)
+
         return map
+    }
+
+    /// Correct the ISO section key swap between macOS and iOS.
+    ///
+    /// macOS virtual keycode 0x0A (HID 0x64, ISO section key) and 0x32
+    /// (HID 0x35, grave accent) produce different characters on the Mac vs
+    /// the iPhone for non-US layouts. The iPhone effectively swaps these two
+    /// physical keys. This detects substitution entries originating from these
+    /// keycodes and swaps their US QWERTY targets.
+    private static func applyISOKeySwap(
+        _ map: inout [Character: Character],
+        usLayoutData: Data, targetLayoutData: Data
+    ) {
+        let modifierStates: [UInt32] = [0, 2]
+
+        for modState in modifierStates {
+            guard let usSectionChar = translateKeycode(
+                        0x0A, modifiers: modState, layoutData: usLayoutData),
+                  let usGraveChar = translateKeycode(
+                        0x32, modifiers: modState, layoutData: usLayoutData),
+                  let targetSectionChar = translateKeycode(
+                        0x0A, modifiers: modState, layoutData: targetLayoutData),
+                  let targetGraveChar = translateKeycode(
+                        0x32, modifiers: modState, layoutData: targetLayoutData)
+            else { continue }
+
+            // Only swap when both characters are in the substitution table
+            // with the expected values from the Mac layout scan.
+            if map[targetSectionChar] == usSectionChar
+                && map[targetGraveChar] == usGraveChar
+            {
+                map[targetSectionChar] = usGraveChar
+                map[targetGraveChar] = usSectionChar
+            }
+        }
     }
 
     /// Apply a substitution table to translate text.

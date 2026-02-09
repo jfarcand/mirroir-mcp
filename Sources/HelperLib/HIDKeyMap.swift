@@ -69,6 +69,12 @@ public enum HIDKeyMap {
         map["."]  = HIDKeyMapping(keycode: 0x37, modifiers: [])
         map["/"]  = HIDKeyMapping(keycode: 0x38, modifiers: [])
 
+        // ISO section key (HID 0x64): the extra key between left Shift and Z
+        // on ISO keyboards. Used by non-US layouts like Canadian-CSA for
+        // characters that the Mac and iPhone map differently on this key.
+        map["§"]  = HIDKeyMapping(keycode: 0x64, modifiers: [])
+        map["±"]  = HIDKeyMapping(keycode: 0x64, modifiers: .leftShift)
+
         // Punctuation (shifted)
         map["_"]  = HIDKeyMapping(keycode: 0x2D, modifiers: .leftShift)
         map["+"]  = HIDKeyMapping(keycode: 0x2E, modifiers: .leftShift)

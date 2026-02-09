@@ -132,11 +132,16 @@ struct LayoutMapperTests {
         // To type é on iPhone, send / to the helper.
         #expect(substitution[Character("é")] == Character("/"),
                 "é should map to / for Canadian-CSA")
+
+        // After ISO key swap: / maps to ` (HID 0x35) instead of § (HID 0x64)
+        // because iOS swaps the ISO section key and grave accent key.
+        #expect(substitution[Character("/")] == Character("`"),
+                "/ should map to ` after ISO key swap")
     }
 
     // MARK: - Round-Trip Consistency
 
-    @Test("Canadian-CSA substitutions are mostly HID-typeable with paste fallback for ISO keys")
+    @Test("Canadian-CSA substitutions are all HID-typeable after ISO key swap")
     func substitutionHIDCoverage() {
         guard let usData = LayoutMapper.layoutData(forSourceID: "com.apple.keylayout.US"),
               let csaData = LayoutMapper.layoutData(
@@ -149,18 +154,13 @@ struct LayoutMapperTests {
             usLayoutData: usData, targetLayoutData: csaData
         )
 
-        // Most substitutions should have HID mappings. Characters that map to
-        // the ISO section key (§, ±) have no HID entry because Mac and iPhone
-        // CSA layouts interpret that key differently. Those characters are
-        // typed via clipboard paste instead.
-        var hidCount = 0
-        for (_, usChar) in substitution {
-            if HIDKeyMap.lookup(usChar) != nil {
-                hidCount += 1
-            }
+        // After the ISO key swap, all substitutions should have HID mappings.
+        // The swap corrects the macOS/iOS disagreement on HID 0x64 and 0x35,
+        // so characters like / (which maps to ` → HID 0x35) and ù (which maps
+        // to § → HID 0x64) are both typeable via HID.
+        for (targetChar, usChar) in substitution {
+            #expect(HIDKeyMap.lookup(usChar) != nil,
+                    "'\(targetChar)' → '\(usChar)' should have HID mapping")
         }
-        #expect(hidCount > 0, "At least some substitutions should be HID-typeable")
-        #expect(hidCount >= substitution.count - 2,
-                "At most 2 substitutions (§, ±) should need paste fallback")
     }
 }
