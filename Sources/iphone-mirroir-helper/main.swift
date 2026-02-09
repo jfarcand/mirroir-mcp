@@ -36,15 +36,18 @@ guard getuid() == 0 else {
 
 setupSignalHandlers()
 
-// Initialize Karabiner virtual HID client
+// Initialize Karabiner virtual HID client.
+// If Karabiner is unavailable (no DriverKit extension, CI environment, etc.),
+// the helper starts in degraded mode: status queries work, input commands
+// return clear errors about Karabiner not being ready.
 let karabiner = KarabinerClient()
 do {
     try karabiner.initialize()
     log("Karabiner client connected (keyboard=\(karabiner.isKeyboardReady), pointing=\(karabiner.isPointingReady))")
 } catch {
-    log("ERROR: Failed to initialize Karabiner client: \(error)")
-    log("Ensure Karabiner-Elements is installed and DriverKit extension is activated.")
-    exit(1)
+    log("WARNING: Karabiner not available: \(error)")
+    log("Starting in degraded mode — status queries work, input commands will return errors.")
+    log("To enable full functionality, install Karabiner-Elements and activate the DriverKit extension.")
 }
 
 // Start the command server (blocks until stopped)

@@ -139,9 +139,12 @@ jobs:
           python3 -c "
           import json, sys
           data = json.loads('''$RESPONSE''')
-          assert data.get('ok') is True, f'Expected ok:true, got: {data}'
-          # pointing_ready will be false in CI (Karabiner DriverKit not approved)
-          print(f'Helper status: ok={data[\"ok\"]} pointing_ready={data.get(\"pointing_ready\", \"N/A\")}')
+          # In CI, Karabiner DriverKit is not available so ok/keyboard/pointing are all false.
+          # The important thing is the daemon is running and responding with valid JSON.
+          assert 'ok' in data, f'Missing ok field in response: {data}'
+          assert 'keyboard_ready' in data, f'Missing keyboard_ready field: {data}'
+          assert 'pointing_ready' in data, f'Missing pointing_ready field: {data}'
+          print(f'Helper status: ok={data[\"ok\"]} keyboard={data[\"keyboard_ready\"]} pointing={data[\"pointing_ready\"]}')
           "
 
       # --- MCP binary from install path ---
