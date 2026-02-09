@@ -161,9 +161,10 @@ struct IPhoneMirroirMCP {
         server.registerTool(MCPToolDefinition(
             name: "type_text",
             description: """
-                Type text on the mirrored iPhone. The iPhone Mirroring window \
-                must be focused and a text field must be active on the iPhone. \
-                Sends each character as a keyboard event.
+                Type text on the mirrored iPhone. Automatically activates the \
+                iPhone Mirroring window if needed (one-time Space switch). \
+                A text field must be active on the iPhone. \
+                Sends each character as a keyboard event via Karabiner virtual HID.
                 """,
             inputSchema: [
                 "type": .string("object"),
@@ -201,6 +202,7 @@ struct IPhoneMirroirMCP {
             name: "press_key",
             description: """
                 Send a special key press to the mirrored iPhone with optional modifiers. \
+                Automatically activates the iPhone Mirroring window if needed (one-time Space switch). \
                 Supported keys: return, escape, tab, delete, space, up, down, left, right. \
                 Optional modifiers: command, shift, option, control. \
                 Examples: press Return to confirm, Escape to cancel, Cmd+N for new.
@@ -231,7 +233,7 @@ struct IPhoneMirroirMCP {
 
                 let modifiers = args["modifiers"]?.asStringArray() ?? []
 
-                let result = input.pressKeyViaAppleScript(
+                let result = input.pressKey(
                     keyName: keyName, modifiers: modifiers
                 )
                 guard result.success else {

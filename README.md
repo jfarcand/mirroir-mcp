@@ -9,11 +9,11 @@ Works with any app visible on the iPhone screen: App Store apps, TestFlight buil
 - **Screenshots** — captures the mirrored iPhone screen as PNG
 - **Taps** — click anywhere on the iPhone screen via Karabiner virtual pointing device
 - **Swipes** — drag between two points with configurable duration
-- **Typing** — type text into any focused field via AppleScript System Events
+- **Typing** — type text into any focused field via Karabiner virtual HID keyboard
 - **Key presses** — Return, Escape, Tab, arrows, with modifier support (Cmd, Shift, etc.)
 - **Navigation** — Home, App Switcher, Spotlight via macOS menu bar actions
 
-Taps and swipes use a Karabiner DriverKit virtual pointing device because iPhone Mirroring routes input through a protected compositor layer that doesn't accept standard CGEvent injection. Typing and key presses use AppleScript to activate the window and send keystrokes through System Events.
+All touch and keyboard input flows through Karabiner DriverKit virtual HID devices because iPhone Mirroring routes input through a protected compositor layer that doesn't accept standard CGEvent injection. The MCP server activates iPhone Mirroring once when keyboard input begins (triggering a macOS Space switch if needed) and stays there — no back-and-forth switching between apps.
 
 ## Example
 
@@ -93,10 +93,10 @@ Coordinates are in points relative to the mirroring window's top-left corner. Sc
 
 ### Typing workflow
 
-`type_text` activates iPhone Mirroring as the frontmost app via System Events, then sends keystrokes. This means:
-- The iPhone Mirroring window takes focus briefly during typing
-- After typing, your previous app regains focus
-- Works with any keyboard layout (not limited to US QWERTY)
+`type_text` and `press_key` route keyboard input through the Karabiner virtual HID keyboard via the helper daemon. If iPhone Mirroring isn't already frontmost, the MCP server activates it once (which may trigger a macOS Space switch) and stays there. Subsequent keyboard tool calls reuse the active window without switching again.
+
+- Characters are mapped to USB HID keycodes (US QWERTY layout)
+- Characters without a US QWERTY mapping are skipped and reported in the response
 - iOS autocorrect applies — type carefully or disable it on the iPhone
 
 ### Key press workflow
@@ -114,15 +114,15 @@ MCP Client (stdin/stdout JSON-RPC)
 iphone-mirroir-mcp (user process)
     ├── MirroringBridge    — AXUIElement window discovery + menu actions
     ├── ScreenCapture      — screencapture -l <windowID>
-    ├── InputSimulation    — AppleScript typing/key presses, coordinate mapping
-    │       ├── type_text  → System Events: set frontmost + keystroke
-    │       ├── press_key  → System Events: set frontmost + key code
+    ├── InputSimulation    — activate-once + coordinate mapping
+    │       ├── type_text  → activate if needed → HelperClient type
+    │       ├── press_key  → activate if needed → HelperClient press_key
     │       └── tap/swipe  → HelperClient (Unix socket IPC)
     └── HelperClient       — Unix socket client
             │
             ▼  /var/run/iphone-mirroir-helper.sock
 iphone-mirroir-helper (root LaunchDaemon)
-    ├── CommandServer      — JSON command dispatch
+    ├── CommandServer      — JSON command dispatch (click/type/press_key/swipe/move)
     └── KarabinerClient    — Karabiner DriverKit virtual HID protocol
             │
             ▼  /Library/Application Support/org.pqrs/tmp/rootonly/vhidd_server/*.sock
@@ -134,7 +134,7 @@ iphone-mirroir-helper (root LaunchDaemon)
 
 **Taps/swipes**: The helper warps the system cursor to the target coordinates, sends a Karabiner virtual pointing device button press, then restores the cursor. iPhone Mirroring's compositor layer requires input through the system HID path rather than programmatic CGEvent injection.
 
-**Typing/key presses**: The MCP server uses AppleScript to set iPhone Mirroring as frontmost via System Events, then sends `keystroke` or `key code` commands. This routes input to iPhone Mirroring without needing the Karabiner virtual keyboard.
+**Typing/key presses**: The MCP server activates iPhone Mirroring via AppleScript System Events (the only reliable way to trigger a macOS Space switch), then sends HID keycodes through the helper's Karabiner virtual keyboard. Activation only happens when iPhone Mirroring isn't already frontmost, and the server does not restore the previous app — this eliminates the per-keystroke Space switching of earlier versions.
 
 **Navigation**: Home, Spotlight, and App Switcher use macOS Accessibility APIs to trigger iPhone Mirroring's menu bar actions directly (no window focus needed).
 
@@ -166,7 +166,7 @@ brew uninstall iphone-mirroir-mcp
 
 **`keyboard_ready: false`** — Karabiner's DriverKit extension isn't running. Open Karabiner-Elements, then go to **System Settings > General > Login Items & Extensions** and enable all toggles under Karabiner-Elements. You may need to enter your password.
 
-**Typing goes to the wrong app instead of iPhone** — Make sure you're running v0.3.0+. Older versions used Karabiner HID keyboard which sent keystrokes to whatever window had focus. v0.3.0 uses AppleScript to activate iPhone Mirroring before typing.
+**Typing goes to the wrong app instead of iPhone** — Make sure you're running v0.4.0+. The MCP server activates iPhone Mirroring via AppleScript before sending keystrokes through Karabiner. If this still fails, check that your terminal app has Accessibility permissions in System Settings.
 
 **Taps don't register** — Check that the helper is running:
 ```bash

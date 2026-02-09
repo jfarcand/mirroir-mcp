@@ -49,9 +49,9 @@ public enum AppleScriptKeyMap {
                 tell process "iPhone Mirroring"
                     set frontmost to true
                 end tell
-                delay 0.3
-                key code \(keyCode)\(modifierClause)
                 delay 0.1
+                key code \(keyCode)\(modifierClause)
+                delay 0.05
                 tell process prevApp
                     set frontmost to true
                 end tell

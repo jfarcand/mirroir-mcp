@@ -17,11 +17,13 @@ struct TypeResult {
 /// Simulates touch and keyboard input on the iPhone Mirroring window.
 /// All coordinates are relative to the mirroring window's content area.
 ///
-/// Requires the Karabiner helper daemon for tap/swipe operations.
-/// Keyboard input uses AppleScript via System Events (no helper needed).
+/// Requires the Karabiner helper daemon for all input operations (tap, swipe,
+/// type, press_key). Keyboard input is sent via Karabiner virtual HID to avoid
+/// the Space-switching overhead of AppleScript activation.
 final class InputSimulation: @unchecked Sendable {
     private let bridge: MirroringBridge
     let helperClient = HelperClient()
+    private let mirroringBundleID = "com.apple.ScreenContinuity"
 
     init(bridge: MirroringBridge) {
         self.bridge = bridge
@@ -73,67 +75,69 @@ final class InputSimulation: @unchecked Sendable {
         return "Helper swipe failed"
     }
 
-    /// Type text using AppleScript keystroke via System Events.
-    /// First activates iPhone Mirroring to make it the frontmost app,
-    /// then sends keystrokes through System Events which routes to the frontmost app.
-    func typeText(_ text: String) -> TypeResult {
-        let escaped = AppleScriptKeyMap.escapeForAppleScript(text)
+    /// Ensure iPhone Mirroring is the frontmost app so it receives keyboard input.
+    /// Only activates if another app is currently in front, to avoid unnecessary
+    /// Space switches. Does NOT restore the previous frontmost app — this eliminates
+    /// the "switch, back, switch, back" jitter that the old AppleScript keystroke approach caused.
+    ///
+    /// Uses AppleScript `set frontmost to true` via System Events because
+    /// `NSRunningApplication.activate()` cannot trigger a macOS Space switch
+    /// (deprecated in macOS 14 with no replacement for cross-Space activation).
+    private func ensureMirroringFrontmost() {
+        let frontApp = NSWorkspace.shared.frontmostApplication
+        if frontApp?.bundleIdentifier == mirroringBundleID {
+            return // already frontmost, no Space switch needed
+        }
 
         let script = NSAppleScript(source: """
             tell application "System Events"
-                set prevApp to name of first process whose frontmost is true
                 tell process "iPhone Mirroring"
-                    set frontmost to true
-                end tell
-                delay 0.3
-                keystroke "\(escaped)"
-                delay 0.1
-                tell process prevApp
                     set frontmost to true
                 end tell
             end tell
             """)
-
         var errorInfo: NSDictionary?
         script?.executeAndReturnError(&errorInfo)
 
-        if let err = errorInfo {
-            let msg = (err[NSAppleScript.errorMessage] as? String) ?? "AppleScript error"
-            return TypeResult(success: false, skippedCharacters: "",
-                              warning: nil, error: msg)
-        }
-
-        return TypeResult(success: true, skippedCharacters: "",
-                          warning: nil, error: nil)
+        usleep(300_000) // 300ms for Space switch to settle
     }
 
-    /// Send a special key press (Return, Escape, arrows, etc.) with optional modifiers.
-    /// Uses AppleScript `key code` via System Events — the same proven approach as typeText.
-    func pressKeyViaAppleScript(keyName: String, modifiers: [String] = []) -> TypeResult {
-        guard let code = AppleScriptKeyMap.keyCode(for: keyName) else {
-            let supported = AppleScriptKeyMap.supportedKeys.joined(separator: ", ")
-            return TypeResult(
-                success: false, skippedCharacters: "",
-                warning: nil,
-                error: "Unknown key: \"\(keyName)\". Supported keys: \(supported)"
-            )
-        }
-
-        let scriptSource = AppleScriptKeyMap.buildKeyPressScript(
-            keyCode: code, modifiers: modifiers
-        )
-        let script = NSAppleScript(source: scriptSource)
-
-        var errorInfo: NSDictionary?
-        script?.executeAndReturnError(&errorInfo)
-
-        if let err = errorInfo {
-            let msg = (err[NSAppleScript.errorMessage] as? String) ?? "AppleScript error"
+    /// Type text via Karabiner virtual keyboard through the helper daemon.
+    /// Activates iPhone Mirroring if needed (at most one Space switch), then
+    /// sends characters through the helper's existing `type` command.
+    func typeText(_ text: String) -> TypeResult {
+        guard helperClient.isAvailable else {
             return TypeResult(success: false, skippedCharacters: "",
-                              warning: nil, error: msg)
+                              warning: nil, error: helperClient.unavailableMessage)
         }
 
-        return TypeResult(success: true, skippedCharacters: "",
-                          warning: nil, error: nil)
+        ensureMirroringFrontmost()
+
+        let response = helperClient.type(text: text)
+        return TypeResult(
+            success: response.ok,
+            skippedCharacters: response.skippedCharacters,
+            warning: response.warning,
+            error: response.ok ? nil : "Helper type command failed"
+        )
+    }
+
+    /// Send a special key press (Return, Escape, arrows, etc.) with optional modifiers
+    /// via Karabiner virtual keyboard through the helper daemon.
+    /// Activates iPhone Mirroring if needed (at most one Space switch).
+    func pressKey(keyName: String, modifiers: [String] = []) -> TypeResult {
+        guard helperClient.isAvailable else {
+            return TypeResult(success: false, skippedCharacters: "",
+                              warning: nil, error: helperClient.unavailableMessage)
+        }
+
+        ensureMirroringFrontmost()
+
+        if helperClient.pressKey(key: keyName, modifiers: modifiers) {
+            return TypeResult(success: true, skippedCharacters: "",
+                              warning: nil, error: nil)
+        }
+        return TypeResult(success: false, skippedCharacters: "",
+                          warning: nil, error: "Helper press_key command failed")
     }
 }

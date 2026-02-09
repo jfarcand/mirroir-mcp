@@ -76,6 +76,21 @@ final class HelperClient: @unchecked Sendable {
         )
     }
 
+    /// Press a special key (return, escape, arrows, etc.) with optional modifiers
+    /// via Karabiner virtual keyboard.
+    func pressKey(key: String, modifiers: [String] = []) -> Bool {
+        var command: [String: Any] = [
+            "action": "press_key",
+            "key": key,
+        ]
+        if !modifiers.isEmpty {
+            command["modifiers"] = modifiers
+        }
+
+        let response = sendCommandWithReconnect(command)
+        return response?["ok"] as? Bool ?? false
+    }
+
     /// Swipe between two screen-absolute points.
     func swipe(fromX: Double, fromY: Double, toX: Double, toY: Double, durationMs: Int = 300) -> Bool {
         let response = sendCommandWithReconnect([

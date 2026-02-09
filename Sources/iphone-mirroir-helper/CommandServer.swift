@@ -15,6 +15,7 @@ let helperSocketPath = "/var/run/iphone-mirroir-helper.sock"
 /// Supported commands:
 /// - click: CGWarp to (x,y), Karabiner button down/up, restore cursor
 /// - type: Map characters to HID keycodes, send via Karabiner keyboard
+/// - press_key: Send a special key (return, escape, arrows) via Karabiner keyboard
 /// - swipe: CGWarp + Karabiner button down, interpolate movement, button up
 /// - move: Send relative mouse movement via Karabiner pointing
 /// - status: Report device readiness
@@ -150,6 +151,8 @@ final class CommandServer {
             return handleSwipe(json)
         case "move":
             return handleMove(json)
+        case "press_key":
+            return handlePressKey(json)
         case "status":
             return handleStatus()
         default:
@@ -396,6 +399,29 @@ final class CommandServer {
         }
 
         karabiner.moveMouse(dx: dx, dy: dy)
+        return makeOkResponse()
+    }
+
+    /// Press a special key (return, escape, arrows, etc.) with optional modifiers.
+    /// Uses `HIDSpecialKeyMap` to look up the USB HID keycode, then sends via Karabiner.
+    private func handlePressKey(_ json: [String: Any]) -> Data {
+        guard let keyName = json["key"] as? String else {
+            return makeErrorResponse("press_key requires key (string)")
+        }
+
+        guard karabiner.isKeyboardReady else {
+            return makeErrorResponse("Karabiner keyboard device not ready")
+        }
+
+        guard let hidKeyCode = HIDSpecialKeyMap.hidKeyCode(for: keyName) else {
+            let supported = HIDSpecialKeyMap.supportedKeys.joined(separator: ", ")
+            return makeErrorResponse("Unknown key: \"\(keyName)\". Supported: \(supported)")
+        }
+
+        let modifierNames = json["modifiers"] as? [String] ?? []
+        let modifiers = HIDSpecialKeyMap.modifiers(from: modifierNames)
+
+        karabiner.typeKey(keycode: hidKeyCode, modifiers: modifiers)
         return makeOkResponse()
     }
 
