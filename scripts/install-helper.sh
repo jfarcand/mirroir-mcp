@@ -35,12 +35,34 @@ sudo chown root:wheel "/Library/LaunchDaemons/$PLIST_NAME.plist"
 sudo chmod 644 "/Library/LaunchDaemons/$PLIST_NAME.plist"
 sudo launchctl bootstrap system "/Library/LaunchDaemons/$PLIST_NAME.plist"
 
+# Verify the daemon is running
+echo ""
+echo "=== Verifying ==="
+if sudo launchctl list "$PLIST_NAME" >/dev/null 2>&1; then
+    PID=$(sudo launchctl list "$PLIST_NAME" 2>/dev/null | awk 'NR==2{print $1}')
+    echo "Helper daemon is running (PID: ${PID:--})"
+else
+    echo "WARNING: Helper daemon failed to start. Check logs:"
+    echo "  sudo cat /var/log/iphone-mirroir-helper.log"
+    exit 1
+fi
+
+# Verify the socket is ready (helper needs a moment to create it)
+SOCKET="/var/run/iphone-mirroir-helper.sock"
+for i in 1 2 3 4 5; do
+    if [ -S "$SOCKET" ]; then
+        echo "Socket ready: $SOCKET"
+        break
+    fi
+    sleep 1
+done
+if [ ! -S "$SOCKET" ]; then
+    echo "WARNING: Socket not found at $SOCKET after 5s. Check logs:"
+    echo "  sudo cat /var/log/iphone-mirroir-helper.log"
+fi
+
 echo ""
 echo "=== Done ==="
-echo "Helper daemon installed and running."
-echo "Logs: /var/log/iphone-mirroir-helper.log"
-echo "MCP server: .build/release/iphone-mirroir-mcp"
-echo ""
-echo "To check status: sudo launchctl list | grep iphone-mirroir"
-echo "To stop:         sudo launchctl bootout system/$PLIST_NAME"
-echo "To uninstall:    ./scripts/uninstall-helper.sh"
+echo "To stop:      sudo launchctl bootout system/$PLIST_NAME"
+echo "To uninstall: ./scripts/uninstall-helper.sh"
+echo "Logs:         /var/log/iphone-mirroir-helper.log"
