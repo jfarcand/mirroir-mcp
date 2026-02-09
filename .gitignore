@@ -8,3 +8,4 @@ DerivedData/
 .netrc
 .mcp.json
 .mcpregistry_*
+claude_docs/*
