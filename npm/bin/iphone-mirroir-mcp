@@ -1,0 +1,44 @@
+#!/usr/bin/env node
+// Thin wrapper that checks the helper daemon is set up, then exec's the native binary.
+
+const { execFileSync, spawnSync } = require("child_process");
+const fs = require("fs");
+const path = require("path");
+
+const HELPER_SOCK = "/var/run/iphone-mirroir-helper.sock";
+const binDir = __dirname;
+const pkgDir = path.dirname(binDir);
+const binary = path.join(binDir, "iphone-mirroir-mcp-native");
+const setupScript = path.join(pkgDir, "setup.js");
+
+// Check if helper daemon is running
+function helperIsRunning() {
+  if (!fs.existsSync(HELPER_SOCK)) return false;
+  const result = spawnSync("bash", ["-c",
+    `echo '{"action":"status"}' | nc -U ${HELPER_SOCK} 2>/dev/null`
+  ], { timeout: 3000 });
+  const output = result.stdout ? result.stdout.toString() : "";
+  return output.includes('"ok"');
+}
+
+// Run setup if helper daemon is not available
+if (!helperIsRunning() && fs.existsSync(setupScript)) {
+  console.error("iphone-mirroir-helper daemon is not running. Running setup...");
+  console.error("");
+  try {
+    execFileSync("node", [setupScript], { stdio: "inherit" });
+  } catch (e) {
+    console.error("Setup failed. See https://github.com/jfarcand/iphone-mirroir-mcp for manual install.");
+    process.exit(1);
+  }
+  console.error("");
+}
+
+// Run the MCP server
+try {
+  execFileSync(binary, process.argv.slice(2), { stdio: "inherit" });
+} catch (e) {
+  if (e.status != null) process.exit(e.status);
+  console.error("iphone-mirroir-mcp binary not found. Run: npm rebuild iphone-mirroir-mcp");
+  process.exit(1);
+}
