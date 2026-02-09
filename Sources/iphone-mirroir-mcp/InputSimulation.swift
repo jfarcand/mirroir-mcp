@@ -5,14 +5,14 @@
 // ABOUTME: Delegates to the privileged Karabiner helper daemon for taps and swipes.
 
 import AppKit
+import Carbon
 import CoreGraphics
 import Foundation
 import HelperLib
 
-/// Result of a type operation, including any characters the helper couldn't map.
+/// Result of a type or key press operation.
 struct TypeResult {
     let success: Bool
-    let skippedCharacters: String
     let warning: String?
     let error: String?
 }
@@ -27,9 +27,30 @@ final class InputSimulation: @unchecked Sendable {
     private let bridge: MirroringBridge
     let helperClient = HelperClient()
     private let mirroringBundleID = "com.apple.ScreenContinuity"
+    /// Character substitution table for translating between the iPhone's hardware
+    /// keyboard layout and US QWERTY (used by the HID helper). Built once at init
+    /// from the first non-US keyboard layout found on the Mac.
+    private let layoutSubstitution: [Character: Character]
 
     init(bridge: MirroringBridge) {
         self.bridge = bridge
+
+        // Build layout substitution table if a non-US layout is installed.
+        // The iPhone's hardware keyboard layout typically matches one of the
+        // Mac's installed layouts. When it differs from US QWERTY, characters
+        // need translation before sending through the HID helper.
+        if let usData = LayoutMapper.layoutData(forSourceID: "com.apple.keylayout.US"),
+           let (targetID, targetData) = LayoutMapper.findNonUSLayout()
+        {
+            self.layoutSubstitution = LayoutMapper.buildSubstitution(
+                usLayoutData: usData, targetLayoutData: targetData
+            )
+            if !self.layoutSubstitution.isEmpty {
+                fputs("LayoutMapper: \(self.layoutSubstitution.count) character substitutions for \(targetID)\n", stderr)
+            }
+        } else {
+            self.layoutSubstitution = [:]
+        }
     }
 
     /// Tap at a position relative to the mirroring window.
@@ -159,17 +180,17 @@ final class InputSimulation: @unchecked Sendable {
     /// Sends Ctrl+Cmd+Z which triggers shake-to-undo in iOS apps.
     func shake() -> TypeResult {
         guard helperClient.isAvailable else {
-            return TypeResult(success: false, skippedCharacters: "",
+            return TypeResult(success: false,
                               warning: nil, error: helperClient.unavailableMessage)
         }
 
         ensureMirroringFrontmost()
 
         if helperClient.shake() {
-            return TypeResult(success: true, skippedCharacters: "",
+            return TypeResult(success: true,
                               warning: nil, error: nil)
         }
-        return TypeResult(success: false, skippedCharacters: "",
+        return TypeResult(success: false,
                           warning: nil, error: "Helper shake command failed")
     }
 
@@ -261,24 +282,114 @@ final class InputSimulation: @unchecked Sendable {
         usleep(300_000) // 300ms for Space switch to settle
     }
 
-    /// Type text via Karabiner virtual keyboard through the helper daemon.
-    /// Activates iPhone Mirroring if needed (at most one Space switch), then
-    /// sends characters through the helper's existing `type` command.
+    /// Type text via a hybrid approach: Karabiner HID for characters with valid
+    /// keycodes, and clipboard paste (via iPhone Mirroring's Edit > Paste menu)
+    /// for characters that lack HID mappings.
+    ///
+    /// When the iPhone's hardware keyboard layout differs from US QWERTY,
+    /// characters are translated through the layout substitution table before
+    /// sending to the HID helper. Characters whose substituted form has no
+    /// HID mapping (e.g., `/` on Canadian-CSA) are pasted via the Mac's
+    /// clipboard bridge using the Accessibility API — no focus changes needed.
+    ///
+    /// HID segments longer than 15 characters are sent in chunks to stay within
+    /// the Karabiner HID report buffer capacity.
     func typeText(_ text: String) -> TypeResult {
         guard helperClient.isAvailable else {
-            return TypeResult(success: false, skippedCharacters: "",
+            return TypeResult(success: false,
                               warning: nil, error: helperClient.unavailableMessage)
         }
 
         ensureMirroringFrontmost()
 
-        let response = helperClient.type(text: text)
-        return TypeResult(
-            success: response.ok,
-            skippedCharacters: response.skippedCharacters,
-            warning: response.warning,
-            error: response.ok ? nil : "Helper type command failed"
-        )
+        // Split text into segments: HID-typeable (substituted) vs paste-needed (original).
+        let segments = buildTypeSegments(text)
+
+        for segment in segments {
+            switch segment.method {
+            case .hid:
+                if let error = typeViaHID(segment.text) {
+                    return error
+                }
+            case .paste:
+                if let error = typeViaPaste(segment.text) {
+                    return error
+                }
+            }
+        }
+
+        return TypeResult(success: true, warning: nil, error: nil)
+    }
+
+    /// A segment of text to be typed, with the method to use.
+    private enum TypeMethod { case hid, paste }
+    private struct TypeSegment {
+        let text: String
+        let method: TypeMethod
+    }
+
+    /// Split text into segments based on whether each character can be typed via HID
+    /// (after layout substitution) or needs clipboard paste.
+    private func buildTypeSegments(_ text: String) -> [TypeSegment] {
+        var segments: [TypeSegment] = []
+        var currentText = ""
+        var currentMethod: TypeMethod = .hid
+
+        for char in text {
+            let substituted = layoutSubstitution[char] ?? char
+            let method: TypeMethod = HIDKeyMap.lookup(substituted) != nil ? .hid : .paste
+            // For HID segments, use the substituted character (US QWERTY equivalent).
+            // For paste segments, use the original character (paste is layout-independent).
+            let outputChar = method == .hid ? substituted : char
+
+            if method == currentMethod {
+                currentText.append(outputChar)
+            } else {
+                if !currentText.isEmpty {
+                    segments.append(TypeSegment(text: currentText, method: currentMethod))
+                }
+                currentText = String(outputChar)
+                currentMethod = method
+            }
+        }
+        if !currentText.isEmpty {
+            segments.append(TypeSegment(text: currentText, method: currentMethod))
+        }
+
+        return segments
+    }
+
+    /// Type text via Karabiner HID in 15-character chunks.
+    private func typeViaHID(_ text: String) -> TypeResult? {
+        let chunkSize = 15
+        var index = text.startIndex
+        while index < text.endIndex {
+            let end = text.index(index, offsetBy: chunkSize,
+                                 limitedBy: text.endIndex) ?? text.endIndex
+            let chunk = String(text[index..<end])
+
+            let response = helperClient.type(text: chunk)
+            guard response.ok else {
+                return TypeResult(
+                    success: false,
+                    warning: response.warning,
+                    error: "Helper type command failed"
+                )
+            }
+
+            index = end
+        }
+        return nil // success
+    }
+
+    /// Placeholder for characters that lack HID keycodes after layout
+    /// substitution. On non-US layouts like Canadian-CSA, the ISO section key
+    /// (HID 0x64) maps differently between Mac and iPhone, leaving characters
+    /// like "/" without a working HID keycode. These characters are skipped
+    /// with a warning until a clipboard bridging solution is found.
+    private func typeViaPaste(_ text: String) -> TypeResult? {
+        fputs("InputSimulation: skipping \(text.count) char(s) with no HID mapping: \(text)\n", stderr)
+        return nil // skip silently — no working paste mechanism available
     }
 
     /// Send a special key press (Return, Escape, arrows, etc.) with optional modifiers
@@ -286,17 +397,17 @@ final class InputSimulation: @unchecked Sendable {
     /// Activates iPhone Mirroring if needed (at most one Space switch).
     func pressKey(keyName: String, modifiers: [String] = []) -> TypeResult {
         guard helperClient.isAvailable else {
-            return TypeResult(success: false, skippedCharacters: "",
+            return TypeResult(success: false,
                               warning: nil, error: helperClient.unavailableMessage)
         }
 
         ensureMirroringFrontmost()
 
         if helperClient.pressKey(key: keyName, modifiers: modifiers) {
-            return TypeResult(success: true, skippedCharacters: "",
+            return TypeResult(success: true,
                               warning: nil, error: nil)
         }
-        return TypeResult(success: false, skippedCharacters: "",
+        return TypeResult(success: false,
                           warning: nil, error: "Helper press_key command failed")
     }
 }

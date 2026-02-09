@@ -13,7 +13,11 @@ import Foundation
 public struct KeyboardParameters: Sendable {
     public var vendorID: UInt64 = 0x05ac
     public var productID: UInt64 = 0x0250
-    public var countryCode: UInt64 = 0
+    /// Country code 1 = ISO keyboard layout. ISO keyboards have an extra key
+    /// between left Shift and Z (HID 0x64) that ANSI keyboards lack. Non-US
+    /// layouts like Canadian-CSA place characters (e.g., /) on this key, so the
+    /// virtual keyboard must be ISO for those keycodes to work.
+    public var countryCode: UInt64 = 1
 
     public init() {}
 

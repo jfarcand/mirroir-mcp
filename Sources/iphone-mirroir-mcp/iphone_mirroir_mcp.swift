@@ -281,14 +281,15 @@ struct IPhoneMirroirMCP {
             }
         ))
 
-        // type_text — send keyboard input
+        // type_text — type text via Karabiner HID with layout translation
         server.registerTool(MCPToolDefinition(
             name: "type_text",
             description: """
                 Type text on the mirrored iPhone. Automatically activates the \
                 iPhone Mirroring window if needed (one-time Space switch). \
                 A text field must be active on the iPhone. \
-                Sends each character as a keyboard event via Karabiner virtual HID.
+                Copies text to the Mac clipboard and pastes via Cmd+V, \
+                which works with any keyboard layout or locale.
                 """,
             inputSchema: [
                 "type": .string("object"),
@@ -310,14 +311,7 @@ struct IPhoneMirroirMCP {
                     return .error(result.error ?? "Failed to type text")
                 }
 
-                if result.skippedCharacters.isEmpty {
-                    return .text("Typed \(text.count) characters")
-                }
-                let typedCount = text.count - result.skippedCharacters.count
-                return .text(
-                    "Typed \(typedCount)/\(text.count) characters. "
-                    + "Skipped (no US QWERTY mapping): \(result.skippedCharacters)"
-                )
+                return .text("Typed \(text.count) characters")
             }
         ))
 

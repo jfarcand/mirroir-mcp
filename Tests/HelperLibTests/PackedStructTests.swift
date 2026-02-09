@@ -153,8 +153,9 @@ struct PackedStructTests {
         #expect(bytes[9] == 0x02)
         for i in 10..<16 { #expect(bytes[i] == 0x00, "productID byte[\(i)] should be 0") }
 
-        // countryCode = 0 (bytes 16-23)
-        for i in 16..<24 { #expect(bytes[i] == 0x00, "countryCode byte[\(i)] should be 0") }
+        // countryCode = 1 (ISO, little-endian uint64 at bytes 16-23)
+        #expect(bytes[16] == 0x01, "countryCode should be 1 (ISO)")
+        for i in 17..<24 { #expect(bytes[i] == 0x00, "countryCode byte[\(i)] should be 0") }
     }
 
     // MARK: - KeyboardModifier

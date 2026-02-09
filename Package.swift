@@ -12,7 +12,10 @@ let package = Package(
     targets: [
         .target(
             name: "HelperLib",
-            path: "Sources/HelperLib"
+            path: "Sources/HelperLib",
+            linkerSettings: [
+                .linkedFramework("Carbon"),
+            ]
         ),
         .executableTarget(
             name: "iphone-mirroir-mcp",
