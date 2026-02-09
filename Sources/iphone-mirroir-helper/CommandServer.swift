@@ -516,8 +516,10 @@ final class CommandServer {
         ])
     }
 
-    /// Swipe from one screen-absolute point to another.
-    /// Disconnects physical mouse, warps cursor, interpolates movement, restores cursor.
+    /// Swipe from one screen-absolute point to another using scroll wheel events.
+    /// iPhone Mirroring maps mouse scroll to iOS swipe/scroll gestures, while
+    /// click-drag maps to touch-and-drag (icon rearranging). Scroll wheel is
+    /// the correct input for page changes, list scrolling, and content swiping.
     private func handleSwipe(_ json: [String: Any]) -> Data {
         guard let fromX = (json["from_x"] as? NSNumber)?.doubleValue,
               let fromY = (json["from_y"] as? NSNumber)?.doubleValue,
@@ -538,11 +540,14 @@ final class CommandServer {
         // Disconnect physical mouse so user movement doesn't interfere
         CGAssociateMouseAndMouseCursorPosition(boolean_t(0))
 
-        // Warp to start position
-        CGWarpMouseCursorPosition(CGPoint(x: fromX, y: fromY))
+        // Warp cursor to the midpoint of the swipe so scroll events target
+        // the correct area of the iPhone Mirroring window
+        let midX = (fromX + toX) / 2.0
+        let midY = (fromY + toY) / 2.0
+        CGWarpMouseCursorPosition(CGPoint(x: midX, y: midY))
         usleep(10_000)
 
-        // Sync Karabiner with nudge
+        // Sync Karabiner with nudge so the virtual device knows the cursor position
         var nudge = PointingInput()
         nudge.x = 1
         karabiner.postPointingReport(nudge)
@@ -551,44 +556,39 @@ final class CommandServer {
         karabiner.postPointingReport(nudge)
         usleep(10_000)
 
-        // Button down with brief dwell for touch registration, then move
-        // immediately. Too long (30ms+) triggers iOS long-press/jiggle mode
-        // on home screen icons. Too short (<5ms) and the touch may not register.
-        var down = PointingInput()
-        down.buttons = 0x01
-        karabiner.postPointingReport(down)
-        usleep(15_000)
-
-        // Interpolate movement
-        let steps = 40
+        // Send scroll wheel events to simulate the swipe gesture.
+        // No button press — scroll wheel maps to iOS swipe/scroll, while
+        // click-drag maps to touch-and-drag (which triggers icon jiggle mode).
         let totalDx = toX - fromX
         let totalDy = toY - fromY
+        let steps = 20
         let stepDelayUs = UInt32(max(durationMs, 1) * 1000 / steps)
 
-        for i in 1...steps {
-            let progress = Double(i) / Double(steps)
-            let targetX = fromX + totalDx * progress
-            let targetY = fromY + totalDy * progress
+        // Scale pixel distance to scroll wheel units. Scroll wheel values are
+        // much coarser than pixels — each unit scrolls several pixels.
+        // Using a divisor to convert pixel distance to reasonable scroll ticks.
+        let scrollScale = 8.0
+        var hAccum = 0.0
+        var vAccum = 0.0
+        let hPerStep = totalDx / scrollScale / Double(steps)
+        let vPerStep = totalDy / scrollScale / Double(steps)
 
-            // Warp cursor along the path
-            CGWarpMouseCursorPosition(CGPoint(x: targetX, y: targetY))
+        for _ in 1...steps {
+            hAccum += hPerStep
+            vAccum += vPerStep
 
-            // Send small relative movement to keep Karabiner in sync
-            let dx = Int8(clamping: Int(totalDx / Double(steps)))
-            let dy = Int8(clamping: Int(totalDy / Double(steps)))
-            var move = PointingInput()
-            move.buttons = 0x01
-            move.x = dx
-            move.y = dy
-            karabiner.postPointingReport(move)
+            let hTick = Int8(clamping: Int(hAccum.rounded()))
+            let vTick = Int8(clamping: Int(vAccum.rounded()))
+
+            hAccum -= Double(hTick)
+            vAccum -= Double(vTick)
+
+            var scroll = PointingInput()
+            scroll.horizontalWheel = hTick
+            scroll.verticalWheel = vTick
+            karabiner.postPointingReport(scroll)
             usleep(stepDelayUs)
         }
-
-        // Button up
-        var up = PointingInput()
-        up.buttons = 0x00
-        karabiner.postPointingReport(up)
-        usleep(10_000)
 
         // Restore cursor and reconnect physical mouse
         CGWarpMouseCursorPosition(savedPosition)

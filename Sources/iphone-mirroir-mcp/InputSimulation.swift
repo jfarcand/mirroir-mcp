@@ -43,6 +43,8 @@ final class InputSimulation: @unchecked Sendable {
             return helperClient.unavailableMessage
         }
 
+        ensureMirroringFrontmost()
+
         let screenX = info.position.x + CGFloat(x)
         let screenY = info.position.y + CGFloat(y)
 
@@ -64,6 +66,8 @@ final class InputSimulation: @unchecked Sendable {
         guard helperClient.isAvailable else {
             return helperClient.unavailableMessage
         }
+
+        ensureMirroringFrontmost()
 
         let startX = Double(info.position.x) + fromX
         let startY = Double(info.position.y) + fromY
@@ -89,6 +93,8 @@ final class InputSimulation: @unchecked Sendable {
             return helperClient.unavailableMessage
         }
 
+        ensureMirroringFrontmost()
+
         let screenX = Double(info.position.x) + x
         let screenY = Double(info.position.y) + y
 
@@ -108,6 +114,8 @@ final class InputSimulation: @unchecked Sendable {
         guard helperClient.isAvailable else {
             return helperClient.unavailableMessage
         }
+
+        ensureMirroringFrontmost()
 
         let screenX = Double(info.position.x) + x
         let screenY = Double(info.position.y) + y
@@ -131,6 +139,8 @@ final class InputSimulation: @unchecked Sendable {
         guard helperClient.isAvailable else {
             return helperClient.unavailableMessage
         }
+
+        ensureMirroringFrontmost()
 
         let startX = Double(info.position.x) + fromX
         let startY = Double(info.position.y) + fromY

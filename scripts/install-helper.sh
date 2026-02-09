@@ -13,7 +13,14 @@ LOG="/var/log/iphone-mirroir-helper.log"
 
 echo "=== Building iphone-mirroir-helper ==="
 cd "$PROJECT_DIR"
-swift build -c release --product "$HELPER_BIN"
+
+# Build as the real user, not root. Running `swift build` as root creates
+# root-owned artifacts in .build/ that block subsequent user builds.
+if [ "$(id -u)" -eq 0 ] && [ -n "$SUDO_USER" ]; then
+    sudo -u "$SUDO_USER" swift build -c release --product "$HELPER_BIN"
+else
+    swift build -c release --product "$HELPER_BIN"
+fi
 
 echo ""
 echo "=== Installing helper (requires sudo) ==="
