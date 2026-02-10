@@ -7,6 +7,7 @@ Works with any app visible on the iPhone screen: App Store apps, TestFlight buil
 ## What Works
 
 - **Screenshots** — captures the mirrored iPhone screen as PNG
+- **Screen analysis** — OCR-based element detection with tap coordinates and a coordinate grid overlay for precise targeting of unlabeled icons
 - **Video recording** — record the mirrored screen as .mov files
 - **Taps** — click anywhere on the iPhone screen via Karabiner virtual pointing device
 - **Swipes** — drag between two points with configurable duration
@@ -184,6 +185,7 @@ The installer handles everything: installs Karabiner if missing (with confirmati
 | Tool | Parameters | Description |
 |------|-----------|-------------|
 | `screenshot` | — | Capture the iPhone screen as base64 PNG |
+| `describe_screen` | — | OCR the screen and return text elements with tap coordinates plus a grid-overlaid screenshot |
 | `start_recording` | `output_path`? | Start video recording of the mirrored screen |
 | `stop_recording` | — | Stop recording and return the .mov file path |
 | `tap` | `x`, `y` | Tap at coordinates (relative to mirroring window) |
@@ -202,7 +204,7 @@ The installer handles everything: installs Karabiner if missing (with confirmati
 | `get_orientation` | — | Report portrait/landscape and window dimensions |
 | `status` | — | Connection state, window geometry, and device readiness |
 
-Coordinates are in points relative to the mirroring window's top-left corner. Screenshots are Retina 2x — divide pixel coordinates by 2 to get tap coordinates.
+Coordinates are in points relative to the mirroring window's top-left corner. Use `describe_screen` to get exact tap coordinates via OCR — its grid overlay also helps target unlabeled icons (back arrows, stars, gears) that OCR can't detect. For raw screenshots, coordinates are Retina 2x — divide pixel coordinates by 2 to get tap coordinates.
 
 ### Typing workflow
 
@@ -227,6 +229,7 @@ MCP Client (stdin/stdout JSON-RPC)
 iphone-mirroir-mcp (user process)
     ├── MirroringBridge    — AXUIElement window discovery + menu actions
     ├── ScreenCapture      — screencapture -l <windowID>
+    ├── ScreenDescriber    — Vision OCR + coordinate grid overlay
     ├── InputSimulation    — activate-once + coordinate mapping
     │       ├── type_text  → activate if needed → HelperClient type
     │       ├── press_key  → activate if needed → HelperClient press_key
