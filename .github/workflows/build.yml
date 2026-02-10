@@ -48,7 +48,7 @@ jobs:
           lines = sys.stdin.readlines()
           obj = json.loads(lines[1])
           tools = [t['name'] for t in obj['result']['tools']]
-          expected = {'screenshot','start_recording','stop_recording','tap','swipe','drag','type_text','press_key','long_press','double_tap','shake','launch_app','open_url','press_home','press_app_switcher','spotlight','get_orientation','status'}
+          expected = {'screenshot','start_recording','stop_recording','tap','swipe','drag','type_text','press_key','long_press','double_tap','shake','launch_app','open_url','press_home','press_app_switcher','spotlight','get_orientation','status','describe_screen'}
           assert set(tools) == expected, f'Expected: {expected}\nGot: {set(tools)}\nMissing: {expected - set(tools)}\nExtra: {set(tools) - expected}'
           print(f'tools/list: {len(tools)} tools registered')
           "

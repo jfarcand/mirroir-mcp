@@ -10,3 +10,6 @@ DerivedData/
 .mcpregistry_*
 claude_docs/*
 update-helper.sh
+npm/bin/iphone-mirroir-mcp-native
+npm/bin/iphone-mirroir-helper
+npm/bin/com.jfarcand.iphone-mirroir-helper.plist
