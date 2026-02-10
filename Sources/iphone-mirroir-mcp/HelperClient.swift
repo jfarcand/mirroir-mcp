@@ -191,8 +191,9 @@ final class HelperClient: @unchecked Sendable {
             return false
         }
 
-        // Set send/receive timeouts (2 seconds)
-        var tv = timeval(tv_sec: 2, tv_usec: 0)
+        // Set send/receive timeouts (5 seconds — type commands with long text
+        // can take several hundred milliseconds for the helper to process)
+        var tv = timeval(tv_sec: 5, tv_usec: 0)
         setsockopt(socketFd, SOL_SOCKET, SO_SNDTIMEO, &tv, socklen_t(MemoryLayout<timeval>.size))
         setsockopt(socketFd, SOL_SOCKET, SO_RCVTIMEO, &tv, socklen_t(MemoryLayout<timeval>.size))
 

@@ -4,20 +4,26 @@
 // ABOUTME: Entry point for the iPhone Mirroring MCP server.
 // ABOUTME: Registers all MCP tools and starts the JSON-RPC server loop over stdio.
 
+import Darwin
 import Foundation
 
 @main
 struct IPhoneMirroirMCP {
     static func main() {
+        // Ignore SIGPIPE so the server doesn't crash when the MCP client
+        // disconnects or its stdio pipe closes unexpectedly.
+        signal(SIGPIPE, SIG_IGN)
+
         // Redirect stderr for logging (stdout is reserved for MCP JSON-RPC)
         let bridge = MirroringBridge()
         let capture = ScreenCapture(bridge: bridge)
         let recorder = ScreenRecorder(bridge: bridge)
         let input = InputSimulation(bridge: bridge)
+        let describer = ScreenDescriber(bridge: bridge)
         let server = MCPServer()
 
         registerTools(server: server, bridge: bridge, capture: capture,
-                      recorder: recorder, input: input)
+                      recorder: recorder, input: input, describer: describer)
 
         // Start the MCP server loop
         server.run()
@@ -28,7 +34,8 @@ struct IPhoneMirroirMCP {
         bridge: MirroringBridge,
         capture: ScreenCapture,
         recorder: ScreenRecorder,
-        input: InputSimulation
+        input: InputSimulation,
+        describer: ScreenDescriber
     ) {
         // screenshot — capture the mirroring window
         server.registerTool(MCPToolDefinition(
@@ -59,6 +66,53 @@ struct IPhoneMirroirMCP {
                 }
 
                 return .image(base64)
+            }
+        ))
+
+        // describe_screen — OCR-based screen element detection with tap coordinates
+        server.registerTool(MCPToolDefinition(
+            name: "describe_screen",
+            description: """
+                Analyze the iPhone screen using OCR and return all visible text elements \
+                with their exact tap coordinates. Use this instead of visually estimating \
+                positions from screenshots. Returns both a structured text list of elements \
+                and the screenshot image. Coordinates are in the same point system as the \
+                tap tool (0,0 = top-left of mirroring window).
+                """,
+            inputSchema: [
+                "type": .string("object"),
+                "properties": .object([:]),
+            ],
+            handler: { _ in
+                guard bridge.findProcess() != nil else {
+                    return .error("iPhone Mirroring app is not running")
+                }
+                let state = bridge.getState()
+                if state == .paused {
+                    _ = bridge.pressResume()
+                    usleep(2_000_000)
+                }
+                guard let result = describer.describe() else {
+                    return .error(
+                        "Failed to capture/analyze screen. Is iPhone Mirroring window visible?")
+                }
+
+                var lines = ["Screen elements (tap coordinates in points):"]
+                for el in result.elements.sorted(by: { $0.tapY < $1.tapY }) {
+                    lines.append("- \"\(el.text)\" at (\(Int(el.tapX)), \(Int(el.tapY)))")
+                }
+                if result.elements.isEmpty {
+                    lines.append("(no text detected)")
+                }
+                let description = lines.joined(separator: "\n")
+
+                return MCPToolResult(
+                    content: [
+                        .text(description),
+                        .image(result.screenshotBase64, mimeType: "image/png"),
+                    ],
+                    isError: false
+                )
             }
         ))
 
