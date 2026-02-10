@@ -156,9 +156,10 @@ final class HelperClient: @unchecked Sendable {
     /// Get an error message explaining that the helper is not available.
     var unavailableMessage: String {
         return """
-            Karabiner helper not running. Tap/type/swipe require the privileged helper.\n\
-            Install: cd iphone-mirroir-mcp && ./scripts/install-helper.sh\n\
-            Screenshots and menu actions (Home, Spotlight, App Switcher) still work.
+            Helper daemon not running. Tap, type, and swipe require the helper daemon.\n\
+            Run this in your terminal to complete setup:\n\
+              npx iphone-mirroir-mcp setup\n\
+            Screenshots and menu actions (Home, Spotlight, App Switcher) still work without it.
             """
     }
 

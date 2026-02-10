@@ -138,9 +138,17 @@ sudo brew services start iphone-mirroir-mcp
 
 Then point your MCP client to the binary at `iphone-mirroir-mcp` (it's in your PATH after `brew install`).
 
-### Setup (all install methods)
+### First-time setup
 
-Open Karabiner-Elements, select **ANSI** keyboard type, then approve the DriverKit extension: **System Settings > General > Login Items & Extensions** — enable all toggles under Karabiner-Elements.
+The first time the agent tries to tap, type, or swipe, it will tell you the helper daemon isn't running. Run this once in your terminal:
+
+```bash
+npx iphone-mirroir-mcp setup
+```
+
+This installs [Karabiner-Elements](https://karabiner-elements.pqrs.org/) if needed, configures the DriverKit extension, and starts the helper daemon. It requires `sudo` for the daemon installation.
+
+After setup, approve the DriverKit extension: **System Settings > General > Login Items & Extensions** — enable all toggles under Karabiner-Elements.
 
 The first time you take a screenshot, macOS will prompt for **Screen Recording** and **Accessibility** permissions. Grant both.
 
