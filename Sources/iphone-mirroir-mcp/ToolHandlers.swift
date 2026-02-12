@@ -14,12 +14,15 @@ extension IPhoneMirroirMCP {
         capture: ScreenCapture,
         recorder: ScreenRecorder,
         input: InputSimulation,
-        describer: ScreenDescriber
+        describer: ScreenDescriber,
+        policy: PermissionPolicy,
+        debug: Bool = false
     ) {
         registerScreenTools(server: server, bridge: bridge, capture: capture,
                             recorder: recorder, describer: describer)
         registerInputTools(server: server, bridge: bridge, input: input)
-        registerNavigationTools(server: server, bridge: bridge, input: input)
+        registerNavigationTools(server: server, bridge: bridge, input: input,
+                                policy: policy, debug: debug)
         registerInfoTools(server: server, bridge: bridge, input: input)
     }
 
@@ -533,7 +536,9 @@ extension IPhoneMirroirMCP {
     private static func registerNavigationTools(
         server: MCPServer,
         bridge: MirroringBridge,
-        input: InputSimulation
+        input: InputSimulation,
+        policy: PermissionPolicy,
+        debug: Bool
     ) {
         // launch_app — open an app by name via Spotlight search
         server.registerTool(MCPToolDefinition(
@@ -557,6 +562,14 @@ extension IPhoneMirroirMCP {
             handler: { args in
                 guard let appName = args["name"]?.asString() else {
                     return .error("Missing required parameter: name (string)")
+                }
+
+                let appDecision = policy.checkAppLaunch(appName)
+                if debug {
+                    fputs("[permission] checkAppLaunch(\(appName))=\(appDecision)\n", stderr)
+                }
+                if case .denied(let reason) = appDecision {
+                    return .error(reason)
                 }
 
                 if let error = input.launchApp(name: appName) {

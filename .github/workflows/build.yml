@@ -42,7 +42,7 @@ jobs:
       - name: Test tools/list
         run: |
           printf '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}\n{"jsonrpc":"2.0","id":2,"method":"tools/list","params":{}}\n' \
-            | .build/release/iphone-mirroir-mcp 2>/dev/null \
+            | .build/release/iphone-mirroir-mcp --dangerously-skip-permissions 2>/dev/null \
             | python3 -c "
           import sys, json
           lines = sys.stdin.readlines()
@@ -56,7 +56,7 @@ jobs:
       - name: Test tool schemas
         run: |
           printf '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}\n{"jsonrpc":"2.0","id":2,"method":"tools/list","params":{}}\n' \
-            | .build/release/iphone-mirroir-mcp 2>/dev/null \
+            | .build/release/iphone-mirroir-mcp --dangerously-skip-permissions 2>/dev/null \
             | python3 -c "
           import sys, json
           lines = sys.stdin.readlines()
@@ -82,6 +82,33 @@ jobs:
           assert ss.get('required', []) == [] or 'properties' not in ss or len(ss['properties']) == 0
 
           print('Tool schemas: OK')
+          "
+
+      - name: Test fail-closed default (readonly only)
+        run: |
+          printf '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}\n{"jsonrpc":"2.0","id":2,"method":"tools/list","params":{}}\n' \
+            | .build/release/iphone-mirroir-mcp 2>/dev/null \
+            | python3 -c "
+          import sys, json
+          lines = sys.stdin.readlines()
+          obj = json.loads(lines[1])
+          tools = [t['name'] for t in obj['result']['tools']]
+          expected_readonly = {'screenshot','start_recording','stop_recording','get_orientation','status','describe_screen'}
+          assert set(tools) == expected_readonly, f'Fail-closed should show only readonly tools.\nExpected: {expected_readonly}\nGot: {set(tools)}\nExtra: {set(tools) - expected_readonly}\nMissing: {expected_readonly - set(tools)}'
+          print(f'Fail-closed default: {len(tools)} readonly tools (OK)')
+          "
+
+      - name: Test --yolo alias shows all tools
+        run: |
+          printf '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}\n{"jsonrpc":"2.0","id":2,"method":"tools/list","params":{}}\n' \
+            | .build/release/iphone-mirroir-mcp --yolo 2>/dev/null \
+            | python3 -c "
+          import sys, json
+          lines = sys.stdin.readlines()
+          obj = json.loads(lines[1])
+          tools = [t['name'] for t in obj['result']['tools']]
+          assert len(tools) == 19, f'--yolo should show all 19 tools, got {len(tools)}: {tools}'
+          print(f'--yolo alias: {len(tools)} tools (OK)')
           "
 
       - name: Test unknown method returns error

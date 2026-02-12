@@ -10,8 +10,12 @@ final class MCPServer: @unchecked Sendable {
     private var tools: [String: MCPToolDefinition] = [:]
     private let encoder: JSONEncoder
     private let decoder: JSONDecoder
+    private let policy: PermissionPolicy
+    private let debug: Bool
 
-    init() {
+    init(policy: PermissionPolicy, debug: Bool = false) {
+        self.policy = policy
+        self.debug = debug
         encoder = JSONEncoder()
         decoder = JSONDecoder()
     }
@@ -75,13 +79,15 @@ final class MCPServer: @unchecked Sendable {
     }
 
     private func handleToolsList(_ request: JSONRPCRequest) -> JSONRPCResponse {
-        let toolList: [JSONValue] = tools.values.map { tool in
-            .object([
-                "name": .string(tool.name),
-                "description": .string(tool.description),
-                "inputSchema": .object(tool.inputSchema),
-            ])
-        }
+        let toolList: [JSONValue] = tools.values
+            .filter { policy.isToolVisible($0.name) }
+            .map { tool in
+                .object([
+                    "name": .string(tool.name),
+                    "description": .string(tool.description),
+                    "inputSchema": .object(tool.inputSchema),
+                ])
+            }
         let result: JSONValue = .object(["tools": .array(toolList)])
         return JSONRPCResponse(id: request.id, result: result, error: nil)
     }
@@ -101,6 +107,21 @@ final class MCPServer: @unchecked Sendable {
                 result: nil,
                 error: JSONRPCError(code: -32602, message: "Unknown tool: \(toolName)")
             )
+        }
+
+        let decision = policy.checkTool(toolName)
+        if debug {
+            fputs("[permission] checkTool(\(toolName))=\(decision)\n", stderr)
+        }
+        if case .denied(let reason) = decision {
+            let content: JSONValue = .array([
+                MCPContent.text(reason).toJSON()
+            ])
+            let result: JSONValue = .object([
+                "content": content,
+                "isError": .bool(true),
+            ])
+            return JSONRPCResponse(id: request.id, result: result, error: nil)
         }
 
         let arguments = request.params?.getArguments() ?? [:]

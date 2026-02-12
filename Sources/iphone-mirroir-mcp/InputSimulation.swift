@@ -32,8 +32,11 @@ final class InputSimulation: @unchecked Sendable {
     /// from the first non-US keyboard layout found on the Mac.
     private let layoutSubstitution: [Character: Character]
 
-    init(bridge: MirroringBridge) {
+    private let debug: Bool
+
+    init(bridge: MirroringBridge, debug: Bool = false) {
         self.bridge = bridge
+        self.debug = debug
 
         // Build layout substitution table if a non-US layout is installed.
         // The iPhone's hardware keyboard layout typically matches one of the
@@ -53,26 +56,52 @@ final class InputSimulation: @unchecked Sendable {
         }
     }
 
+    /// Write debug line to both stderr and /tmp/iphone-mirroir-mcp-debug.log.
+    private static let debugLogPath = "/tmp/iphone-mirroir-mcp-debug.log"
+
+    private func debugLog(_ tag: String, _ message: String) {
+        guard debug else { return }
+        let line = "[\(tag)] \(message)\n"
+        fputs(line, stderr)
+        if let fh = FileHandle(forWritingAtPath: Self.debugLogPath) {
+            fh.seekToEndOfFile()
+            fh.write(Data(line.utf8))
+            fh.closeFile()
+        } else {
+            FileManager.default.createFile(atPath: Self.debugLogPath,
+                                           contents: Data(line.utf8))
+        }
+    }
+
+    /// Log window info and frontmost app state for any coordinate-based operation.
+    private func logWindowState(_ tag: String, _ info: WindowInfo) {
+        let frontApp = NSWorkspace.shared.frontmostApplication?.bundleIdentifier ?? "unknown"
+        debugLog(tag, "window=(\(Int(info.position.x)),\(Int(info.position.y))) size=\(Int(info.size.width))x\(Int(info.size.height)) frontApp=\(frontApp)")
+    }
+
     /// Tap at a position relative to the mirroring window.
     /// Returns nil on success, or an error message if the helper is unavailable.
     func tap(x: Double, y: Double) -> String? {
         guard let info = bridge.getWindowInfo() else {
+            debugLog("tap", "ERROR: window not found")
             return "iPhone Mirroring window not found"
         }
 
         guard helperClient.isAvailable else {
+            debugLog("tap", "ERROR: helper unavailable")
             return helperClient.unavailableMessage
         }
 
+        logWindowState("tap", info)
         ensureMirroringFrontmost()
 
         let screenX = info.position.x + CGFloat(x)
         let screenY = info.position.y + CGFloat(y)
+        debugLog("tap", "relative=(\(x),\(y)) screen=(\(Int(screenX)),\(Int(screenY)))")
 
-        if helperClient.click(x: Double(screenX), y: Double(screenY)) {
-            return nil // success
-        }
-        return "Helper click failed"
+        let result = helperClient.click(x: Double(screenX), y: Double(screenY))
+        debugLog("tap", "helperClick=\(result ? "OK" : "FAILED")")
+        return result ? nil : "Helper click failed"
     }
 
     /// Swipe from one point to another relative to the mirroring window.
@@ -81,13 +110,16 @@ final class InputSimulation: @unchecked Sendable {
         -> String?
     {
         guard let info = bridge.getWindowInfo() else {
+            debugLog("swipe", "ERROR: window not found")
             return "iPhone Mirroring window not found"
         }
 
         guard helperClient.isAvailable else {
+            debugLog("swipe", "ERROR: helper unavailable")
             return helperClient.unavailableMessage
         }
 
+        logWindowState("swipe", info)
         ensureMirroringFrontmost()
 
         let startX = Double(info.position.x) + fromX
@@ -95,56 +127,63 @@ final class InputSimulation: @unchecked Sendable {
         let endX = Double(info.position.x) + toX
         let endY = Double(info.position.y) + toY
 
-        if helperClient.swipe(fromX: startX, fromY: startY,
+        debugLog("swipe", "from=(\(fromX),\(fromY))->(\(toX),\(toY)) screen=(\(Int(startX)),\(Int(startY)))->(\(Int(endX)),\(Int(endY))) duration=\(durationMs)ms")
+
+        let result = helperClient.swipe(fromX: startX, fromY: startY,
                               toX: endX, toY: endY,
-                              durationMs: durationMs) {
-            return nil // success
-        }
-        return "Helper swipe failed"
+                              durationMs: durationMs)
+        debugLog("swipe", "helper=\(result ? "OK" : "FAILED")")
+        return result ? nil : "Helper swipe failed"
     }
 
     /// Long press at a position relative to the mirroring window.
     /// Returns nil on success, or an error message on failure.
     func longPress(x: Double, y: Double, durationMs: Int = 500) -> String? {
         guard let info = bridge.getWindowInfo() else {
+            debugLog("longPress", "ERROR: window not found")
             return "iPhone Mirroring window not found"
         }
 
         guard helperClient.isAvailable else {
+            debugLog("longPress", "ERROR: helper unavailable")
             return helperClient.unavailableMessage
         }
 
+        logWindowState("longPress", info)
         ensureMirroringFrontmost()
 
         let screenX = Double(info.position.x) + x
         let screenY = Double(info.position.y) + y
+        debugLog("longPress", "relative=(\(x),\(y)) screen=(\(Int(screenX)),\(Int(screenY))) duration=\(durationMs)ms")
 
-        if helperClient.longPress(x: screenX, y: screenY, durationMs: durationMs) {
-            return nil
-        }
-        return "Helper long press failed"
+        let result = helperClient.longPress(x: screenX, y: screenY, durationMs: durationMs)
+        debugLog("longPress", "helper=\(result ? "OK" : "FAILED")")
+        return result ? nil : "Helper long press failed"
     }
 
     /// Double-tap at a position relative to the mirroring window.
     /// Returns nil on success, or an error message on failure.
     func doubleTap(x: Double, y: Double) -> String? {
         guard let info = bridge.getWindowInfo() else {
+            debugLog("doubleTap", "ERROR: window not found")
             return "iPhone Mirroring window not found"
         }
 
         guard helperClient.isAvailable else {
+            debugLog("doubleTap", "ERROR: helper unavailable")
             return helperClient.unavailableMessage
         }
 
+        logWindowState("doubleTap", info)
         ensureMirroringFrontmost()
 
         let screenX = Double(info.position.x) + x
         let screenY = Double(info.position.y) + y
+        debugLog("doubleTap", "relative=(\(x),\(y)) screen=(\(Int(screenX)),\(Int(screenY)))")
 
-        if helperClient.doubleTap(x: screenX, y: screenY) {
-            return nil
-        }
-        return "Helper double tap failed"
+        let result = helperClient.doubleTap(x: screenX, y: screenY)
+        debugLog("doubleTap", "helper=\(result ? "OK" : "FAILED")")
+        return result ? nil : "Helper double tap failed"
     }
 
     /// Drag from one point to another relative to the mirroring window.
@@ -154,13 +193,16 @@ final class InputSimulation: @unchecked Sendable {
     func drag(fromX: Double, fromY: Double, toX: Double, toY: Double,
               durationMs: Int = 1000) -> String? {
         guard let info = bridge.getWindowInfo() else {
+            debugLog("drag", "ERROR: window not found")
             return "iPhone Mirroring window not found"
         }
 
         guard helperClient.isAvailable else {
+            debugLog("drag", "ERROR: helper unavailable")
             return helperClient.unavailableMessage
         }
 
+        logWindowState("drag", info)
         ensureMirroringFrontmost()
 
         let startX = Double(info.position.x) + fromX
@@ -168,38 +210,44 @@ final class InputSimulation: @unchecked Sendable {
         let endX = Double(info.position.x) + toX
         let endY = Double(info.position.y) + toY
 
-        if helperClient.drag(fromX: startX, fromY: startY,
+        debugLog("drag", "from=(\(fromX),\(fromY))->(\(toX),\(toY)) screen=(\(Int(startX)),\(Int(startY)))->(\(Int(endX)),\(Int(endY))) duration=\(durationMs)ms")
+
+        let result = helperClient.drag(fromX: startX, fromY: startY,
                              toX: endX, toY: endY,
-                             durationMs: durationMs) {
-            return nil
-        }
-        return "Helper drag failed"
+                             durationMs: durationMs)
+        debugLog("drag", "helper=\(result ? "OK" : "FAILED")")
+        return result ? nil : "Helper drag failed"
     }
 
     /// Trigger a shake gesture on the mirrored iPhone.
     /// Sends Ctrl+Cmd+Z which triggers shake-to-undo in iOS apps.
     func shake() -> TypeResult {
         guard helperClient.isAvailable else {
+            debugLog("shake", "ERROR: helper unavailable")
             return TypeResult(success: false,
                               warning: nil, error: helperClient.unavailableMessage)
         }
 
+        debugLog("shake", "sending shake gesture")
         ensureMirroringFrontmost()
 
-        if helperClient.shake() {
-            return TypeResult(success: true,
-                              warning: nil, error: nil)
+        let result = helperClient.shake()
+        debugLog("shake", "helper=\(result ? "OK" : "FAILED")")
+        if result {
+            return TypeResult(success: true, warning: nil, error: nil)
         }
-        return TypeResult(success: false,
-                          warning: nil, error: "Helper shake command failed")
+        return TypeResult(success: false, warning: nil, error: "Helper shake command failed")
     }
 
     /// Launch an app by name using Spotlight search.
     /// Opens Spotlight, types the app name, waits for results, and presses Return.
     /// Returns nil on success, or an error message on failure.
     func launchApp(name: String) -> String? {
+        debugLog("launchApp", "launching '\(name)'")
+
         // Step 1: Open Spotlight via menu action
         guard bridge.triggerMenuAction(menu: "View", item: "Spotlight") else {
+            debugLog("launchApp", "ERROR: failed to open Spotlight")
             return "Failed to open Spotlight. Is iPhone Mirroring running?"
         }
         usleep(800_000) // 800ms for Spotlight to appear and be ready for input
@@ -207,6 +255,7 @@ final class InputSimulation: @unchecked Sendable {
         // Step 2: Type the app name
         let typeResult = typeText(name)
         guard typeResult.success else {
+            debugLog("launchApp", "ERROR: failed to type app name")
             return typeResult.error ?? "Failed to type app name"
         }
         usleep(1_000_000) // 1s for search results to populate
@@ -214,9 +263,11 @@ final class InputSimulation: @unchecked Sendable {
         // Step 3: Press Return to launch the top result
         let keyResult = pressKey(keyName: "return")
         guard keyResult.success else {
+            debugLog("launchApp", "ERROR: failed to press Return")
             return keyResult.error ?? "Failed to press Return"
         }
 
+        debugLog("launchApp", "launched '\(name)' OK")
         return nil
     }
 
@@ -225,6 +276,8 @@ final class InputSimulation: @unchecked Sendable {
     /// and presses Return to navigate.
     /// Returns nil on success, or an error message on failure.
     func openURL(_ url: String) -> String? {
+        debugLog("openURL", "opening '\(url)'")
+
         // Step 1: Launch Safari
         if let error = launchApp(name: "Safari") {
             return error
@@ -266,8 +319,11 @@ final class InputSimulation: @unchecked Sendable {
     private func ensureMirroringFrontmost() {
         let frontApp = NSWorkspace.shared.frontmostApplication
         if frontApp?.bundleIdentifier == mirroringBundleID {
+            debugLog("focus", "already frontmost")
             return // already frontmost, no Space switch needed
         }
+
+        debugLog("focus", "switching from \(frontApp?.bundleIdentifier ?? "nil")")
 
         let script = NSAppleScript(source: """
             tell application "System Events"
@@ -279,7 +335,14 @@ final class InputSimulation: @unchecked Sendable {
         var errorInfo: NSDictionary?
         script?.executeAndReturnError(&errorInfo)
 
+        if let err = errorInfo {
+            debugLog("focus", "AppleScript error: \(err)")
+        }
+
         usleep(300_000) // 300ms for Space switch to settle
+
+        let afterApp = NSWorkspace.shared.frontmostApplication
+        debugLog("focus", "after switch frontApp=\(afterApp?.bundleIdentifier ?? "nil")")
     }
 
     /// Type text via a hybrid approach: Karabiner HID for characters with valid
@@ -296,10 +359,12 @@ final class InputSimulation: @unchecked Sendable {
     /// the Karabiner HID report buffer capacity.
     func typeText(_ text: String) -> TypeResult {
         guard helperClient.isAvailable else {
+            debugLog("typeText", "ERROR: helper unavailable")
             return TypeResult(success: false,
                               warning: nil, error: helperClient.unavailableMessage)
         }
 
+        debugLog("typeText", "typing \(text.count) char(s): \(text.prefix(50))")
         ensureMirroringFrontmost()
 
         // Split text into segments: HID-typeable (substituted) vs paste-needed (original).
@@ -397,17 +462,20 @@ final class InputSimulation: @unchecked Sendable {
     /// Activates iPhone Mirroring if needed (at most one Space switch).
     func pressKey(keyName: String, modifiers: [String] = []) -> TypeResult {
         guard helperClient.isAvailable else {
+            debugLog("pressKey", "ERROR: helper unavailable")
             return TypeResult(success: false,
                               warning: nil, error: helperClient.unavailableMessage)
         }
 
+        let modStr = modifiers.isEmpty ? "" : " modifiers=\(modifiers.joined(separator: "+"))"
+        debugLog("pressKey", "key=\(keyName)\(modStr)")
         ensureMirroringFrontmost()
 
-        if helperClient.pressKey(key: keyName, modifiers: modifiers) {
-            return TypeResult(success: true,
-                              warning: nil, error: nil)
+        let result = helperClient.pressKey(key: keyName, modifiers: modifiers)
+        debugLog("pressKey", "helper=\(result ? "OK" : "FAILED")")
+        if result {
+            return TypeResult(success: true, warning: nil, error: nil)
         }
-        return TypeResult(success: false,
-                          warning: nil, error: "Helper press_key command failed")
+        return TypeResult(success: false, warning: nil, error: "Helper press_key command failed")
     }
 }
