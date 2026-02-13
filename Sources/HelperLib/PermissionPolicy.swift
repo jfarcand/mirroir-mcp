@@ -9,7 +9,8 @@ public enum PermissionDecision: Sendable, Equatable {
     case denied(reason: String)
 }
 
-/// JSON-decodable permission configuration loaded from ~/.config/iphone-mirroir-mcp/permissions.json.
+/// JSON-decodable permission configuration loaded from ~/.iphone-mirroir-mcp/permissions.json.
+/// The loader checks project-local (<cwd>/.iphone-mirroir-mcp/) first, then global (~/.iphone-mirroir-mcp/).
 public struct PermissionConfig: Codable, Sendable {
     /// Whitelist of mutating tools to allow (case-insensitive).
     public var allow: [String]?
@@ -32,8 +33,21 @@ public struct PermissionPolicy: Sendable {
     /// Optional config loaded from disk.
     public let config: PermissionConfig?
 
-    /// Path to the JSON permission config file.
-    public static let configPath = "~/.config/iphone-mirroir-mcp/permissions.json"
+    /// Base directory name for config files (both global and project-local).
+    public static let configDirName = ".iphone-mirroir-mcp"
+
+    /// Path to the global config directory.
+    public static var globalConfigDir: String {
+        ("~/" + configDirName as NSString).expandingTildeInPath
+    }
+
+    /// Path to the project-local config directory (relative to current working directory).
+    public static var localConfigDir: String {
+        FileManager.default.currentDirectoryPath + "/" + configDirName
+    }
+
+    /// Display path for error messages (shows the global config path with tilde).
+    public static let configPath = "~/.iphone-mirroir-mcp/permissions.json"
 
     /// Tools that are always visible and allowed (observation-only, no side effects).
     public static let readonlyTools: Set<String> = [
@@ -43,6 +57,8 @@ public struct PermissionPolicy: Sendable {
         "stop_recording",
         "get_orientation",
         "status",
+        "list_scenarios",
+        "get_scenario",
     ]
 
     /// Tools that mutate iPhone state and require explicit permission.
@@ -141,11 +157,18 @@ public struct PermissionPolicy: Sendable {
         return false
     }
 
-    /// Load permission config from the standard config path.
-    /// Returns nil if the file doesn't exist or is malformed (fail-closed defaults).
+    /// Load permission config, checking project-local directory first then global.
+    /// Returns nil if no file exists or is malformed (fail-closed defaults).
     public static func loadConfig() -> PermissionConfig? {
-        let path = (configPath as NSString).expandingTildeInPath
-        guard FileManager.default.fileExists(atPath: path) else {
+        let localPath = localConfigDir + "/permissions.json"
+        let globalPath = globalConfigDir + "/permissions.json"
+
+        let path: String
+        if FileManager.default.fileExists(atPath: localPath) {
+            path = localPath
+        } else if FileManager.default.fileExists(atPath: globalPath) {
+            path = globalPath
+        } else {
             return nil
         }
 
@@ -157,6 +180,11 @@ public struct PermissionPolicy: Sendable {
             fputs("Warning: Failed to parse permissions config at \(path): \(error.localizedDescription)\n", stderr)
             return nil
         }
+    }
+
+    /// Returns the scenario directories in resolution order (project-local first, then global).
+    public static var scenarioDirs: [String] {
+        [localConfigDir + "/scenarios", globalConfigDir + "/scenarios"]
     }
 
     /// Parse CLI arguments for the skip-permissions flag.

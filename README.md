@@ -147,6 +147,27 @@ Start recording, open Settings, scroll down to General > About, then stop
 recording. I need a video of the scroll lag I'm seeing.
 ```
 
+## Scenarios
+
+Scenarios are YAML files that describe multi-step test flows as intents, not scripts. Steps like `tap: "Email"` don't specify coordinates — the AI finds the element by fuzzy OCR matching and adapts to unexpected dialogs, screen layout changes, and timing. Place them in `~/.iphone-mirroir-mcp/scenarios/` (global) or `<cwd>/.iphone-mirroir-mcp/scenarios/` (project-local).
+
+```yaml
+name: Login Flow
+app: Expo Go
+description: Test the login screen with valid credentials
+
+steps:
+  - launch: "Expo Go"
+  - wait_for: "Email"
+  - tap: "Email"
+  - type: "${TEST_EMAIL}"
+  - tap: "Sign In"
+  - assert_visible: "Welcome"
+  - screenshot: "final_state"
+```
+
+`${VAR}` placeholders are resolved from environment variables. See [Tools Reference](docs/tools.md#scenarios) for the full step type reference and directory layout. Example scenario files are in the [`scenarios/`](scenarios/) directory.
+
 ## Security Warning
 
 **This gives an AI agent full control of your iPhone screen.** It can tap anything, type anything, open any app — autonomously. That includes banking apps, messages, and payments.
@@ -192,7 +213,7 @@ brew uninstall iphone-mirroir-mcp
 
 | | |
 |---|---|
-| [Tools Reference](docs/tools.md) | All 18 tools, parameters, and input workflows |
+| [Tools Reference](docs/tools.md) | All 21 tools, parameters, and input workflows |
 | [Permissions](docs/permissions.md) | Fail-closed permission model and config file |
 | [Architecture](docs/architecture.md) | System diagram and how input reaches the iPhone |
 | [Troubleshooting](docs/troubleshooting.md) | Debug mode and common issues |

@@ -1,6 +1,6 @@
 # Tools Reference
 
-All 18 tools exposed by the MCP server. Mutating tools require [permission](permissions.md) to appear in `tools/list`.
+All 21 tools exposed by the MCP server. Mutating tools require [permission](permissions.md) to appear in `tools/list`.
 
 ## Tool List
 
@@ -25,6 +25,8 @@ All 18 tools exposed by the MCP server. Mutating tools require [permission](perm
 | `spotlight` | — | Open Spotlight search |
 | `get_orientation` | — | Report portrait/landscape and window dimensions |
 | `status` | — | Connection state, window geometry, and device readiness |
+| `list_scenarios` | — | List available YAML scenarios from project-local and global config dirs |
+| `get_scenario` | `name` | Read a scenario YAML file with ${VAR} env substitution |
 
 ## Coordinates
 
@@ -42,3 +44,57 @@ Coordinates are in points relative to the mirroring window's top-left corner. Us
 `press_key` sends special keys that `type_text` can't handle — navigation keys, Return to submit forms, Escape to dismiss dialogs, Tab to switch fields, arrows to move through lists. Add modifiers for shortcuts like Cmd+N (new message) or Cmd+Z (undo).
 
 For navigating within apps, combine `spotlight` + `type_text` + `press_key`. For example: `spotlight` → `type_text "Messages"` → `press_key return` → `press_key {"key":"n","modifiers":["command"]}` to open a new conversation.
+
+## Scenarios
+
+Scenarios are YAML files that describe multi-step test flows as intents, not scripts. The server provides two readonly tools for scenario discovery and reading — the AI is the execution engine that interprets steps and calls existing MCP tools.
+
+### Why AI Execution?
+
+Steps like `tap: "Email"` don't specify coordinates — the AI calls `describe_screen`, finds the element by fuzzy matching, and taps it. This matters because real iOS apps change between versions, vary across screen sizes, and throw unexpected UI (permission prompts, keyboard suggestions, notification banners). A deterministic script runner would need exact strings and hardcoded timeouts. The AI adapts: it scrolls to find off-screen elements, dismisses unexpected dialogs, retries failed steps, and flags unresolved `${VAR}` placeholders. Scenarios declare *what* should happen; the AI figures out *how*.
+
+### Directory Layout
+
+```
+~/.iphone-mirroir-mcp/scenarios/          # global scenarios
+<cwd>/.iphone-mirroir-mcp/scenarios/      # project-local (overrides global)
+```
+
+Project-local scenarios with the same filename override global ones.
+
+### YAML Format
+
+```yaml
+name: Login Flow
+app: Expo Go
+description: Test the login screen with valid credentials
+
+steps:
+  - launch: "Expo Go"
+  - wait_for: "Email"
+  - tap: "Email"
+  - type: "${TEST_EMAIL}"
+  - tap: "Sign In"
+  - assert_visible: "Welcome"
+  - screenshot: "final_state"
+```
+
+### Variable Substitution
+
+`${VAR}` placeholders are resolved from environment variables when `get_scenario` reads the file. Unresolved variables are left as-is so the AI can flag them.
+
+### Step Types
+
+Steps are intents — the AI maps each to the appropriate MCP tool calls:
+
+| Step | AI Action |
+|------|-----------|
+| `launch` | calls `launch_app` |
+| `tap: "Label"` | calls `describe_screen` to find element, then `tap` |
+| `type` | calls `type_text` |
+| `swipe: "up"` | calls `swipe` with appropriate coordinates |
+| `wait_for: "Label"` | polls `describe_screen` until element appears |
+| `assert_visible` / `assert_not_visible` | checks via `describe_screen` |
+| `screenshot: "label"` | captures and labels in report |
+| `press_key` | calls `press_key` |
+| `open_url` | calls `open_url` |

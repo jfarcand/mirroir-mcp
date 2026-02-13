@@ -1,0 +1,16 @@
+name: Login Flow
+app: Expo Go
+description: Test the login screen with valid credentials
+
+steps:
+  - launch: "Expo Go"
+  - wait_for: "LoginDemo"
+  - tap: "LoginDemo"
+  - wait_for: "Email"
+  - tap: "Email"
+  - type: "${TEST_EMAIL}"
+  - tap: "Password"
+  - type: "${TEST_PASSWORD}"
+  - tap: "Sign In"
+  - assert_visible: "Welcome"
+  - screenshot: "final_state"

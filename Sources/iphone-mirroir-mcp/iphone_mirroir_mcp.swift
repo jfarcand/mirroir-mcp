@@ -23,32 +23,32 @@ struct IPhoneMirroirMCP {
         let config = PermissionPolicy.loadConfig()
         let policy = PermissionPolicy(skipPermissions: skipPermissions, config: config)
 
-        // Log startup info to stderr (always) and debug log file (when --debug)
+        // Log startup info to stderr and the log file (always persisted)
         if skipPermissions {
-            DebugLog.log("startup", "Permission mode: all tools enabled (--dangerously-skip-permissions)")
+            DebugLog.persist("startup", "Permission mode: all tools enabled (--dangerously-skip-permissions)")
         } else if let cfg = config {
-            DebugLog.log("startup", "Permission mode: config-based (\(PermissionPolicy.configPath))")
-            DebugLog.log("startup", "  allow: \(cfg.allow ?? [])")
-            DebugLog.log("startup", "  deny: \(cfg.deny ?? [])")
-            DebugLog.log("startup", "  blockedApps: \(cfg.blockedApps ?? [])")
+            DebugLog.persist("startup", "Permission mode: config-based (\(PermissionPolicy.configPath))")
+            DebugLog.persist("startup", "  allow: \(cfg.allow ?? [])")
+            DebugLog.persist("startup", "  deny: \(cfg.deny ?? [])")
+            DebugLog.persist("startup", "  blockedApps: \(cfg.blockedApps ?? [])")
         } else {
-            DebugLog.log("startup", "Permission mode: fail-closed (readonly tools only)")
+            DebugLog.persist("startup", "Permission mode: fail-closed (readonly tools only)")
         }
 
-        if DebugLog.enabled {
-            // Truncate the debug log on each server start (startup lines already written above)
-        } else {
-            // Log startup to stderr even without --debug (lightweight, useful for MCP client logs)
-            if skipPermissions {
-                fputs("[startup] Permission mode: all tools enabled (--dangerously-skip-permissions)\n", stderr)
-            } else if let cfg = config {
-                fputs("[startup] Permission mode: config-based (\(PermissionPolicy.configPath))\n", stderr)
-                fputs("[startup]   allow: \(cfg.allow ?? [])\n", stderr)
-                fputs("[startup]   deny: \(cfg.deny ?? [])\n", stderr)
-                fputs("[startup]   blockedApps: \(cfg.blockedApps ?? [])\n", stderr)
-            } else {
-                fputs("[startup] Permission mode: fail-closed (readonly tools only)\n", stderr)
-            }
+        // Log denied and hidden tools so silent exclusions are visible
+        let deniedTools = PermissionPolicy.mutatingTools.filter { tool in
+            if case .denied = policy.checkTool(tool) { return true }
+            return false
+        }.sorted()
+        let hiddenTools = PermissionPolicy.mutatingTools.filter { tool in
+            !policy.isToolVisible(tool)
+        }.sorted()
+
+        if !deniedTools.isEmpty {
+            DebugLog.persist("startup", "WARNING: denied tools: \(deniedTools)")
+        }
+        if !hiddenTools.isEmpty {
+            DebugLog.persist("startup", "WARNING: hidden from tools/list: \(hiddenTools)")
         }
 
         let bridge = MirroringBridge()

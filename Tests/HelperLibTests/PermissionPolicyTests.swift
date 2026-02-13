@@ -16,10 +16,10 @@ struct PermissionClassificationTests {
         #expect(overlap.isEmpty, "Readonly and mutating sets must not overlap: \(overlap)")
     }
 
-    @Test("all 19 tools are classified")
+    @Test("all 21 tools are classified")
     func allToolsClassified() {
         let total = PermissionPolicy.readonlyTools.count + PermissionPolicy.mutatingTools.count
-        #expect(total == 19, "Expected 19 tools, got \(total)")
+        #expect(total == 21, "Expected 21 tools, got \(total)")
     }
 
     @Test("readonly tools contains expected tools")
@@ -27,6 +27,7 @@ struct PermissionClassificationTests {
         let expected: Set<String> = [
             "screenshot", "describe_screen", "start_recording",
             "stop_recording", "get_orientation", "status",
+            "list_scenarios", "get_scenario",
         ]
         #expect(PermissionPolicy.readonlyTools == expected)
     }
@@ -39,6 +40,38 @@ struct PermissionClassificationTests {
             "open_url", "press_home", "press_app_switcher", "spotlight",
         ]
         #expect(PermissionPolicy.mutatingTools == expected)
+    }
+}
+
+// MARK: - Scenario Tool Classification
+
+@Suite("PermissionPolicy - Scenario Tools")
+struct PermissionScenarioTests {
+
+    @Test("list_scenarios is readonly")
+    func listScenariosReadonly() {
+        #expect(PermissionPolicy.readonlyTools.contains("list_scenarios"))
+        #expect(!PermissionPolicy.mutatingTools.contains("list_scenarios"))
+    }
+
+    @Test("get_scenario is readonly")
+    func getScenarioReadonly() {
+        #expect(PermissionPolicy.readonlyTools.contains("get_scenario"))
+        #expect(!PermissionPolicy.mutatingTools.contains("get_scenario"))
+    }
+
+    @Test("scenario tools are always allowed without config")
+    func scenarioToolsAlwaysAllowed() {
+        let policy = PermissionPolicy(skipPermissions: false, config: nil)
+        #expect(policy.checkTool("list_scenarios") == .allowed)
+        #expect(policy.checkTool("get_scenario") == .allowed)
+    }
+
+    @Test("scenario tools are always visible")
+    func scenarioToolsAlwaysVisible() {
+        let policy = PermissionPolicy(skipPermissions: false, config: nil)
+        #expect(policy.isToolVisible("list_scenarios") == true)
+        #expect(policy.isToolVisible("get_scenario") == true)
     }
 }
 

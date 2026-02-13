@@ -1,0 +1,15 @@
+name: Settings Navigation
+app: Settings
+description: Navigate through Settings to General > About
+
+steps:
+  - launch: "Settings"
+  - wait_for: "General"
+  - tap: "General"
+  - wait_for: "About"
+  - tap: "About"
+  - assert_visible: "Model Name"
+  - screenshot: "about_screen"
+  - press_key: "escape"
+  - press_key: "escape"
+  - assert_visible: "Settings"

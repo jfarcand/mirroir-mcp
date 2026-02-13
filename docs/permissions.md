@@ -4,13 +4,13 @@ The server is **fail-closed by default**. Without a config file, only read-only 
 
 | Always allowed | Requires permission |
 |---------------|-------------------|
-| `screenshot`, `describe_screen`, `start_recording`, `stop_recording`, `get_orientation`, `status` | `tap`, `swipe`, `drag`, `type_text`, `press_key`, `long_press`, `double_tap`, `shake`, `launch_app`, `open_url`, `press_home`, `press_app_switcher`, `spotlight` |
+| `screenshot`, `describe_screen`, `start_recording`, `stop_recording`, `get_orientation`, `status`, `list_scenarios`, `get_scenario` | `tap`, `swipe`, `drag`, `type_text`, `press_key`, `long_press`, `double_tap`, `shake`, `launch_app`, `open_url`, `press_home`, `press_app_switcher`, `spotlight` |
 
 Mutating tools are hidden from `tools/list` entirely — the MCP client never sees them unless you allow them.
 
 ## Config File
 
-Create `~/.config/iphone-mirroir-mcp/permissions.json`:
+Create `~/.iphone-mirroir-mcp/permissions.json` (or `<cwd>/.iphone-mirroir-mcp/permissions.json` for project-local overrides):
 
 ```json
 {
