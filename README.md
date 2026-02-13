@@ -10,9 +10,8 @@ Input flows through [Karabiner](https://karabiner-elements.pqrs.org/) DriverKit 
 
 ## Requirements
 
-- macOS 15+ with iPhone Mirroring
-- iPhone connected via iPhone Mirroring
-- [Karabiner-Elements](https://karabiner-elements.pqrs.org/) installed and activated
+- macOS 15+
+- iPhone connected via [iPhone Mirroring](https://support.apple.com/en-us/105071)
 
 ## Install
 
@@ -165,6 +164,9 @@ The MCP server only works while iPhone Mirroring is active. Closing the window o
 ## Updating
 
 ```bash
+# npx (always fetches latest)
+npx -y iphone-mirroir-mcp install
+
 # Homebrew
 brew upgrade iphone-mirroir-mcp
 sudo brew services restart iphone-mirroir-mcp
