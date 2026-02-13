@@ -71,6 +71,96 @@ The MCP server only works while iPhone Mirroring is active. Closing the window o
 
 **Threat model**: The helper socket (`/var/run/iphone-mirroir-helper.sock`) is restricted to `root:staff` with mode 0660. On macOS, all interactive user accounts belong to the `staff` group, so any local user on the machine can send commands to the helper. This is appropriate for single-user Macs (the target use case). On shared machines, any local user account could drive the iPhone screen. There is no authentication handshake — the socket permission is the only access control.
 
+See [Permissions](#permissions) below to control which tools the MCP server exposes.
+
+## Permissions
+
+The server is **fail-closed by default**. Without a config file, only readonly tools are exposed to the MCP client:
+
+| Always allowed | Requires permission |
+|---------------|-------------------|
+| `screenshot`, `describe_screen`, `start_recording`, `stop_recording`, `get_orientation`, `status` | `tap`, `swipe`, `drag`, `type_text`, `press_key`, `long_press`, `double_tap`, `shake`, `launch_app`, `open_url`, `press_home`, `press_app_switcher`, `spotlight` |
+
+Mutating tools are hidden from `tools/list` entirely — the MCP client never sees them unless you allow them.
+
+### Config file
+
+Create `~/.config/iphone-mirroir-mcp/permissions.json`:
+
+```json
+{
+  "allow": ["tap", "swipe", "type_text", "press_key", "launch_app"],
+  "deny": [],
+  "blockedApps": []
+}
+```
+
+- **`allow`** — whitelist of mutating tools to expose (case-insensitive). Use `["*"]` to allow all.
+- **`deny`** — blocklist that overrides allow. A tool in both lists is denied.
+- **`blockedApps`** — app names that `launch_app` refuses to open (case-insensitive).
+
+### Examples
+
+Allow all mutating tools:
+
+```json
+{
+  "allow": ["*"]
+}
+```
+
+Allow tapping and typing, block banking apps:
+
+```json
+{
+  "allow": ["tap", "swipe", "type_text", "press_key", "describe_screen"],
+  "deny": ["shake"],
+  "blockedApps": ["Wallet", "PayPal", "Venmo"]
+}
+```
+
+Block Instagram from being launched:
+
+```json
+{
+  "allow": ["*"],
+  "blockedApps": ["Instagram"]
+}
+```
+
+### CLI flags
+
+For development and testing, bypass the permission system entirely:
+
+```bash
+npx -y iphone-mirroir-mcp --dangerously-skip-permissions
+npx -y iphone-mirroir-mcp --yolo   # alias
+```
+
+Both flags expose all tools regardless of config. Do not use in production.
+
+## Debug Mode
+
+Pass `--debug` to enable verbose logging:
+
+```bash
+npx -y iphone-mirroir-mcp --debug
+```
+
+Logs are written to both stderr and `/tmp/iphone-mirroir-mcp-debug.log` (truncated on each startup). Logged events include permission checks, tap coordinates, focus state, and window geometry.
+
+Tail the log in a separate terminal:
+
+```bash
+tail -f /tmp/iphone-mirroir-mcp-debug.log
+```
+
+Combine with permission bypass for full-access debugging:
+
+```bash
+npx -y iphone-mirroir-mcp --debug --yolo
+```
+
 ## Requirements
 
 - macOS 15+ with iPhone Mirroring
@@ -227,6 +317,7 @@ MCP Client (stdin/stdout JSON-RPC)
     │
     ▼
 iphone-mirroir-mcp (user process)
+    ├── PermissionPolicy   — fail-closed tool gating (config + CLI flags)
     ├── MirroringBridge    — AXUIElement window discovery + menu actions
     ├── ScreenCapture      — screencapture -l <windowID>
     ├── ScreenDescriber    — Vision OCR + coordinate grid overlay
