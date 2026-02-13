@@ -1,8 +1,14 @@
 # iphone-mirroir-mcp
 
+[![npm version](https://img.shields.io/npm/v/iphone-mirroir-mcp)](https://www.npmjs.com/package/iphone-mirroir-mcp)
+[![License](https://img.shields.io/badge/license-Apache--2.0-blue)](LICENSE)
+[![macOS 15+](https://img.shields.io/badge/macOS-15%2B-black?logo=apple)](https://support.apple.com/en-us/105071)
+
+> **Why "mirroir"?** — It's the old French spelling of *miroir* (mirror). A nod to the author's roots, not a typo.
+
 ## Why iPhone Mirroring?
 
-MCP server that controls a real iPhone through macOS iPhone Mirroring. Screenshot, tap, swipe, type — from any MCP client.
+MCP server that controls a real iPhone through macOS iPhone Mirroring. Screenshot, tap, swipe, type — from any MCP client. Input flows through [Karabiner](https://karabiner-elements.pqrs.org/) DriverKit virtual HID devices because iPhone Mirroring routes input through a protected compositor layer that blocks standard CGEvent injection.
 
 Works with any app visible on the iPhone screen: App Store apps, TestFlight builds, Expo Go, React Native dev builds — anything you can see in the mirroring window.
 
@@ -119,59 +125,36 @@ The installer handles everything: installs Karabiner if missing (with confirmati
 
 </details>
 
-## What Works
-
-| Feature | Description |
-|---------|-------------|
-| Screenshots | Capture the mirrored iPhone screen as PNG |
-| Screen analysis | OCR-based element detection with tap coordinates and grid overlay for targeting unlabeled icons |
-| Video recording | Record the mirrored screen as .mov files |
-| Taps | Click anywhere on the iPhone screen via Karabiner virtual pointing device |
-| Swipes | Drag between two points with configurable duration |
-| Long press | Hold tap for context menus and drag initiation |
-| Double tap | Two rapid taps for zoom and text selection |
-| Drag | Slow sustained drag for rearranging icons, adjusting sliders |
-| Typing | Type text into any focused field via Karabiner virtual HID keyboard with non-US layout support |
-| Key presses | Return, Escape, Tab, arrows, with modifier support (Cmd, Shift, etc.) |
-| Navigation | Home, App Switcher, Spotlight via macOS menu bar actions |
-| App launch | Open any app by name via Spotlight search |
-| URL opening | Navigate to any URL in Safari |
-| Shake gesture | Trigger shake-to-undo and developer menus |
-| Orientation | Report portrait/landscape and window dimensions |
-
-All touch and keyboard input flows through Karabiner DriverKit virtual HID devices because iPhone Mirroring routes input through a protected compositor layer that doesn't accept standard CGEvent injection. The MCP server activates iPhone Mirroring once when keyboard input begins (triggering a macOS Space switch if needed) and stays there — no back-and-forth switching between apps.
-
 ## Examples
 
-```
-You:  "Open Messages and send 'hello' to Alice"
-
-Agent: launch_app "Messages"
-       → screenshot (sees conversation list)
-       → tap on Alice's conversation
-       → tap text field → type_text "hello"
-       → press_key return → screenshot (verify sent)
-```
+**Test a login flow** — paste this into Claude Code, Cursor, or any MCP client:
 
 ```
-You:  "Test the login flow in my Expo app"
-
-Agent: launch_app "Expo Go"
-       → screenshot (sees project list)
-       → tap on the project → screenshot (sees login screen)
-       → tap email field → type_text "test@example.com"
-       → tap password field → type_text "password123"
-       → tap "Sign In" button → screenshot (verify logged in)
+Open my Expo Go app, tap on the "LoginDemo" project, and test the login
+screen. Use test@example.com / password123. Take a screenshot after each step
+so I can see what happened.
 ```
 
-```
-You:  "Record a video of scrolling through the Settings app"
+The agent will `launch_app "Expo Go"` → `screenshot` → `tap` on the project → `tap` the email field → `type_text "test@example.com"` → `tap` the password field → `type_text "password123"` → `tap` Sign In → `screenshot` to verify.
 
-Agent: start_recording
-       → launch_app "Settings" → screenshot
-       → swipe up to scroll → swipe up again
-       → tap "General" → screenshot
-       → stop_recording (returns .mov file path)
+**Send an iMessage:**
+
+```
+Open Messages, find my conversation with Alice, and send "running 10 min late"
+```
+
+**Record a bug repro video:**
+
+```
+Start recording, open Settings, scroll down to General > About, then stop
+recording. I need a video of the scroll lag I'm seeing.
+```
+
+**Navigate a React Native dev build:**
+
+```
+Open my app "WidgetPro", shake the device to open the React Native dev menu,
+tap "Reload", and screenshot the result.
 ```
 
 ## Security Warning
@@ -303,7 +286,6 @@ Coordinates are in points relative to the mirroring window's top-left corner. Us
 `type_text` and `press_key` route keyboard input through the Karabiner virtual HID keyboard via the helper daemon. If iPhone Mirroring isn't already frontmost, the MCP server activates it once (which may trigger a macOS Space switch) and stays there. Subsequent keyboard tool calls reuse the active window without switching again.
 
 - Characters are mapped to USB HID keycodes with automatic keyboard layout translation — non-US layouts (French AZERTY, German QWERTZ, etc.) are supported via UCKeyTranslate
-- **Known limitation**: On ISO keyboards (e.g., Canadian-CSA), a small number of characters tied to the ISO section key (`§`, `±`) cannot be typed via HID because macOS and iOS swap keycodes 0x64 and 0x35 differently. These characters are silently skipped. Clipboard paste is not available — iPhone Mirroring does not bridge the Mac clipboard when paste is triggered programmatically.
 - iOS autocorrect applies — type carefully or disable it on the iPhone
 
 ### Key press workflow
@@ -311,6 +293,14 @@ Coordinates are in points relative to the mirroring window's top-left corner. Us
 `press_key` sends special keys that `type_text` can't handle — navigation keys, Return to submit forms, Escape to dismiss dialogs, Tab to switch fields, arrows to move through lists. Add modifiers for shortcuts like Cmd+N (new message) or Cmd+Z (undo).
 
 For navigating within apps, combine `spotlight` + `type_text` + `press_key`. For example: `spotlight` → `type_text "Messages"` → `press_key return` → `press_key {"key":"n","modifiers":["command"]}` to open a new conversation.
+
+## Known Limitations
+
+- **No clipboard paste** — iPhone Mirroring does not bridge the Mac clipboard when paste is triggered programmatically. All text must be typed character-by-character.
+- **ISO keyboard section key** — On ISO keyboards (e.g., Canadian-CSA), characters tied to the section key (`§`, `±`) cannot be typed via HID because macOS and iOS swap keycodes 0x64 and 0x35 differently. These characters are silently skipped.
+- **iOS autocorrect** — iOS applies autocorrect to typed text. Disable it in iPhone Settings > General > Keyboard, or type words followed by spaces to confirm them before autocorrect triggers.
+- **Single-user only** — The helper socket has no authentication. On shared Macs, any local user in the `staff` group can send commands. See [Security Warning](#security-warning).
+- **No background interaction** — The MCP server can only interact with the iPhone while the iPhone Mirroring window is visible. Closing the window or locking the phone kills all input.
 
 ## Architecture
 
