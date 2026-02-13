@@ -1,0 +1,338 @@
+---
+import Layout from "../layouts/Layout.astro";
+import { Code } from "astro:components";
+import "../styles/global.css";
+
+const installCmd = "npx -y iphone-mirroir-mcp install";
+const brewCmd = "brew tap jfarcand/tap && brew install iphone-mirroir-mcp";
+const sourceCmd = "git clone https://github.com/jfarcand/iphone-mirroir-mcp.git && cd iphone-mirroir-mcp && ./install.sh";
+
+const permissionsCode = `{
+  "allow": ["tap", "swipe", "type_text", "press_key", "launch_app"],
+  "deny": [],
+  "blockedApps": ["Wallet", "Banking"]
+}`;
+
+const scenarioExpo = `name: Expo Go Login Flow
+app: Expo Go
+steps:
+  - launch: "Expo Go"
+  - wait_for: "LoginDemo"
+  - tap: "LoginDemo"
+  - tap: "Email"
+  - type: "\${TEST_EMAIL}"
+  - tap: "Password"
+  - type: "\${TEST_PASSWORD}"
+  - tap: "Sign In"
+  - assert_visible: "Welcome"
+  - screenshot: "login_success"`;
+
+const scenarioWaze = `name: Commute ETA Notification
+app: Waze, Messages
+description: Get ETA from Waze, text it via iMessage.
+
+steps:
+  - launch: "Waze"
+  - wait_for: "Where to?"
+  - tap: "Where to?"
+  - tap: "\${DESTINATION:-Work}"
+  - tap: "Go"
+  - wait_for: "min"
+  - remember: "Read the commute ETA."
+  - press_home: true
+  - launch: "Messages"
+  - tap: "New Message"
+  - tap: "To:"
+  - type: "\${RECIPIENT}"
+  - tap: "\${RECIPIENT}"
+  - tap: "iMessage"
+  - type: "On my way! ETA {eta}"
+  - press_key: "return"
+  - screenshot: "message_sent"`;
+
+const scenariosRepo = "jfarcand/iphone-mirroir-scenarios";
+const scenariosBase = `https://github.com/${scenariosRepo}`;
+const rawBase = `https://raw.githubusercontent.com/${scenariosRepo}/main`;
+
+interface Scenario {
+  name: string;
+  description: string;
+  app: string;
+  path: string;
+  category: string;
+  url: string;
+  rawUrl: string;
+}
+
+const ghHeaders: Record<string, string> = {
+  Accept: "application/vnd.github.v3+json",
+};
+const ghToken = import.meta.env.GITHUB_TOKEN ?? process.env.GITHUB_TOKEN;
+if (ghToken) {
+  ghHeaders.Authorization = `Bearer ${ghToken}`;
+}
+
+let scenarios: Scenario[] = [];
+try {
+  const treeRes = await fetch(
+    `https://api.github.com/repos/${scenariosRepo}/git/trees/main?recursive=1`,
+    { headers: ghHeaders }
+  );
+  const tree = await treeRes.json();
+  const yamlFiles = (tree.tree ?? []).filter(
+    (f: { path: string }) => f.path.endsWith(".yaml") || f.path.endsWith(".yml")
+  );
+
+  const fetches = yamlFiles.map(async (f: { path: string }) => {
+    const res = await fetch(
+      `https://api.github.com/repos/${scenariosRepo}/contents/${f.path}`,
+      { headers: ghHeaders }
+    );
+    const data = await res.json();
+    const content = atob(data.content.replace(/\n/g, ""));
+    const nameMatch = content.match(/^name:\s*(.+)$/m);
+    const descMatch = content.match(/^description:\s*(.+)$/m);
+    const appMatch = content.match(/^app:\s*(.+)$/m);
+    const parts = f.path.split("/");
+    const category = parts.length > 1 ? parts.slice(0, -1).join("/") : "";
+    return {
+      name: nameMatch ? nameMatch[1].trim() : f.path,
+      description: descMatch ? descMatch[1].trim() : "",
+      app: appMatch ? appMatch[1].trim() : "",
+      path: f.path,
+      category,
+      url: `${scenariosBase}/blob/main/${f.path}`,
+      rawUrl: `${rawBase}/${f.path}`,
+    };
+  });
+  scenarios = await Promise.all(fetches);
+} catch {
+  // Build continues with empty list if GitHub API is unreachable
+}
+
+const scenarioIndex = JSON.stringify(scenarios);
+---
+
+<Layout
+  title="iphone-mirroir-mcp — MCP server for iPhone Mirroring"
+  description="MCP server for macOS iPhone Mirroring. Screenshot, tap, swipe, type — control a real iPhone from any MCP client."
+>
+  <!-- Hero -->
+  <header>
+    <img src={`${import.meta.env.BASE_URL}logo-robot.svg`} alt="iphone-mirroir-mcp" class="logo" width="80" height="80" />
+    <h1>iphone-mirroir-mcp</h1>
+    <p class="tagline">
+      The MCP server for iPhone Mirroring.
+    </p>
+  </header>
+
+  <!-- Install -->
+  <section>
+    <h2>Install iphone-mirroir-mcp</h2>
+    <div class="install-block">
+      <code><span class="prompt">$</span> {installCmd}</code>
+      <button class="copy-btn" data-copy={installCmd}>Copy</button>
+    </div>
+    <p class="install-hint">
+      Paste that in a macOS Terminal. The installer prompts you to select your MCP client and writes the config automatically.
+    </p>
+    <p class="alt-install">
+      or via <a href="https://github.com/jfarcand/homebrew-tap">Homebrew</a>:
+    </p>
+    <div class="install-block install-block-alt">
+      <code><span class="prompt">$</span> {brewCmd}</code>
+      <button class="copy-btn" data-copy={brewCmd}>Copy</button>
+    </div>
+    <p class="alt-install">
+      or <a href="https://github.com/jfarcand/iphone-mirroir-mcp">from source</a>:
+    </p>
+    <div class="install-block install-block-alt">
+      <code><span class="prompt">$</span> {sourceCmd}</code>
+      <button class="copy-btn" data-copy={sourceCmd}>Copy</button>
+    </div>
+  </section>
+
+  <!-- What it does -->
+  <section>
+    <h2>What Does iphone-mirroir-mcp Do?</h2>
+    <p>
+      It exposes 21 tools — screenshot, tap, swipe, type, record video — as an MCP server.
+      Works with any app visible on screen: App Store apps, TestFlight builds, Expo Go, React Native dev builds.
+      No Xcode, no simulator, no provisioning profile.
+    </p>
+
+    <div class="tool-grid">
+      <div class="tool-category cat-touch">
+        <h3>Touch</h3>
+        <ul>
+          <li><code>tap</code> <span>Tap at screen coordinates</span></li>
+          <li><code>double_tap</code> <span>Double-tap for zoom or text selection</span></li>
+          <li><code>long_press</code> <span>Hold for context menus</span></li>
+          <li><code>swipe</code> <span>Quick flick between two points</span></li>
+          <li><code>drag</code> <span>Slow drag for sliders and icons</span></li>
+        </ul>
+      </div>
+      <div class="tool-category cat-input">
+        <h3>Input</h3>
+        <ul>
+          <li><code>type_text</code> <span>Type text via virtual keyboard</span></li>
+          <li><code>press_key</code> <span>Send special keys with modifiers</span></li>
+          <li><code>shake</code> <span>Shake gesture for undo or dev menus</span></li>
+        </ul>
+      </div>
+      <div class="tool-category cat-observe">
+        <h3>Observe</h3>
+        <ul>
+          <li><code>screenshot</code> <span>Capture screen as PNG</span></li>
+          <li><code>describe_screen</code> <span>OCR with tap coordinates</span></li>
+          <li><code>start_recording</code> <span>Begin video recording</span></li>
+          <li><code>stop_recording</code> <span>End recording, get file path</span></li>
+          <li><code>get_orientation</code> <span>Portrait or landscape</span></li>
+          <li><code>status</code> <span>Connection and device readiness</span></li>
+        </ul>
+      </div>
+      <div class="tool-category cat-navigate">
+        <h3>Navigate</h3>
+        <ul>
+          <li><code>launch_app</code> <span>Open app by name via Spotlight</span></li>
+          <li><code>open_url</code> <span>Open URL in Safari</span></li>
+          <li><code>press_home</code> <span>Return to home screen</span></li>
+          <li><code>press_app_switcher</code> <span>Show recent apps</span></li>
+          <li><code>spotlight</code> <span>Open Spotlight search</span></li>
+          <li><code>list_scenarios</code> <span>List available YAML scenarios</span></li>
+          <li><code>get_scenario</code> <span>Read scenario with env substitution</span></li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- Permissions -->
+  <section>
+    <h2>Fail-closed by default</h2>
+    <p>
+      Without a config file, only read-only tools are exposed. Mutating tools are
+      hidden from the MCP client entirely — it never sees them unless you allow them.
+    </p>
+
+    <Code code={permissionsCode} lang="json" theme="github-dark" />
+
+    <p>
+      Drop this in <code>~/.iphone-mirroir-mcp/permissions.json</code> to control
+      exactly which tools your AI agent can use.
+    </p>
+  </section>
+
+  <!-- Scenarios -->
+  <section>
+    <h2>Scenarios: intents, not scripts</h2>
+    <p>
+      Scenarios are reusable YAML skills installed from the
+      <a href="https://github.com/jfarcand/iphone-mirroir-scenarios">marketplace</a>.
+      Steps like <code>tap: "Email"</code> don't specify coordinates — the AI finds
+      the element by OCR matching and adapts to unexpected dialogs and layout changes.
+    </p>
+
+    <div class="scenario-grid">
+      <div class="scenario-col">
+        <h3>Test a login flow</h3>
+        <Code code={scenarioExpo} lang="yaml" theme="github-dark" />
+      </div>
+      <div class="scenario-col">
+        <h3>Cross-app workflow</h3>
+        <Code code={scenarioWaze} lang="yaml" theme="github-dark" />
+      </div>
+    </div>
+
+    <p>
+      <code>$&#123;VAR&#125;</code> placeholders resolve from environment variables.
+      Install scenarios in Claude Code or GitHub Copilot:
+    </p>
+    <div class="install-block install-block-alt">
+      <code><span class="prompt">/</span>plugin marketplace add jfarcand/iphone-mirroir-scenarios</code>
+      <button class="copy-btn" data-copy="/plugin marketplace add jfarcand/iphone-mirroir-scenarios">Copy</button>
+    </div>
+
+    <div class="scenario-search-wrap">
+      <input
+        type="text"
+        id="scenario-q"
+        placeholder="Search scenarios... (e.g. login, slack, calendar)"
+        autocomplete="off"
+      />
+      <ul id="scenario-results"></ul>
+    </div>
+    <script id="scenario-data" type="application/json" set:html={scenarioIndex} />
+    <script>
+      const scenarios = JSON.parse(
+        document.getElementById("scenario-data")!.textContent ?? "[]"
+      );
+      const input = document.getElementById("scenario-q")!;
+      const results = document.getElementById("scenario-results")!;
+
+      function render(matches: typeof scenarios) {
+        if (!matches.length) {
+          results.innerHTML = "";
+          return;
+        }
+        results.innerHTML = matches
+          .map(
+            (s: any) =>
+              `<li>
+                <div class="scenario-row">
+                  <a href="${s.url}" target="_blank">${s.name}</a>
+                  <span class="scenario-app">${s.app}</span>
+                  <a class="scenario-dl" href="${s.rawUrl}" download title="Download YAML">\u2193</a>
+                </div>
+                ${s.description ? `<span class="scenario-desc">${s.description}</span>` : ""}
+              </li>`
+          )
+          .join("");
+      }
+
+      input.addEventListener("input", () => {
+        const q = (input as HTMLInputElement).value.toLowerCase().trim();
+        if (!q) {
+          render([]);
+          return;
+        }
+        const matches = scenarios.filter(
+          (s: any) =>
+            s.name.toLowerCase().includes(q) ||
+            s.description.toLowerCase().includes(q) ||
+            s.app.toLowerCase().includes(q) ||
+            s.category.toLowerCase().includes(q)
+        );
+        render(matches);
+      });
+    </script>
+  </section>
+
+  <!-- Works with -->
+  <section>
+    <h2>Works with</h2>
+    <p>Any MCP client that supports stdio transport.</p>
+    <div class="client-list">
+      <a href="https://docs.anthropic.com/en/docs/claude-code"><span>Claude Code</span></a>
+      <a href="https://cursor.com"><span>Cursor</span></a>
+      <a href="https://github.com/openai/codex"><span>OpenAI Codex</span></a>
+      <a href="https://github.com/features/copilot"><span>GitHub Copilot</span></a>
+      <a href="https://github.com/nickvdyck/opencode"><span>OpenCode</span></a>
+    </div>
+  </section>
+
+  <!-- Footer -->
+  <footer>
+    <p>
+      <a href="https://github.com/jfarcand/iphone-mirroir-mcp">GitHub</a> &middot;
+      Apache-2.0 &middot;
+      macOS 15+
+    </p>
+    <p>
+      Why "mirroir"? It's the old French spelling of <em>miroir</em> (mirror).
+      A nod to the author's roots, not a typo.
+    </p>
+    <p>
+      iPhone is a trademark of Apple Inc. This project is not affiliated with or endorsed by Apple.
+    </p>
+  </footer>
+</Layout>

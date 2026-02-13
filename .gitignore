@@ -15,3 +15,6 @@ npm/bin/iphone-mirroir-mcp-native
 npm/bin/iphone-mirroir-helper
 npm/bin/com.jfarcand.iphone-mirroir-helper.plist
 .iphone-mirroir-mcp/scenarios/
+website/node_modules/
+website/dist/
+website/.astro/

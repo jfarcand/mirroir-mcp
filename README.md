@@ -195,6 +195,7 @@ Ready-to-use scenarios for Calendar, Clock, Settings, Slack, Weather, Expo Go, a
 
 ```bash
 /plugin marketplace add jfarcand/iphone-mirroir-scenarios
+/plugin install iphone-mirroir-scenarios:scenarios
 ```
 
 #### Manual (all clients)

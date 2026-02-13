@@ -1,0 +1,48 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" fill="none">
+  <!-- Robot logo — iOS-style, white background, gradient accents -->
+
+  <defs>
+    <!-- Gradient for robot structure (antenna, head, ears, smile) -->
+    <linearGradient id="body" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#6bb87a"/>
+      <stop offset="100%" stop-color="#3d7a4a"/>
+    </linearGradient>
+    <!-- Gradient for eyes -->
+    <linearGradient id="eyes" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#6ee7a0"/>
+      <stop offset="100%" stop-color="#34d670"/>
+    </linearGradient>
+    <!-- Outer frame gradient -->
+    <linearGradient id="frame" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#eef5ee"/>
+      <stop offset="100%" stop-color="#d8e8d8"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Outer rounded squircle frame -->
+  <rect x="6" y="6" width="116" height="116" rx="28" fill="url(#frame)"/>
+  <rect x="10" y="10" width="108" height="108" rx="24" fill="#fff"/>
+
+  <!-- Antenna crossbar -->
+  <line x1="44" y1="28" x2="84" y2="28" stroke="url(#body)" stroke-width="4.5" stroke-linecap="round"/>
+  <!-- Antenna stem -->
+  <line x1="64" y1="28" x2="64" y2="38" stroke="url(#body)" stroke-width="4.5" stroke-linecap="round"/>
+  <!-- Antenna ball -->
+  <circle cx="64" cy="25" r="5" fill="url(#body)"/>
+
+  <!-- Robot head -->
+  <rect x="30" y="42" width="68" height="50" rx="16" stroke="url(#body)" stroke-width="5" fill="none"/>
+
+  <!-- Left ear -->
+  <line x1="30" y1="64" x2="20" y2="64" stroke="url(#body)" stroke-width="4.5" stroke-linecap="round"/>
+  <!-- Right ear -->
+  <line x1="98" y1="64" x2="108" y2="64" stroke="url(#body)" stroke-width="4.5" stroke-linecap="round"/>
+
+  <!-- Left eye -->
+  <circle cx="50" cy="60" r="8" fill="url(#eyes)"/>
+  <!-- Right eye -->
+  <circle cx="78" cy="60" r="8" fill="url(#eyes)"/>
+
+  <!-- Smile (curved arc) -->
+  <path d="M46 76 Q64 86 82 76" stroke="url(#body)" stroke-width="4" stroke-linecap="round" fill="none"/>
+</svg>
