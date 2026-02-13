@@ -1,4 +1,4 @@
-// Copyright 2026 jfarcand
+// Copyright 2026 jfarcand@apache.org
 // Licensed under the Apache License, Version 2.0
 //
 // ABOUTME: Tests for the enhanced press_key command that supports single printable characters.

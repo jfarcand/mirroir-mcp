@@ -1,34 +1,145 @@
 # iphone-mirroir-mcp
 
+## Why iPhone Mirroring?
+
 MCP server that controls a real iPhone through macOS iPhone Mirroring. Screenshot, tap, swipe, type — from any MCP client.
 
 Works with any app visible on the iPhone screen: App Store apps, TestFlight builds, Expo Go, React Native dev builds — anything you can see in the mirroring window.
 
-## What Works
-
-- **Screenshots** — captures the mirrored iPhone screen as PNG
-- **Screen analysis** — OCR-based element detection with tap coordinates and a coordinate grid overlay for precise targeting of unlabeled icons
-- **Video recording** — record the mirrored screen as .mov files
-- **Taps** — click anywhere on the iPhone screen via Karabiner virtual pointing device
-- **Swipes** — drag between two points with configurable duration
-- **Long press** — hold tap for context menus and drag initiation
-- **Double tap** — two rapid taps for zoom and text selection
-- **Drag** — slow sustained drag for rearranging icons, adjusting sliders
-- **Typing** — type text into any focused field via Karabiner virtual HID keyboard with non-US keyboard layout support
-- **Key presses** — Return, Escape, Tab, arrows, with modifier support (Cmd, Shift, etc.)
-- **Navigation** — Home, App Switcher, Spotlight via macOS menu bar actions
-- **App launch** — open any app by name via Spotlight search
-- **URL opening** — navigate to any URL in Safari
-- **Shake gesture** — trigger shake-to-undo and developer menus
-- **Orientation detection** — report portrait/landscape and window dimensions
-
-All touch and keyboard input flows through Karabiner DriverKit virtual HID devices because iPhone Mirroring routes input through a protected compositor layer that doesn't accept standard CGEvent injection. The MCP server activates iPhone Mirroring once when keyboard input begins (triggering a macOS Space switch if needed) and stays there — no back-and-forth switching between apps.
-
-## Why iPhone Mirroring?
-
 Every other iPhone automation tool requires Appium, Xcode, WebDriverAgent, and a provisioning profile. This project takes a different approach: it controls the iPhone through macOS iPhone Mirroring using Karabiner virtual HID devices. No Xcode. No developer account. No provisioning profile.
 
 This means you can test real apps on a real device — Expo Go, Flutter, React Native dev builds, TestFlight betas, App Store apps — directly on your iPhone without a simulator. The AI agent sees exactly what a real user sees and interacts with the same touch targets, autocorrect, and keyboard behavior.
+
+## Requirements
+
+- macOS 15+ with iPhone Mirroring
+- iPhone connected via iPhone Mirroring
+- [Karabiner-Elements](https://karabiner-elements.pqrs.org/) installed and activated
+
+## Install
+
+One command sets up everything — Karabiner, helper daemon, and your MCP client config:
+
+```bash
+npx -y iphone-mirroir-mcp install
+```
+
+The installer prompts you to select your MCP client (Claude Code, Cursor, GitHub Copilot, or OpenAI Codex) and writes the config automatically.
+
+After install, approve the DriverKit extension if prompted: **System Settings > General > Login Items & Extensions** — enable all toggles under Karabiner-Elements. The first time you take a screenshot, macOS will prompt for **Screen Recording** and **Accessibility** permissions. Grant both.
+
+<details>
+<summary>Manual per-client setup</summary>
+
+#### Claude Code
+
+```bash
+claude mcp add --transport stdio iphone-mirroring -- npx -y iphone-mirroir-mcp
+```
+
+#### Cursor
+
+Add to `.cursor/mcp.json` in your project root:
+
+```json
+{
+  "mcpServers": {
+    "iphone-mirroring": {
+      "command": "npx",
+      "args": ["-y", "iphone-mirroir-mcp"]
+    }
+  }
+}
+```
+
+#### GitHub Copilot (VS Code)
+
+Add to `.vscode/mcp.json` in your workspace:
+
+```json
+{
+  "servers": {
+    "iphone-mirroring": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "iphone-mirroir-mcp"]
+    }
+  }
+}
+```
+
+#### OpenAI Codex
+
+```bash
+codex mcp add iphone-mirroring -- npx -y iphone-mirroir-mcp
+```
+
+Or add to `~/.codex/config.toml`:
+
+```toml
+[mcp_servers.iphone-mirroring]
+command = "npx"
+args = ["-y", "iphone-mirroir-mcp"]
+```
+
+#### Helper daemon only
+
+If your MCP client is already configured but the helper daemon isn't running:
+
+```bash
+npx iphone-mirroir-mcp setup
+```
+
+</details>
+
+<details>
+<summary>Homebrew</summary>
+
+```bash
+brew install --cask karabiner-elements   # if not already installed
+brew tap jfarcand/tap
+brew install iphone-mirroir-mcp
+sudo brew services start iphone-mirroir-mcp
+```
+
+Then point your MCP client to the binary at `iphone-mirroir-mcp` (it's in your PATH after `brew install`).
+
+</details>
+
+<details>
+<summary>Install from source</summary>
+
+```bash
+git clone https://github.com/jfarcand/iphone-mirroir-mcp.git
+cd iphone-mirroir-mcp
+./install.sh
+```
+
+The installer handles everything: installs Karabiner if missing (with confirmation), waits for the DriverKit extension approval, builds both binaries, configures the Karabiner ignore rule, installs the helper daemon, and runs a verification check. Use the full path to the binary in your `.mcp.json`: `<repo>/.build/release/iphone-mirroir-mcp`.
+
+</details>
+
+## What Works
+
+| Feature | Description |
+|---------|-------------|
+| Screenshots | Capture the mirrored iPhone screen as PNG |
+| Screen analysis | OCR-based element detection with tap coordinates and grid overlay for targeting unlabeled icons |
+| Video recording | Record the mirrored screen as .mov files |
+| Taps | Click anywhere on the iPhone screen via Karabiner virtual pointing device |
+| Swipes | Drag between two points with configurable duration |
+| Long press | Hold tap for context menus and drag initiation |
+| Double tap | Two rapid taps for zoom and text selection |
+| Drag | Slow sustained drag for rearranging icons, adjusting sliders |
+| Typing | Type text into any focused field via Karabiner virtual HID keyboard with non-US layout support |
+| Key presses | Return, Escape, Tab, arrows, with modifier support (Cmd, Shift, etc.) |
+| Navigation | Home, App Switcher, Spotlight via macOS menu bar actions |
+| App launch | Open any app by name via Spotlight search |
+| URL opening | Navigate to any URL in Safari |
+| Shake gesture | Trigger shake-to-undo and developer menus |
+| Orientation | Report portrait/landscape and window dimensions |
+
+All touch and keyboard input flows through Karabiner DriverKit virtual HID devices because iPhone Mirroring routes input through a protected compositor layer that doesn't accept standard CGEvent injection. The MCP server activates iPhone Mirroring once when keyboard input begins (triggering a macOS Space switch if needed) and stays there — no back-and-forth switching between apps.
 
 ## Examples
 
@@ -161,115 +272,6 @@ Combine with permission bypass for full-access debugging:
 npx -y iphone-mirroir-mcp --debug --yolo
 ```
 
-## Requirements
-
-- macOS 15+ with iPhone Mirroring
-- iPhone connected via iPhone Mirroring
-- [Karabiner-Elements](https://karabiner-elements.pqrs.org/) installed and activated
-
-## Install
-
-One command sets up everything — Karabiner, helper daemon, and your MCP client config:
-
-```bash
-npx -y iphone-mirroir-mcp install
-```
-
-The installer prompts you to select your MCP client (Claude Code, Cursor, GitHub Copilot, or OpenAI Codex) and writes the config automatically.
-
-After install, approve the DriverKit extension if prompted: **System Settings > General > Login Items & Extensions** — enable all toggles under Karabiner-Elements. The first time you take a screenshot, macOS will prompt for **Screen Recording** and **Accessibility** permissions. Grant both.
-
-<details>
-<summary>Manual per-client setup</summary>
-
-#### Claude Code
-
-```bash
-claude mcp add --transport stdio iphone-mirroring -- npx -y iphone-mirroir-mcp
-```
-
-#### Cursor
-
-Add to `.cursor/mcp.json` in your project root:
-
-```json
-{
-  "mcpServers": {
-    "iphone-mirroring": {
-      "command": "npx",
-      "args": ["-y", "iphone-mirroir-mcp"]
-    }
-  }
-}
-```
-
-#### GitHub Copilot (VS Code)
-
-Add to `.vscode/mcp.json` in your workspace:
-
-```json
-{
-  "servers": {
-    "iphone-mirroring": {
-      "type": "stdio",
-      "command": "npx",
-      "args": ["-y", "iphone-mirroir-mcp"]
-    }
-  }
-}
-```
-
-#### OpenAI Codex
-
-```bash
-codex mcp add iphone-mirroring -- npx -y iphone-mirroir-mcp
-```
-
-Or add to `~/.codex/config.toml`:
-
-```toml
-[mcp_servers.iphone-mirroring]
-command = "npx"
-args = ["-y", "iphone-mirroir-mcp"]
-```
-
-#### Helper daemon only
-
-If your MCP client is already configured but the helper daemon isn't running:
-
-```bash
-npx iphone-mirroir-mcp setup
-```
-
-</details>
-
-<details>
-<summary>Homebrew</summary>
-
-```bash
-brew install --cask karabiner-elements   # if not already installed
-brew tap jfarcand/tap
-brew install iphone-mirroir-mcp
-sudo brew services start iphone-mirroir-mcp
-```
-
-Then point your MCP client to the binary at `iphone-mirroir-mcp` (it's in your PATH after `brew install`).
-
-</details>
-
-<details>
-<summary>Install from source</summary>
-
-```bash
-git clone https://github.com/jfarcand/iphone-mirroir-mcp.git
-cd iphone-mirroir-mcp
-./install.sh
-```
-
-The installer handles everything: installs Karabiner if missing (with confirmation), waits for the DriverKit extension approval, builds both binaries, configures the Karabiner ignore rule, installs the helper daemon, and runs a verification check. Use the full path to the binary in your `.mcp.json`: `<repo>/.build/release/iphone-mirroir-mcp`.
-
-</details>
-
 ## Tools
 
 | Tool | Parameters | Description |
@@ -385,6 +387,3 @@ If not responding, restart: `sudo brew services restart iphone-mirroir-mcp` or `
 
 **iOS autocorrect mangling typed text** — iOS applies autocorrect to typed text. Disable autocorrect in iPhone Settings > General > Keyboard, or type words followed by spaces to confirm them before autocorrect triggers.
 
-## License
-
-Apache 2.0

@@ -1,4 +1,4 @@
-// Copyright 2026 jfarcand
+// Copyright 2026 jfarcand@apache.org
 // Licensed under the Apache License, Version 2.0
 //
 // ABOUTME: Uses Apple's Vision framework to detect text elements in screenshots.

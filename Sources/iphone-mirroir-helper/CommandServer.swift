@@ -1,4 +1,4 @@
-// Copyright 2026 jfarcand
+// Copyright 2026 jfarcand@apache.org
 // Licensed under the Apache License, Version 2.0
 //
 // ABOUTME: Unix stream socket server accepting JSON commands from the MCP server.

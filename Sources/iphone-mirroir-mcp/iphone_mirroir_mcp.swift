@@ -1,4 +1,4 @@
-// Copyright 2026 jfarcand
+// Copyright 2026 jfarcand@apache.org
 // Licensed under the Apache License, Version 2.0
 //
 // ABOUTME: Entry point for the iPhone Mirroring MCP server.
