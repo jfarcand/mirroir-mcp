@@ -127,7 +127,23 @@ The installer handles everything: installs Karabiner if missing (with confirmati
 
 ## Examples
 
-**Test a login flow** — paste this into Claude Code, Cursor, or any MCP client:
+Paste any of these into Claude Code, Cursor, or any MCP client:
+
+**Send an iMessage:**
+
+```
+Open Messages, find my conversation with Alice, and send "running 10 min late".
+Take a screenshot so I can confirm it was sent.
+```
+
+**Add a calendar event:**
+
+```
+Open Calendar, create a new event called "Dentist" next Tuesday at 2pm,
+and screenshot the week view so I can see it.
+```
+
+**Test a login flow:**
 
 ```
 Open my Expo Go app, tap on the "LoginDemo" project, and test the login
@@ -137,24 +153,11 @@ so I can see what happened.
 
 The agent will `launch_app "Expo Go"` → `screenshot` → `tap` on the project → `tap` the email field → `type_text "test@example.com"` → `tap` the password field → `type_text "password123"` → `tap` Sign In → `screenshot` to verify.
 
-**Send an iMessage:**
-
-```
-Open Messages, find my conversation with Alice, and send "running 10 min late"
-```
-
 **Record a bug repro video:**
 
 ```
 Start recording, open Settings, scroll down to General > About, then stop
 recording. I need a video of the scroll lag I'm seeing.
-```
-
-**Navigate a React Native dev build:**
-
-```
-Open my app "WidgetPro", shake the device to open the React Native dev menu,
-tap "Reload", and screenshot the result.
 ```
 
 ## Security Warning
