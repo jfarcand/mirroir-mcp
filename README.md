@@ -259,6 +259,8 @@ brew uninstall iphone-mirroir-mcp
 | [Architecture](docs/architecture.md) | System diagram and how input reaches the iPhone |
 | [Known Limitations](docs/limitations.md) | Focus stealing, keyboard layout gaps, autocorrect |
 | [Troubleshooting](docs/troubleshooting.md) | Debug mode and common issues |
+| [Contributing](CONTRIBUTING.md) | How to add tools, commands, and tests |
+| [Scenarios Marketplace](docs/scenarios-marketplace.md) | Scenario format, plugin discovery, and authoring |
 | [Contributor License Agreement](CLA.md) | CLA for all contributions |
 
 ## Contributing
