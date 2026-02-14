@@ -3,11 +3,12 @@
 
 import Foundation
 import HelperLib
+import os
 
 // MARK: - MCP Server
 
-final class MCPServer: @unchecked Sendable {
-    private var tools: [String: MCPToolDefinition] = [:]
+final class MCPServer: Sendable {
+    private let tools = OSAllocatedUnfairLock(initialState: [String: MCPToolDefinition]())
     private let encoder: JSONEncoder
     private let decoder: JSONDecoder
     private let policy: PermissionPolicy
@@ -18,7 +19,7 @@ final class MCPServer: @unchecked Sendable {
     }
 
     func registerTool(_ tool: MCPToolDefinition) {
-        tools[tool.name] = tool
+        tools.withLock { $0[tool.name] = tool }
     }
 
     /// Run the MCP server, reading JSON-RPC from stdin and writing to stdout.
@@ -83,15 +84,17 @@ final class MCPServer: @unchecked Sendable {
     }
 
     private func handleToolsList(_ request: JSONRPCRequest) -> JSONRPCResponse {
-        let toolList: [JSONValue] = tools.values
-            .filter { policy.isToolVisible($0.name) }
-            .map { tool in
-                .object([
-                    "name": .string(tool.name),
-                    "description": .string(tool.description),
-                    "inputSchema": .object(tool.inputSchema),
-                ])
-            }
+        let toolList: [JSONValue] = tools.withLock { snapshot in
+            snapshot.values
+                .filter { policy.isToolVisible($0.name) }
+                .map { tool in
+                    .object([
+                        "name": .string(tool.name),
+                        "description": .string(tool.description),
+                        "inputSchema": .object(tool.inputSchema),
+                    ])
+                }
+        }
         let result: JSONValue = .object(["tools": .array(toolList)])
         return JSONRPCResponse(id: request.id, result: result, error: nil)
     }
@@ -105,7 +108,7 @@ final class MCPServer: @unchecked Sendable {
             )
         }
 
-        guard let tool = tools[toolName] else {
+        guard let tool = tools.withLock({ $0[toolName] }) else {
             return JSONRPCResponse(
                 id: request.id,
                 result: nil,

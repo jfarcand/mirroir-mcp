@@ -6,22 +6,23 @@
 
 import Darwin
 import Foundation
+import os
 
 /// Client for communicating with the iphone-mirroir-helper LaunchDaemon.
 /// Connects to the helper's Unix stream socket and sends newline-delimited JSON commands.
 ///
 /// The helper handles all Karabiner virtual HID interaction (which requires root).
 /// This client runs in the unprivileged MCP server process.
-final class HelperClient: @unchecked Sendable {
+final class HelperClient: Sendable {
     private let socketPath = "/var/run/iphone-mirroir-helper.sock"
-    private var socketFd: Int32 = -1
+    private let socketFd = OSAllocatedUnfairLock(initialState: Int32(-1))
 
     /// Whether the helper daemon is reachable and devices are ready.
     var isAvailable: Bool {
-        if socketFd < 0 {
+        if socketFd.withLock({ $0 }) < 0 {
             _ = connect()
         }
-        guard socketFd >= 0 else { return false }
+        guard socketFd.withLock({ $0 }) >= 0 else { return false }
 
         // Quick status check
         guard let response = sendCommand(["action": "status"]) else {
@@ -32,7 +33,10 @@ final class HelperClient: @unchecked Sendable {
     }
 
     deinit {
-        disconnect()
+        let fd = socketFd.withLock { $0 }
+        if fd >= 0 {
+            Darwin.close(fd)
+        }
     }
 
     // MARK: - Public API
@@ -166,8 +170,8 @@ final class HelperClient: @unchecked Sendable {
     // MARK: - Connection Management
 
     private func connect() -> Bool {
-        socketFd = socket(AF_UNIX, SOCK_STREAM, 0)
-        guard socketFd >= 0 else { return false }
+        let fd = socket(AF_UNIX, SOCK_STREAM, 0)
+        guard fd >= 0 else { return false }
 
         var addr = sockaddr_un()
         addr.sun_family = sa_family_t(AF_UNIX)
@@ -181,29 +185,33 @@ final class HelperClient: @unchecked Sendable {
 
         let result = withUnsafePointer(to: &addr) { ptr in
             ptr.withMemoryRebound(to: sockaddr.self, capacity: 1) { sockPtr in
-                Darwin.connect(socketFd, sockPtr, socklen_t(MemoryLayout<sockaddr_un>.size))
+                Darwin.connect(fd, sockPtr, socklen_t(MemoryLayout<sockaddr_un>.size))
             }
         }
 
         if result != 0 {
-            Darwin.close(socketFd)
-            socketFd = -1
+            Darwin.close(fd)
             return false
         }
 
         // Set send/receive timeouts (5 seconds — type commands with long text
         // can take several hundred milliseconds for the helper to process)
         var tv = timeval(tv_sec: 5, tv_usec: 0)
-        setsockopt(socketFd, SOL_SOCKET, SO_SNDTIMEO, &tv, socklen_t(MemoryLayout<timeval>.size))
-        setsockopt(socketFd, SOL_SOCKET, SO_RCVTIMEO, &tv, socklen_t(MemoryLayout<timeval>.size))
+        setsockopt(fd, SOL_SOCKET, SO_SNDTIMEO, &tv, socklen_t(MemoryLayout<timeval>.size))
+        setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, &tv, socklen_t(MemoryLayout<timeval>.size))
 
+        socketFd.withLock { $0 = fd }
         return true
     }
 
     private func disconnect() {
-        if socketFd >= 0 {
-            Darwin.close(socketFd)
-            socketFd = -1
+        let fd = socketFd.withLock { fd -> Int32 in
+            let old = fd
+            fd = -1
+            return old
+        }
+        if fd >= 0 {
+            Darwin.close(fd)
         }
     }
 
@@ -222,7 +230,10 @@ final class HelperClient: @unchecked Sendable {
 
     /// Send a JSON command and read the JSON response.
     private func sendCommand(_ command: [String: Any]) -> [String: Any]? {
-        guard socketFd >= 0 || connect() else { return nil }
+        let fd = socketFd.withLock { $0 }
+        guard fd >= 0 || connect() else { return nil }
+        let activeFd = socketFd.withLock { $0 }
+        guard activeFd >= 0 else { return nil }
 
         var data: Data
         do {
@@ -235,13 +246,13 @@ final class HelperClient: @unchecked Sendable {
 
         // Send
         let sent = data.withUnsafeBytes { buf in
-            send(socketFd, buf.baseAddress, buf.count, 0)
+            send(activeFd, buf.baseAddress, buf.count, 0)
         }
         guard sent == data.count else { return nil }
 
         // Read response (expect single line)
         var responseBuf = [UInt8](repeating: 0, count: 4096)
-        let bytesRead = recv(socketFd, &responseBuf, responseBuf.count, 0)
+        let bytesRead = recv(activeFd, &responseBuf, responseBuf.count, 0)
         guard bytesRead > 0 else { return nil }
 
         // Find newline delimiter in response

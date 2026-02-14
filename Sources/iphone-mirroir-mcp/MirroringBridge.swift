@@ -32,7 +32,7 @@ struct WindowInfo: Sendable {
 /// Bridge to interact with the iPhone Mirroring app via macOS accessibility APIs.
 /// The iPhone Mirroring window is special — it does not appear in AXWindows
 /// but is accessible via AXMainWindow/AXFocusedWindow.
-final class MirroringBridge: @unchecked Sendable {
+final class MirroringBridge: Sendable {
     private let bundleIdentifier = "com.apple.ScreenContinuity"
 
     /// Find the iPhone Mirroring process.

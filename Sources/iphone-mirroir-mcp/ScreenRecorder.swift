@@ -6,16 +6,24 @@
 
 import Foundation
 import HelperLib
+import os
 
 /// Records the iPhone Mirroring window as a video file.
 /// Uses the macOS `screencapture -v -l <windowID>` command which records
 /// a specific window until stopped via SIGINT.
 ///
 /// Requires Screen Recording permission in System Preferences > Privacy & Security.
-final class ScreenRecorder: @unchecked Sendable {
+final class ScreenRecorder: Sendable {
     private let bridge: MirroringBridge
-    private var recordingProcess: Process?
-    private var recordingPath: String?
+
+    /// Mutable recording state protected by an unfair lock.
+    /// Uses @unchecked Sendable because Process is not Sendable but access
+    /// is serialized through OSAllocatedUnfairLock.
+    private struct RecordingState: @unchecked Sendable {
+        var process: Process?
+        var path: String?
+    }
+    private let state = OSAllocatedUnfairLock(initialState: RecordingState())
 
     init(bridge: MirroringBridge) {
         self.bridge = bridge
@@ -23,7 +31,7 @@ final class ScreenRecorder: @unchecked Sendable {
 
     /// Whether a recording is currently in progress.
     var isRecording: Bool {
-        return recordingProcess?.isRunning ?? false
+        return state.withLock { $0.process?.isRunning ?? false }
     }
 
     /// Start recording the mirroring window.
@@ -60,8 +68,10 @@ final class ScreenRecorder: @unchecked Sendable {
                 + "Check Screen Recording permission in System Preferences > Privacy & Security."
         }
 
-        recordingProcess = process
-        recordingPath = path
+        state.withLock {
+            $0.process = process
+            $0.path = path
+        }
         return nil
     }
 
@@ -69,18 +79,24 @@ final class ScreenRecorder: @unchecked Sendable {
     /// Returns a tuple of (filePath, errorMessage). On success, filePath is set.
     /// On failure, errorMessage is set.
     func stopRecording() -> (filePath: String?, error: String?) {
-        guard let process = recordingProcess, process.isRunning else {
-            return (nil, "No recording in progress")
+        let (process, path) = state.withLock { s -> (Process?, String?) in
+            let p = s.process
+            let pt = s.path
+            return (p, pt)
         }
 
-        let path = recordingPath
+        guard let process = process, process.isRunning else {
+            return (nil, "No recording in progress")
+        }
 
         // Send SIGINT to gracefully stop screencapture (same as Ctrl+C)
         process.interrupt()
         process.waitUntilExit()
 
-        recordingProcess = nil
-        recordingPath = nil
+        state.withLock {
+            $0.process = nil
+            $0.path = nil
+        }
 
         guard process.terminationStatus == 0 || process.terminationStatus == 2 else {
             // Exit code 2 is normal for SIGINT termination

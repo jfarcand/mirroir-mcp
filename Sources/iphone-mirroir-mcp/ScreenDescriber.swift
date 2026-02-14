@@ -11,7 +11,7 @@ import Vision
 
 /// Runs OCR on the iPhone Mirroring window screenshot and returns detected
 /// text elements with their tap coordinates in the mirroring window's point space.
-final class ScreenDescriber: @unchecked Sendable {
+final class ScreenDescriber: Sendable {
     private let bridge: MirroringBridge
 
     init(bridge: MirroringBridge) {

@@ -11,7 +11,7 @@ import HelperLib
 /// Captures the iPhone Mirroring window content as a screenshot.
 /// Uses the macOS `screencapture` command since CGWindowListCreateImage
 /// is unavailable on macOS 15+ (replaced by ScreenCaptureKit).
-final class ScreenCapture: @unchecked Sendable {
+final class ScreenCapture: Sendable {
     private let bridge: MirroringBridge
 
     init(bridge: MirroringBridge) {

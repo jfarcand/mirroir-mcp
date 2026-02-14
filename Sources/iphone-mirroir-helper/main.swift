@@ -2,26 +2,12 @@
 // ABOUTME: Initializes the Karabiner virtual HID client and starts the Unix socket command server.
 
 import Darwin
+import Dispatch
 import Foundation
 
 /// Log to stderr (consistent with KarabinerClient and CommandServer).
 private func log(_ message: String) {
     FileHandle.standardError.write(Data("[Helper] \(message)\n".utf8))
-}
-
-// MARK: - Signal Handling
-
-/// Atomic flag for cross-thread signal notification.
-/// Uses nonisolated(unsafe) because signal handlers run on arbitrary threads
-/// and cannot participate in Swift's actor isolation model.
-private nonisolated(unsafe) var shouldTerminate = false
-
-private func setupSignalHandlers() {
-    let handler: @convention(c) (Int32) -> Void = { _ in
-        shouldTerminate = true
-    }
-    signal(SIGTERM, handler)
-    signal(SIGINT, handler)
 }
 
 // MARK: - Main
@@ -33,8 +19,6 @@ guard getuid() == 0 else {
     log("ERROR: Helper must run as root (current uid: \(getuid())). Use sudo or install as LaunchDaemon.")
     exit(1)
 }
-
-setupSignalHandlers()
 
 // Initialize Karabiner virtual HID client.
 // If Karabiner is unavailable (no DriverKit extension, CI environment, etc.),
@@ -53,22 +37,27 @@ do {
 // Start the command server (blocks until stopped)
 let server = CommandServer(karabiner: karabiner)
 
-// Handle graceful shutdown in a background thread.
-// These references cross actor boundaries but are safe because:
-// - shouldTerminate is only written from the signal handler (atomic on macOS)
-// - server.stop() / karabiner.shutdown() are thread-safe shutdown methods
-nonisolated(unsafe) let serverRef = server
-nonisolated(unsafe) let karabinerRef = karabiner
-DispatchQueue.global(qos: .utility).async {
-    while !shouldTerminate {
-        Thread.sleep(forTimeInterval: 0.5)
-    }
+// Handle graceful shutdown via GCD signal sources.
+// DispatchSource captures server/karabiner in its closure, eliminating the
+// need for nonisolated(unsafe) references across actor boundaries.
+signal(SIGTERM, SIG_IGN)
+signal(SIGINT, SIG_IGN)
+
+let sigtermSource = DispatchSource.makeSignalSource(signal: SIGTERM, queue: .global(qos: .utility))
+let sigintSource = DispatchSource.makeSignalSource(signal: SIGINT, queue: .global(qos: .utility))
+
+let shutdownHandler: () -> Void = {
     log("Received termination signal, shutting down...")
-    serverRef.stop()
-    karabinerRef.shutdown()
+    server.stop()
+    karabiner.shutdown()
     log("Shutdown complete")
     exit(0)
 }
+
+sigtermSource.setEventHandler(handler: shutdownHandler)
+sigintSource.setEventHandler(handler: shutdownHandler)
+sigtermSource.resume()
+sigintSource.resume()
 
 do {
     try server.start()

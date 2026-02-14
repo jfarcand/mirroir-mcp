@@ -3,14 +3,18 @@
 
 import Foundation
 import HelperLib
+import os
 
 /// Shared debug logger used across the MCP server.
 /// Startup messages always persist to the log file via `persist()`.
 /// Verbose per-request messages only write when `enabled` is true via `log()`.
 enum DebugLog {
-    /// Whether verbose debug logging is active. Set once at startup from --debug flag,
-    /// before any concurrent access occurs.
-    nonisolated(unsafe) static var enabled = false
+    /// Whether verbose debug logging is active. Set once at startup from --debug flag.
+    private static let _enabled = OSAllocatedUnfairLock(initialState: false)
+    static var enabled: Bool {
+        get { _enabled.withLock { $0 } }
+        set { _enabled.withLock { $0 = newValue } }
+    }
 
     /// Path to the debug log file inside the global config directory.
     static var logPath: String {

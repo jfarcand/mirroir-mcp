@@ -23,7 +23,7 @@ struct TypeResult {
 /// Requires the Karabiner helper daemon for all input operations (tap, swipe,
 /// type, press_key). Keyboard input is sent via Karabiner virtual HID to avoid
 /// the Space-switching overhead of AppleScript activation.
-final class InputSimulation: @unchecked Sendable {
+final class InputSimulation: Sendable {
     private let bridge: MirroringBridge
     let helperClient = HelperClient()
     private let mirroringBundleID = "com.apple.ScreenContinuity"
