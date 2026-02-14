@@ -106,3 +106,20 @@ Steps are intents — the AI maps each to the appropriate MCP tool calls:
 | `open_url` | calls `open_url` |
 | `shake` | calls `shake` |
 | `remember: "instruction"` | AI reads dynamic data from screen and holds it for later steps |
+| `condition:` | Branch based on screen state — see below |
+
+### Conditions
+
+Scenarios can branch using `condition` steps. The AI calls `describe_screen` to evaluate the condition, then executes the matching branch:
+
+```yaml
+- condition:
+    if_visible: "Unread"        # or if_not_visible
+    then:
+      - tap: "Unread"
+      - tap: "Archive"
+    else:                       # optional
+      - screenshot: "empty"
+```
+
+If the condition is true, the `then` steps execute. If false and `else` is present, those steps execute instead. Steps inside branches are regular steps, including nested conditions.
