@@ -196,7 +196,7 @@ steps:
 
 ### Scenario Marketplace
 
-Ready-to-use scenarios for Calendar, Clock, Settings, Slack, Weather, Expo Go, and cross-app workflows. Install from [jfarcand/iphone-mirroir-scenarios](https://github.com/jfarcand/iphone-mirroir-scenarios):
+Ready-to-use scenarios that automate anything a human can do on an iPhone — tap, type, navigate, chain apps together. If you can do it manually, you can script it. Install from [jfarcand/iphone-mirroir-scenarios](https://github.com/jfarcand/iphone-mirroir-scenarios):
 
 #### Claude Code / GitHub Copilot
 
