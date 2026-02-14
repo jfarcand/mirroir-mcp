@@ -50,7 +50,7 @@ jobs:
           CONFIG="$HOME/.config/karabiner/karabiner.json"
           mkdir -p "$(dirname "$CONFIG")"
 
-          # No existing config on a fresh runner, so create one (same logic as install.sh)
+          # No existing config on a fresh runner, so create one (same logic as mirroir.sh)
           cat > "$CONFIG" << 'KARABINER_EOF'
           {
               "profiles": [

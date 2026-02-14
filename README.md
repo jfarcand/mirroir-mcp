@@ -111,7 +111,7 @@ Then point your MCP client to the binary at `iphone-mirroir-mcp` (it's in your P
 ```bash
 git clone https://github.com/jfarcand/iphone-mirroir-mcp.git
 cd iphone-mirroir-mcp
-./install.sh
+./mirroir.sh
 ```
 
 The installer handles everything: installs Karabiner if missing (with confirmation), waits for the DriverKit extension approval, builds both binaries, configures the Karabiner ignore rule, installs the helper daemon, and runs a verification check. Use the full path to the binary in your `.mcp.json`: `<repo>/.build/release/iphone-mirroir-mcp`.
@@ -236,7 +236,7 @@ brew uninstall iphone-mirroir-mcp
 
 # From source — removes helper daemon, Karabiner config changes,
 # and optionally Karabiner-Elements itself
-./uninstall.sh
+./uninstall-mirroir.sh
 ```
 
 ## Documentation
