@@ -36,8 +36,7 @@ final class ScreenCapture: Sendable {
         }
 
         // Wait with timeout to prevent indefinite hangs
-        let completed = waitForProcess(process, timeoutSeconds: 10)
-        if !completed {
+        if !process.waitWithTimeout(seconds: 10) {
             process.terminate()
             return nil
         }
@@ -57,15 +56,5 @@ final class ScreenCapture: Sendable {
         }
 
         return data.base64EncodedString()
-    }
-
-    /// Wait for a process to exit within the given timeout.
-    /// Returns true if the process exited, false if the timeout was reached.
-    private func waitForProcess(_ process: Process, timeoutSeconds: Int) -> Bool {
-        let deadline = Date().addingTimeInterval(TimeInterval(timeoutSeconds))
-        while process.isRunning && Date() < deadline {
-            usleep(EnvConfig.processPollUs)
-        }
-        return !process.isRunning
     }
 }

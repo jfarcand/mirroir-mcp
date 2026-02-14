@@ -91,10 +91,20 @@ struct GridOverlayTests {
         let result = GridOverlay.addOverlay(to: png, windowSize: windowSize)!
         let image = decodePNG(result)!
 
-        // Pixel at (100, 100) should be on a grid line intersection — not pure black anymore
+        // Pixel at (100, 100) should be on a grid line intersection.
+        // Grid lines are white (1,1,1) at 0.3 alpha on black (0,0,0) background.
+        // Composited value: ~(70, 70, 70). CoreGraphics premultiplied alpha
+        // compositing rounds differently than simple (0.3 * 255), so we use
+        // the empirically observed value with tolerance ±5.
         let gridPixel = pixelAt(x: 100, y: 100, in: image)
-        let isModified = gridPixel.r > 0 || gridPixel.g > 0 || gridPixel.b > 0
-        #expect(isModified, "Pixel at grid line intersection should be modified from pure black")
+        let tolerance: UInt8 = 5
+        let expectedChannel: UInt8 = 70
+        #expect(abs(Int(gridPixel.r) - Int(expectedChannel)) <= Int(tolerance),
+                "Grid pixel R should be ~\(expectedChannel), got \(gridPixel.r)")
+        #expect(abs(Int(gridPixel.g) - Int(expectedChannel)) <= Int(tolerance),
+                "Grid pixel G should be ~\(expectedChannel), got \(gridPixel.g)")
+        #expect(abs(Int(gridPixel.b) - Int(expectedChannel)) <= Int(tolerance),
+                "Grid pixel B should be ~\(expectedChannel), got \(gridPixel.b)")
 
         // Pixel at (50, 50) is between grid lines and far from labels — should remain black
         let cleanPixel = pixelAt(x: 50, y: 50, in: image)
@@ -102,6 +112,8 @@ struct GridOverlayTests {
                 "Pixel between grid lines should remain unchanged")
     }
 
+    /// Canary test: alerts if the grid spacing constant changes, which would
+    /// invalidate coordinate assumptions in describe_screen tap-point calculations.
     @Test("grid spacing constant is 50 points")
     func gridSpacingValue() {
         #expect(GridOverlay.gridSpacing == 50.0)

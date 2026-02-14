@@ -234,7 +234,6 @@ struct JSONRPCResponseTests {
         )
         let data = try encoder.encode(response)
         let dict = try decoder.decode([String: JSONValue].self, from: data)
-        #expect(dict["jsonrpc"] != nil)
         guard case .string(let ver) = dict["jsonrpc"] else {
             Issue.record("Expected jsonrpc string")
             return
@@ -254,6 +253,51 @@ struct JSONRPCResponseTests {
         #expect(json != nil)
         #expect(json!.contains("-32601"))
         #expect(json!.contains("Method not found"))
+    }
+}
+
+@Suite("JSONRPCError")
+struct JSONRPCErrorResponseTests {
+
+    private let encoder = JSONEncoder()
+
+    @Test("method-not-found error uses code -32601")
+    func methodNotFoundError() throws {
+        let response = JSONRPCResponse(
+            id: .number(1),
+            result: nil,
+            error: JSONRPCError(code: -32601, message: "Method not found: unknown_method")
+        )
+        let data = try encoder.encode(response)
+        let json = String(data: data, encoding: .utf8)!
+        #expect(json.contains("-32601"))
+        #expect(json.contains("unknown_method"))
+    }
+
+    @Test("parse error uses code -32700")
+    func parseError() throws {
+        let response = JSONRPCResponse(
+            id: nil,
+            result: nil,
+            error: JSONRPCError(code: -32700, message: "Parse error: invalid UTF-8")
+        )
+        let data = try encoder.encode(response)
+        let json = String(data: data, encoding: .utf8)!
+        #expect(json.contains("-32700"))
+        #expect(json.contains("invalid UTF-8"))
+    }
+
+    @Test("invalid params error uses code -32602")
+    func invalidParamsError() throws {
+        let response = JSONRPCResponse(
+            id: .string("req-42"),
+            result: nil,
+            error: JSONRPCError(code: -32602, message: "Missing tool name")
+        )
+        let data = try encoder.encode(response)
+        let json = String(data: data, encoding: .utf8)!
+        #expect(json.contains("-32602"))
+        #expect(json.contains("Missing tool name"))
     }
 }
 

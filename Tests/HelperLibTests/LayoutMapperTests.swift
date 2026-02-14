@@ -127,6 +127,8 @@ struct LayoutMapperTests {
         )
         #expect(!substitution.isEmpty,
                 "Canadian-CSA should differ from US QWERTY")
+        #expect(substitution.count >= 10,
+                "Canadian-CSA should have at least 10 substitutions, got \(substitution.count)")
 
         // The / key on US QWERTY (vk 0x2C) produces é on Canadian-CSA.
         // To type é on iPhone, send / to the helper.
