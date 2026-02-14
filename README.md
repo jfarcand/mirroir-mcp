@@ -259,6 +259,21 @@ brew uninstall iphone-mirroir-mcp
 | [Architecture](docs/architecture.md) | System diagram and how input reaches the iPhone |
 | [Known Limitations](docs/limitations.md) | Focus stealing, keyboard layout gaps, autocorrect |
 | [Troubleshooting](docs/troubleshooting.md) | Debug mode and common issues |
+| [Contributor License Agreement](CLA.md) | CLA for all contributions |
+
+## Contributing
+
+Contributions are welcome! By submitting a pull request or patch, you agree to the [Contributor License Agreement](CLA.md). Your Git commit metadata (name and email) serves as your electronic signature — no separate form to sign.
+
+The CLA ensures the project can be maintained long-term under a consistent license. You retain full ownership of your contributions — the CLA simply grants the maintainer the right to distribute them as part of the project. Key provisions:
+
+| Clause | Purpose |
+|---|---|
+| Copyright license (§2) | Grants a broad license so the project can be relicensed if needed (e.g., dual licensing for sustainability) |
+| Patent license (§3) | Protects all users from patent claims by contributors (standard Apache-style) |
+| Original work (§4) | Contributors certify they own what they submit |
+| Employer clause (§6) | Covers the common case where a contributor's employer might claim ownership |
+| Git-based signing (§7) | Submitting a PR = agreement — zero friction, similar to the DCO used by the Linux kernel |
 
 ---
 
