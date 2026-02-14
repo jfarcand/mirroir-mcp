@@ -33,7 +33,7 @@ echo "Helper daemon removed."
 echo ""
 echo "--- Permissions config ---"
 
-MCP_CONFIG_DIR="$HOME/.config/iphone-mirroir-mcp"
+MCP_CONFIG_DIR="$HOME/.iphone-mirroir-mcp"
 if [ -d "$MCP_CONFIG_DIR" ]; then
     read -p "Remove permissions config ($MCP_CONFIG_DIR)? [y/N] " remove_config
     case "$remove_config" in
