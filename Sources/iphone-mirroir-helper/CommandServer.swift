@@ -133,8 +133,15 @@ final class CommandServer {
 
                 let response = processCommand(data: lineData)
                 let responseData = response + Data([0x0A]) // newline delimiter
-                _ = responseData.withUnsafeBytes { buf in
+                let sent = responseData.withUnsafeBytes { buf in
                     send(fd, buf.baseAddress, buf.count, 0)
+                }
+                if sent < 0 {
+                    let sendErrno = errno
+                    logHelper("send() failed: \(String(cString: strerror(sendErrno)))")
+                    if sendErrno == EPIPE || sendErrno == ECONNRESET {
+                        break
+                    }
                 }
             }
         }

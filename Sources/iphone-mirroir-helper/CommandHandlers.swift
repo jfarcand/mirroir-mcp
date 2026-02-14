@@ -14,10 +14,17 @@ extension CommandServer {
 
     /// Parse and execute a JSON command, returning the JSON response.
     func processCommand(data: Data) -> Data {
-        guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+        let parsed: Any
+        do {
+            parsed = try JSONSerialization.jsonObject(with: data)
+        } catch {
+            logHelper("JSON parse failed: \(error)")
+            return makeErrorResponse("Invalid JSON command: \(error.localizedDescription)")
+        }
+        guard let json = parsed as? [String: Any],
               let action = json["action"] as? String
         else {
-            return makeErrorResponse("Invalid JSON command")
+            return makeErrorResponse("Invalid JSON command: missing 'action' key")
         }
 
         switch action {

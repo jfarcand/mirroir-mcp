@@ -224,7 +224,13 @@ final class HelperClient: @unchecked Sendable {
     private func sendCommand(_ command: [String: Any]) -> [String: Any]? {
         guard socketFd >= 0 || connect() else { return nil }
 
-        guard var data = try? JSONSerialization.data(withJSONObject: command) else { return nil }
+        var data: Data
+        do {
+            data = try JSONSerialization.data(withJSONObject: command)
+        } catch {
+            DebugLog.log("HelperClient", "JSON serialization failed for command: \(error)")
+            return nil
+        }
         data.append(0x0A) // newline delimiter
 
         // Send
@@ -246,6 +252,11 @@ final class HelperClient: @unchecked Sendable {
             responseData = Data(responseBuf[0..<bytesRead])
         }
 
-        return try? JSONSerialization.jsonObject(with: responseData) as? [String: Any]
+        do {
+            return try JSONSerialization.jsonObject(with: responseData) as? [String: Any]
+        } catch {
+            DebugLog.log("HelperClient", "JSON response parse failed: \(error)")
+            return nil
+        }
     }
 }

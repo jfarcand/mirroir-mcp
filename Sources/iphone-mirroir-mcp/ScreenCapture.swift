@@ -48,7 +48,13 @@ final class ScreenCapture: @unchecked Sendable {
         let fileURL = URL(fileURLWithPath: tempPath)
         defer { try? FileManager.default.removeItem(at: fileURL) }
 
-        guard let data = try? Data(contentsOf: fileURL) else { return nil }
+        let data: Data
+        do {
+            data = try Data(contentsOf: fileURL)
+        } catch {
+            DebugLog.log("ScreenCapture", "Failed to read screenshot: \(error)")
+            return nil
+        }
 
         return data.base64EncodedString()
     }

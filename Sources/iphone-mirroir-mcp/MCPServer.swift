@@ -27,10 +27,17 @@ final class MCPServer: @unchecked Sendable {
         while let line = readLine(strippingNewline: true) {
             if line.isEmpty { continue }
 
-            guard let data = line.data(using: .utf8),
-                  let request = try? decoder.decode(JSONRPCRequest.self, from: data)
-            else {
-                writeError(id: nil, code: -32700, message: "Parse error")
+            guard let data = line.data(using: .utf8) else {
+                writeError(id: nil, code: -32700, message: "Parse error: invalid UTF-8")
+                continue
+            }
+
+            let request: JSONRPCRequest
+            do {
+                request = try decoder.decode(JSONRPCRequest.self, from: data)
+            } catch {
+                DebugLog.log("MCPServer", "JSON-RPC decode failed: \(error)")
+                writeError(id: nil, code: -32700, message: "Parse error: \(error.localizedDescription)")
                 continue
             }
 
@@ -131,9 +138,21 @@ final class MCPServer: @unchecked Sendable {
     }
 
     private func writeResponse(_ response: JSONRPCResponse) {
-        guard let data = try? encoder.encode(response),
-              let jsonString = String(data: data, encoding: .utf8)
-        else { return }
+        let data: Data
+        do {
+            data = try encoder.encode(response)
+        } catch {
+            DebugLog.log("MCPServer", "Failed to encode response: \(error)")
+            // Send a minimal error response as a fallback
+            let fallback = #"{"jsonrpc":"2.0","id":null,"error":{"code":-32603,"message":"Internal error: response encoding failed"}}"#
+            print(fallback)
+            fflush(stdout)
+            return
+        }
+        guard let jsonString = String(data: data, encoding: .utf8) else {
+            DebugLog.log("MCPServer", "Response data is not valid UTF-8")
+            return
+        }
         print(jsonString)
         fflush(stdout)
     }

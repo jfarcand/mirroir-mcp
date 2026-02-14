@@ -53,7 +53,13 @@ final class ScreenDescriber: @unchecked Sendable {
         let fileURL = URL(fileURLWithPath: tempPath)
         defer { try? FileManager.default.removeItem(at: fileURL) }
 
-        guard let data = try? Data(contentsOf: fileURL) else { return nil }
+        let data: Data
+        do {
+            data = try Data(contentsOf: fileURL)
+        } catch {
+            DebugLog.log("ScreenDescriber", "Failed to read screenshot: \(error)")
+            return nil
+        }
 
         // Create CGImage for Vision (OCR runs on the clean image, before grid overlay)
         guard let imageSource = CGImageSourceCreateWithData(data as CFData, nil),

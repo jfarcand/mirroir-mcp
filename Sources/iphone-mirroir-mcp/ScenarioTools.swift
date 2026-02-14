@@ -146,7 +146,11 @@ extension IPhoneMirroirMCP {
         let fallbackName = (path as NSString).lastPathComponent
             .replacingOccurrences(of: ".yaml", with: "")
 
-        guard let content = try? String(contentsOfFile: path, encoding: .utf8) else {
+        let content: String
+        do {
+            content = try String(contentsOfFile: path, encoding: .utf8)
+        } catch {
+            DebugLog.log("ScenarioTools", "Failed to read scenario header at \(path): \(error)")
             return ScenarioInfo(name: fallbackName, description: "", source: source)
         }
 
@@ -186,7 +190,11 @@ extension IPhoneMirroirMCP {
 
         // Match ${VAR_NAME} and ${VAR_NAME:-default_value} patterns
         let pattern = "\\$\\{([A-Za-z_][A-Za-z0-9_]*)(?::-((?:[^}]|\\}(?!\\}))*?))?\\}"
-        guard let regex = try? NSRegularExpression(pattern: pattern) else {
+        let regex: NSRegularExpression
+        do {
+            regex = try NSRegularExpression(pattern: pattern)
+        } catch {
+            DebugLog.log("ScenarioTools", "Regex compilation failed: \(error)")
             return result
         }
 

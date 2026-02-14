@@ -26,7 +26,13 @@ enum CursorSync {
         karabiner: KarabinerClient,
         body: () -> Void
     ) {
-        let savedPosition = CGEvent(source: nil)?.location ?? .zero
+        let savedPosition: CGPoint
+        if let event = CGEvent(source: nil) {
+            savedPosition = event.location
+        } else {
+            logHelper("CursorSync: CGEvent(source: nil) returned nil, cursor restore will use origin")
+            savedPosition = .zero
+        }
 
         CGAssociateMouseAndMouseCursorPosition(boolean_t(0))
         CGWarpMouseCursorPosition(target)
