@@ -334,6 +334,11 @@ final class KarabinerClient {
 
     /// Poll the client socket until both devices report ready or timeout.
     /// The server sends responses to our client socket from its response socket.
+    ///
+    /// Uses a blocking recv() with SO_RCVTIMEO (set during initialize) as the
+    /// polling mechanism. Each recv() times out after recvTimeoutUs, at which
+    /// point we re-send init requests to prompt the server. This avoids busy-wait
+    /// while keeping latency low.
     private func waitForDevicesReady(timeoutSec: TimeInterval) throws {
         let deadline = Date().addingTimeInterval(timeoutSec)
         var buf = [UInt8](repeating: 0, count: 1024)

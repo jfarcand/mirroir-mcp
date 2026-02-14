@@ -94,9 +94,10 @@ final class CommandServer {
                 continue
             }
 
-            // Handle one client at a time (MCP server is the only client)
+            // Handle one client at a time (MCP server is the only client).
+            // defer ensures the fd is closed even if handleClient throws or returns early.
+            defer { Darwin.close(clientFd) }
             handleClient(fd: clientFd)
-            Darwin.close(clientFd)
         }
     }
 
@@ -112,6 +113,10 @@ final class CommandServer {
 
     // MARK: - Client Handling
 
+    /// Maximum size of a single command line (64 KB). Lines exceeding this are
+    /// rejected to prevent unbounded memory growth from malformed input.
+    private static let maxCommandSize = 65_536
+
     /// Read newline-delimited JSON from the client and dispatch commands.
     private func handleClient(fd: Int32) {
         logHelper("Client connected")
@@ -123,6 +128,13 @@ final class CommandServer {
             if bytesRead <= 0 { break }
 
             buffer.append(contentsOf: readBuf[0..<bytesRead])
+
+            // Guard against unbounded buffer growth from missing newlines
+            if buffer.count > Self.maxCommandSize && !buffer.contains(0x0A) {
+                logHelper("Command exceeds \(Self.maxCommandSize) bytes without newline, dropping")
+                buffer.removeAll()
+                continue
+            }
 
             // Process complete lines
             while let newlineIndex = buffer.firstIndex(of: 0x0A) {
