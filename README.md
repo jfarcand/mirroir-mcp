@@ -27,20 +27,19 @@ Input flows through [Karabiner](https://karabiner-elements.pqrs.org/) DriverKit 
 /bin/bash -c "$(curl -fsSL https://mirroir.dev/get-mirroir.sh)"
 ```
 
-Clones the repo, builds from source, installs the helper daemon, and configures Karabiner. Override the install location with `IPHONE_MIRROIR_HOME`.
-
-After install, approve the DriverKit extension if prompted: **System Settings > General > Login Items & Extensions** — enable all toggles under Karabiner-Elements. The first time you take a screenshot, macOS will prompt for **Screen Recording** and **Accessibility** permissions. Grant both.
-
-<details>
-<summary>npx (alternative)</summary>
+or via [npx](https://www.npmjs.com/package/iphone-mirroir-mcp):
 
 ```bash
 npx -y iphone-mirroir-mcp install
 ```
 
-The npx installer prompts you to select your MCP client (Claude Code, Claude Desktop, ChatGPT, Cursor, GitHub Copilot, or OpenAI Codex) and writes the config automatically.
+or via [Homebrew](https://tap.mirroir.dev):
 
-</details>
+```bash
+brew tap jfarcand/tap && brew install iphone-mirroir-mcp
+```
+
+After install, approve the DriverKit extension if prompted: **System Settings > General > Login Items & Extensions** — enable all toggles under Karabiner-Elements. The first time you take a screenshot, macOS will prompt for **Screen Recording** and **Accessibility** permissions. Grant both.
 
 <details>
 <summary>Per-client setup</summary>
@@ -103,20 +102,6 @@ If your MCP client is already configured but the helper daemon isn't running:
 ```bash
 npx iphone-mirroir-mcp setup
 ```
-
-</details>
-
-<details>
-<summary>Homebrew</summary>
-
-```bash
-brew install --cask karabiner-elements   # if not already installed
-brew tap jfarcand/tap
-brew install iphone-mirroir-mcp
-sudo brew services start iphone-mirroir-mcp
-```
-
-Then point your MCP client to the binary at `iphone-mirroir-mcp` (it's in your PATH after `brew install`).
 
 </details>
 
