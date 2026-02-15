@@ -60,6 +60,7 @@ public struct PermissionPolicy: Sendable {
         "stop_recording",
         "get_orientation",
         "status",
+        "check_health",
         "list_scenarios",
         "get_scenario",
     ]

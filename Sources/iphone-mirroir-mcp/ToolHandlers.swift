@@ -22,7 +22,8 @@ extension IPhoneMirroirMCP {
         registerInputTools(server: server, bridge: bridge, input: input)
         registerNavigationTools(server: server, bridge: bridge, input: input,
                                 policy: policy)
-        registerInfoTools(server: server, bridge: bridge, input: input)
+        registerInfoTools(server: server, bridge: bridge, input: input,
+                          capture: capture)
         registerScenarioTools(server: server)
     }
 }

@@ -244,7 +244,7 @@ The server supports two MCP protocol versions, negotiating the client's preferre
 | `registerScreenTools` | `ScreenTools.swift` | `screenshot`, `describe_screen`, `start_recording`, `stop_recording` |
 | `registerInputTools` | `InputTools.swift` | `tap`, `swipe`, `drag`, `type_text`, `press_key`, `long_press`, `double_tap`, `shake` |
 | `registerNavigationTools` | `NavigationTools.swift` | `launch_app`, `open_url`, `press_home`, `press_app_switcher`, `spotlight` |
-| `registerInfoTools` | `InfoTools.swift` | `status`, `get_orientation` |
+| `registerInfoTools` | `InfoTools.swift` | `status`, `get_orientation`, `check_health` |
 | `registerScenarioTools` | `ScenarioTools.swift` | `list_scenarios`, `get_scenario` |
 
 Each tool is defined as an `MCPToolDefinition` containing name, description, JSON Schema input definition, and a synchronous handler closure.

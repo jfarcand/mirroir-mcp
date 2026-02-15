@@ -68,32 +68,40 @@ extension IPhoneMirroirMCP {
                     return .error("Missing required parameter: name (string)")
                 }
 
-                let filename = name.hasSuffix(".yaml") ? name : name + ".yaml"
                 let dirs = PermissionPolicy.scenarioDirs
+                let (resolvedPath, ambiguous) = resolveScenario(name: name, dirs: dirs)
 
-                var filePath: String?
-                for dir in dirs {
-                    let candidate = dir + "/" + filename
-                    if FileManager.default.fileExists(atPath: candidate) {
-                        filePath = candidate
-                        break
+                if let path = resolvedPath {
+                    do {
+                        var content = try String(contentsOfFile: path, encoding: .utf8)
+                        content = substituteEnvVars(in: content)
+                        return .text(content)
+                    } catch {
+                        return .error(
+                            "Failed to read scenario at \(path): \(error.localizedDescription)")
                     }
                 }
 
-                guard let resolvedPath = filePath else {
-                    let searchedDirs = dirs.joined(separator: ", ")
+                if !ambiguous.isEmpty {
+                    let matches = ambiguous.map { "  - \($0)" }.joined(separator: "\n")
                     return .error(
-                        "Scenario '\(name)' not found. Searched: \(searchedDirs)")
+                        "Ambiguous scenario name '\(name)'. Multiple matches found:\n\(matches)\n" +
+                        "Use the full path (e.g. 'apps/slack/\(name)') to disambiguate.")
                 }
 
-                do {
-                    var content = try String(contentsOfFile: resolvedPath, encoding: .utf8)
-                    content = substituteEnvVars(in: content)
-                    return .text(content)
-                } catch {
+                // Not found — show available scenarios to help the user
+                let scenarios = discoverScenarios()
+                if scenarios.isEmpty {
+                    let searchedDirs = dirs.joined(separator: ", ")
                     return .error(
-                        "Failed to read scenario at \(resolvedPath): \(error.localizedDescription)")
+                        "Scenario '\(name)' not found. No scenarios installed.\n" +
+                        "Searched: \(searchedDirs)\n" +
+                        "Install scenarios: https://github.com/jfarcand/iphone-mirroir-scenarios")
                 }
+
+                let available = scenarios.map { "  - \($0.name)" }.joined(separator: "\n")
+                return .error(
+                    "Scenario '\(name)' not found. Available scenarios:\n\(available)")
             }
         ))
     }
@@ -265,5 +273,52 @@ extension IPhoneMirroirMCP {
         }
 
         return result
+    }
+
+    /// Resolve a scenario name to a file path, supporting both exact relative paths and basename lookup.
+    /// Returns (resolvedPath, ambiguousMatches). If resolvedPath is non-nil, it's the unique match.
+    /// If ambiguousMatches is non-empty, multiple files matched the basename.
+    static func resolveScenario(
+        name: String,
+        dirs: [String]
+    ) -> (path: String?, ambiguous: [String]) {
+        let filename = name.hasSuffix(".yaml") ? name : name + ".yaml"
+
+        // Phase 1: Try exact relative path match (project-local first)
+        for dir in dirs {
+            let candidate = dir + "/" + filename
+            if FileManager.default.fileExists(atPath: candidate) {
+                return (candidate, [])
+            }
+        }
+
+        // Phase 2: Try basename match across all directories
+        let targetBasename = (filename as NSString).lastPathComponent
+        var matches: [String] = []
+
+        for dir in dirs {
+            for relPath in findYAMLFiles(in: dir) {
+                let basename = (relPath as NSString).lastPathComponent
+                if basename == targetBasename {
+                    matches.append(relPath)
+                }
+            }
+        }
+
+        if matches.count == 1 {
+            // Unique basename match — find which dir it's in
+            for dir in dirs {
+                let candidate = dir + "/" + matches[0]
+                if FileManager.default.fileExists(atPath: candidate) {
+                    return (candidate, [])
+                }
+            }
+        }
+
+        if matches.count > 1 {
+            return (nil, matches)
+        }
+
+        return (nil, [])
     }
 }

@@ -1,8 +1,8 @@
 // Copyright 2026 jfarcand@apache.org
 // Licensed under the Apache License, Version 2.0
 //
-// ABOUTME: Tests for info tool MCP handlers: get_orientation, status.
-// ABOUTME: Verifies orientation reporting and comprehensive status string formatting.
+// ABOUTME: Tests for info tool MCP handlers: get_orientation, status, check_health.
+// ABOUTME: Verifies orientation reporting, status formatting, and health check diagnostics.
 
 import XCTest
 import HelperLib
@@ -13,6 +13,7 @@ final class InfoToolHandlerTests: XCTestCase {
     private var server: MCPServer!
     private var bridge: StubBridge!
     private var input: StubInput!
+    private var capture: StubCapture!
 
     override func setUp() {
         super.setUp()
@@ -20,7 +21,10 @@ final class InfoToolHandlerTests: XCTestCase {
         server = MCPServer(policy: policy)
         bridge = StubBridge()
         input = StubInput()
-        IPhoneMirroirMCP.registerInfoTools(server: server, bridge: bridge, input: input)
+        capture = StubCapture()
+        capture.captureResult = "base64data"
+        IPhoneMirroirMCP.registerInfoTools(server: server, bridge: bridge, input: input,
+                                            capture: capture)
     }
 
     private func callTool(_ name: String, args: [String: JSONValue] = [:]) -> JSONRPCResponse {
@@ -117,5 +121,55 @@ final class InfoToolHandlerTests: XCTestCase {
         XCTAssertFalse(isError(response))
         let text = extractText(response)
         XCTAssertTrue(text?.contains("Helper: not running") ?? false)
+    }
+
+    // MARK: - check_health
+
+    func testCheckHealthAllOk() {
+        bridge.state = .connected
+        input.statusDict = ["ok": true, "keyboard_ready": true, "pointing_ready": true]
+        capture.captureResult = "base64data"
+        let response = callTool("check_health")
+        XCTAssertFalse(isError(response))
+        let text = extractText(response)!
+        XCTAssertTrue(text.contains("All checks passed"))
+        XCTAssertTrue(text.contains("[ok] iPhone Mirroring app is running"))
+        XCTAssertTrue(text.contains("[ok] Mirroring connected"))
+        XCTAssertTrue(text.contains("[ok] Helper daemon connected"))
+        XCTAssertTrue(text.contains("[ok] Screen capture working"))
+    }
+
+    func testCheckHealthNotRunning() {
+        bridge.processRunning = false
+        bridge.state = .notRunning
+        input.statusDict = nil
+        capture.captureResult = nil
+        let response = callTool("check_health")
+        let text = extractText(response)!
+        XCTAssertTrue(text.contains("Issues detected"))
+        XCTAssertTrue(text.contains("[FAIL] iPhone Mirroring app is not running"))
+    }
+
+    func testCheckHealthPaused() {
+        bridge.state = .paused
+        let response = callTool("check_health")
+        let text = extractText(response)!
+        XCTAssertTrue(text.contains("[WARN] Mirroring is paused"))
+    }
+
+    func testCheckHealthHelperDown() {
+        bridge.state = .connected
+        input.statusDict = nil
+        let response = callTool("check_health")
+        let text = extractText(response)!
+        XCTAssertTrue(text.contains("[FAIL] Helper daemon not reachable"))
+    }
+
+    func testCheckHealthCaptureFailed() {
+        bridge.state = .connected
+        capture.captureResult = nil
+        let response = callTool("check_health")
+        let text = extractText(response)!
+        XCTAssertTrue(text.contains("[FAIL] Screen capture failed"))
     }
 }

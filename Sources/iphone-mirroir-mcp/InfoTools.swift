@@ -11,7 +11,8 @@ extension IPhoneMirroirMCP {
     static func registerInfoTools(
         server: MCPServer,
         bridge: any MirroringBridging,
-        input: any InputProviding
+        input: any InputProviding,
+        capture: any ScreenCapturing
     ) {
         // get_orientation — report device orientation
         server.registerTool(MCPToolDefinition(
@@ -39,6 +40,88 @@ extension IPhoneMirroirMCP {
 
                 return .text(
                     "Orientation: \(orientation.rawValue) (window: \(sizeDesc))")
+            }
+        ))
+
+        // check_health — single diagnostic tool for setup debugging
+        server.registerTool(MCPToolDefinition(
+            name: "check_health",
+            description: """
+                Run a comprehensive health check of the iPhone Mirroring setup. \
+                Checks mirroring window state, helper daemon connectivity, \
+                Karabiner virtual HID readiness, and screen capture availability. \
+                Use this to diagnose setup issues in a single call.
+                """,
+            inputSchema: [
+                "type": .string("object"),
+                "properties": .object([:]),
+            ],
+            handler: { _ in
+                var checks: [String] = []
+                var allOk = true
+
+                // 1. iPhone Mirroring process
+                let process = bridge.findProcess()
+                if process != nil {
+                    checks.append("[ok] iPhone Mirroring app is running")
+                } else {
+                    checks.append("[FAIL] iPhone Mirroring app is not running")
+                    allOk = false
+                }
+
+                // 2. Mirroring window state
+                let state = bridge.getState()
+                switch state {
+                case .connected:
+                    let info = bridge.getWindowInfo()
+                    let size = info.map {
+                        "\(Int($0.size.width))x\(Int($0.size.height))"
+                    } ?? "unknown"
+                    checks.append("[ok] Mirroring connected (window: \(size))")
+                case .paused:
+                    checks.append("[WARN] Mirroring is paused — click the window to resume")
+                    allOk = false
+                case .noWindow:
+                    checks.append("[FAIL] App running but no mirroring window found")
+                    allOk = false
+                case .notRunning:
+                    checks.append("[FAIL] No mirroring window — open iPhone Mirroring")
+                    allOk = false
+                }
+
+                // 3. Helper daemon
+                if let status = input.helperStatus() {
+                    let kb = status["keyboard_ready"] as? Bool ?? false
+                    let pt = status["pointing_ready"] as? Bool ?? false
+                    if kb && pt {
+                        checks.append("[ok] Helper daemon connected (keyboard + pointing ready)")
+                    } else {
+                        checks.append(
+                            "[WARN] Helper connected but devices not ready " +
+                            "(keyboard=\(kb), pointing=\(pt))")
+                        allOk = false
+                    }
+                } else {
+                    checks.append(
+                        "[FAIL] Helper daemon not reachable — " +
+                        "run 'npx iphone-mirroir-mcp setup' or check launchd")
+                    allOk = false
+                }
+
+                // 4. Screen capture
+                let screenshot = capture.captureBase64()
+                if screenshot != nil {
+                    checks.append("[ok] Screen capture working")
+                } else {
+                    checks.append(
+                        "[FAIL] Screen capture failed — " +
+                        "grant Screen Recording permission in System Settings")
+                    allOk = false
+                }
+
+                let summary = allOk ? "All checks passed" : "Issues detected"
+                let output = "\(summary)\n\n" + checks.joined(separator: "\n")
+                return .text(output)
             }
         ))
 

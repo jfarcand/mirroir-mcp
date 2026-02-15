@@ -6,7 +6,7 @@ Scenarios are YAML files that describe multi-step iPhone automation flows as int
 
 The system has two layers:
 
-1. **This repository** (`iphone-mirroir-mcp`) — provides 21 MCP tools for iPhone interaction
+1. **This repository** (`iphone-mirroir-mcp`) — provides 22 MCP tools for iPhone interaction
 2. **Scenario repositories** (e.g., [jfarcand/iphone-mirroir-scenarios](https://github.com/jfarcand/iphone-mirroir-scenarios)) — provide reusable YAML scenario files + plugin discovery
 
 Scenarios are intentionally simple. Steps like `tap: "Email"` don't specify pixel coordinates — the AI uses `describe_screen` for fuzzy OCR matching and adapts to unexpected dialogs, layout changes, and timing differences.

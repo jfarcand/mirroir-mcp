@@ -1,6 +1,6 @@
 # Tools Reference
 
-All 21 tools exposed by the MCP server. Mutating tools require [permission](permissions.md) to appear in `tools/list`.
+All 22 tools exposed by the MCP server. Mutating tools require [permission](permissions.md) to appear in `tools/list`.
 
 ## Tool List
 
@@ -25,6 +25,7 @@ All 21 tools exposed by the MCP server. Mutating tools require [permission](perm
 | `spotlight` | — | Open Spotlight search |
 | `get_orientation` | — | Report portrait/landscape and window dimensions |
 | `status` | — | Connection state, window geometry, and device readiness |
+| `check_health` | — | Comprehensive setup diagnostic: mirroring, helper, Karabiner, screen capture |
 | `list_scenarios` | — | List available YAML scenarios from project-local and global config dirs |
 | `get_scenario` | `name` | Read a scenario YAML file with ${VAR} env substitution |
 
