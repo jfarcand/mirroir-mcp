@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="website/public/logo-robot.svg" alt="iphone-mirroir-mcp" width="120" />
+  <img src="website/public/mirroir-wordmark.svg" alt="iphone-mirroir-mcp" width="128" />
 </p>
 
 # iphone-mirroir-mcp

@@ -1,0 +1,56 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 160" width="128" height="160" fill="none">
+  <!-- mirroir.dev — original robot with wordmark below -->
+
+  <defs>
+    <linearGradient id="body" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#6bb87a"/>
+      <stop offset="100%" stop-color="#3d7a4a"/>
+    </linearGradient>
+    <linearGradient id="eyes" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#6ee7a0"/>
+      <stop offset="100%" stop-color="#34d670"/>
+    </linearGradient>
+    <linearGradient id="frame" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#3d2a16"/>
+      <stop offset="100%" stop-color="#2e1f0f"/>
+    </linearGradient>
+  </defs>
+
+  <!-- ==================== -->
+  <!-- ORIGINAL ROBOT ICON -->
+  <!-- ==================== -->
+  <!-- Outer rounded squircle frame -->
+  <rect x="6" y="6" width="116" height="116" rx="28" fill="url(#frame)"/>
+  <rect x="10" y="10" width="108" height="108" rx="24" fill="#2e1f0f"/>
+
+  <!-- Antenna crossbar -->
+  <line x1="44" y1="28" x2="84" y2="28" stroke="url(#body)" stroke-width="4.5" stroke-linecap="round"/>
+  <!-- Antenna stem -->
+  <line x1="64" y1="28" x2="64" y2="38" stroke="url(#body)" stroke-width="4.5" stroke-linecap="round"/>
+  <!-- Antenna ball -->
+  <circle cx="64" cy="25" r="5" fill="url(#body)"/>
+
+  <!-- Robot head -->
+  <rect x="30" y="42" width="68" height="50" rx="16" stroke="url(#body)" stroke-width="5" fill="none"/>
+
+  <!-- Left ear -->
+  <line x1="30" y1="64" x2="20" y2="64" stroke="url(#body)" stroke-width="4.5" stroke-linecap="round"/>
+  <!-- Right ear -->
+  <line x1="98" y1="64" x2="108" y2="64" stroke="url(#body)" stroke-width="4.5" stroke-linecap="round"/>
+
+  <!-- Left eye -->
+  <circle cx="50" cy="60" r="8" fill="url(#eyes)"/>
+  <!-- Right eye -->
+  <circle cx="78" cy="60" r="8" fill="url(#eyes)"/>
+
+  <!-- Smile -->
+  <path d="M46 76 Q64 86 82 76" stroke="url(#body)" stroke-width="4" stroke-linecap="round" fill="none"/>
+
+  <!-- ==================== -->
+  <!-- WORDMARK: miЯRoir — single text element, Cyrillic Я for reversed R -->
+  <!-- ==================== -->
+  <!-- Background for wordmark area — matches robot frame so it works on any page background -->
+  <rect x="6" y="126" width="116" height="30" rx="8" fill="#2e1f0f"/>
+  <text x="64" y="145" font-family="'Helvetica Neue', 'SF Pro Display', Arial, sans-serif"
+        font-size="18" font-weight="300" fill="#f5f0eb" text-anchor="middle" letter-spacing="0.5">mi<tspan font-weight="700" fill="url(#eyes)">ЯR</tspan>oir</text>
+</svg>
