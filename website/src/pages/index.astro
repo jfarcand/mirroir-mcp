@@ -3,9 +3,9 @@ import Layout from "../layouts/Layout.astro";
 import { Code } from "astro:components";
 import "../styles/global.css";
 
-const installCmd = "npx -y iphone-mirroir-mcp install";
+const curlCmd = '/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/jfarcand/iphone-mirroir-mcp/main/get-mirroir.sh)"';
+const npxCmd = "npx -y iphone-mirroir-mcp install";
 const brewCmd = "brew tap jfarcand/tap && brew install iphone-mirroir-mcp";
-const sourceCmd = "git clone https://github.com/jfarcand/iphone-mirroir-mcp.git && cd iphone-mirroir-mcp && ./mirroir.sh";
 
 const permissionsCode = `{
   "allow": ["tap", "swipe", "type_text", "press_key", "launch_app"],
@@ -162,25 +162,25 @@ const scenarioIndex = JSON.stringify(scenarios);
   <section>
     <h2>Install iphone-mirroir-mcp</h2>
     <div class="install-block">
-      <code><span class="prompt">$</span> {installCmd}</code>
-      <button class="copy-btn" data-copy={installCmd}>Copy</button>
+      <code><span class="prompt">$</span> {curlCmd}</code>
+      <button class="copy-btn" data-copy={curlCmd}>Copy</button>
     </div>
     <p class="install-hint">
-      Paste that in a macOS Terminal. The installer prompts you to select your MCP client and writes the config automatically.
+      Paste that in a macOS Terminal. Clones the repo, builds from source, installs the helper daemon, and configures Karabiner.
     </p>
+    <p class="alt-install">
+      or via <a href="https://www.npmjs.com/package/iphone-mirroir-mcp">npx</a>:
+    </p>
+    <div class="install-block install-block-alt">
+      <code><span class="prompt">$</span> {npxCmd}</code>
+      <button class="copy-btn" data-copy={npxCmd}>Copy</button>
+    </div>
     <p class="alt-install">
       or via <a href="https://github.com/jfarcand/homebrew-tap">Homebrew</a>:
     </p>
     <div class="install-block install-block-alt">
       <code><span class="prompt">$</span> {brewCmd}</code>
       <button class="copy-btn" data-copy={brewCmd}>Copy</button>
-    </div>
-    <p class="alt-install">
-      or <a href="https://github.com/jfarcand/iphone-mirroir-mcp">from source</a>:
-    </p>
-    <div class="install-block install-block-alt">
-      <code><span class="prompt">$</span> {sourceCmd}</code>
-      <button class="copy-btn" data-copy={sourceCmd}>Copy</button>
     </div>
   </section>
 

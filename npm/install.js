@@ -4,11 +4,12 @@
 // Only supports macOS (darwin) since iPhone Mirroring is a macOS feature.
 
 const https = require("https");
+const crypto = require("crypto");
 const fs = require("fs");
 const path = require("path");
 const { execSync } = require("child_process");
 
-const VERSION = "0.10.0";
+const VERSION = "0.11.0";
 const REPO = "jfarcand/iphone-mirroir-mcp";
 const BINARY = "iphone-mirroir-mcp";
 
@@ -46,6 +47,7 @@ function main() {
   }
 
   download(url, tmpFile, () => {
+    verifyChecksum(tarball, tmpFile, () => {
     // Extract all files: iphone-mirroir-mcp, iphone-mirroir-helper, plist
     execSync(`tar xzf "${tmpFile}" -C "${binDir}"`, { stdio: "inherit" });
 
@@ -68,6 +70,51 @@ function main() {
 
     fs.unlinkSync(tmpFile);
     console.log(`Installed binaries to ${binDir}`);
+    });
+  });
+}
+
+function verifyChecksum(tarball, filePath, cb) {
+  const checksumsUrl = `https://github.com/${REPO}/releases/download/v${VERSION}/SHA256SUMS`;
+  const checksumsFile = filePath + ".sha256";
+
+  download(checksumsUrl, checksumsFile, () => {
+    const checksums = fs.readFileSync(checksumsFile, "utf8");
+    fs.unlinkSync(checksumsFile);
+
+    const expectedHash = checksums
+      .split("\n")
+      .map((line) => line.trim())
+      .filter((line) => line.endsWith(tarball))
+      .map((line) => line.split(/\s+/)[0])[0];
+
+    if (!expectedHash) {
+      console.warn(
+        `Warning: no checksum found for ${tarball} in SHA256SUMS, skipping verification`
+      );
+      cb();
+      return;
+    }
+
+    const fileBuffer = fs.readFileSync(filePath);
+    const actualHash = crypto
+      .createHash("sha256")
+      .update(fileBuffer)
+      .digest("hex");
+
+    if (actualHash !== expectedHash) {
+      console.error(
+        `Checksum mismatch for ${tarball}:\n  expected: ${expectedHash}\n  got:      ${actualHash}`
+      );
+      console.error(
+        "Install from source instead: https://github.com/" + REPO
+      );
+      fs.unlinkSync(filePath);
+      process.exit(1);
+    }
+
+    console.log(`Checksum verified: ${tarball}`);
+    cb();
   });
 }
 

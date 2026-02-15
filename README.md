@@ -23,12 +23,23 @@ Input flows through [Karabiner](https://karabiner-elements.pqrs.org/) DriverKit 
 ## Install
 
 ```bash
+/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/jfarcand/iphone-mirroir-mcp/main/get-mirroir.sh)"
+```
+
+Clones the repo, builds from source, installs the helper daemon, and configures Karabiner. Override the install location with `IPHONE_MIRROIR_HOME`.
+
+After install, approve the DriverKit extension if prompted: **System Settings > General > Login Items & Extensions** — enable all toggles under Karabiner-Elements. The first time you take a screenshot, macOS will prompt for **Screen Recording** and **Accessibility** permissions. Grant both.
+
+<details>
+<summary>npx (alternative)</summary>
+
+```bash
 npx -y iphone-mirroir-mcp install
 ```
 
-The installer prompts you to select your MCP client (Claude Code, Claude Desktop, ChatGPT, Cursor, GitHub Copilot, or OpenAI Codex) and writes the config automatically.
+The npx installer prompts you to select your MCP client (Claude Code, Claude Desktop, ChatGPT, Cursor, GitHub Copilot, or OpenAI Codex) and writes the config automatically.
 
-After install, approve the DriverKit extension if prompted: **System Settings > General > Login Items & Extensions** — enable all toggles under Karabiner-Elements. The first time you take a screenshot, macOS will prompt for **Screen Recording** and **Accessibility** permissions. Grant both.
+</details>
 
 <details>
 <summary>Per-client setup</summary>
@@ -225,6 +236,9 @@ See [Tools Reference](docs/tools.md#scenarios) for the full step type reference 
 ## Updating
 
 ```bash
+# curl installer (re-run — pulls latest and rebuilds)
+/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/jfarcand/iphone-mirroir-mcp/main/get-mirroir.sh)"
+
 # npx (always fetches latest)
 npx -y iphone-mirroir-mcp install
 

@@ -162,7 +162,12 @@ jobs:
           cd .build/release
           tar czf $GITHUB_WORKSPACE/iphone-mirroir-mcp-darwin-arm64.tar.gz iphone-mirroir-mcp iphone-mirroir-helper com.jfarcand.iphone-mirroir-helper.plist
 
+      - name: Generate checksums
+        run: shasum -a 256 iphone-mirroir-mcp-darwin-arm64.tar.gz > SHA256SUMS
+
       - name: Upload release
         uses: softprops/action-gh-release@v2
         with:
-          files: iphone-mirroir-mcp-darwin-arm64.tar.gz
+          files: |
+            iphone-mirroir-mcp-darwin-arm64.tar.gz
+            SHA256SUMS
