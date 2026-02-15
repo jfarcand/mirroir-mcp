@@ -13,19 +13,44 @@ const permissionsCode = `{
   "blockedApps": ["Wallet", "Banking"]
 }`;
 
-const scenarioExpo = `name: Expo Go Login Flow
+const scenarioExpo = `name: Expo Go Signup + Onboarding
 app: Expo Go
+description: >
+  Sign up, handle error or success,
+  then swipe through onboarding.
+
 steps:
   - launch: "Expo Go"
   - wait_for: "LoginDemo"
   - tap: "LoginDemo"
+  - tap: "Sign Up"
   - tap: "Email"
   - type: "\${TEST_EMAIL}"
   - tap: "Password"
   - type: "\${TEST_PASSWORD}"
-  - tap: "Sign In"
+  - tap: "Create Account"
+  - condition:
+      if_visible: "already exists"
+      then:
+        - tap: "Sign In Instead"
+        - tap: "Email"
+        - type: "\${TEST_EMAIL}"
+        - tap: "Password"
+        - type: "\${TEST_PASSWORD}"
+        - tap: "Sign In"
+      else:
+        - wait_for: "Welcome"
   - assert_visible: "Welcome"
-  - screenshot: "login_success"`;
+  - screenshot: "authenticated"
+  - repeat:
+      until_visible: "Get Started"
+      max: 5
+      steps:
+        - swipe: "left"
+        - screenshot: "onboarding"
+  - tap: "Get Started"
+  - assert_visible: "Dashboard"
+  - screenshot: "complete"`;
 
 const scenarioWaze = `name: Commute ETA Notification
 app: Waze, Messages
@@ -196,7 +221,7 @@ const scenarioIndex = JSON.stringify(scenarios);
 
     <div class="scenario-grid">
       <div class="scenario-col">
-        <h3>Test a login flow</h3>
+        <h3>Branching + looping</h3>
         <Code code={scenarioExpo} lang="yaml" theme="github-dark" />
       </div>
       <div class="scenario-col">
