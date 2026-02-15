@@ -115,7 +115,7 @@ pre code {
   color: var(--color-text);
   padding: 0;
   white-space: normal;
-  word-break: break-all;
+  overflow-wrap: break-word;
 }
 
 .install-block .prompt {
@@ -577,6 +577,11 @@ footer .trademark {
   .install-block {
     flex-direction: column;
     align-items: flex-start;
+  }
+
+  .scenario-col pre {
+    max-height: 300px;
+    overflow-y: auto;
   }
 
 }

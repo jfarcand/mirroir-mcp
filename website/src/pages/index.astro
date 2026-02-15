@@ -241,62 +241,58 @@ try {
       <sup>*</sup> Also supported by GitHub Copilot.
     </p>
 
-    <h3 class="search-heading">Browse pre-built scenarios</h3>
+    <h3 class="search-heading">Search the community scenario library</h3>
     <div class="scenario-search-wrap">
       <input
         type="text"
         id="scenario-q"
-        placeholder="Filter by name, app, or category..."
+        placeholder="Search scenarios... (e.g. login, slack, calendar)"
         autocomplete="off"
       />
+      <ul id="scenario-results"></ul>
     </div>
-
-    {scenarios.length > 0 ? (
-      <div id="mp-catalog">
-        {[...new Set(scenarios.map((s) => s.category))].sort().map((cat) => (
-          <div class="mp-category" data-category={cat}>
-            <h3 class="mp-category-title">{cat || "general"}</h3>
-            <div class="mp-grid">
-              {scenarios
-                .filter((s) => s.category === cat)
-                .map((s) => (
-                  <div class="mp-card" data-name={s.name.toLowerCase()} data-app={s.app.toLowerCase()} data-cat={s.category.toLowerCase()}>
-                    <div class="mp-card-header">
-                      <a href={s.url} target="_blank">{s.name}</a>
-                      <a class="scenario-dl" href={s.rawUrl} download title="Download YAML">&darr;</a>
-                    </div>
-                    <span class="scenario-app">{s.app}</span>
-                    {s.description && <p class="mp-card-desc">{s.description}</p>}
-                  </div>
-                ))}
-            </div>
-          </div>
-        ))}
-      </div>
-    ) : (
-      <p>No scenarios found. The <a href={scenariosBase}>scenarios repository</a> may be empty or unreachable during build.</p>
-    )}
-
+    <script id="scenario-data" type="application/json" set:html={JSON.stringify(scenarios)} />
     <script>
-      const input = document.getElementById("scenario-q") as HTMLInputElement;
-      const categories = document.querySelectorAll<HTMLElement>(".mp-category");
+      const scenarios = JSON.parse(
+        document.getElementById("scenario-data")!.textContent ?? "[]"
+      );
+      const input = document.getElementById("scenario-q")!;
+      const results = document.getElementById("scenario-results")!;
+
+      function render(matches: typeof scenarios) {
+        if (!matches.length) {
+          results.innerHTML = "";
+          return;
+        }
+        results.innerHTML = matches
+          .map(
+            (s: any) =>
+              `<li>
+                <div class="scenario-row">
+                  <a href="${s.url}" target="_blank">${s.name}</a>
+                  <span class="scenario-app">${s.app}</span>
+                  <a class="scenario-dl" href="${s.rawUrl}" download title="Download YAML">\u2193</a>
+                </div>
+                ${s.description ? `<span class="scenario-desc">${s.description}</span>` : ""}
+              </li>`
+          )
+          .join("");
+      }
 
       input.addEventListener("input", () => {
-        const q = input.value.toLowerCase().trim();
-        categories.forEach((cat) => {
-          const catCards = cat.querySelectorAll<HTMLElement>(".mp-card");
-          let visibleCount = 0;
-          catCards.forEach((card) => {
-            const match = !q ||
-              card.dataset.name!.includes(q) ||
-              card.dataset.app!.includes(q) ||
-              card.dataset.cat!.includes(q) ||
-              (card.querySelector(".mp-card-desc")?.textContent ?? "").toLowerCase().includes(q);
-            card.style.display = match ? "" : "none";
-            if (match) visibleCount++;
-          });
-          cat.style.display = visibleCount > 0 ? "" : "none";
-        });
+        const q = (input as HTMLInputElement).value.toLowerCase().trim();
+        if (!q) {
+          render([]);
+          return;
+        }
+        const matches = scenarios.filter(
+          (s: any) =>
+            s.name.toLowerCase().includes(q) ||
+            s.description.toLowerCase().includes(q) ||
+            s.app.toLowerCase().includes(q) ||
+            s.category.toLowerCase().includes(q)
+        );
+        render(matches);
       });
     </script>
   </section>
