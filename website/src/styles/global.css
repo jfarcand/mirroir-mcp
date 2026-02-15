@@ -299,18 +299,33 @@ section > p {
 /* Scenario search */
 .scenario-search-wrap {
   margin-top: 1rem;
+  max-width: 480px;
+  margin-left: auto;
+  margin-right: auto;
+  position: relative;
+}
+
+.scenario-search-wrap::before {
+  content: "\1F50D";
+  position: absolute;
+  left: 0.75rem;
+  top: 0.55rem;
+  font-size: 0.85rem;
+  pointer-events: none;
+  opacity: 0.5;
 }
 
 .scenario-search-wrap input {
   width: 100%;
   font-family: var(--font-mono);
   font-size: 0.85rem;
-  padding: 0.6rem 0.75rem;
+  padding: 0.6rem 0.75rem 0.6rem 2.1rem;
   border-radius: 6px;
   border: 1px solid var(--color-border);
   background: var(--color-code-bg);
   color: var(--color-text);
   outline: none;
+  transition: border-color 0.15s;
 }
 
 .scenario-search-wrap input:focus {
