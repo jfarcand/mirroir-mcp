@@ -11,7 +11,7 @@
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue)](LICENSE)
 [![macOS 15+](https://img.shields.io/badge/macOS-15%2B-black?logo=apple)](https://support.apple.com/en-us/105071)
 
-MCP server that gives AI agents full control of a real iPhone through macOS iPhone Mirroring. [Screenshot, tap, swipe, type](docs/tools.md) — from any MCP client. Test your Expo app, automate your morning routine, or let your AI read one app and act in another. Works with any app on screen — no source code required.
+MCP server that controls a real iPhone through macOS iPhone Mirroring. [Screenshot, tap, swipe, type](docs/tools.md) — from any MCP client. Works with any app on screen, no source code required.
 
 Input flows through [Karabiner](https://karabiner-elements.pqrs.org/) DriverKit virtual HID devices because iPhone Mirroring blocks standard CGEvent injection.
 
