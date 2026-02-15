@@ -23,7 +23,7 @@ Input flows through [Karabiner](https://karabiner-elements.pqrs.org/) DriverKit 
 ## Install
 
 ```bash
-/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/jfarcand/iphone-mirroir-mcp/main/get-mirroir.sh)"
+/bin/bash -c "$(curl -fsSL https://mirroir.dev/get-mirroir.sh)"
 ```
 
 Clones the repo, builds from source, installs the helper daemon, and configures Karabiner. Override the install location with `IPHONE_MIRROIR_HOME`.
@@ -237,7 +237,7 @@ See [Tools Reference](docs/tools.md#scenarios) for the full step type reference 
 
 ```bash
 # curl installer (re-run — pulls latest and rebuilds)
-/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/jfarcand/iphone-mirroir-mcp/main/get-mirroir.sh)"
+/bin/bash -c "$(curl -fsSL https://mirroir.dev/get-mirroir.sh)"
 
 # npx (always fetches latest)
 npx -y iphone-mirroir-mcp install

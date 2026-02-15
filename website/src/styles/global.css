@@ -104,7 +104,7 @@ pre code {
   padding: 0.75rem 1rem;
   border-radius: 8px;
   margin: 1.25rem auto 2rem;
-  max-width: 700px;
+  max-width: 860px;
   font-family: var(--font-mono);
   font-size: 0.9rem;
 }
@@ -114,8 +114,8 @@ pre code {
   background: none;
   color: var(--color-text);
   padding: 0;
-  white-space: nowrap;
-  overflow-x: auto;
+  white-space: normal;
+  word-break: break-all;
 }
 
 .install-block .prompt {
@@ -462,6 +462,78 @@ section > p {
   font-size: 0.8rem;
   color: var(--color-muted);
   margin-top: 0.15rem;
+}
+
+/* Back link */
+.back-link {
+  display: inline-block;
+  font-size: 0.85rem;
+  color: var(--color-muted);
+  margin-bottom: 1rem;
+}
+
+.back-link:hover {
+  color: var(--color-accent);
+}
+
+/* Marketplace catalog */
+.mp-category {
+  margin-top: 1.5rem;
+}
+
+.mp-category-title {
+  font-size: 0.8rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--color-muted);
+  padding-bottom: 0.4rem;
+  border-bottom: 1px solid var(--color-border);
+  margin-bottom: 0.75rem;
+}
+
+.mp-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 0.75rem;
+}
+
+.mp-card {
+  background: var(--color-code-bg);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  padding: 0.75rem 1rem;
+  transition: border-color 0.15s;
+}
+
+.mp-card:hover {
+  border-color: var(--color-accent);
+}
+
+.mp-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-bottom: 0.35rem;
+}
+
+.mp-card-header a:first-child {
+  font-size: 0.9rem;
+  font-weight: 600;
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mp-card-desc {
+  font-size: 0.8rem;
+  color: var(--color-muted);
+  margin-top: 0.35rem;
+  margin-bottom: 0;
+  line-height: 1.4;
 }
 
 /* Footer */

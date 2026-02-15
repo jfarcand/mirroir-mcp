@@ -3,7 +3,7 @@ import Layout from "../layouts/Layout.astro";
 import { Code } from "astro:components";
 import "../styles/global.css";
 
-const curlCmd = '/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/jfarcand/iphone-mirroir-mcp/main/get-mirroir.sh)"';
+const curlCmd = '/bin/bash -c "$(curl -fsSL https://mirroir.dev/get-mirroir.sh)"';
 const npxCmd = "npx -y iphone-mirroir-mcp install";
 const brewCmd = "brew tap jfarcand/tap && brew install iphone-mirroir-mcp";
 
@@ -164,7 +164,6 @@ try {
   // Build continues with empty list if GitHub API is unreachable
 }
 
-const scenarioIndex = JSON.stringify(scenarios);
 ---
 
 <Layout
@@ -216,7 +215,7 @@ const scenarioIndex = JSON.stringify(scenarios);
       Scenarios are reusable YAML files that describe automation flows as intents, not scripts.
       Steps like <code>tap: "Email"</code> don't specify coordinates — the AI finds
       the element by OCR matching and adapts to unexpected dialogs and layout changes.
-      Test an app or automate your morning routine. Share them from the <a href="https://github.com/jfarcand/iphone-mirroir-scenarios">marketplace</a>.
+      Test an app or automate your morning routine. Share them on the <a href="https://github.com/jfarcand/iphone-mirroir-scenarios">community repository</a>.
     </p>
 
     <div class="scenario-grid">
@@ -232,65 +231,72 @@ const scenarioIndex = JSON.stringify(scenarios);
 
     <p>
       <code>$&#123;VAR&#125;</code> placeholders resolve from environment variables.
-      Install scenarios in Claude Code:
+      Install scenarios in Claude Code<sup>*</sup>:
     </p>
     <div class="install-block install-block-alt">
-      <code><span class="prompt">$</span> claude plugin marketplace add jfarcand/iphone-mirroir-scenarios</code>
-      <button class="copy-btn" data-copy="claude plugin marketplace add jfarcand/iphone-mirroir-scenarios">Copy</button>
+      <code><span class="prompt">$</span> claude plugin marketplace add marketplace.mirroir.dev</code>
+      <button class="copy-btn" data-copy="claude plugin marketplace add marketplace.mirroir.dev">Copy</button>
     </div>
+    <p class="install-hint">
+      <sup>*</sup> Also supported by GitHub Copilot.
+    </p>
 
     <h3 class="search-heading">Browse pre-built scenarios</h3>
     <div class="scenario-search-wrap">
       <input
         type="text"
         id="scenario-q"
-        placeholder="Search scenarios... (e.g. login, slack, calendar)"
+        placeholder="Filter by name, app, or category..."
         autocomplete="off"
       />
-      <ul id="scenario-results"></ul>
     </div>
-    <script id="scenario-data" type="application/json" set:html={scenarioIndex} />
-    <script>
-      const scenarios = JSON.parse(
-        document.getElementById("scenario-data")!.textContent ?? "[]"
-      );
-      const input = document.getElementById("scenario-q")!;
-      const results = document.getElementById("scenario-results")!;
 
-      function render(matches: typeof scenarios) {
-        if (!matches.length) {
-          results.innerHTML = "";
-          return;
-        }
-        results.innerHTML = matches
-          .map(
-            (s: any) =>
-              `<li>
-                <div class="scenario-row">
-                  <a href="${s.url}" target="_blank">${s.name}</a>
-                  <span class="scenario-app">${s.app}</span>
-                  <a class="scenario-dl" href="${s.rawUrl}" download title="Download YAML">\u2193</a>
-                </div>
-                ${s.description ? `<span class="scenario-desc">${s.description}</span>` : ""}
-              </li>`
-          )
-          .join("");
-      }
+    {scenarios.length > 0 ? (
+      <div id="mp-catalog">
+        {[...new Set(scenarios.map((s) => s.category))].sort().map((cat) => (
+          <div class="mp-category" data-category={cat}>
+            <h3 class="mp-category-title">{cat || "general"}</h3>
+            <div class="mp-grid">
+              {scenarios
+                .filter((s) => s.category === cat)
+                .map((s) => (
+                  <div class="mp-card" data-name={s.name.toLowerCase()} data-app={s.app.toLowerCase()} data-cat={s.category.toLowerCase()}>
+                    <div class="mp-card-header">
+                      <a href={s.url} target="_blank">{s.name}</a>
+                      <a class="scenario-dl" href={s.rawUrl} download title="Download YAML">&darr;</a>
+                    </div>
+                    <span class="scenario-app">{s.app}</span>
+                    {s.description && <p class="mp-card-desc">{s.description}</p>}
+                  </div>
+                ))}
+            </div>
+          </div>
+        ))}
+      </div>
+    ) : (
+      <p>No scenarios found. The <a href={scenariosBase}>scenarios repository</a> may be empty or unreachable during build.</p>
+    )}
+
+    <script>
+      const input = document.getElementById("scenario-q") as HTMLInputElement;
+      const categories = document.querySelectorAll<HTMLElement>(".mp-category");
 
       input.addEventListener("input", () => {
-        const q = (input as HTMLInputElement).value.toLowerCase().trim();
-        if (!q) {
-          render([]);
-          return;
-        }
-        const matches = scenarios.filter(
-          (s: any) =>
-            s.name.toLowerCase().includes(q) ||
-            s.description.toLowerCase().includes(q) ||
-            s.app.toLowerCase().includes(q) ||
-            s.category.toLowerCase().includes(q)
-        );
-        render(matches);
+        const q = input.value.toLowerCase().trim();
+        categories.forEach((cat) => {
+          const catCards = cat.querySelectorAll<HTMLElement>(".mp-card");
+          let visibleCount = 0;
+          catCards.forEach((card) => {
+            const match = !q ||
+              card.dataset.name!.includes(q) ||
+              card.dataset.app!.includes(q) ||
+              card.dataset.cat!.includes(q) ||
+              (card.querySelector(".mp-card-desc")?.textContent ?? "").toLowerCase().includes(q);
+            card.style.display = match ? "" : "none";
+            if (match) visibleCount++;
+          });
+          cat.style.display = visibleCount > 0 ? "" : "none";
+        });
       });
     </script>
   </section>
