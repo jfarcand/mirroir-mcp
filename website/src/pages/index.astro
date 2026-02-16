@@ -182,6 +182,25 @@ try {
     </p>
   </header>
 
+  <!-- Demo Videos -->
+  <section class="demo-section">
+    <h2>See it in action</h2>
+    <div class="demo-grid">
+      <div class="demo-col">
+        <h3>Login Flow</h3>
+        <video autoplay loop muted playsinline>
+          <source src={`${import.meta.env.BASE_URL}video1-expo-login.mp4`} type="video/mp4" />
+        </video>
+      </div>
+      <div class="demo-col">
+        <h3>Cross-App Workflow</h3>
+        <video autoplay loop muted playsinline>
+          <source src={`${import.meta.env.BASE_URL}video2-waze-slack.mp4`} type="video/mp4" />
+        </video>
+      </div>
+    </div>
+  </section>
+
   <!-- Install -->
   <section>
     <h2>Install iphone-mirroir-mcp</h2>
@@ -297,22 +316,6 @@ try {
     </script>
   </section>
 
-  <!-- Permissions -->
-  <section>
-    <h2>Fail-closed by default</h2>
-    <p>
-      Without a config file, only read-only tools are exposed. Mutating tools are
-      hidden from the MCP client entirely — it never sees them unless you allow them.
-    </p>
-
-    <Code code={permissionsCode} lang="json" theme="github-dark" />
-
-    <p>
-      Drop this in <code>~/.iphone-mirroir-mcp/permissions.json</code> to control
-      exactly which tools your AI agent can use.
-    </p>
-  </section>
-
   <!-- What it does -->
   <section>
     <h2>What Does iphone-mirroir-mcp Do?</h2>
@@ -364,40 +367,44 @@ try {
     </div>
   </section>
 
-  <!-- Works with -->
+  <!-- Integrations -->
   <section>
-    <h2>Works with</h2>
+    <h2>Integrations</h2>
     <p>Any MCP client that supports stdio transport — plug into your editor or build your own agent.</p>
 
     <div class="client-group">
-      <h3>Coding Assistants</h3>
+      <h3>Agents</h3>
       <div class="client-list">
         <a href="https://docs.anthropic.com/en/docs/claude-code"><span>Claude Code</span></a>
-        <a href="https://claude.ai"><span>Claude Desktop</span></a>
         <a href="https://chatgpt.com"><span>ChatGPT</span></a>
         <a href="https://cursor.com"><span>Cursor</span></a>
         <a href="https://github.com/features/copilot"><span>GitHub Copilot</span></a>
-        <a href="https://github.com/openai/codex"><span>Codex</span></a>
-        <a href="https://github.com/google-gemini/gemini-cli"><span>Gemini CLI</span></a>
-        <a href="https://github.com/nickvdyck/opencode"><span>OpenCode</span></a>
-        <a href="https://codeium.com/windsurf"><span>Windsurf</span></a>
-        <a href="https://github.com/continuedev/continue"><span>Continue</span></a>
       </div>
     </div>
 
     <div class="client-group">
-      <h3>Agent Frameworks</h3>
+      <h3>Frameworks</h3>
       <div class="client-list">
-        <a href="https://github.com/openclaw/openclaw"><span>OpenClaw</span></a>
-        <a href="https://github.com/rowboatlabs/rowboat"><span>Rowboat</span></a>
-        <a href="https://strandsagents.com"><span>Strands Agents</span></a>
         <a href="https://github.com/langchain-ai/langgraph"><span>LangGraph</span></a>
-        <a href="https://github.com/lastmile-ai/mcp-agent"><span>mcp-agent</span></a>
-        <a href="https://github.com/Chainlit/chainlit"><span>Chainlit</span></a>
-        <a href="https://github.com/danny-avila/LibreChat"><span>LibreChat</span></a>
-        <a href="https://github.com/embabel/embabel-agent"><span>Embabel</span></a>
+        <a href="https://strandsagents.com"><span>Strands Agents</span></a>
       </div>
     </div>
+  </section>
+
+  <!-- Permissions -->
+  <section>
+    <h2>Fail-closed by default</h2>
+    <p>
+      Without a config file, only read-only tools are exposed. Mutating tools are
+      hidden from the MCP client entirely — it never sees them unless you allow them.
+    </p>
+
+    <Code code={permissionsCode} lang="json" theme="github-dark" />
+
+    <p>
+      Drop this in <code>~/.iphone-mirroir-mcp/permissions.json</code> to control
+      exactly which tools your AI agent can use.
+    </p>
   </section>
 
   <!-- FAQ -->
@@ -430,30 +437,6 @@ try {
     </p>
   </section>
 
-  <!-- Further Documentation -->
-  <section>
-    <h2>Further Documentation</h2>
-    <p>
-      <a href="https://github.com/jfarcand/iphone-mirroir-mcp#readme">README &amp; docs on GitHub</a>
-    </p>
-  </section>
-
-  <!-- Community Discussion -->
-  <section>
-    <h2>Community Discussion</h2>
-    <p>
-      <a href="https://github.com/jfarcand/iphone-mirroir-mcp/discussions/1">Join the conversation</a>
-    </p>
-  </section>
-
-  <!-- Donate -->
-  <section>
-    <h2>Donate</h2>
-    <p>
-      <a href="https://github.com/sponsors/jfarcand">Sponsor on GitHub</a>
-    </p>
-  </section>
-
   <!-- Footer -->
   <footer>
     <p>
@@ -461,6 +444,9 @@ try {
     </p>
     <p>
       <a href="https://github.com/jfarcand/iphone-mirroir-mcp">GitHub</a> &middot;
+      <a href="https://github.com/jfarcand/iphone-mirroir-mcp#readme">Docs</a> &middot;
+      <a href="https://github.com/jfarcand/iphone-mirroir-mcp/discussions/1">Community</a> &middot;
+      <a href="https://github.com/sponsors/jfarcand">Sponsor</a> &middot;
       Apache-2.0 &middot;
       macOS 15+
     </p>
