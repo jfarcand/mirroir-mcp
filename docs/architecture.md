@@ -189,7 +189,7 @@ sequenceDiagram
 
     Client->>Server: {"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-11-25"}}
     Server->>Server: Negotiate protocol version
-    Server->>Client: {"jsonrpc":"2.0","id":1,"result":{"protocolVersion":"2025-11-25","capabilities":{"tools":{}},"serverInfo":{"name":"iphone-mirroir-mcp","version":"0.12.0"}}}
+    Server->>Client: {"jsonrpc":"2.0","id":1,"result":{"protocolVersion":"2025-11-25","capabilities":{"tools":{}},"serverInfo":{"name":"iphone-mirroir-mcp","version":"0.12.1"}}}
 
     Client->>Server: {"jsonrpc":"2.0","id":2,"method":"tools/list"}
     Server->>Server: Filter tools by PermissionPolicy.isToolVisible()
