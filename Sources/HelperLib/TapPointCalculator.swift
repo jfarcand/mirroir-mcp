@@ -56,10 +56,12 @@ public enum TapPointCalculator {
     /// Minimum gap above to trigger upward offset. Set high enough to avoid
     /// false positives on in-app buttons (e.g. Waze shortcut pills, ~40pt gap)
     /// while still catching home screen icon labels (gaps typically 60-150pt
-    /// between rows). When OCR text inside icons (e.g. Calendar "13") reduces
-    /// the gap below this threshold, the tap lands on the label text instead —
-    /// which still works because the entire icon+label area is tappable.
+    /// between rows).
     static let minGapForOffset: Double = 50.0
+    /// Minimum short labels in a row to be classified as an icon grid row.
+    /// Icon rows use the gap from the previous multi-element row, bypassing
+    /// stray OCR text detected inside icons (e.g. Calendar date, Clock numbers).
+    static let iconRowMinLabels = 3
     /// Fixed upward offset applied to short labels when a gap is detected.
     /// Matches the typical distance from an icon label to the icon center
     /// on iOS home screens (~30pt).
@@ -81,6 +83,7 @@ public enum TapPointCalculator {
 
         var results: [TapPoint] = []
         var previousRowBottomY: Double = 0.0
+        var previousMultiRowBottomY: Double = 0.0
         var idx = 0
 
         while idx < sorted.count {
@@ -92,17 +95,32 @@ public enum TapPointCalculator {
                 rowEnd += 1
             }
 
-            // All elements from idx..<rowEnd share the same gap from the previous row
-            let gap = rowTopY - previousRowBottomY
+            // The offset is a row-level decision: a row is an icon label row only
+            // when ALL its elements are short labels. Mixed rows (e.g. Waze's
+            // "Y aller" + "Partir plus tard") are never icon rows.
+            let rowSize = rowEnd - idx
+            let shortLabelsInRow = (idx..<rowEnd).filter { j in
+                sorted[j].text.count <= maxLabelLength
+                    && sorted[j].bboxWidth < windowWidth * maxLabelWidthFraction
+            }.count
+            let allShortLabels = shortLabelsInRow == rowSize
+            let isIconRow = allShortLabels && shortLabelsInRow >= iconRowMinLabels
+
+            // Icon rows measure gap from the previous multi-element row,
+            // bypassing single-element OCR fragments inside icons.
+            let gap: Double
+            if isIconRow {
+                gap = rowTopY - previousMultiRowBottomY
+            } else {
+                gap = rowTopY - previousRowBottomY
+            }
 
             for j in idx..<rowEnd {
                 let element = sorted[j]
-                let isShortLabel = element.text.count <= maxLabelLength
-                    && element.bboxWidth < windowWidth * maxLabelWidthFraction
 
                 let tapY: Double
                 let textCenterY = (element.textTopY + element.textBottomY) / 2.0
-                if isShortLabel && gap > minGapForOffset {
+                if allShortLabels && gap > minGapForOffset {
                     tapY = max(element.textTopY - iconOffset, 0.0)
                 } else {
                     tapY = textCenterY
@@ -119,6 +137,13 @@ public enum TapPointCalculator {
             // Advance previousRowBottomY to the max textBottomY in this row
             for j in idx..<rowEnd {
                 previousRowBottomY = max(previousRowBottomY, sorted[j].textBottomY)
+            }
+
+            // Advance previousMultiRowBottomY only for rows with 2+ elements
+            if (rowEnd - idx) >= 2 {
+                for j in idx..<rowEnd {
+                    previousMultiRowBottomY = max(previousMultiRowBottomY, sorted[j].textBottomY)
+                }
             }
 
             idx = rowEnd

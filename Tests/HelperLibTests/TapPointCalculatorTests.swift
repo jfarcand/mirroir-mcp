@@ -92,6 +92,53 @@ struct TapPointCalculatorTests {
         #expect(results[2].tapY == 164.0, "Calendrier should use text center (gap too small for offset)")
     }
 
+    @Test("icon row bypasses single-element OCR fragments for gap calculation")
+    func iconRowBypassesSingleElements() {
+        // Home screen: status bar → Calendar "16" inside icon → 4 icon labels.
+        // The single "16" shouldn't reduce the gap for the icon label row.
+        let elements = [
+            element(text: "15:37", tapX: 71, textTopY: 25, textBottomY: 37),
+            element(text: "75", tapX: 354, textTopY: 27, textBottomY: 37),
+            element(text: "16", tapX: 250, textTopY: 148, textBottomY: 165),
+            element(text: "Météo", tapX: 68, textTopY: 188, textBottomY: 200),
+            element(text: "Calendrier", tapX: 252, textTopY: 188, textBottomY: 200),
+            element(text: "Livres", tapX: 340, textTopY: 188, textBottomY: 200),
+            element(text: "Horloge", tapX: 159, textTopY: 188, textBottomY: 200),
+        ]
+
+        let results = TapPointCalculator.computeTapPoints(
+            elements: elements, windowWidth: windowWidth
+        )
+
+        let meteo = results.first { $0.text == "Météo" }!
+        #expect(meteo.tapY == 158.0, "Icon row should bypass single-element '16' for gap")
+    }
+
+    @Test("mixed row with short and long labels does not offset any element")
+    func mixedRowNoOffset() {
+        // Waze route screen: "Y aller" (7 chars) + "Partir plus tard" (16 chars) on
+        // the same row. Because the row contains a non-short element, the entire row
+        // is treated as regular content — no element gets offset.
+        let elements = [
+            element(text: "54 min", tapX: 63, textTopY: 639, textBottomY: 655),
+            element(text: "Y aller", tapX: 299, textTopY: 829, textBottomY: 845),
+            element(
+                text: "Partir plus tard", tapX: 112, textTopY: 829, textBottomY: 845,
+                bboxWidth: 120
+            ),
+        ]
+
+        let results = TapPointCalculator.computeTapPoints(
+            elements: elements, windowWidth: windowWidth
+        )
+
+        let yAller = results.first { $0.text == "Y aller" }!
+        let partir = results.first { $0.text == "Partir plus tard" }!
+        // Both should use text center since the row is mixed (16-char label is not short)
+        #expect(yAller.tapY == 837.0, "Y aller should use text center in mixed row")
+        #expect(partir.tapY == 837.0, "Partir plus tard should use text center in mixed row")
+    }
+
     // MARK: - Full-width text (no offset)
 
     @Test("long text does not get offset regardless of gap")

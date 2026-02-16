@@ -5,7 +5,7 @@
 // ABOUTME: Verifies app-not-running checks, capture failure paths, and success responses.
 
 import XCTest
-import HelperLib
+@testable import HelperLib
 @testable import iphone_mirroir_mcp
 
 final class ScreenToolHandlerTests: XCTestCase {
@@ -108,6 +108,62 @@ final class ScreenToolHandlerTests: XCTestCase {
         XCTAssertTrue(isError(response))
         let text = extractText(response)
         XCTAssertTrue(text?.contains("Failed to capture") ?? false)
+    }
+
+    func testDescribeScreenSkipOCRReturnsImageOnly() {
+        bridge.processRunning = true
+        describer.describeResult = ScreenDescriber.DescribeResult(
+            elements: [],
+            screenshotBase64: "iVBORw0KGgo="
+        )
+        let response = callTool("describe_screen", args: ["skip_ocr": .bool(true)])
+        XCTAssertFalse(isError(response))
+
+        // Verify the skip_ocr flag was passed through
+        XCTAssertTrue(describer.lastSkipOCR)
+
+        // Verify response contains both text note and image
+        guard case .object(let result) = response.result,
+              case .array(let content) = result["content"] else {
+            return XCTFail("Expected content array")
+        }
+        XCTAssertEqual(content.count, 2)
+
+        // First content block should be the skip-OCR text note
+        if case .object(let textObj) = content[0],
+           case .string(let text) = textObj["text"] {
+            XCTAssertTrue(text.contains("OCR skipped"))
+        } else {
+            XCTFail("Expected text content with OCR skipped note")
+        }
+
+        // Second content block should be the image
+        if case .object(let imgObj) = content[1] {
+            XCTAssertEqual(imgObj["type"], .string("image"))
+            XCTAssertEqual(imgObj["data"], .string("iVBORw0KGgo="))
+        } else {
+            XCTFail("Expected image content")
+        }
+    }
+
+    func testDescribeScreenDefaultDoesNotSkipOCR() {
+        bridge.processRunning = true
+        describer.describeResult = ScreenDescriber.DescribeResult(
+            elements: [
+                TapPoint(text: "Settings", tapX: 100, tapY: 200, confidence: 0.95)
+            ],
+            screenshotBase64: "iVBORw0KGgo="
+        )
+        let response = callTool("describe_screen")
+        XCTAssertFalse(isError(response))
+
+        // Verify skip_ocr defaults to false
+        XCTAssertFalse(describer.lastSkipOCR)
+
+        // Verify response contains element text
+        let text = extractText(response)
+        XCTAssertTrue(text?.contains("Settings") ?? false)
+        XCTAssertTrue(text?.contains("(100, 200)") ?? false)
     }
 
     // MARK: - start_recording

@@ -151,6 +151,8 @@ Start recording, open Settings, scroll down to General > About, then stop
 recording. I need a video of the scroll lag I'm seeing.
 ```
 
+> **Tip:** `describe_screen` supports `skip_ocr: true` to return only the grid-overlaid screenshot without running Vision OCR, letting the MCP client use its own vision model instead (costs more tokens but can identify icons, images, and non-text UI elements).
+
 ## Scenarios
 
 Scenarios are YAML files that describe multi-step automation flows as intents, not scripts. Steps like `tap: "Email"` don't specify coordinates — the AI finds the element by fuzzy OCR matching and adapts to unexpected dialogs, screen layout changes, and timing.

@@ -48,7 +48,7 @@ protocol ScreenRecording: Sendable {
 
 /// Abstracts OCR-based screen element detection.
 protocol ScreenDescribing: Sendable {
-    func describe() -> ScreenDescriber.DescribeResult?
+    func describe(skipOCR: Bool) -> ScreenDescriber.DescribeResult?
 }
 
 // MARK: - Conformances

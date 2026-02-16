@@ -7,7 +7,7 @@ All 22 tools exposed by the MCP server. Mutating tools require [permission](perm
 | Tool | Parameters | Description |
 |------|-----------|-------------|
 | `screenshot` | — | Capture the iPhone screen as base64 PNG |
-| `describe_screen` | — | OCR the screen and return text elements with tap coordinates plus a grid-overlaid screenshot |
+| `describe_screen` | `skip_ocr`? | OCR the screen and return text elements with tap coordinates plus a grid-overlaid screenshot |
 | `start_recording` | `output_path`? | Start video recording of the mirrored screen |
 | `stop_recording` | — | Stop recording and return the .mov file path |
 | `tap` | `x`, `y` | Tap at coordinates (relative to mirroring window) |
@@ -32,6 +32,12 @@ All 22 tools exposed by the MCP server. Mutating tools require [permission](perm
 ## Coordinates
 
 Coordinates are in points relative to the mirroring window's top-left corner. Use `describe_screen` to get exact tap coordinates via OCR — its grid overlay also helps target unlabeled icons (back arrows, stars, gears) that OCR can't detect. For raw screenshots, coordinates are Retina 2x — divide pixel coordinates by 2 to get tap coordinates.
+
+## Describe Screen
+
+`describe_screen` runs Apple Vision OCR on the mirroring window and returns detected text elements with their tap coordinates, plus a grid-overlaid screenshot for visual context.
+
+Set `skip_ocr: true` to skip Vision OCR and return only the grid-overlaid screenshot. This lets MCP clients use their own vision model to analyze the screen instead of relying on the built-in OCR (costs more tokens but can identify icons, images, and UI elements that text-only OCR misses).
 
 ## Typing Workflow
 

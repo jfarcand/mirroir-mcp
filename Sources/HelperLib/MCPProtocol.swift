@@ -147,6 +147,11 @@ extension JSONValue {
         guard case .array(let items) = self else { return nil }
         return items.compactMap { $0.asString() }
     }
+
+    public func asBool() -> Bool? {
+        if case .bool(let b) = self { return b }
+        return nil
+    }
 }
 
 public struct JSONRPCResponse: Encodable, Sendable {

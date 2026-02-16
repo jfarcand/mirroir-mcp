@@ -26,7 +26,9 @@ final class ScreenDescriber: Sendable {
 
     /// Capture the mirroring window, run OCR, and return detected text elements
     /// with their tap coordinates plus the screenshot as base64 PNG.
-    func describe() -> DescribeResult? {
+    /// When `skipOCR` is true, returns only the grid-overlaid screenshot with
+    /// an empty elements array, letting the MCP client use its own vision model.
+    func describe(skipOCR: Bool = false) -> DescribeResult? {
         guard let info = bridge.getWindowInfo(), info.windowID != 0 else { return nil }
 
         // Capture screenshot to temp file (same approach as ScreenCapture)
@@ -58,6 +60,12 @@ final class ScreenDescriber: Sendable {
         } catch {
             DebugLog.log("ScreenDescriber", "Failed to read screenshot: \(error)")
             return nil
+        }
+
+        // Return grid-overlaid screenshot without running OCR
+        if skipOCR {
+            let griddedData = GridOverlay.addOverlay(to: data, windowSize: info.size) ?? data
+            return DescribeResult(elements: [], screenshotBase64: griddedData.base64EncodedString())
         }
 
         // Create CGImage for Vision (OCR runs on the clean image, before grid overlay)

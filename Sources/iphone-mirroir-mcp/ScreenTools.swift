@@ -55,13 +55,21 @@ extension IPhoneMirroirMCP {
                 with their exact tap coordinates. Use this instead of visually estimating \
                 positions from screenshots. Returns both a structured text list of elements \
                 and the screenshot image. Coordinates are in the same point system as the \
-                tap tool (0,0 = top-left of mirroring window).
+                tap tool (0,0 = top-left of mirroring window). \
+                Set skip_ocr to true to skip Vision OCR and return only the grid-overlaid \
+                screenshot, letting the MCP client use its own vision model.
                 """,
             inputSchema: [
                 "type": .string("object"),
-                "properties": .object([:]),
+                "properties": .object([
+                    "skip_ocr": .object([
+                        "type": .string("boolean"),
+                        "description": .string(
+                            "Skip Vision OCR and return only the grid-overlaid screenshot (default: false)"),
+                    ])
+                ]),
             ],
-            handler: { _ in
+            handler: { args in
                 guard bridge.findProcess() != nil else {
                     return .error("iPhone Mirroring app is not running")
                 }
@@ -70,9 +78,22 @@ extension IPhoneMirroirMCP {
                     _ = bridge.pressResume()
                     usleep(EnvConfig.resumeFromPausedUs)
                 }
-                guard let result = describer.describe() else {
+
+                let skipOCR = args["skip_ocr"]?.asBool() ?? false
+
+                guard let result = describer.describe(skipOCR: skipOCR) else {
                     return .error(
                         "Failed to capture/analyze screen. Is iPhone Mirroring window visible?")
+                }
+
+                if skipOCR {
+                    return MCPToolResult(
+                        content: [
+                            .text("Screenshot captured with grid overlay (OCR skipped). Use your vision model to analyze the image."),
+                            .image(result.screenshotBase64, mimeType: "image/png"),
+                        ],
+                        isError: false
+                    )
                 }
 
                 var lines = ["Screen elements (tap coordinates in points):"]

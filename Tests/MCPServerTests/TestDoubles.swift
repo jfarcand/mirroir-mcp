@@ -111,8 +111,10 @@ final class StubRecorder: ScreenRecording, @unchecked Sendable {
 
 final class StubDescriber: ScreenDescribing, @unchecked Sendable {
     var describeResult: ScreenDescriber.DescribeResult?
+    var lastSkipOCR: Bool = false
 
-    func describe() -> ScreenDescriber.DescribeResult? {
-        describeResult
+    func describe(skipOCR: Bool) -> ScreenDescriber.DescribeResult? {
+        lastSkipOCR = skipOCR
+        return describeResult
     }
 }
