@@ -199,6 +199,41 @@ try {
         </video>
       </div>
     </div>
+    <div class="demo-lightbox" id="demo-lightbox">
+      <video autoplay loop muted playsinline id="demo-lightbox-video"></video>
+    </div>
+    <script>
+      const lightbox = document.getElementById("demo-lightbox")!;
+      const lbVideo = document.getElementById("demo-lightbox-video")! as HTMLVideoElement;
+
+      document.querySelectorAll(".demo-col video").forEach((vid) => {
+        vid.addEventListener("click", () => {
+          const src = (vid as HTMLVideoElement).querySelector("source")!.src;
+          lbVideo.innerHTML = "";
+          const source = document.createElement("source");
+          source.src = src;
+          source.type = "video/mp4";
+          lbVideo.appendChild(source);
+          lbVideo.load();
+          lbVideo.play();
+          lightbox.classList.add("active");
+        });
+      });
+
+      lightbox.addEventListener("click", (e) => {
+        if (e.target === lightbox) {
+          lightbox.classList.remove("active");
+          lbVideo.pause();
+        }
+      });
+
+      document.addEventListener("keydown", (e) => {
+        if (e.key === "Escape" && lightbox.classList.contains("active")) {
+          lightbox.classList.remove("active");
+          lbVideo.pause();
+        }
+      });
+    </script>
   </section>
 
   <!-- Install -->
