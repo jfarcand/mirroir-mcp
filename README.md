@@ -221,6 +221,46 @@ Once installed, scenarios are available through the `list_scenarios` and `get_sc
 
 See [Tools Reference](docs/tools.md#scenarios) for the full step type reference and directory layout.
 
+## Test Runner
+
+Run scenarios deterministically from the command line — no AI in the loop. Steps execute sequentially: OCR finds elements, taps land on coordinates, assertions pass or fail. Designed for CI, regression testing, and scripted automation.
+
+```bash
+iphone-mirroir-mcp test [options] <scenario>...
+```
+
+**Run a scenario:**
+
+```bash
+iphone-mirroir-mcp test apps/settings/check-about
+```
+
+**Run all scenarios with JUnit output:**
+
+```bash
+iphone-mirroir-mcp test --junit results.xml --verbose
+```
+
+**Validate scenarios without executing (dry run):**
+
+```bash
+iphone-mirroir-mcp test --dry-run apps/settings/*.yaml
+```
+
+| Option | Description |
+|---|---|
+| `--junit <path>` | Write JUnit XML report (for CI integration) |
+| `--screenshot-dir <dir>` | Save failure screenshots (default: `./mirroir-test-results/`) |
+| `--timeout <seconds>` | `wait_for` timeout (default: 15) |
+| `--verbose` | Show step-by-step detail |
+| `--dry-run` | Parse and validate without executing |
+
+The test runner uses the same OCR and input subsystems as the MCP server. Steps like `tap: "General"` find the element via Vision OCR and tap at the detected coordinates. `wait_for` polls OCR until the label appears or times out. AI-only steps (`remember`, `condition`, `repeat`) are skipped with a warning.
+
+Scenario resolution searches `<cwd>/.iphone-mirroir-mcp/scenarios/` and `~/.iphone-mirroir-mcp/scenarios/` — same directories as `list_scenarios`. Pass a `.yaml` path to run a specific file, or a name to search the scenario directories.
+
+Exit code is `0` when all scenarios pass, `1` when any step fails.
+
 ## Updating
 
 ```bash
