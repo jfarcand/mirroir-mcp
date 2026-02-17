@@ -1,0 +1,15 @@
+name: FakeMirroring smoke test
+app: FakeMirroring
+description: Validates test runner against FakeMirroring in CI (OCR-based assertions only)
+
+steps:
+  - wait_for: "Settings"
+  - assert_visible: "Settings"
+  - assert_visible: "Safari"
+  - assert_visible: "Photos"
+  - assert_visible: "Camera"
+  - assert_visible: "Messages"
+  - assert_not_visible: "NonExistent"
+  - assert_not_visible: "Instagram"
+  - home
+  - screenshot: "smoke_test"

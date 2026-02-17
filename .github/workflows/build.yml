@@ -38,6 +38,22 @@ jobs:
           IPHONE_MIRROIR_PROCESS_NAME: FakeMirroring
         run: swift test --filter IntegrationTests
 
+      - name: Test runner (FakeMirroring)
+        env:
+          IPHONE_MIRROIR_BUNDLE_ID: com.jfarcand.FakeMirroring
+          IPHONE_MIRROIR_PROCESS_NAME: FakeMirroring
+        run: |
+          .build/release/iphone-mirroir-mcp test --junit test-results.xml --verbose Tests/Fixtures/scenarios/fake-mirroring-check.yaml
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-runner-results
+          path: |
+            test-results.xml
+            mirroir-test-results/
+
       - name: Binary info
         run: |
           ls -lh .build/release/iphone-mirroir-mcp .build/release/iphone-mirroir-helper

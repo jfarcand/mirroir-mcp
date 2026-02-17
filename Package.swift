@@ -62,5 +62,9 @@ let package = Package(
                 .linkedFramework("Vision"),
             ]
         ),
+        .testTarget(
+            name: "TestRunnerTests",
+            dependencies: ["iphone-mirroir-mcp", "HelperLib"]
+        ),
     ]
 )

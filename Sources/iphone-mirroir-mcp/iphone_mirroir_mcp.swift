@@ -17,6 +17,12 @@ struct IPhoneMirroirMCP {
 
         // Parse CLI flags
         let args = CommandLine.arguments
+
+        // Handle `test` subcommand before MCP server initialization
+        if args.count >= 2 && args[1] == "test" {
+            let exitCode = TestRunner.run(arguments: Array(args.dropFirst(2)))
+            Darwin.exit(exitCode)
+        }
         let skipPermissions = PermissionPolicy.parseSkipPermissions(from: args)
         DebugLog.enabled = args.contains("--debug")
         DebugLog.reset()
