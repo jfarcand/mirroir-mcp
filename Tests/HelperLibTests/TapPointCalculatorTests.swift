@@ -49,31 +49,35 @@ struct TapPointCalculatorTests {
         }
     }
 
-    @Test("icon labels in separate rows each get offset")
+    @Test("icon rows in separate rows each get offset")
     func separateRows() {
-        // Row 1 label, then Row 2 label with big gap between
+        // Row 1 with 3 icons, then Row 2 with 3 icons — big gap between
         let elements = [
             element(text: "Météo", tapX: 54, textTopY: 150, textBottomY: 165),
+            element(text: "Photos", tapX: 124, textTopY: 150, textBottomY: 165),
+            element(text: "Horloge", tapX: 194, textTopY: 150, textBottomY: 165),
             element(text: "Livres", tapX: 54, textTopY: 300, textBottomY: 315),
+            element(text: "Safari", tapX: 124, textTopY: 300, textBottomY: 315),
+            element(text: "Musique", tapX: 194, textTopY: 300, textBottomY: 315),
         ]
 
         let results = TapPointCalculator.computeTapPoints(
             elements: elements, windowWidth: windowWidth
         )
 
-        #expect(results.count == 2)
-        // First: gap = 150 > 8 → fixed 30pt offset
+        #expect(results.count == 6)
+        // Row 1: gap = 150 from y=0, isIconRow → fixed 30pt offset
         #expect(results[0].tapY == 120.0)
-        // Second: gap = 300 - 165 = 135 > 8 → fixed 30pt offset
-        #expect(results[1].tapY == 270.0)
+        // Row 2: gap = 300 - 165 = 135 > 50, isIconRow → fixed 30pt offset
+        #expect(results[3].tapY == 270.0)
     }
 
     @Test("simulates real home screen with Calendar OCR text reducing gap")
     func homeScreenWithCalendarText() {
         // Calendar icon shows "13" inside it, OCR picks it up just above the label row.
-        // The "13" reduces the gap between it and the label row to 24pt, which is
-        // below the 50pt threshold. Labels use textTopY (no offset), which still
-        // works because the entire icon+label area is tappable on the home screen.
+        // "13" is a single-element row (not an icon row), so it uses text center.
+        // The label row has only 2 elements (below iconRowMinLabels=3), and
+        // the gap from "13" is small anyway, so labels also use text center.
         let elements = [
             element(text: "13", tapX: 194, textTopY: 118, textBottomY: 134),
             element(text: "Météo", tapX: 54, textTopY: 158, textBottomY: 170),
@@ -85,11 +89,11 @@ struct TapPointCalculatorTests {
         )
 
         #expect(results.count == 3)
-        // "13": gap from 0 = 118 > 50 → offset 30 → tapY = 88
-        #expect(results[0].tapY == 88.0)
-        // Both labels in same row: gap = 158 - 134 = 24 < 50 → no offset, use text center
-        #expect(results[1].tapY == 164.0, "Météo should use text center (gap too small for offset)")
-        #expect(results[2].tapY == 164.0, "Calendrier should use text center (gap too small for offset)")
+        // "13": single-element row, not isIconRow → text center = (118+134)/2 = 126
+        #expect(results[0].tapY == 126.0)
+        // Both labels in same row: only 2 elements (not isIconRow) → text center
+        #expect(results[1].tapY == 164.0, "Météo should use text center")
+        #expect(results[2].tapY == 164.0, "Calendrier should use text center")
     }
 
     @Test("icon row bypasses single-element OCR fragments for gap calculation")
@@ -180,8 +184,10 @@ struct TapPointCalculatorTests {
 
     // MARK: - Mixed content
 
-    @Test("only short labels get offset in mixed content")
-    func mixedContent() {
+    @Test("single short labels use text center even with large gap")
+    func singleShortLabelsUseTextCenter() {
+        // Settings-style layout: single short labels with section gaps between them.
+        // Each label is alone in its row (not an icon grid) → uses text center.
         let elements = [
             element(text: "Settings", textTopY: 80, textBottomY: 95, bboxWidth: 60),
             element(
@@ -197,17 +203,17 @@ struct TapPointCalculatorTests {
         )
 
         #expect(results.count == 3)
-        // "Settings": gap = 80 > 50, short label → fixed 30pt offset
-        #expect(results[0].tapY == 50.0, "Short label should get 30pt offset")
+        // "Settings": single-element row, not isIconRow → text center
+        #expect(results[0].tapY == 87.5, "Single short label should use text center")
         // Long text: not a short label → uses text center
         #expect(results[1].tapY == 140.0, "Long text should use text center")
-        // "Safari": gap = 250 - 150 = 100 > 50, short label → fixed 30pt offset
-        #expect(results[2].tapY == 220.0, "Short label after long text should get 30pt offset")
+        // "Safari": single-element row, not isIconRow → text center
+        #expect(results[2].tapY == 257.5, "Single short label should use text center")
     }
 
     // MARK: - Small gap (no offset)
 
-    @Test("short label with small gap does not get offset")
+    @Test("single short labels use text center regardless of gap")
     func smallGap() {
         let elements = [
             element(text: "Label A", textTopY: 100, textBottomY: 115),
@@ -219,10 +225,10 @@ struct TapPointCalculatorTests {
         )
 
         #expect(results.count == 2)
-        // "Label A": gap = 100 > 50 → fixed 30pt offset
-        #expect(results[0].tapY == 70.0)
-        // "Label B": gap = 120 - 115 = 5 → < 50 → no offset, use text center
-        #expect(results[1].tapY == 127.5, "Small gap should prevent offset, use text center")
+        // "Label A": single-element row, not isIconRow → text center
+        #expect(results[0].tapY == 107.5)
+        // "Label B": single-element row, gap = 5 < 50 → text center
+        #expect(results[1].tapY == 127.5, "Small gap should use text center")
     }
 
     // MARK: - First element at top of screen
@@ -242,7 +248,7 @@ struct TapPointCalculatorTests {
         #expect(results[0].tapY == 12.5, "Small gap from screen top should use text center")
     }
 
-    @Test("first element with large gap from top gets offset")
+    @Test("single element with large gap uses text center (not icon row)")
     func firstElementLargeGap() {
         let elements = [
             element(text: "Photos", textTopY: 150, textBottomY: 165),
@@ -253,8 +259,8 @@ struct TapPointCalculatorTests {
         )
 
         #expect(results.count == 1)
-        // Gap = 150 > 8 → fixed 30pt offset
-        #expect(results[0].tapY == 120.0)
+        // Single element, not isIconRow → text center = (150+165)/2 = 157.5
+        #expect(results[0].tapY == 157.5)
     }
 
     // MARK: - Edge cases
@@ -267,14 +273,15 @@ struct TapPointCalculatorTests {
         #expect(results.isEmpty)
     }
 
-    @Test("tap Y is clamped to zero when offset would go negative")
+    @Test("tap Y is clamped to zero when icon row offset would go negative")
     func clampToZero() {
-        // Element near top of screen where 30pt offset would go negative.
-        // Gap from y=0 must be > 50 for offset to trigger, and textTopY must be < 30.
-        // Use a previous element to create a gap > 50 while keeping textTopY low.
+        // Icon row near top of screen where 30pt offset would go negative.
+        // Need 3+ elements to form an icon row, with textTopY < 30.
         let elements = [
             element(text: "Header", textTopY: 0, textBottomY: 5, bboxWidth: 300),
-            element(text: "App", textTopY: 60, textBottomY: 75),
+            element(text: "App1", tapX: 54, textTopY: 60, textBottomY: 75),
+            element(text: "App2", tapX: 124, textTopY: 60, textBottomY: 75),
+            element(text: "App3", tapX: 194, textTopY: 60, textBottomY: 75),
         ]
 
         let results = TapPointCalculator.computeTapPoints(
@@ -282,26 +289,25 @@ struct TapPointCalculatorTests {
         )
         // "Header": wide text, no offset → text center = (0+5)/2 = 2.5
         #expect(results[0].tapY == 2.5)
-        // "App": gap = 60 - 5 = 55 > 50 → offset 30, tapY = 60 - 30 = 30
-        #expect(results[1].tapY == 30.0, "Tap Y should be offset when gap > 50")
+        // Icon row: gap = 60 - 5 = 55 > 50, isIconRow → offset 30, tapY = 60 - 30 = 30
+        #expect(results[1].tapY == 30.0, "Icon row should be offset when gap > 50")
     }
 
-    @Test("clamping prevents negative tapY after offset")
-    func clampAfterOffset() {
-        // First element with textTopY = 55, gap from y=0 = 55 > 50 threshold.
-        // offset = 30 → tapY = 55 - 30 = 25 → valid (no clamping needed).
-        // Use textTopY = 20 with a setup that creates gap > 50 to test clamping.
+    @Test("icon row offset uses textTopY minus 30pt")
+    func iconRowOffsetMath() {
+        // Verify the exact offset calculation: tapY = textTopY - 30
         let elements = [
-            element(text: "Tiny", textTopY: 0, textBottomY: 1, bboxWidth: 300),
-            element(text: "X", textTopY: 52, textBottomY: 67),
+            element(text: "Abc", tapX: 54, textTopY: 80, textBottomY: 95),
+            element(text: "Def", tapX: 124, textTopY: 80, textBottomY: 95),
+            element(text: "Ghi", tapX: 194, textTopY: 80, textBottomY: 95),
         ]
         let results = TapPointCalculator.computeTapPoints(
             elements: elements, windowWidth: windowWidth
         )
-        // "Tiny": wide text, no offset → text center = (0+1)/2 = 0.5
-        #expect(results[0].tapY == 0.5)
-        // "X": gap = 52 - 1 = 51 > 50 → offset 30 → tapY = 52 - 30 = 22
-        #expect(results[1].tapY == 22.0, "Should apply offset when gap exceeds threshold")
+        // Gap from y=0 = 80 > 50, isIconRow → offset 30 → tapY = 80 - 30 = 50
+        #expect(results[0].tapY == 50.0, "Icon row should use textTopY - 30pt offset")
+        #expect(results[1].tapY == 50.0)
+        #expect(results[2].tapY == 50.0)
     }
 
     // MARK: - Confidence and coordinates passthrough
@@ -348,19 +354,21 @@ struct TapPointCalculatorTests {
 
     // MARK: - Boundary: exactly at threshold
 
-    @Test("label with exactly 15 characters is treated as short")
+    @Test("icon row with exactly 15-char labels gets offset")
     func exactMaxLabelLength() {
-        // 15 chars exactly
+        // 15 chars exactly, 3 elements to form icon row
         let elements = [
-            element(text: "123456789012345", textTopY: 100, textBottomY: 115, bboxWidth: 80),
+            element(text: "123456789012345", tapX: 54, textTopY: 100, textBottomY: 115, bboxWidth: 80),
+            element(text: "abcdefghijklmno", tapX: 124, textTopY: 100, textBottomY: 115, bboxWidth: 80),
+            element(text: "ABCDEFGHIJKLMNO", tapX: 194, textTopY: 100, textBottomY: 115, bboxWidth: 80),
         ]
 
         let results = TapPointCalculator.computeTapPoints(
             elements: elements, windowWidth: windowWidth
         )
 
-        // gap = 100 > 8, short label → fixed 30pt offset
-        #expect(results[0].tapY == 70.0, "15-char label should be treated as short")
+        // gap = 100 > 50, isIconRow (3 short labels) → fixed 30pt offset
+        #expect(results[0].tapY == 70.0, "15-char labels in icon row should get offset")
     }
 
     @Test("label with 16 characters is not treated as short")
@@ -395,18 +403,48 @@ struct TapPointCalculatorTests {
         #expect(results[1].tapY == 67.5, "Gap exactly at threshold should use text center")
     }
 
-    @Test("gap just above 50 triggers fixed offset")
+    @Test("gap just above 50 triggers icon row offset")
     func justAboveMinGap() {
+        // Previous wide text, then an icon row with gap just above threshold
         let elements = [
-            element(text: "First", textTopY: 0, textBottomY: 10),
-            element(text: "Second", textTopY: 80, textBottomY: 95),
+            element(text: "Header text", textTopY: 0, textBottomY: 10, bboxWidth: 300),
+            element(text: "App1", tapX: 54, textTopY: 61, textBottomY: 76),
+            element(text: "App2", tapX: 124, textTopY: 61, textBottomY: 76),
+            element(text: "App3", tapX: 194, textTopY: 61, textBottomY: 76),
         ]
 
         let results = TapPointCalculator.computeTapPoints(
             elements: elements, windowWidth: windowWidth
         )
 
-        // "Second": gap = 80 - 10 = 70 > 50 → fixed 30pt offset → tapY = 80 - 30 = 50
-        #expect(results[1].tapY == 50.0, "Gap above threshold should trigger fixed 30pt offset")
+        // "App1": gap = 61 - 10 = 51 > 50, isIconRow → offset 30 → tapY = 61 - 30 = 31
+        #expect(results[1].tapY == 31.0, "Gap above threshold should trigger icon row offset")
+    }
+
+    // MARK: - Settings-style list items (regression test)
+
+    @Test("Settings list items use text center despite section separator gaps")
+    func settingsListItems() {
+        // Réglages (Settings) layout: each list item is a single label in its row
+        // with section separator gaps > 50pt between groups. These must NOT get
+        // the icon offset, which would place the tap in the separator gap.
+        let elements = [
+            element(text: "Réglages", tapX: 206, textTopY: 80, textBottomY: 95, bboxWidth: 100),
+            element(text: "Batterie", tapX: 86, textTopY: 605, textBottomY: 620, bboxWidth: 80),
+            element(text: "Général", tapX: 104, textTopY: 695, textBottomY: 710, bboxWidth: 70),
+            element(text: "Accessibilité", tapX: 105, textTopY: 750, textBottomY: 765, bboxWidth: 110),
+        ]
+
+        let results = TapPointCalculator.computeTapPoints(
+            elements: elements, windowWidth: windowWidth
+        )
+
+        let general = results.first { $0.text == "Général" }!
+        // "Général" is a single-element row (not an icon row) → must use text center
+        // Gap from "Batterie" = 695 - 620 = 75 > 50, but offset must NOT be applied
+        #expect(general.tapY == 702.5, "Settings item should use text center, not icon offset")
+
+        let batterie = results.first { $0.text == "Batterie" }!
+        #expect(batterie.tapY == 612.5, "Settings item should use text center")
     }
 }

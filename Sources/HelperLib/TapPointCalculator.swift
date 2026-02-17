@@ -95,9 +95,10 @@ public enum TapPointCalculator {
                 rowEnd += 1
             }
 
-            // The offset is a row-level decision: a row is an icon label row only
-            // when ALL its elements are short labels. Mixed rows (e.g. Waze's
-            // "Y aller" + "Partir plus tard") are never icon rows.
+            // The offset is a row-level decision: only icon grid rows (3+ short
+            // labels) get the upward offset. Single short labels (e.g. Settings
+            // list items like "Général") use text center to avoid false offsets
+            // into section separator gaps.
             let rowSize = rowEnd - idx
             let shortLabelsInRow = (idx..<rowEnd).filter { j in
                 sorted[j].text.count <= maxLabelLength
@@ -120,7 +121,7 @@ public enum TapPointCalculator {
 
                 let tapY: Double
                 let textCenterY = (element.textTopY + element.textBottomY) / 2.0
-                if allShortLabels && gap > minGapForOffset {
+                if isIconRow && gap > minGapForOffset {
                     tapY = max(element.textTopY - iconOffset, 0.0)
                 } else {
                     tapY = textCenterY
