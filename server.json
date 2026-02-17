@@ -6,12 +6,12 @@
     "url": "https://github.com/jfarcand/iphone-mirroir-mcp",
     "source": "github"
   },
-  "version": "0.12.2",
+  "version": "0.12.3",
   "packages": [
     {
       "registryType": "npm",
       "identifier": "iphone-mirroir-mcp",
-      "version": "0.12.2",
+      "version": "0.12.3",
       "transport": {
         "type": "stdio"
       },
