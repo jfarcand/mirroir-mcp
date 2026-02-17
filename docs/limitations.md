@@ -12,7 +12,7 @@ Karabiner's virtual HID keyboard and pointing device deliver events through the 
 
 If you are typing in a terminal or editor and an MCP tool fires, iPhone Mirroring will become frontmost and your terminal loses focus. After the tool completes, iPhone Mirroring retains focus — the server intentionally does not switch back to avoid per-call Space jitter.
 
-Read-only tools (`describe_screen`, `screenshot`, `status`, `get_orientation`, `list_scenarios`, `get_scenario`) use the Accessibility API and do **not** steal focus.
+Read-only tools (`screenshot`, `describe_screen`, `start_recording`, `stop_recording`, `status`, `get_orientation`, `check_health`, `list_scenarios`, `get_scenario`) use the Accessibility API and do **not** steal focus.
 
 ### Mitigations
 
