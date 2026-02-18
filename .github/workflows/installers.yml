@@ -177,8 +177,8 @@ jobs:
           which iphone-mirroir-mcp
           which iphone-mirroir-helper
           which mirroir
-          # Verify mirroir is a symlink to iphone-mirroir-mcp
-          test "$(readlink "$(which mirroir)")" = "iphone-mirroir-mcp"
+          # Verify mirroir CLI works (symlink to iphone-mirroir-mcp)
+          mirroir test --help 2>&1 | grep -q "iphone-mirroir-mcp test"
 
       - name: Start daemon via brew services
         run: sudo brew services start iphone-mirroir-mcp
