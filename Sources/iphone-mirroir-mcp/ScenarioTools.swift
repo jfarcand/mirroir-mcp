@@ -293,13 +293,16 @@ extension IPhoneMirroirMCP {
         }
 
         // Phase 2: Try basename match across all directories
+        // Deduplicate by relative path so local overrides global
         let targetBasename = (filename as NSString).lastPathComponent
+        var seen = Set<String>()
         var matches: [String] = []
 
         for dir in dirs {
             for relPath in findYAMLFiles(in: dir) {
                 let basename = (relPath as NSString).lastPathComponent
-                if basename == targetBasename {
+                if basename == targetBasename && !seen.contains(relPath) {
+                    seen.insert(relPath)
                     matches.append(relPath)
                 }
             }

@@ -330,6 +330,26 @@ final class ScenarioToolsTests: XCTestCase {
         XCTAssertTrue(path!.contains("/local/"))
     }
 
+    func testResolveSameRelPathInBothDirsIsNotAmbiguous() {
+        let localDir = tmpDir + "/local"
+        let globalDir = tmpDir + "/global"
+        try? FileManager.default.createDirectory(
+            atPath: localDir, withIntermediateDirectories: true)
+        try? FileManager.default.createDirectory(
+            atPath: globalDir, withIntermediateDirectories: true)
+        // Same relative path in both dirs (e.g., marketplace cloned to both)
+        createFile("local/apps/settings/list-apps.yaml",
+            content: "name: Local List", baseDir: tmpDir)
+        createFile("global/apps/settings/list-apps.yaml",
+            content: "name: Global List", baseDir: tmpDir)
+
+        let (path, ambiguous) = IPhoneMirroirMCP.resolveScenario(
+            name: "list-apps", dirs: [localDir, globalDir])
+        XCTAssertNotNil(path, "Same rel path in both dirs should resolve, not be ambiguous")
+        XCTAssertTrue(ambiguous.isEmpty)
+        XCTAssertTrue(path!.contains("/local/"))
+    }
+
     func testResolveWithYamlExtension() {
         createFile("test.yaml", content: "name: Test")
         let (path, _) = IPhoneMirroirMCP.resolveScenario(
