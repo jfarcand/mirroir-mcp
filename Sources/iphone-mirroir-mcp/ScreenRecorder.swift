@@ -42,7 +42,7 @@ final class ScreenRecorder: Sendable {
         }
 
         guard let info = bridge.getWindowInfo(), info.windowID != 0 else {
-            return "iPhone Mirroring window not found"
+            return "Target window not found"
         }
 
         let path = outputPath ?? defaultRecordingPath()

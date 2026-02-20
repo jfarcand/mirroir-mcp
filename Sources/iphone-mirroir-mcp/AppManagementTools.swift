@@ -32,8 +32,8 @@ extension IPhoneMirroirMCP {
                 "required": .array([.string("name")]),
             ],
             handler: { args in
-                let ctx = registry.resolve(args["target"]?.asString())
-                guard let ctx else { return .error("Unknown target '\(args["target"]?.asString() ?? "")'") }
+                let (ctx, err) = registry.resolveForTool(args)
+                guard let ctx else { return err! }
                 guard let menuBridge = ctx.bridge as? (any MenuActionCapable) else {
                     return .error("Target '\(ctx.name)' does not support reset_app")
                 }
@@ -46,7 +46,7 @@ extension IPhoneMirroirMCP {
 
                 // Open App Switcher
                 guard menuBridge.triggerMenuAction(menu: "View", item: "App Switcher") else {
-                    return .error("Failed to open App Switcher. Is iPhone Mirroring running?")
+                    return .error("Failed to open App Switcher. Is '\(ctx.name)' running?")
                 }
 
                 usleep(EnvConfig.toolSettlingDelayUs)

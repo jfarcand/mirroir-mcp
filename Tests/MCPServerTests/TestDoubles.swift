@@ -71,11 +71,13 @@ final class StubInput: InputProviding, @unchecked Sendable {
     ]
     var helperAvailable = true
 
-    func tap(x: Double, y: Double) -> String? { tapResult }
-    func swipe(fromX: Double, fromY: Double, toX: Double, toY: Double, durationMs: Int) -> String? { swipeResult }
-    func drag(fromX: Double, fromY: Double, toX: Double, toY: Double, durationMs: Int) -> String? { dragResult }
-    func longPress(x: Double, y: Double, durationMs: Int) -> String? { longPressResult }
-    func doubleTap(x: Double, y: Double) -> String? { doubleTapResult }
+    func tap(x: Double, y: Double, cursorMode: CursorMode? = nil) -> String? { tapResult }
+    func swipe(fromX: Double, fromY: Double, toX: Double, toY: Double,
+               durationMs: Int, cursorMode: CursorMode? = nil) -> String? { swipeResult }
+    func drag(fromX: Double, fromY: Double, toX: Double, toY: Double,
+              durationMs: Int, cursorMode: CursorMode? = nil) -> String? { dragResult }
+    func longPress(x: Double, y: Double, durationMs: Int, cursorMode: CursorMode? = nil) -> String? { longPressResult }
+    func doubleTap(x: Double, y: Double, cursorMode: CursorMode? = nil) -> String? { doubleTapResult }
     func shake() -> TypeResult { shakeResult }
     func typeText(_ text: String) -> TypeResult { typeTextResult }
     func pressKey(keyName: String, modifiers: [String]) -> TypeResult { pressKeyResult }
@@ -89,6 +91,11 @@ final class StubInput: InputProviding, @unchecked Sendable {
 
 final class StubCapture: ScreenCapturing, @unchecked Sendable {
     var captureResult: String?
+
+    func captureData() -> Data? {
+        guard let captureResult else { return nil }
+        return Data(base64Encoded: captureResult)
+    }
 
     func captureBase64() -> String? {
         captureResult

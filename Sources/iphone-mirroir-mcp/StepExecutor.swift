@@ -41,11 +41,21 @@ struct StepExecutorConfig {
 }
 
 /// Executes scenario steps against system subsystems via protocol abstractions.
+///
+/// **Threading contract**: StepExecutor is designed for single-threaded,
+/// sequential step execution. All calls to `execute()` must happen on the
+/// same thread. The mutable subsystem references are swapped during
+/// `switch_target` steps and are not synchronized for concurrent access.
 final class StepExecutor {
-    private var bridge: any WindowBridging
-    private var input: InputProviding
-    private var describer: ScreenDescribing
-    private var capture: ScreenCapturing
+    /// Mutable subsystem references that change when `switch_target` is executed.
+    private struct Subsystems {
+        var bridge: any WindowBridging
+        var input: any InputProviding
+        var describer: any ScreenDescribing
+        var capture: any ScreenCapturing
+    }
+
+    private var subsystems: Subsystems
     private let config: StepExecutorConfig
     private let registry: TargetRegistry?
 
@@ -55,13 +65,20 @@ final class StepExecutor {
          capture: ScreenCapturing,
          config: StepExecutorConfig = .default,
          registry: TargetRegistry? = nil) {
-        self.bridge = bridge
-        self.input = input
-        self.describer = describer
-        self.capture = capture
+        self.subsystems = Subsystems(
+            bridge: bridge,
+            input: input,
+            describer: describer,
+            capture: capture
+        )
         self.config = config
         self.registry = registry
     }
+
+    private var bridge: any WindowBridging { subsystems.bridge }
+    private var input: any InputProviding { subsystems.input }
+    private var describer: any ScreenDescribing { subsystems.describer }
+    private var capture: any ScreenCapturing { subsystems.capture }
 
     /// Execute a single step and return the result.
     func execute(step: ScenarioStep, stepIndex: Int, scenarioName: String) -> StepResult {
@@ -658,10 +675,12 @@ final class StepExecutor {
                               durationSeconds: elapsed(startTime))
         }
 
-        bridge = ctx.bridge
-        input = ctx.input
-        describer = ctx.describer
-        capture = ctx.capture
+        subsystems = Subsystems(
+            bridge: ctx.bridge,
+            input: ctx.input,
+            describer: ctx.describer,
+            capture: ctx.capture
+        )
 
         return StepResult(step: step, status: .passed,
                           message: "Switched to target '\(name)'",

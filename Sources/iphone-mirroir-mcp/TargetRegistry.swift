@@ -5,9 +5,12 @@
 // ABOUTME: Maintains an active target and resolves per-call target overrides.
 
 import Foundation
+import HelperLib
 import os
 
 /// Capabilities that may or may not be available for a given target type.
+/// Exposed in list_targets output so AI clients know which tools work on each target.
+/// Runtime gating uses protocol conformance (e.g. `as? MenuActionCapable`).
 enum TargetCapability: String, Sendable, Codable {
     case menuActions
     case spotlight
@@ -35,6 +38,11 @@ final class TargetRegistry: @unchecked Sendable {
     private let lock = OSAllocatedUnfairLock(initialState: "")
 
     init(targets: [String: TargetContext], defaultName: String) {
+        precondition(!targets.isEmpty, "TargetRegistry requires at least one target")
+        precondition(
+            targets[defaultName] != nil,
+            "TargetRegistry default '\(defaultName)' not found in targets: \(targets.keys.sorted())"
+        )
         self.targets = targets
         self.lock.withLock { $0 = defaultName }
     }
@@ -78,5 +86,14 @@ final class TargetRegistry: @unchecked Sendable {
     /// Number of configured targets.
     var count: Int {
         targets.count
+    }
+
+    /// Resolve a target from MCP tool args, returning an error result on failure.
+    /// Eliminates the resolve+guard boilerplate repeated across tool handlers.
+    func resolveForTool(_ args: [String: JSONValue]) -> (TargetContext?, MCPToolResult?) {
+        if let ctx = resolve(args["target"]?.asString()) {
+            return (ctx, nil)
+        }
+        return (nil, .error("Unknown target '\(args["target"]?.asString() ?? "")'"))
     }
 }

@@ -28,12 +28,20 @@ struct TargetConfig: Codable, Sendable {
 
 /// Top-level structure of targets.json.
 struct TargetsFile: Codable, Sendable {
-    let targets: [String: TargetConfig]?
+    let targets: [String: TargetConfig]
     let defaultTarget: String?
 
     enum CodingKeys: String, CodingKey {
         case targets
         case defaultTarget = "default_target"
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.targets = try container.decodeIfPresent([String: TargetConfig].self,
+                                                      forKey: .targets) ?? [:]
+        self.defaultTarget = try container.decodeIfPresent(String.self,
+                                                            forKey: .defaultTarget)
     }
 }
 

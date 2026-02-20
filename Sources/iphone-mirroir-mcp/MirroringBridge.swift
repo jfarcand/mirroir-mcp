@@ -76,29 +76,17 @@ final class MirroringBridge: Sendable {
     func getWindowInfo() -> WindowInfo? {
         guard let (window, pid) = getMainWindow() else { return nil }
 
-        // Get position
-        var posValue: CFTypeRef?
-        AXUIElementCopyAttributeValue(window, kAXPositionAttribute as CFString, &posValue)
-        var position = CGPoint.zero
-        if let pv = posValue, CFGetTypeID(pv) == AXValueGetTypeID() {
-            AXValueGetValue(unsafeDowncast(pv, to: AXValue.self), .cgPoint, &position)
-        }
+        guard let geom = WindowListHelper.geometryFromAXElement(window) else { return nil }
 
-        // Get size
-        var sizeValue: CFTypeRef?
-        AXUIElementCopyAttributeValue(window, kAXSizeAttribute as CFString, &sizeValue)
-        var size = CGSize.zero
-        if let sv = sizeValue, CFGetTypeID(sv) == AXValueGetTypeID() {
-            AXValueGetValue(unsafeDowncast(sv, to: AXValue.self), .cgSize, &size)
-        }
-
-        // Find CGWindowID by matching against CGWindowListCopyWindowInfo
-        let windowID = findCGWindowID(pid: pid, position: position, size: size)
+        let windowList = WindowListHelper.captureWindowList()
+        let windowID = WindowListHelper.findWindowID(
+            pid: pid, position: geom.position, size: geom.size, in: windowList
+        )
 
         return WindowInfo(
             windowID: windowID ?? 0,
-            position: position,
-            size: size,
+            position: geom.position,
+            size: geom.size,
             pid: pid
         )
     }
@@ -229,37 +217,4 @@ final class MirroringBridge: Sendable {
     }
 
     // MARK: - Private
-
-    /// Find the CGWindowID by matching process ID and window geometry.
-    private func findCGWindowID(pid: pid_t, position: CGPoint, size: CGSize) -> CGWindowID? {
-        // Use .optionAll because iPhone Mirroring windows may report isOnScreen=false
-        // even when visible. Filter by PID and geometry match instead.
-        let windowList = CGWindowListCopyWindowInfo(
-            [.optionAll, .excludeDesktopElements], kCGNullWindowID
-        ) as? [[String: Any]] ?? []
-
-        for entry in windowList {
-            guard let ownerPID = entry[kCGWindowOwnerPID as String] as? pid_t,
-                  ownerPID == pid,
-                  let bounds = entry[kCGWindowBounds as String] as? [String: Any],
-                  let windowID = entry[kCGWindowNumber as String] as? CGWindowID
-            else { continue }
-
-            let wx = (bounds["X"] as? CGFloat) ?? (bounds["X"] as? Int).map { CGFloat($0) } ?? 0
-            let wy = (bounds["Y"] as? CGFloat) ?? (bounds["Y"] as? Int).map { CGFloat($0) } ?? 0
-            let ww =
-                (bounds["Width"] as? CGFloat) ?? (bounds["Width"] as? Int).map { CGFloat($0) } ?? 0
-            let wh =
-                (bounds["Height"] as? CGFloat) ?? (bounds["Height"] as? Int).map { CGFloat($0) }
-                ?? 0
-
-            // Match by approximate position and size
-            if abs(wx - position.x) < 2 && abs(wy - position.y) < 2
-                && abs(ww - size.width) < 2 && abs(wh - size.height) < 2
-            {
-                return windowID
-            }
-        }
-        return nil
-    }
 }

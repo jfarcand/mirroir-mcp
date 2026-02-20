@@ -100,7 +100,7 @@ final class FakeMirroringIntegrationTests: XCTestCase {
     // MARK: - OCR Tests
 
     func testDescribeScreen() {
-        let describer = ScreenDescriber(bridge: bridge)
+        let describer = ScreenDescriber(bridge: bridge, capture: ScreenCapture(bridge: bridge))
         let result = describer.describe()
         XCTAssertNotNil(result, "Should capture and describe FakeMirroring window")
 
@@ -124,7 +124,7 @@ final class FakeMirroringIntegrationTests: XCTestCase {
     }
 
     func testOCRCoordinateAccuracy() {
-        let describer = ScreenDescriber(bridge: bridge)
+        let describer = ScreenDescriber(bridge: bridge, capture: ScreenCapture(bridge: bridge))
         guard let result = describer.describe() else {
             XCTFail("describe() returned nil")
             return

@@ -25,13 +25,13 @@ extension IPhoneMirroirMCP {
                 "properties": .object([:]),
             ],
             handler: { args in
-                let ctx = registry.resolve(args["target"]?.asString())
-                guard let ctx else { return .error("Unknown target '\(args["target"]?.asString() ?? "")'") }
+                let (ctx, err) = registry.resolveForTool(args)
+                guard let ctx else { return err! }
                 let bridge = ctx.bridge
                 let capture = ctx.capture
 
                 guard bridge.findProcess() != nil else {
-                    return .error("iPhone Mirroring app is not running")
+                    return .error("Target '\(ctx.name)' is not running")
                 }
 
                 let state = bridge.getState()
@@ -44,7 +44,7 @@ extension IPhoneMirroirMCP {
 
                 guard let base64 = capture.captureBase64() else {
                     return .error(
-                        "Failed to capture screenshot. Is iPhone Mirroring window visible?")
+                        "Failed to capture screenshot. Is the '\(ctx.name)' window visible?")
                 }
 
                 return .image(base64)
@@ -76,13 +76,13 @@ extension IPhoneMirroirMCP {
                 ]),
             ],
             handler: { args in
-                let ctx = registry.resolve(args["target"]?.asString())
-                guard let ctx else { return .error("Unknown target '\(args["target"]?.asString() ?? "")'") }
+                let (ctx, err) = registry.resolveForTool(args)
+                guard let ctx else { return err! }
                 let bridge = ctx.bridge
                 let describer = ctx.describer
 
                 guard bridge.findProcess() != nil else {
-                    return .error("iPhone Mirroring app is not running")
+                    return .error("Target '\(ctx.name)' is not running")
                 }
                 let state = bridge.getState()
                 if state == .paused {
@@ -96,7 +96,7 @@ extension IPhoneMirroirMCP {
 
                 guard let result = describer.describe(skipOCR: skipOCR) else {
                     return .error(
-                        "Failed to capture/analyze screen. Is iPhone Mirroring window visible?")
+                        "Failed to capture/analyze screen. Is the '\(ctx.name)' window visible?")
                 }
 
                 if skipOCR {
@@ -155,8 +155,8 @@ extension IPhoneMirroirMCP {
                 ]),
             ],
             handler: { args in
-                let ctx = registry.resolve(args["target"]?.asString())
-                guard let ctx else { return .error("Unknown target '\(args["target"]?.asString() ?? "")'") }
+                let (ctx, err) = registry.resolveForTool(args)
+                guard let ctx else { return err! }
                 let recorder = ctx.recorder
 
                 let outputPath = args["output_path"]?.asString()
@@ -181,8 +181,8 @@ extension IPhoneMirroirMCP {
                 "properties": .object([:]),
             ],
             handler: { args in
-                let ctx = registry.resolve(args["target"]?.asString())
-                guard let ctx else { return .error("Unknown target '\(args["target"]?.asString() ?? "")'") }
+                let (ctx, err) = registry.resolveForTool(args)
+                guard let ctx else { return err! }
                 let recorder = ctx.recorder
 
                 let result = recorder.stopRecording()

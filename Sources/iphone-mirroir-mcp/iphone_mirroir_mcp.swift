@@ -92,20 +92,20 @@ struct IPhoneMirroirMCP {
 
     /// Build a TargetRegistry from targets.json or fall back to a single iPhone target.
     static func buildTargetRegistry() -> TargetRegistry {
-        if let file = TargetConfigLoader.load(),
-           let configs = file.targets, !configs.isEmpty {
-            return buildMultiTargetRegistry(configs: configs,
+        if let file = TargetConfigLoader.load(), !file.targets.isEmpty {
+            return buildMultiTargetRegistry(configs: file.targets,
                                             defaultName: file.defaultTarget)
         }
 
         // Single-target mode: identical behavior to pre-multi-target code
         let bridge = MirroringBridge()
+        let capture = ScreenCapture(bridge: bridge)
         let ctx = TargetContext(
             name: "iphone",
             bridge: bridge,
             input: InputSimulation(bridge: bridge),
-            capture: ScreenCapture(bridge: bridge),
-            describer: ScreenDescriber(bridge: bridge),
+            capture: capture,
+            describer: ScreenDescriber(bridge: bridge, capture: capture),
             recorder: ScreenRecorder(bridge: bridge),
             capabilities: iphoneMirroringCapabilities
         )
@@ -139,19 +139,33 @@ struct IPhoneMirroirMCP {
                 capabilities = []
             }
 
+            let cursorMode: CursorMode = config.type == "iphone-mirroring"
+                ? .direct : .preserving
+            let capture = ScreenCapture(bridge: bridge)
             targets[name] = TargetContext(
                 name: name,
                 bridge: bridge,
-                input: InputSimulation(bridge: bridge),
-                capture: ScreenCapture(bridge: bridge),
-                describer: ScreenDescriber(bridge: bridge),
+                input: InputSimulation(bridge: bridge, cursorMode: cursorMode),
+                capture: capture,
+                describer: ScreenDescriber(bridge: bridge, capture: capture),
                 recorder: ScreenRecorder(bridge: bridge),
                 capabilities: capabilities
             )
         }
 
-        // Fall back to first alphabetical target if default is not specified
-        let resolvedDefault = defaultName ?? targets.keys.sorted().first ?? "iphone"
+        // Resolve default: use specified default if it exists, otherwise first alphabetical.
+        let sortedNames = targets.keys.sorted()
+        let resolvedDefault: String
+        if let specified = defaultName, targets[specified] != nil {
+            resolvedDefault = specified
+        } else {
+            if let specified = defaultName {
+                DebugLog.log("TargetRegistry",
+                    "Configured default '\(specified)' not found in targets \(sortedNames), "
+                    + "falling back to '\(sortedNames.first ?? "")'")
+            }
+            resolvedDefault = sortedNames.first!  // Safe: configs was checked !isEmpty above
+        }
         return TargetRegistry(targets: targets, defaultName: resolvedDefault)
     }
 }

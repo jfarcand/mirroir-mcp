@@ -53,7 +53,7 @@ enum CompileCommand {
 
         let capture = ScreenCapture(bridge: bridge)
         let input = InputSimulation(bridge: bridge)
-        let realDescriber = ScreenDescriber(bridge: bridge)
+        let realDescriber = ScreenDescriber(bridge: bridge, capture: capture)
         let recordingDescriber = RecordingDescriber(wrapping: realDescriber)
 
         let executorConfig = StepExecutorConfig(

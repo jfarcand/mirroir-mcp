@@ -8,6 +8,22 @@ import Foundation
 import HelperLib
 
 extension IPhoneMirroirMCP {
+    /// Schema fragment for the optional cursor_mode parameter on coordinate tools.
+    private static let cursorModeSchema: JSONValue = .object([
+        "type": .string("string"),
+        "enum": .array([.string("direct"), .string("preserving")]),
+        "description": .string(
+            "Cursor management: 'direct' leaves cursor at target, "
+            + "'preserving' restores cursor to its original position after the operation. "
+            + "Defaults to 'direct' for iPhone Mirroring, 'preserving' for generic windows."),
+    ])
+
+    /// Parse an optional cursor_mode string from tool args into a CursorMode.
+    private static func parseCursorMode(_ args: [String: JSONValue]) -> CursorMode? {
+        guard let value = args["cursor_mode"]?.asString() else { return nil }
+        return value == "direct" ? .direct : .preserving
+    }
+
     static func registerInputTools(
         server: MCPServer,
         registry: TargetRegistry
@@ -34,19 +50,20 @@ extension IPhoneMirroirMCP {
                         "description": .string(
                             "Y coordinate relative to the mirroring window (0 = top edge)"),
                     ]),
+                    "cursor_mode": cursorModeSchema,
                 ]),
                 "required": .array([.string("x"), .string("y")]),
             ],
             handler: { args in
-                let ctx = registry.resolve(args["target"]?.asString())
-                guard let ctx else { return .error("Unknown target '\(args["target"]?.asString() ?? "")'") }
+                let (ctx, err) = registry.resolveForTool(args)
+                guard let ctx else { return err! }
                 let input = ctx.input
 
                 guard let x = args["x"]?.asNumber(), let y = args["y"]?.asNumber() else {
                     return .error("Missing required parameters: x, y (numbers)")
                 }
 
-                if let error = input.tap(x: x, y: y) {
+                if let error = input.tap(x: x, y: y, cursorMode: parseCursorMode(args)) {
                     return .error(error)
                 }
                 return .text("Tapped at (\(Int(x)), \(Int(y)))")
@@ -86,6 +103,7 @@ extension IPhoneMirroirMCP {
                         "description": .string(
                             "Duration of swipe in milliseconds (default: 300)"),
                     ]),
+                    "cursor_mode": cursorModeSchema,
                 ]),
                 "required": .array([
                     .string("from_x"), .string("from_y"),
@@ -93,8 +111,8 @@ extension IPhoneMirroirMCP {
                 ]),
             ],
             handler: { args in
-                let ctx = registry.resolve(args["target"]?.asString())
-                guard let ctx else { return .error("Unknown target '\(args["target"]?.asString() ?? "")'") }
+                let (ctx, err) = registry.resolveForTool(args)
+                guard let ctx else { return err! }
                 let input = ctx.input
 
                 guard let fromX = args["from_x"]?.asNumber(),
@@ -111,7 +129,8 @@ extension IPhoneMirroirMCP {
                 if let error = input.swipe(
                     fromX: fromX, fromY: fromY,
                     toX: toX, toY: toY,
-                    durationMs: duration
+                    durationMs: duration,
+                    cursorMode: parseCursorMode(args)
                 ) {
                     return .error(error)
                 }
@@ -155,6 +174,7 @@ extension IPhoneMirroirMCP {
                         "description": .string(
                             "Duration of drag in milliseconds (default: 1000, minimum: 200)"),
                     ]),
+                    "cursor_mode": cursorModeSchema,
                 ]),
                 "required": .array([
                     .string("from_x"), .string("from_y"),
@@ -162,8 +182,8 @@ extension IPhoneMirroirMCP {
                 ]),
             ],
             handler: { args in
-                let ctx = registry.resolve(args["target"]?.asString())
-                guard let ctx else { return .error("Unknown target '\(args["target"]?.asString() ?? "")'") }
+                let (ctx, err) = registry.resolveForTool(args)
+                guard let ctx else { return err! }
                 let input = ctx.input
 
                 guard let fromX = args["from_x"]?.asNumber(),
@@ -180,7 +200,8 @@ extension IPhoneMirroirMCP {
                 if let error = input.drag(
                     fromX: fromX, fromY: fromY,
                     toX: toX, toY: toY,
-                    durationMs: duration
+                    durationMs: duration,
+                    cursorMode: parseCursorMode(args)
                 ) {
                     return .error(error)
                 }
@@ -211,8 +232,8 @@ extension IPhoneMirroirMCP {
                 "required": .array([.string("text")]),
             ],
             handler: { args in
-                let ctx = registry.resolve(args["target"]?.asString())
-                guard let ctx else { return .error("Unknown target '\(args["target"]?.asString() ?? "")'") }
+                let (ctx, err) = registry.resolveForTool(args)
+                guard let ctx else { return err! }
                 let input = ctx.input
 
                 guard let text = args["text"]?.asString() else {
@@ -262,8 +283,8 @@ extension IPhoneMirroirMCP {
                 "required": .array([.string("key")]),
             ],
             handler: { args in
-                let ctx = registry.resolve(args["target"]?.asString())
-                guard let ctx else { return .error("Unknown target '\(args["target"]?.asString() ?? "")'") }
+                let (ctx, err) = registry.resolveForTool(args)
+                guard let ctx else { return err! }
                 let input = ctx.input
 
                 guard let keyName = args["key"]?.asString() else {
@@ -314,12 +335,13 @@ extension IPhoneMirroirMCP {
                         "description": .string(
                             "Hold duration in milliseconds (default: 500, minimum: 100)"),
                     ]),
+                    "cursor_mode": cursorModeSchema,
                 ]),
                 "required": .array([.string("x"), .string("y")]),
             ],
             handler: { args in
-                let ctx = registry.resolve(args["target"]?.asString())
-                guard let ctx else { return .error("Unknown target '\(args["target"]?.asString() ?? "")'") }
+                let (ctx, err) = registry.resolveForTool(args)
+                guard let ctx else { return err! }
                 let input = ctx.input
 
                 guard let x = args["x"]?.asNumber(), let y = args["y"]?.asNumber() else {
@@ -328,7 +350,8 @@ extension IPhoneMirroirMCP {
 
                 let duration = args["duration_ms"]?.asInt() ?? EnvConfig.defaultLongPressDurationMs
 
-                if let error = input.longPress(x: x, y: y, durationMs: duration) {
+                if let error = input.longPress(x: x, y: y, durationMs: duration,
+                                               cursorMode: parseCursorMode(args)) {
                     return .error(error)
                 }
                 return .text("Long pressed at (\(Int(x)), \(Int(y))) for \(duration)ms")
@@ -357,19 +380,20 @@ extension IPhoneMirroirMCP {
                         "description": .string(
                             "Y coordinate relative to the mirroring window (0 = top edge)"),
                     ]),
+                    "cursor_mode": cursorModeSchema,
                 ]),
                 "required": .array([.string("x"), .string("y")]),
             ],
             handler: { args in
-                let ctx = registry.resolve(args["target"]?.asString())
-                guard let ctx else { return .error("Unknown target '\(args["target"]?.asString() ?? "")'") }
+                let (ctx, err) = registry.resolveForTool(args)
+                guard let ctx else { return err! }
                 let input = ctx.input
 
                 guard let x = args["x"]?.asNumber(), let y = args["y"]?.asNumber() else {
                     return .error("Missing required parameters: x, y (numbers)")
                 }
 
-                if let error = input.doubleTap(x: x, y: y) {
+                if let error = input.doubleTap(x: x, y: y, cursorMode: parseCursorMode(args)) {
                     return .error(error)
                 }
                 return .text("Double-tapped at (\(Int(x)), \(Int(y)))")
@@ -390,8 +414,8 @@ extension IPhoneMirroirMCP {
                 "properties": .object([:]),
             ],
             handler: { args in
-                let ctx = registry.resolve(args["target"]?.asString())
-                guard let ctx else { return .error("Unknown target '\(args["target"]?.asString() ?? "")'") }
+                let (ctx, err) = registry.resolveForTool(args)
+                guard let ctx else { return err! }
                 let input = ctx.input
 
                 let result = input.shake()

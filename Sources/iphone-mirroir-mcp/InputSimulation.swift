@@ -17,8 +17,22 @@ struct TypeResult {
     let error: String?
 }
 
-/// Simulates touch and keyboard input on the iPhone Mirroring window.
-/// All coordinates are relative to the mirroring window's content area.
+/// Controls how the mouse cursor is managed during coordinate-based operations.
+/// Pluggable: new strategies can be added as enum cases.
+enum CursorMode: Sendable {
+    /// No cursor management — cursor moves to the target and stays there.
+    /// Used for iPhone Mirroring where HID events are consumed by the
+    /// mirroring session without affecting the user's workflow.
+    case direct
+
+    /// Save the cursor position before the operation, restore it after.
+    /// Used for generic window targets where automation shares the macOS
+    /// cursor with the user.
+    case preserving
+}
+
+/// Simulates touch and keyboard input on a target window.
+/// All coordinates are relative to the target window's content area.
 ///
 /// Requires the Karabiner helper daemon for all input operations (tap, swipe,
 /// type, press_key). Keyboard input is sent via Karabiner virtual HID to avoid
@@ -27,13 +41,15 @@ final class InputSimulation: Sendable {
     private let bridge: any WindowBridging
     let helperClient = HelperClient()
     private let mirroringBundleID: String
+    private let cursorMode: CursorMode
     /// Character substitution table for translating between the iPhone's hardware
     /// keyboard layout and US QWERTY (used by the HID helper). Built once at init
     /// from the first non-US keyboard layout found on the Mac.
     private let layoutSubstitution: [Character: Character]
 
-    init(bridge: any WindowBridging) {
+    init(bridge: any WindowBridging, cursorMode: CursorMode = .direct) {
         self.bridge = bridge
+        self.cursorMode = cursorMode
         // Resolve the process name for AppleScript focus management.
         // iPhone Mirroring uses the configured process name; generic targets
         // fall back to the process name from the running application.
@@ -69,7 +85,7 @@ final class InputSimulation: Sendable {
         let state = bridge.getState()
         guard state == .connected else {
             DebugLog.log(tag, "ERROR: mirroring not connected (state: \(state))")
-            return "iPhone Mirroring is not connected. Is the phone locked or the app closed?"
+            return "Target '\(bridge.targetName)' is not connected. Is the window visible?"
         }
         return nil
     }
@@ -85,7 +101,7 @@ final class InputSimulation: Sendable {
 
         guard let info = bridge.getWindowInfo() else {
             DebugLog.log(tag, "ERROR: window not found")
-            return (nil, "iPhone Mirroring window not found")
+            return (nil, "Target '\(bridge.targetName)' window not found")
         }
 
         guard helperClient.isAvailable else {
@@ -102,13 +118,28 @@ final class InputSimulation: Sendable {
         return (info, nil)
     }
 
+    // MARK: - Cursor management
+
+    /// Save the current cursor position if the effective cursor mode requires it.
+    /// Per-call override takes precedence over the instance default.
+    private func saveCursor(mode: CursorMode? = nil) -> CGPoint? {
+        guard (mode ?? cursorMode) == .preserving else { return nil }
+        return CGEvent(source: nil)?.location
+    }
+
+    /// Restore the cursor to a previously saved position.
+    private func restoreCursor(_ savedPosition: CGPoint?) {
+        guard let pos = savedPosition else { return }
+        CGWarpMouseCursorPosition(pos)
+    }
+
     /// Validate that coordinates fall within the iPhone Mirroring window bounds.
     /// Returns nil if valid, or a descriptive error message if out of bounds.
     func validateBounds(x: Double, y: Double, info: WindowInfo, tag: String) -> String? {
         let w = Double(info.size.width)
         let h = Double(info.size.height)
         if x < 0 || x > w || y < 0 || y > h {
-            let msg = "Coordinates (\(Int(x)), \(Int(y))) are outside the iPhone Mirroring window (\(Int(w))x\(Int(h))). x must be 0-\(Int(w)), y must be 0-\(Int(h))."
+            let msg = "Coordinates (\(Int(x)), \(Int(y))) are outside the '\(bridge.targetName)' window (\(Int(w))x\(Int(h))). x must be 0-\(Int(w)), y must be 0-\(Int(h))."
             DebugLog.log(tag, "REJECTED: \(msg)")
             return msg
         }
@@ -121,11 +152,14 @@ final class InputSimulation: Sendable {
         DebugLog.log(tag, "window=(\(Int(info.position.x)),\(Int(info.position.y))) size=\(Int(info.size.width))x\(Int(info.size.height)) frontApp=\(frontApp)")
     }
 
-    /// Tap at a position relative to the mirroring window.
+    /// Tap at a position relative to the target window.
     /// Returns nil on success, or an error message if the helper is unavailable.
-    func tap(x: Double, y: Double) -> String? {
+    func tap(x: Double, y: Double, cursorMode override: CursorMode? = nil) -> String? {
         let prep = prepareInput(tag: "tap", x: x, y: y)
         guard let info = prep.info else { return prep.error }
+
+        let saved = saveCursor(mode: override)
+        defer { restoreCursor(saved) }
 
         let screenX = info.position.x + CGFloat(x)
         let screenY = info.position.y + CGFloat(y)
@@ -136,10 +170,10 @@ final class InputSimulation: Sendable {
         return result ? nil : "Helper click failed"
     }
 
-    /// Swipe from one point to another relative to the mirroring window.
+    /// Swipe from one point to another relative to the target window.
     /// Returns nil on success, or an error message if the helper is unavailable.
-    func swipe(fromX: Double, fromY: Double, toX: Double, toY: Double, durationMs: Int = 300)
-        -> String?
+    func swipe(fromX: Double, fromY: Double, toX: Double, toY: Double,
+               durationMs: Int = 300, cursorMode override: CursorMode? = nil) -> String?
     {
         let prep = prepareInput(tag: "swipe", x: fromX, y: fromY)
         guard let info = prep.info else { return prep.error }
@@ -147,6 +181,9 @@ final class InputSimulation: Sendable {
         if let boundsError = validateBounds(x: toX, y: toY, info: info, tag: "swipe") {
             return boundsError
         }
+
+        let saved = saveCursor(mode: override)
+        defer { restoreCursor(saved) }
 
         let startX = Double(info.position.x) + fromX
         let startY = Double(info.position.y) + fromY
@@ -162,11 +199,15 @@ final class InputSimulation: Sendable {
         return result ? nil : "Helper swipe failed"
     }
 
-    /// Long press at a position relative to the mirroring window.
+    /// Long press at a position relative to the target window.
     /// Returns nil on success, or an error message on failure.
-    func longPress(x: Double, y: Double, durationMs: Int = 500) -> String? {
+    func longPress(x: Double, y: Double, durationMs: Int = 500,
+                   cursorMode override: CursorMode? = nil) -> String? {
         let prep = prepareInput(tag: "longPress", x: x, y: y)
         guard let info = prep.info else { return prep.error }
+
+        let saved = saveCursor(mode: override)
+        defer { restoreCursor(saved) }
 
         let screenX = Double(info.position.x) + x
         let screenY = Double(info.position.y) + y
@@ -177,11 +218,14 @@ final class InputSimulation: Sendable {
         return result ? nil : "Helper long press failed"
     }
 
-    /// Double-tap at a position relative to the mirroring window.
+    /// Double-tap at a position relative to the target window.
     /// Returns nil on success, or an error message on failure.
-    func doubleTap(x: Double, y: Double) -> String? {
+    func doubleTap(x: Double, y: Double, cursorMode override: CursorMode? = nil) -> String? {
         let prep = prepareInput(tag: "doubleTap", x: x, y: y)
         guard let info = prep.info else { return prep.error }
+
+        let saved = saveCursor(mode: override)
+        defer { restoreCursor(saved) }
 
         let screenX = Double(info.position.x) + x
         let screenY = Double(info.position.y) + y
@@ -192,18 +236,21 @@ final class InputSimulation: Sendable {
         return result ? nil : "Helper double tap failed"
     }
 
-    /// Drag from one point to another relative to the mirroring window.
+    /// Drag from one point to another relative to the target window.
     /// Unlike swipe (quick flick), drag maintains sustained contact for
     /// rearranging icons, adjusting sliders, and drag-and-drop operations.
     /// Returns nil on success, or an error message on failure.
     func drag(fromX: Double, fromY: Double, toX: Double, toY: Double,
-              durationMs: Int = 1000) -> String? {
+              durationMs: Int = 1000, cursorMode override: CursorMode? = nil) -> String? {
         let prep = prepareInput(tag: "drag", x: fromX, y: fromY)
         guard let info = prep.info else { return prep.error }
 
         if let boundsError = validateBounds(x: toX, y: toY, info: info, tag: "drag") {
             return boundsError
         }
+
+        let saved = saveCursor(mode: override)
+        defer { restoreCursor(saved) }
 
         let startX = Double(info.position.x) + fromX
         let startY = Double(info.position.y) + fromY
@@ -255,7 +302,7 @@ final class InputSimulation: Sendable {
         guard let menuBridge = bridge as? (any MenuActionCapable),
               menuBridge.triggerMenuAction(menu: "View", item: "Spotlight") else {
             DebugLog.log("launchApp", "ERROR: failed to open Spotlight")
-            return "Failed to open Spotlight. Is iPhone Mirroring running?"
+            return "Failed to open Spotlight. Is target '\(bridge.targetName)' running?"
         }
         usleep(EnvConfig.spotlightAppearanceUs)
 
@@ -315,21 +362,14 @@ final class InputSimulation: Sendable {
         return nil
     }
 
-    /// Ensure iPhone Mirroring is the frontmost app so it receives keyboard input.
-    /// Always runs AppleScript activation because NSWorkspace.frontmostApplication
-    /// can report stale values when another app gained keyboard focus between MCP
-    /// calls. The activation is idempotent (~10ms no-op when already front).
-    /// Only sleeps 300ms when a real Space switch was needed.
+    /// Ensure the target window is the frontmost app so it receives input.
+    /// Always activates because NSWorkspace.frontmostApplication can report
+    /// stale values when another app gained focus between MCP calls.
+    /// Only sleeps for Space-switch settling when we weren't already frontmost.
     ///
-    /// Does NOT restore the previous frontmost app — this eliminates
-    /// the "switch, back, switch, back" jitter that the old AppleScript keystroke approach caused.
-    ///
-    /// Uses AppleScript `set frontmost to true` via System Events because
-    /// `NSRunningApplication.activate()` cannot trigger a macOS Space switch
-    /// (deprecated in macOS 14 with no replacement for cross-Space activation).
-    /// Ensure the target window is the frontmost app so it receives keyboard input.
-    /// For iPhone Mirroring, uses AppleScript activation to trigger Space switching.
-    /// For generic targets, uses NSRunningApplication.activate().
+    /// Uses AppleScript `set frontmost to true` via System Events for
+    /// cross-Space activation (NSRunningApplication.activate() cannot trigger
+    /// a macOS Space switch, deprecated in macOS 14).
     private func ensureTargetFrontmost() {
         let frontApp = NSWorkspace.shared.frontmostApplication
         let alreadyFront = frontApp?.bundleIdentifier == mirroringBundleID
@@ -340,9 +380,21 @@ final class InputSimulation: Sendable {
             DebugLog.log("focus", "switching from \(frontApp?.bundleIdentifier ?? "nil")")
         }
 
-        // Always activate — NSWorkspace.frontmostApplication can report stale
-        // values when another app gained keyboard focus between MCP calls.
-        let processName = EnvConfig.mirroringProcessName
+        // Resolve the process name for the current target's running application.
+        // For iPhone Mirroring this is the configured process name; for generic
+        // targets it's the app's localized name from NSRunningApplication.
+        let processName: String
+        if bridge is MirroringBridge {
+            processName = EnvConfig.mirroringProcessName
+        } else if let app = bridge.findProcess(), let name = app.localizedName {
+            processName = name
+        } else {
+            // Fallback: use NSRunningApplication.activate() directly
+            bridge.activate()
+            if !alreadyFront { usleep(EnvConfig.spaceSwitchSettleUs) }
+            return
+        }
+
         let script = NSAppleScript(source: """
             tell application "System Events"
                 tell process "\(processName)"
@@ -357,8 +409,6 @@ final class InputSimulation: Sendable {
             DebugLog.log("focus", "AppleScript error: \(err)")
         }
 
-        // Only wait for Space switch when we weren't already frontmost.
-        // When already front, the AppleScript is a no-op and needs no settling time.
         if !alreadyFront {
             usleep(EnvConfig.spaceSwitchSettleUs)
         }

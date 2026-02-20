@@ -38,8 +38,8 @@ extension IPhoneMirroirMCP {
                 "required": .array([.string("mode")]),
             ],
             handler: { args in
-                let ctx = registry.resolve(args["target"]?.asString())
-                guard let ctx else { return .error("Unknown target '\(args["target"]?.asString() ?? "")'") }
+                let (ctx, err) = registry.resolveForTool(args)
+                guard let ctx else { return err! }
                 guard let menuBridge = ctx.bridge as? (any MenuActionCapable) else {
                     return .error("Target '\(ctx.name)' does not support set_network")
                 }

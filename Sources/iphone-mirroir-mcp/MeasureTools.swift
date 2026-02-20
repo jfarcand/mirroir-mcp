@@ -47,8 +47,8 @@ extension IPhoneMirroirMCP {
                 "required": .array([.string("action"), .string("until")]),
             ],
             handler: { args in
-                let ctx = registry.resolve(args["target"]?.asString())
-                guard let ctx else { return .error("Unknown target '\(args["target"]?.asString() ?? "")'") }
+                let (ctx, err) = registry.resolveForTool(args)
+                guard let ctx else { return err! }
                 let bridge = ctx.bridge
                 let input = ctx.input
                 let describer = ctx.describer

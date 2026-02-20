@@ -33,8 +33,8 @@ extension IPhoneMirroirMCP {
                 "required": .array([.string("name")]),
             ],
             handler: { args in
-                let ctx = registry.resolve(args["target"]?.asString())
-                guard let ctx else { return .error("Unknown target '\(args["target"]?.asString() ?? "")'") }
+                let (ctx, err) = registry.resolveForTool(args)
+                guard let ctx else { return err! }
                 let input = ctx.input
 
                 guard let appName = args["name"]?.asString() else {
@@ -74,8 +74,8 @@ extension IPhoneMirroirMCP {
                 "required": .array([.string("url")]),
             ],
             handler: { args in
-                let ctx = registry.resolve(args["target"]?.asString())
-                guard let ctx else { return .error("Unknown target '\(args["target"]?.asString() ?? "")'") }
+                let (ctx, err) = registry.resolveForTool(args)
+                guard let ctx else { return err! }
                 let input = ctx.input
 
                 guard let url = args["url"]?.asString() else {
@@ -101,8 +101,8 @@ extension IPhoneMirroirMCP {
                 "properties": .object([:]),
             ],
             handler: { args in
-                let ctx = registry.resolve(args["target"]?.asString())
-                guard let ctx else { return .error("Unknown target '\(args["target"]?.asString() ?? "")'") }
+                let (ctx, err) = registry.resolveForTool(args)
+                guard let ctx else { return err! }
                 guard let menuBridge = ctx.bridge as? (any MenuActionCapable) else {
                     return .error("Target '\(ctx.name)' does not support press_home")
                 }
@@ -110,7 +110,7 @@ extension IPhoneMirroirMCP {
                 if menuBridge.triggerMenuAction(menu: "View", item: "Home Screen") {
                     return .text("Pressed Home — navigated to home screen")
                 } else {
-                    return .error("Failed to press Home. Is iPhone Mirroring running?")
+                    return .error("Failed to press Home. Is '\(ctx.name)' running?")
                 }
             }
         ))
@@ -127,8 +127,8 @@ extension IPhoneMirroirMCP {
                 "properties": .object([:]),
             ],
             handler: { args in
-                let ctx = registry.resolve(args["target"]?.asString())
-                guard let ctx else { return .error("Unknown target '\(args["target"]?.asString() ?? "")'") }
+                let (ctx, err) = registry.resolveForTool(args)
+                guard let ctx else { return err! }
                 guard let menuBridge = ctx.bridge as? (any MenuActionCapable) else {
                     return .error("Target '\(ctx.name)' does not support press_app_switcher")
                 }
@@ -136,7 +136,7 @@ extension IPhoneMirroirMCP {
                 if menuBridge.triggerMenuAction(menu: "View", item: "App Switcher") {
                     return .text("Opened App Switcher")
                 } else {
-                    return .error("Failed to open App Switcher. Is iPhone Mirroring running?")
+                    return .error("Failed to open App Switcher. Is '\(ctx.name)' running?")
                 }
             }
         ))
@@ -153,8 +153,8 @@ extension IPhoneMirroirMCP {
                 "properties": .object([:]),
             ],
             handler: { args in
-                let ctx = registry.resolve(args["target"]?.asString())
-                guard let ctx else { return .error("Unknown target '\(args["target"]?.asString() ?? "")'") }
+                let (ctx, err) = registry.resolveForTool(args)
+                guard let ctx else { return err! }
                 guard let menuBridge = ctx.bridge as? (any MenuActionCapable) else {
                     return .error("Target '\(ctx.name)' does not support spotlight")
                 }
@@ -162,7 +162,7 @@ extension IPhoneMirroirMCP {
                 if menuBridge.triggerMenuAction(menu: "View", item: "Spotlight") {
                     return .text("Opened Spotlight search")
                 } else {
-                    return .error("Failed to open Spotlight. Is iPhone Mirroring running?")
+                    return .error("Failed to open Spotlight. Is '\(ctx.name)' running?")
                 }
             }
         ))

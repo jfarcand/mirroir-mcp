@@ -446,7 +446,8 @@ enum DoctorCommand {
             return []
         }
 
-        guard let targets = targetsFile.targets, !targets.isEmpty else {
+        let targets = targetsFile.targets
+        guard !targets.isEmpty else {
             return []
         }
 
