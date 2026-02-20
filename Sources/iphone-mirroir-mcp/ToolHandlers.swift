@@ -10,28 +10,19 @@ import HelperLib
 extension IPhoneMirroirMCP {
     static func registerTools(
         server: MCPServer,
-        bridge: any MirroringBridging,
-        capture: any ScreenCapturing,
-        recorder: any ScreenRecording,
-        input: any InputProviding,
-        describer: any ScreenDescribing,
+        registry: TargetRegistry,
         policy: PermissionPolicy
     ) {
-        registerScreenTools(server: server, bridge: bridge, capture: capture,
-                            recorder: recorder, describer: describer)
-        registerInputTools(server: server, bridge: bridge, input: input)
-        registerNavigationTools(server: server, bridge: bridge, input: input,
+        registerScreenTools(server: server, registry: registry)
+        registerInputTools(server: server, registry: registry)
+        registerNavigationTools(server: server, registry: registry,
                                 policy: policy)
-        registerInfoTools(server: server, bridge: bridge, input: input,
-                          capture: capture)
+        registerInfoTools(server: server, registry: registry)
         registerScenarioTools(server: server)
-        registerScrollToTools(server: server, bridge: bridge, input: input,
-                              describer: describer)
-        registerAppManagementTools(server: server, bridge: bridge, input: input,
-                                   describer: describer)
-        registerMeasureTools(server: server, bridge: bridge, input: input,
-                             describer: describer)
-        registerNetworkTools(server: server, bridge: bridge, input: input,
-                             describer: describer)
+        registerScrollToTools(server: server, registry: registry)
+        registerAppManagementTools(server: server, registry: registry)
+        registerMeasureTools(server: server, registry: registry)
+        registerNetworkTools(server: server, registry: registry)
+        registerTargetTools(server: server, registry: registry)
     }
 }

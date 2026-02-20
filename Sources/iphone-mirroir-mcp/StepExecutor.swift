@@ -42,22 +42,25 @@ struct StepExecutorConfig {
 
 /// Executes scenario steps against system subsystems via protocol abstractions.
 final class StepExecutor {
-    private let bridge: MirroringBridging
-    private let input: InputProviding
-    private let describer: ScreenDescribing
-    private let capture: ScreenCapturing
+    private var bridge: any WindowBridging
+    private var input: InputProviding
+    private var describer: ScreenDescribing
+    private var capture: ScreenCapturing
     private let config: StepExecutorConfig
+    private let registry: TargetRegistry?
 
-    init(bridge: MirroringBridging,
+    init(bridge: any WindowBridging,
          input: InputProviding,
          describer: ScreenDescribing,
          capture: ScreenCapturing,
-         config: StepExecutorConfig = .default) {
+         config: StepExecutorConfig = .default,
+         registry: TargetRegistry? = nil) {
         self.bridge = bridge
         self.input = input
         self.describer = describer
         self.capture = capture
         self.config = config
+        self.registry = registry
     }
 
     /// Execute a single step and return the result.
@@ -112,6 +115,8 @@ final class StepExecutor {
             result = executeMeasure(name: name, action: action, until: until,
                                      maxSeconds: maxSeconds, stepIndex: stepIndex,
                                      scenarioName: scenarioName, startTime: startTime)
+        case .switchTarget(let name):
+            result = executeSwitchTarget(name: name, startTime: startTime)
         case .skipped(let stepType, let reason):
             let duration = CFAbsoluteTimeGetCurrent() - startTime
             result = StepResult(step: step, status: .skipped,
@@ -345,7 +350,12 @@ final class StepExecutor {
 
     private func executeHome(startTime: CFAbsoluteTime) -> StepResult {
         let step = ScenarioStep.home
-        let success = bridge.triggerMenuAction(menu: "View", item: "Home Screen")
+        guard let menuBridge = bridge as? (any MenuActionCapable) else {
+            return StepResult(step: step, status: .failed,
+                              message: "Target '\(bridge.targetName)' does not support the home button",
+                              durationSeconds: elapsed(startTime))
+        }
+        let success = menuBridge.triggerMenuAction(menu: "View", item: "Home Screen")
         if !success {
             return StepResult(step: step, status: .failed,
                               message: "Failed to trigger Home Screen menu action",
@@ -463,9 +473,14 @@ final class StepExecutor {
 
     private func executeResetApp(appName: String, startTime: CFAbsoluteTime) -> StepResult {
         let step = ScenarioStep.resetApp(appName: appName)
+        guard let menuBridge = self.menuBridge else {
+            return StepResult(step: step, status: .failed,
+                              message: "Target '\(bridge.targetName)' does not support reset_app",
+                              durationSeconds: elapsed(startTime))
+        }
 
         // Open App Switcher
-        guard bridge.triggerMenuAction(menu: "View", item: "App Switcher") else {
+        guard menuBridge.triggerMenuAction(menu: "View", item: "App Switcher") else {
             return StepResult(step: step, status: .failed,
                               message: "Failed to open App Switcher",
                               durationSeconds: elapsed(startTime))
@@ -475,8 +490,7 @@ final class StepExecutor {
 
         // OCR to find the app card
         guard let describeResult = describer.describe(skipOCR: false) else {
-            // Can't read screen — return to home and fail
-            _ = bridge.triggerMenuAction(menu: "View", item: "Home Screen")
+            _ = menuBridge.triggerMenuAction(menu: "View", item: "Home Screen")
             return StepResult(step: step, status: .failed,
                               message: "Failed to capture screen in App Switcher",
                               durationSeconds: elapsed(startTime))
@@ -484,8 +498,7 @@ final class StepExecutor {
 
         guard let match = ElementMatcher.findMatch(label: appName,
                                                      in: describeResult.elements) else {
-            // App not in switcher — already quit, go home
-            _ = bridge.triggerMenuAction(menu: "View", item: "Home Screen")
+            _ = menuBridge.triggerMenuAction(menu: "View", item: "Home Screen")
             return StepResult(step: step, status: .passed,
                               message: "App not in switcher (already quit)",
                               durationSeconds: elapsed(startTime))
@@ -496,7 +509,7 @@ final class StepExecutor {
         let cardY = match.element.tapY
         if let error = input.swipe(fromX: cardX, fromY: cardY,
                                     toX: cardX, toY: cardY - EnvConfig.appSwitcherSwipeDistance, durationMs: EnvConfig.appSwitcherSwipeDurationMs) {
-            _ = bridge.triggerMenuAction(menu: "View", item: "Home Screen")
+            _ = menuBridge.triggerMenuAction(menu: "View", item: "Home Screen")
             return StepResult(step: step, status: .failed,
                               message: "Failed to swipe app card: \(error)",
                               durationSeconds: elapsed(startTime))
@@ -504,8 +517,7 @@ final class StepExecutor {
 
         usleep(config.settlingDelayMs * 1000)
 
-        // Return to home screen
-        _ = bridge.triggerMenuAction(menu: "View", item: "Home Screen")
+        _ = menuBridge.triggerMenuAction(menu: "View", item: "Home Screen")
 
         return StepResult(step: step, status: .passed,
                           message: "Force-quit \(appName)",
@@ -516,6 +528,11 @@ final class StepExecutor {
 
     private func executeSetNetwork(mode: String, startTime: CFAbsoluteTime) -> StepResult {
         let step = ScenarioStep.setNetwork(mode: mode)
+        guard let menuBridge = self.menuBridge else {
+            return StepResult(step: step, status: .failed,
+                              message: "Target '\(bridge.targetName)' does not support set_network",
+                              durationSeconds: elapsed(startTime))
+        }
 
         let validModes = ["airplane_on", "airplane_off", "wifi_on", "wifi_off",
                           "cellular_on", "cellular_off"]
@@ -547,7 +564,7 @@ final class StepExecutor {
 
         // Find and tap the setting row
         guard let describeResult = describer.describe(skipOCR: false) else {
-            _ = bridge.triggerMenuAction(menu: "View", item: "Home Screen")
+            _ = menuBridge.triggerMenuAction(menu: "View", item: "Home Screen")
             return StepResult(step: step, status: .failed,
                               message: "Failed to capture Settings screen",
                               durationSeconds: elapsed(startTime))
@@ -555,14 +572,14 @@ final class StepExecutor {
 
         guard let match = ElementMatcher.findMatch(label: targetLabel,
                                                      in: describeResult.elements) else {
-            _ = bridge.triggerMenuAction(menu: "View", item: "Home Screen")
+            _ = menuBridge.triggerMenuAction(menu: "View", item: "Home Screen")
             return StepResult(step: step, status: .failed,
                               message: "\"\(targetLabel)\" not found in Settings",
                               durationSeconds: elapsed(startTime))
         }
 
         if let error = input.tap(x: match.element.tapX, y: match.element.tapY) {
-            _ = bridge.triggerMenuAction(menu: "View", item: "Home Screen")
+            _ = menuBridge.triggerMenuAction(menu: "View", item: "Home Screen")
             return StepResult(step: step, status: .failed,
                               message: "Failed to tap \(targetLabel): \(error)",
                               durationSeconds: elapsed(startTime))
@@ -570,8 +587,7 @@ final class StepExecutor {
 
         usleep(config.settlingDelayMs * 1000)
 
-        // Return to home screen
-        _ = bridge.triggerMenuAction(menu: "View", item: "Home Screen")
+        _ = menuBridge.triggerMenuAction(menu: "View", item: "Home Screen")
 
         return StepResult(step: step, status: .passed,
                           message: "Toggled \(mode)",
@@ -624,10 +640,43 @@ final class StepExecutor {
                           durationSeconds: elapsed(startTime))
     }
 
+    // MARK: - switch_target
+
+    private func executeSwitchTarget(name: String, startTime: CFAbsoluteTime) -> StepResult {
+        let step = ScenarioStep.switchTarget(name: name)
+
+        guard let registry = registry else {
+            return StepResult(step: step, status: .failed,
+                              message: "No target registry — cannot switch targets",
+                              durationSeconds: elapsed(startTime))
+        }
+
+        guard let ctx = registry.resolve(name) else {
+            let available = registry.allTargets.map { $0.name }.joined(separator: ", ")
+            return StepResult(step: step, status: .failed,
+                              message: "Unknown target '\(name)'. Available: [\(available)]",
+                              durationSeconds: elapsed(startTime))
+        }
+
+        bridge = ctx.bridge
+        input = ctx.input
+        describer = ctx.describer
+        capture = ctx.capture
+
+        return StepResult(step: step, status: .passed,
+                          message: "Switched to target '\(name)'",
+                          durationSeconds: elapsed(startTime))
+    }
+
     // MARK: - Helpers
 
     private func elapsed(_ startTime: CFAbsoluteTime) -> Double {
         CFAbsoluteTimeGetCurrent() - startTime
+    }
+
+    /// Convenience cast to MenuActionCapable for steps that need menu actions.
+    private var menuBridge: (any MenuActionCapable)? {
+        bridge as? (any MenuActionCapable)
     }
 
     /// Save a screenshot for debugging when a step fails.

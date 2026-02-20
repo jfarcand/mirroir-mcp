@@ -11,7 +11,7 @@ import HelperLib
 /// Tap steps use recorded coordinates, wait_for/assert steps use recorded delays,
 /// and scroll_to steps replay exact swipe sequences.
 final class CompiledStepExecutor {
-    private let bridge: MirroringBridging
+    private let bridge: any WindowBridging
     private let input: InputProviding
     private let capture: ScreenCapturing
     private let normalExecutor: StepExecutor
@@ -20,7 +20,7 @@ final class CompiledStepExecutor {
     /// Extra milliseconds added to observed delays for safety margin.
     static var sleepBufferMs: Int { EnvConfig.compiledSleepBufferMs }
 
-    init(bridge: MirroringBridging,
+    init(bridge: any WindowBridging,
          input: InputProviding,
          describer: ScreenDescribing,
          capture: ScreenCapturing,

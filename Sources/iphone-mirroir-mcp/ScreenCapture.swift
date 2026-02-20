@@ -12,9 +12,9 @@ import HelperLib
 /// Uses the macOS `screencapture` command since CGWindowListCreateImage
 /// is unavailable on macOS 15+ (replaced by ScreenCaptureKit).
 final class ScreenCapture: Sendable {
-    private let bridge: MirroringBridge
+    private let bridge: any WindowBridging
 
-    init(bridge: MirroringBridge) {
+    init(bridge: any WindowBridging) {
         self.bridge = bridge
     }
 

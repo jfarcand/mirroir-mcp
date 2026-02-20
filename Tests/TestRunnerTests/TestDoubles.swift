@@ -12,14 +12,15 @@ import Foundation
 
 // MARK: - StubBridge
 
-final class StubBridge: MirroringBridging, @unchecked Sendable {
+final class StubBridge: MenuActionCapable, @unchecked Sendable {
+    var targetName: String = "iphone"
     var windowInfo: WindowInfo? = WindowInfo(
         windowID: 1,
         position: .zero,
         size: CGSize(width: 410, height: 898),
         pid: 1
     )
-    var state: MirroringState = .connected
+    var state: WindowState = .connected
     var orientation: DeviceOrientation? = .portrait
     var menuActionResult = true
     var pressResumeResult = true
@@ -34,13 +35,15 @@ final class StubBridge: MirroringBridging, @unchecked Sendable {
         windowInfo
     }
 
-    func getState() -> MirroringState {
+    func getState() -> WindowState {
         state
     }
 
     func getOrientation() -> DeviceOrientation? {
         orientation
     }
+
+    func activate() {}
 
     func triggerMenuAction(menu: String, item: String) -> Bool {
         menuActionCalls.append((menu: menu, item: item))
@@ -136,5 +139,20 @@ final class StubDescriber: ScreenDescribing, @unchecked Sendable {
             return result
         }
         return describeResult
+    }
+}
+
+// MARK: - StubRecorder
+
+final class StubRecorder: ScreenRecording, @unchecked Sendable {
+    var startResult: String?
+    var stopResult: (filePath: String?, error: String?) = ("/tmp/test.mov", nil)
+
+    func startRecording(outputPath: String?) -> String? {
+        startResult
+    }
+
+    func stopRecording() -> (filePath: String?, error: String?) {
+        stopResult
     }
 }

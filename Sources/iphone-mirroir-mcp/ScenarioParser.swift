@@ -13,6 +13,8 @@ struct ScenarioDefinition {
     let description: String
     let filePath: String
     let steps: [ScenarioStep]
+    /// Target names declared in the scenario header (for multi-target scenarios).
+    let targets: [String]
 }
 
 /// A single executable step within a scenario.
@@ -33,6 +35,7 @@ enum ScenarioStep {
     case resetApp(appName: String)
     case setNetwork(mode: String)
     indirect case measure(name: String, action: ScenarioStep, until: String, maxSeconds: Double?)
+    case switchTarget(name: String)
     case skipped(stepType: String, reason: String)
 
     /// The step type as a YAML key string (e.g. "tap", "wait_for", "launch").
@@ -54,6 +57,7 @@ enum ScenarioStep {
         case .resetApp: return "reset_app"
         case .setNetwork: return "set_network"
         case .measure: return "measure"
+        case .switchTarget: return "target"
         case .skipped(let stepType, _): return stepType
         }
     }
@@ -77,6 +81,7 @@ enum ScenarioStep {
         case .resetApp(let name): return name
         case .setNetwork(let mode): return mode
         case .measure(let name, _, _, _): return name
+        case .switchTarget(let name): return name
         case .skipped: return nil
         }
     }
@@ -102,6 +107,7 @@ enum ScenarioStep {
         case .resetApp(let name): return "reset_app: \"\(name)\""
         case .setNetwork(let mode): return "set_network: \"\(mode)\""
         case .measure(let name, _, _, _): return "measure: \"\(name)\""
+        case .switchTarget(let name): return "target: \"\(name)\""
         case .skipped(let type, _): return "\(type) (skipped)"
         }
     }
@@ -126,13 +132,49 @@ enum ScenarioParser {
             from: content, fallbackName: fallbackName, source: "")
 
         let steps = parseSteps(from: content)
+        let targets = parseTargets(from: content)
 
         return ScenarioDefinition(
             name: header.name,
             description: header.description,
             filePath: filePath,
-            steps: steps
+            steps: steps,
+            targets: targets
         )
+    }
+
+    /// Extract target names from the `targets:` header block.
+    /// Returns an empty array if no `targets:` block is found.
+    static func parseTargets(from content: String) -> [String] {
+        let lines = content.components(separatedBy: .newlines)
+        var inTargets = false
+        var targets: [String] = []
+
+        for line in lines {
+            let trimmed = line.trimmingCharacters(in: .whitespaces)
+
+            if trimmed == "targets:" {
+                inTargets = true
+                continue
+            }
+
+            guard inTargets else { continue }
+
+            // Target entries are list items: "- iphone"
+            guard trimmed.hasPrefix("- ") else {
+                if !line.hasPrefix(" ") && !line.hasPrefix("\t") && !trimmed.isEmpty {
+                    break
+                }
+                continue
+            }
+
+            let name = String(trimmed.dropFirst(2)).trimmingCharacters(in: .whitespaces)
+            if !name.isEmpty {
+                targets.append(stripQuotes(name))
+            }
+        }
+
+        return targets
     }
 
     /// Extract steps from the YAML content.
@@ -222,6 +264,8 @@ enum ScenarioParser {
             return .resetApp(appName: value)
         case "set_network":
             return .setNetwork(mode: value)
+        case "target":
+            return .switchTarget(name: value)
         case "measure":
             return parseMeasure(value)
         // AI-only steps that cannot run deterministically

@@ -10,9 +10,7 @@ import HelperLib
 extension IPhoneMirroirMCP {
     static func registerInfoTools(
         server: MCPServer,
-        bridge: any MirroringBridging,
-        input: any InputProviding,
-        capture: any ScreenCapturing
+        registry: TargetRegistry
     ) {
         // get_orientation — report device orientation
         server.registerTool(MCPToolDefinition(
@@ -27,7 +25,11 @@ extension IPhoneMirroirMCP {
                 "type": .string("object"),
                 "properties": .object([:]),
             ],
-            handler: { _ in
+            handler: { args in
+                let ctx = registry.resolve(args["target"]?.asString())
+                guard let ctx else { return .error("Unknown target '\(args["target"]?.asString() ?? "")'") }
+                let bridge = ctx.bridge
+
                 guard let orientation = bridge.getOrientation() else {
                     return .error(
                         "Cannot determine orientation. Is iPhone Mirroring running?")
@@ -56,7 +58,13 @@ extension IPhoneMirroirMCP {
                 "type": .string("object"),
                 "properties": .object([:]),
             ],
-            handler: { _ in
+            handler: { args in
+                let ctx = registry.resolve(args["target"]?.asString())
+                guard let ctx else { return .error("Unknown target '\(args["target"]?.asString() ?? "")'") }
+                let bridge = ctx.bridge
+                let input = ctx.input
+                let capture = ctx.capture
+
                 var checks: [String] = []
                 var allOk = true
 
@@ -137,7 +145,12 @@ extension IPhoneMirroirMCP {
                 "type": .string("object"),
                 "properties": .object([:]),
             ],
-            handler: { _ in
+            handler: { args in
+                let ctx = registry.resolve(args["target"]?.asString())
+                guard let ctx else { return .error("Unknown target '\(args["target"]?.asString() ?? "")'") }
+                let bridge = ctx.bridge
+                let input = ctx.input
+
                 let state = bridge.getState()
                 let mirroringStatus: String
                 switch state {

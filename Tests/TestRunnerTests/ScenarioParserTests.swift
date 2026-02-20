@@ -404,4 +404,46 @@ final class ScenarioParserTests: XCTestCase {
         let scenario = ScenarioParser.parse(content: yaml)
         XCTAssertEqual(scenario.steps.count, 5)
     }
+
+    // MARK: - Target Switching
+
+    func testParseSwitchTargetStep() {
+        let steps = ScenarioParser.parseSteps(from: "steps:\n  - target: \"android\"")
+        XCTAssertEqual(steps.count, 1)
+        if case .switchTarget(let name) = steps[0] {
+            XCTAssertEqual(name, "android")
+        } else {
+            XCTFail("Expected .switchTarget, got \(steps[0])")
+        }
+    }
+
+    func testParseTargetsHeader() {
+        let yaml = """
+        name: Multi-target test
+        targets:
+          - iphone
+          - android
+        steps:
+          - target: "iphone"
+          - tap: "Settings"
+        """
+        let scenario = ScenarioParser.parse(content: yaml)
+        XCTAssertEqual(scenario.targets, ["iphone", "android"])
+    }
+
+    func testParseNoTargetsHeaderReturnsEmpty() {
+        let yaml = "name: Single\nsteps:\n  - home"
+        let scenario = ScenarioParser.parse(content: yaml)
+        XCTAssertTrue(scenario.targets.isEmpty)
+    }
+
+    func testSwitchTargetTypeKey() {
+        let step = ScenarioStep.switchTarget(name: "android")
+        XCTAssertEqual(step.typeKey, "target")
+    }
+
+    func testSwitchTargetDisplayName() {
+        let step = ScenarioStep.switchTarget(name: "android")
+        XCTAssertEqual(step.displayName, "target: \"android\"")
+    }
 }

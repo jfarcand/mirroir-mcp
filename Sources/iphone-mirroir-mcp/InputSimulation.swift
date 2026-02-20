@@ -24,16 +24,26 @@ struct TypeResult {
 /// type, press_key). Keyboard input is sent via Karabiner virtual HID to avoid
 /// the Space-switching overhead of AppleScript activation.
 final class InputSimulation: Sendable {
-    private let bridge: MirroringBridge
+    private let bridge: any WindowBridging
     let helperClient = HelperClient()
-    private let mirroringBundleID = EnvConfig.mirroringBundleID
+    private let mirroringBundleID: String
     /// Character substitution table for translating between the iPhone's hardware
     /// keyboard layout and US QWERTY (used by the HID helper). Built once at init
     /// from the first non-US keyboard layout found on the Mac.
     private let layoutSubstitution: [Character: Character]
 
-    init(bridge: MirroringBridge) {
+    init(bridge: any WindowBridging) {
         self.bridge = bridge
+        // Resolve the process name for AppleScript focus management.
+        // iPhone Mirroring uses the configured process name; generic targets
+        // fall back to the process name from the running application.
+        if let menuBridge = bridge as? MirroringBridge {
+            self.mirroringBundleID = menuBridge.targetName == "iphone"
+                ? EnvConfig.mirroringBundleID
+                : bridge.findProcess()?.bundleIdentifier ?? EnvConfig.mirroringBundleID
+        } else {
+            self.mirroringBundleID = bridge.findProcess()?.bundleIdentifier ?? ""
+        }
 
         // Build layout substitution table if a non-US layout is installed.
         // The iPhone's hardware keyboard layout typically matches one of the
@@ -88,7 +98,7 @@ final class InputSimulation: Sendable {
         }
 
         logWindowState(tag, info)
-        ensureMirroringFrontmost()
+        ensureTargetFrontmost()
         return (info, nil)
     }
 
@@ -222,7 +232,7 @@ final class InputSimulation: Sendable {
         }
 
         DebugLog.log("shake", "sending shake gesture")
-        ensureMirroringFrontmost()
+        ensureTargetFrontmost()
 
         let result = helperClient.shake()
         DebugLog.log("shake", "helper=\(result ? "OK" : "FAILED")")
@@ -241,8 +251,9 @@ final class InputSimulation: Sendable {
         }
         DebugLog.log("launchApp", "launching '\(name)'")
 
-        // Step 1: Open Spotlight via menu action
-        guard bridge.triggerMenuAction(menu: "View", item: "Spotlight") else {
+        // Step 1: Open Spotlight via menu action (requires MenuActionCapable)
+        guard let menuBridge = bridge as? (any MenuActionCapable),
+              menuBridge.triggerMenuAction(menu: "View", item: "Spotlight") else {
             DebugLog.log("launchApp", "ERROR: failed to open Spotlight")
             return "Failed to open Spotlight. Is iPhone Mirroring running?"
         }
@@ -316,7 +327,10 @@ final class InputSimulation: Sendable {
     /// Uses AppleScript `set frontmost to true` via System Events because
     /// `NSRunningApplication.activate()` cannot trigger a macOS Space switch
     /// (deprecated in macOS 14 with no replacement for cross-Space activation).
-    private func ensureMirroringFrontmost() {
+    /// Ensure the target window is the frontmost app so it receives keyboard input.
+    /// For iPhone Mirroring, uses AppleScript activation to trigger Space switching.
+    /// For generic targets, uses NSRunningApplication.activate().
+    private func ensureTargetFrontmost() {
         let frontApp = NSWorkspace.shared.frontmostApplication
         let alreadyFront = frontApp?.bundleIdentifier == mirroringBundleID
 
@@ -374,7 +388,7 @@ final class InputSimulation: Sendable {
         }
 
         DebugLog.log("typeText", "typing \(text.count) char(s): \(text.prefix(50))")
-        ensureMirroringFrontmost()
+        ensureTargetFrontmost()
 
         // Split text into segments: HID-typeable (substituted) vs paste-needed (original).
         let segments = buildTypeSegments(text)
@@ -479,7 +493,7 @@ final class InputSimulation: Sendable {
 
         let modStr = modifiers.isEmpty ? "" : " modifiers=\(modifiers.joined(separator: "+"))"
         DebugLog.log("pressKey", "key=\(keyName)\(modStr)")
-        ensureMirroringFrontmost()
+        ensureTargetFrontmost()
 
         let result = helperClient.pressKey(key: keyName, modifiers: modifiers)
         DebugLog.log("pressKey", "helper=\(result ? "OK" : "FAILED")")

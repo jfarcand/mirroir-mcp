@@ -9,15 +9,26 @@ import CoreGraphics
 import Foundation
 import HelperLib
 
-/// Abstracts the iPhone Mirroring app bridge for window discovery and menu actions.
-protocol MirroringBridging: Sendable {
+/// Abstracts window discovery and state detection for any target window.
+protocol WindowBridging: Sendable {
+    /// Display name of this target (e.g. "iphone", "android").
+    var targetName: String { get }
     func findProcess() -> NSRunningApplication?
     func getWindowInfo() -> WindowInfo?
-    func getState() -> MirroringState
+    func getState() -> WindowState
     func getOrientation() -> DeviceOrientation?
+    /// Bring the target window to the front so it receives input.
+    func activate()
+}
+
+/// Extends WindowBridging with menu bar actions available on iPhone Mirroring.
+protocol MenuActionCapable: WindowBridging {
     func triggerMenuAction(menu: String, item: String) -> Bool
     func pressResume() -> Bool
 }
+
+/// Backward-compatible alias for code that references the old protocol name.
+typealias MirroringBridging = MenuActionCapable
 
 /// Abstracts user input simulation (tap, swipe, type, etc.) via the Karabiner helper.
 protocol InputProviding: Sendable {
@@ -53,7 +64,7 @@ protocol ScreenDescribing: Sendable {
 
 // MARK: - Conformances
 
-extension MirroringBridge: MirroringBridging {}
+extension MirroringBridge: MenuActionCapable {}
 
 extension InputSimulation: InputProviding {
     func helperStatus() -> [String: Any]? {

@@ -60,6 +60,7 @@ enum DoctorCommand {
         checks.append(checkMirroringConnected())
         checks.append(checkScreenRecording())
         checks.append(checkAccessibility())
+        checks.append(contentsOf: checkConfiguredTargets())
 
         if config.json {
             printJSON(checks: checks)
@@ -438,6 +439,41 @@ enum DoctorCommand {
             detail: "not granted",
             fixHint: "Open System Settings > Privacy & Security > Accessibility and enable the terminal app you're using."
         )
+    }
+
+    static func checkConfiguredTargets() -> [DoctorCheck] {
+        guard let targetsFile = TargetConfigLoader.load() else {
+            return []
+        }
+
+        guard let targets = targetsFile.targets, !targets.isEmpty else {
+            return []
+        }
+
+        var checks: [DoctorCheck] = []
+
+        let defaultTarget = targetsFile.defaultTarget ?? targets.keys.sorted().first ?? ""
+        let names = targets.keys.sorted()
+        checks.append(DoctorCheck(
+            name: "Configured targets",
+            status: .passed,
+            detail: "\(names.count) target(s): \(names.joined(separator: ", ")) (default: \(defaultTarget))",
+            fixHint: nil
+        ))
+
+        for name in names {
+            guard let config = targets[name] else { continue }
+            let typeName = config.type
+            let bundleID = config.bundleID ?? "unset"
+            checks.append(DoctorCheck(
+                name: "Target '\(name)'",
+                status: .passed,
+                detail: "\(typeName) (bundle: \(bundleID))",
+                fixHint: nil
+            ))
+        }
+
+        return checks
     }
 
     // MARK: - Output Formatting

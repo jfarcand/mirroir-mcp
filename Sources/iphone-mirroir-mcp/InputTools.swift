@@ -10,8 +10,7 @@ import HelperLib
 extension IPhoneMirroirMCP {
     static func registerInputTools(
         server: MCPServer,
-        bridge: any MirroringBridging,
-        input: any InputProviding
+        registry: TargetRegistry
     ) {
         // tap — click at coordinates on the mirrored iPhone
         server.registerTool(MCPToolDefinition(
@@ -39,6 +38,10 @@ extension IPhoneMirroirMCP {
                 "required": .array([.string("x"), .string("y")]),
             ],
             handler: { args in
+                let ctx = registry.resolve(args["target"]?.asString())
+                guard let ctx else { return .error("Unknown target '\(args["target"]?.asString() ?? "")'") }
+                let input = ctx.input
+
                 guard let x = args["x"]?.asNumber(), let y = args["y"]?.asNumber() else {
                     return .error("Missing required parameters: x, y (numbers)")
                 }
@@ -90,6 +93,10 @@ extension IPhoneMirroirMCP {
                 ]),
             ],
             handler: { args in
+                let ctx = registry.resolve(args["target"]?.asString())
+                guard let ctx else { return .error("Unknown target '\(args["target"]?.asString() ?? "")'") }
+                let input = ctx.input
+
                 guard let fromX = args["from_x"]?.asNumber(),
                     let fromY = args["from_y"]?.asNumber(),
                     let toX = args["to_x"]?.asNumber(),
@@ -155,6 +162,10 @@ extension IPhoneMirroirMCP {
                 ]),
             ],
             handler: { args in
+                let ctx = registry.resolve(args["target"]?.asString())
+                guard let ctx else { return .error("Unknown target '\(args["target"]?.asString() ?? "")'") }
+                let input = ctx.input
+
                 guard let fromX = args["from_x"]?.asNumber(),
                     let fromY = args["from_y"]?.asNumber(),
                     let toX = args["to_x"]?.asNumber(),
@@ -200,6 +211,10 @@ extension IPhoneMirroirMCP {
                 "required": .array([.string("text")]),
             ],
             handler: { args in
+                let ctx = registry.resolve(args["target"]?.asString())
+                guard let ctx else { return .error("Unknown target '\(args["target"]?.asString() ?? "")'") }
+                let input = ctx.input
+
                 guard let text = args["text"]?.asString() else {
                     return .error("Missing required parameter: text (string)")
                 }
@@ -247,6 +262,10 @@ extension IPhoneMirroirMCP {
                 "required": .array([.string("key")]),
             ],
             handler: { args in
+                let ctx = registry.resolve(args["target"]?.asString())
+                guard let ctx else { return .error("Unknown target '\(args["target"]?.asString() ?? "")'") }
+                let input = ctx.input
+
                 guard let keyName = args["key"]?.asString() else {
                     return .error("Missing required parameter: key (string)")
                 }
@@ -299,6 +318,10 @@ extension IPhoneMirroirMCP {
                 "required": .array([.string("x"), .string("y")]),
             ],
             handler: { args in
+                let ctx = registry.resolve(args["target"]?.asString())
+                guard let ctx else { return .error("Unknown target '\(args["target"]?.asString() ?? "")'") }
+                let input = ctx.input
+
                 guard let x = args["x"]?.asNumber(), let y = args["y"]?.asNumber() else {
                     return .error("Missing required parameters: x, y (numbers)")
                 }
@@ -338,6 +361,10 @@ extension IPhoneMirroirMCP {
                 "required": .array([.string("x"), .string("y")]),
             ],
             handler: { args in
+                let ctx = registry.resolve(args["target"]?.asString())
+                guard let ctx else { return .error("Unknown target '\(args["target"]?.asString() ?? "")'") }
+                let input = ctx.input
+
                 guard let x = args["x"]?.asNumber(), let y = args["y"]?.asNumber() else {
                     return .error("Missing required parameters: x, y (numbers)")
                 }
@@ -362,7 +389,11 @@ extension IPhoneMirroirMCP {
                 "type": .string("object"),
                 "properties": .object([:]),
             ],
-            handler: { _ in
+            handler: { args in
+                let ctx = registry.resolve(args["target"]?.asString())
+                guard let ctx else { return .error("Unknown target '\(args["target"]?.asString() ?? "")'") }
+                let input = ctx.input
+
                 let result = input.shake()
                 guard result.success else {
                     return .error(result.error ?? "Failed to trigger shake")

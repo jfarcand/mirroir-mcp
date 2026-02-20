@@ -12,14 +12,15 @@ import HelperLib
 
 // MARK: - StubBridge
 
-final class StubBridge: MirroringBridging, @unchecked Sendable {
+final class StubBridge: MenuActionCapable, @unchecked Sendable {
+    var targetName: String = "iphone"
     var windowInfo: WindowInfo? = WindowInfo(
         windowID: 1,
         position: .zero,
         size: CGSize(width: 410, height: 898),
         pid: 1
     )
-    var state: MirroringState = .connected
+    var state: WindowState = .connected
     var orientation: DeviceOrientation? = .portrait
     var menuActionResult = true
     var pressResumeResult = true
@@ -33,13 +34,15 @@ final class StubBridge: MirroringBridging, @unchecked Sendable {
         windowInfo
     }
 
-    func getState() -> MirroringState {
+    func getState() -> WindowState {
         state
     }
 
     func getOrientation() -> DeviceOrientation? {
         orientation
     }
+
+    func activate() {}
 
     func triggerMenuAction(menu: String, item: String) -> Bool {
         menuActionResult
@@ -117,4 +120,26 @@ final class StubDescriber: ScreenDescribing, @unchecked Sendable {
         lastSkipOCR = skipOCR
         return describeResult
     }
+}
+
+// MARK: - TargetRegistry helpers for tests
+
+/// Creates a TargetRegistry with a single "iphone" target from the given stubs.
+func makeTestRegistry(
+    bridge: StubBridge,
+    input: StubInput,
+    capture: StubCapture = StubCapture(),
+    recorder: StubRecorder = StubRecorder(),
+    describer: StubDescriber = StubDescriber()
+) -> TargetRegistry {
+    let ctx = TargetContext(
+        name: "iphone",
+        bridge: bridge,
+        input: input,
+        capture: capture,
+        describer: describer,
+        recorder: recorder,
+        capabilities: [.menuActions, .spotlight, .home, .appSwitcher]
+    )
+    return TargetRegistry(targets: ["iphone": ctx], defaultName: "iphone")
 }

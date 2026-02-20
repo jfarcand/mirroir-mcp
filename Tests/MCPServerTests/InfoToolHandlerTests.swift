@@ -23,8 +23,8 @@ final class InfoToolHandlerTests: XCTestCase {
         input = StubInput()
         capture = StubCapture()
         capture.captureResult = "base64data"
-        IPhoneMirroirMCP.registerInfoTools(server: server, bridge: bridge, input: input,
-                                            capture: capture)
+        let registry = makeTestRegistry(bridge: bridge, input: input, capture: capture)
+        IPhoneMirroirMCP.registerInfoTools(server: server, registry: registry)
     }
 
     private func callTool(_ name: String, args: [String: JSONValue] = [:]) -> JSONRPCResponse {

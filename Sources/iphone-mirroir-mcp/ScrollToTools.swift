@@ -10,9 +10,7 @@ import HelperLib
 extension IPhoneMirroirMCP {
     static func registerScrollToTools(
         server: MCPServer,
-        bridge: any MirroringBridging,
-        input: any InputProviding,
-        describer: any ScreenDescribing
+        registry: TargetRegistry
     ) {
         // scroll_to — scroll until an element is visible via OCR
         server.registerTool(MCPToolDefinition(
@@ -48,6 +46,12 @@ extension IPhoneMirroirMCP {
                 "required": .array([.string("label")]),
             ],
             handler: { args in
+                let ctx = registry.resolve(args["target"]?.asString())
+                guard let ctx else { return .error("Unknown target '\(args["target"]?.asString() ?? "")'") }
+                let bridge = ctx.bridge
+                let input = ctx.input
+                let describer = ctx.describer
+
                 guard let label = args["label"]?.asString() else {
                     return .error("Missing required parameter: label (string)")
                 }

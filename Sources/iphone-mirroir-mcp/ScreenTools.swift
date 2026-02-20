@@ -10,10 +10,7 @@ import HelperLib
 extension IPhoneMirroirMCP {
     static func registerScreenTools(
         server: MCPServer,
-        bridge: any MirroringBridging,
-        capture: any ScreenCapturing,
-        recorder: any ScreenRecording,
-        describer: any ScreenDescribing
+        registry: TargetRegistry
     ) {
         // screenshot — capture the mirroring window
         server.registerTool(MCPToolDefinition(
@@ -27,15 +24,22 @@ extension IPhoneMirroirMCP {
                 "type": .string("object"),
                 "properties": .object([:]),
             ],
-            handler: { _ in
+            handler: { args in
+                let ctx = registry.resolve(args["target"]?.asString())
+                guard let ctx else { return .error("Unknown target '\(args["target"]?.asString() ?? "")'") }
+                let bridge = ctx.bridge
+                let capture = ctx.capture
+
                 guard bridge.findProcess() != nil else {
                     return .error("iPhone Mirroring app is not running")
                 }
 
                 let state = bridge.getState()
                 if state == .paused {
-                    _ = bridge.pressResume()
-                    usleep(EnvConfig.resumeFromPausedUs) // Wait 2s for connection to resume
+                    if let menuBridge = bridge as? (any MenuActionCapable) {
+                        _ = menuBridge.pressResume()
+                        usleep(EnvConfig.resumeFromPausedUs)
+                    }
                 }
 
                 guard let base64 = capture.captureBase64() else {
@@ -72,13 +76,20 @@ extension IPhoneMirroirMCP {
                 ]),
             ],
             handler: { args in
+                let ctx = registry.resolve(args["target"]?.asString())
+                guard let ctx else { return .error("Unknown target '\(args["target"]?.asString() ?? "")'") }
+                let bridge = ctx.bridge
+                let describer = ctx.describer
+
                 guard bridge.findProcess() != nil else {
                     return .error("iPhone Mirroring app is not running")
                 }
                 let state = bridge.getState()
                 if state == .paused {
-                    _ = bridge.pressResume()
-                    usleep(EnvConfig.resumeFromPausedUs)
+                    if let menuBridge = bridge as? (any MenuActionCapable) {
+                        _ = menuBridge.pressResume()
+                        usleep(EnvConfig.resumeFromPausedUs)
+                    }
                 }
 
                 let skipOCR = args["skip_ocr"]?.asBool() ?? false
@@ -144,6 +155,10 @@ extension IPhoneMirroirMCP {
                 ]),
             ],
             handler: { args in
+                let ctx = registry.resolve(args["target"]?.asString())
+                guard let ctx else { return .error("Unknown target '\(args["target"]?.asString() ?? "")'") }
+                let recorder = ctx.recorder
+
                 let outputPath = args["output_path"]?.asString()
 
                 if let error = recorder.startRecording(outputPath: outputPath) {
@@ -165,7 +180,11 @@ extension IPhoneMirroirMCP {
                 "type": .string("object"),
                 "properties": .object([:]),
             ],
-            handler: { _ in
+            handler: { args in
+                let ctx = registry.resolve(args["target"]?.asString())
+                guard let ctx else { return .error("Unknown target '\(args["target"]?.asString() ?? "")'") }
+                let recorder = ctx.recorder
+
                 let result = recorder.stopRecording()
                 if let error = result.error {
                     return .error(error)

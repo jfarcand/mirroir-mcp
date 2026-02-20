@@ -61,6 +61,7 @@ public struct PermissionPolicy: Sendable {
         "get_orientation",
         "status",
         "check_health",
+        "list_targets",
         "list_scenarios",
         "get_scenario",
     ]
@@ -84,6 +85,7 @@ public struct PermissionPolicy: Sendable {
         "reset_app",
         "measure",
         "set_network",
+        "switch_target",
     ]
 
     public init(skipPermissions: Bool, config: PermissionConfig?) {

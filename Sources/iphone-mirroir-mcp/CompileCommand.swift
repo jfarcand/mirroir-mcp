@@ -225,7 +225,7 @@ enum CompileCommand {
 
         // Steps that are already OCR-free
         case .launch, .type, .pressKey, .swipe, .home, .openURL, .shake,
-             .resetApp, .setNetwork, .screenshot:
+             .resetApp, .setNetwork, .screenshot, .switchTarget:
             return .passthrough()
         }
     }

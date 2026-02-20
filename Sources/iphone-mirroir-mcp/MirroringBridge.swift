@@ -14,13 +14,16 @@ enum DeviceOrientation: String, Sendable {
     case landscape
 }
 
-/// Connection state of the iPhone Mirroring session.
-enum MirroringState: Sendable {
+/// Connection state of a target window (iPhone Mirroring or generic window).
+enum WindowState: Sendable {
     case connected
     case paused
     case notRunning
     case noWindow
 }
+
+/// Backward-compatible alias for code that references the old name.
+typealias MirroringState = WindowState
 
 /// Information about the mirroring window position and size.
 struct WindowInfo: Sendable {
@@ -34,7 +37,14 @@ struct WindowInfo: Sendable {
 /// The iPhone Mirroring window is special — it does not appear in AXWindows
 /// but is accessible via AXMainWindow/AXFocusedWindow.
 final class MirroringBridge: Sendable {
-    private let bundleIdentifier = EnvConfig.mirroringBundleID
+    let targetName: String
+    private let bundleIdentifier: String
+
+    init(targetName: String = "iphone",
+         bundleID: String? = nil) {
+        self.targetName = targetName
+        self.bundleIdentifier = bundleID ?? EnvConfig.mirroringBundleID
+    }
 
     /// Find the iPhone Mirroring process.
     func findProcess() -> NSRunningApplication? {
