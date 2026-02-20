@@ -11,10 +11,10 @@ DRIVERKIT_MANAGER="/Applications/.Karabiner-VirtualHIDDevice-Manager.app/Content
 
 echo "=== Uninstalling mirroir-mcp ==="
 
-# --- Step 1: Stop and remove helper daemon ---
+# --- Step 1: Stop and remove helper daemon + MCP binary ---
 
 echo ""
-echo "--- Helper daemon ---"
+echo "--- Helper daemon + MCP binary ---"
 
 if sudo launchctl list "$PLIST_NAME" >/dev/null 2>&1; then
     echo "Stopping daemon..."
@@ -22,13 +22,25 @@ if sudo launchctl list "$PLIST_NAME" >/dev/null 2>&1; then
     sleep 1
 fi
 
+# Stop pre-rename daemon if still running
+sudo launchctl bootout system/com.jfarcand.iphone-mirroir-helper 2>/dev/null || true
+
+sudo rm -f "/usr/local/bin/mirroir-mcp"
 sudo rm -f "/usr/local/bin/$HELPER_BIN"
 sudo rm -f "/usr/local/bin/mirroir"
 sudo rm -f "/Library/LaunchDaemons/$PLIST_NAME.plist"
 sudo rm -f "/var/run/mirroir-helper.sock"
 sudo rm -f "/var/log/mirroir-helper.log"
 rm -f "$HOME/.mirroir-mcp/debug.log"
-echo "Helper daemon removed."
+
+# Clean up pre-rename artifacts
+sudo rm -f "/usr/local/bin/iphone-mirroir-mcp"
+sudo rm -f "/usr/local/bin/iphone-mirroir-helper"
+sudo rm -f "/Library/LaunchDaemons/com.jfarcand.iphone-mirroir-helper.plist"
+sudo rm -f "/var/run/iphone-mirroir-helper.sock"
+rm -rf "$HOME/.iphone-mirroir-mcp"
+
+echo "Helper daemon + MCP binary removed."
 
 # --- Step 2: Remove permissions config ---
 

@@ -2,7 +2,7 @@
   "servers": {
     "mirroir": {
       "type": "stdio",
-      "command": "/Users/jeanfrancoisarcand/workspace/jfarcand/mirroir-mcp/.build/release/mirroir-mcp",
+      "command": "${workspaceFolder}/.build/release/mirroir-mcp",
       "args": [
         "--yolo"
       ]
