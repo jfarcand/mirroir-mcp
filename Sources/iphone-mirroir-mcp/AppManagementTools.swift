@@ -43,7 +43,7 @@ extension IPhoneMirroirMCP {
                     return .error("Failed to open App Switcher. Is iPhone Mirroring running?")
                 }
 
-                usleep(500_000)  // 500ms settling
+                usleep(EnvConfig.toolSettlingDelayUs)
 
                 // OCR to find the app card
                 guard let describeResult = describer.describe(skipOCR: false) else {
@@ -61,12 +61,12 @@ extension IPhoneMirroirMCP {
                 let cardX = match.element.tapX
                 let cardY = match.element.tapY
                 if let error = input.swipe(fromX: cardX, fromY: cardY,
-                                            toX: cardX, toY: cardY - 300, durationMs: 200) {
+                                            toX: cardX, toY: cardY - EnvConfig.appSwitcherSwipeDistance, durationMs: EnvConfig.appSwitcherSwipeDurationMs) {
                     _ = bridge.triggerMenuAction(menu: "View", item: "Home Screen")
                     return .error("Failed to swipe app card: \(error)")
                 }
 
-                usleep(500_000)  // 500ms settling
+                usleep(EnvConfig.toolSettlingDelayUs)
 
                 // Return to home screen
                 _ = bridge.triggerMenuAction(menu: "View", item: "Home Screen")

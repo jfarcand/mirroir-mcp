@@ -277,7 +277,7 @@ final class EventRecorder {
 
     /// Find the nearest OCR text label to the given window-relative coordinates.
     private func findNearestLabel(x: Double, y: Double) -> String? {
-        let maxDistance = 30.0 // points — only match nearby elements
+        let maxDistance = EnvConfig.eventLabelMaxDistance
         var bestLabel: String?
         var bestDistance = Double.infinity
 
@@ -337,13 +337,13 @@ enum EventClassifier {
     }
 
     /// Tap distance threshold in points — clicks within this distance are taps.
-    static let tapDistanceThreshold = 5.0
+    static var tapDistanceThreshold: Double { EnvConfig.eventTapDistanceThreshold }
 
     /// Swipe distance threshold in points — drags beyond this distance are swipes.
-    static let swipeDistanceThreshold = 30.0
+    static var swipeDistanceThreshold: Double { EnvConfig.eventSwipeDistanceThreshold }
 
     /// Long press threshold in seconds.
-    static let longPressThreshold = 0.5
+    static var longPressThreshold: Double { EnvConfig.eventLongPressThreshold }
 
     /// Classify a mouse gesture from down/up positions and hold duration.
     /// Coordinates are window-relative.

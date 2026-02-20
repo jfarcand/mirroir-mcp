@@ -55,7 +55,7 @@ extension IPhoneMirroirMCP {
                 if let error = input.launchApp(name: "Settings") {
                     return .error("Failed to launch Settings: \(error)")
                 }
-                usleep(1_500_000)  // 1.5s for Settings to load
+                usleep(EnvConfig.settingsLoadUs)  // Wait for Settings to load
 
                 let targetLabel: String
                 switch mode {
@@ -86,7 +86,7 @@ extension IPhoneMirroirMCP {
                     return .error("Failed to tap \(targetLabel): \(error)")
                 }
 
-                usleep(500_000)  // 500ms settling
+                usleep(EnvConfig.toolSettlingDelayUs)
 
                 // Return to home screen
                 _ = bridge.triggerMenuAction(menu: "View", item: "Home Screen")

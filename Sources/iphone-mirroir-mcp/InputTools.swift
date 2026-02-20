@@ -99,7 +99,7 @@ extension IPhoneMirroirMCP {
                         "Missing required parameters: from_x, from_y, to_x, to_y (numbers)")
                 }
 
-                let duration = args["duration_ms"]?.asInt() ?? 300
+                let duration = args["duration_ms"]?.asInt() ?? EnvConfig.defaultSwipeDurationMs
 
                 if let error = input.swipe(
                     fromX: fromX, fromY: fromY,
@@ -164,7 +164,7 @@ extension IPhoneMirroirMCP {
                         "Missing required parameters: from_x, from_y, to_x, to_y (numbers)")
                 }
 
-                let duration = args["duration_ms"]?.asInt() ?? 1000
+                let duration = args["duration_ms"]?.asInt() ?? EnvConfig.defaultDragDurationMs
 
                 if let error = input.drag(
                     fromX: fromX, fromY: fromY,
@@ -303,7 +303,7 @@ extension IPhoneMirroirMCP {
                     return .error("Missing required parameters: x, y (numbers)")
                 }
 
-                let duration = args["duration_ms"]?.asInt() ?? 500
+                let duration = args["duration_ms"]?.asInt() ?? EnvConfig.defaultLongPressDurationMs
 
                 if let error = input.longPress(x: x, y: y, durationMs: duration) {
                     return .error(error)

@@ -5,13 +5,14 @@
 // ABOUTME: Sends diagnostic payloads as system+user messages and parses structured JSON responses.
 
 import Foundation
+import HelperLib
 
 /// OpenAI Chat Completions API provider for AI diagnosis.
 struct OpenAIProvider: AIAgentProviding {
     let config: AgentConfig
 
     private static let completionsPath = "/v1/chat/completions"
-    private static let timeoutSeconds = 30
+    private static var timeoutSeconds: Int { EnvConfig.openAITimeoutSeconds }
 
     func diagnose(payload: DiagnosticPayload) -> AIDiagnosis? {
         guard let apiKeyEnv = config.apiKeyEnvVar else {

@@ -2,7 +2,7 @@
 // Licensed under the Apache License, Version 2.0
 //
 // ABOUTME: Named constants for all timing delays and non-timing magic numbers used across the project.
-// ABOUTME: Provides default values that can be overridden via environment variables through EnvConfig.
+// ABOUTME: Provides default values that can be overridden via settings.json through EnvConfig.
 
 /// Default values for all timing and numeric constants.
 /// Use ``EnvConfig`` to access these values with environment variable overrides.
@@ -95,4 +95,177 @@ public enum TimingConstants {
 
     /// macOS built-in staff group ID for socket permissions.
     public static let staffGroupID: UInt32 = 20
+
+    // MARK: - Vision & Interactive Region Detection
+
+    /// Minimum region dimension in points to be considered a button.
+    public static let regionMinSizePt: Double = 20.0
+
+    /// Maximum region dimension in points to be considered a button.
+    public static let regionMaxSizePt: Double = 120.0
+
+    /// Distance threshold for OCR overlap in points.
+    public static let ocrOverlapThresholdPt: Double = 15.0
+
+    /// Minimum distance from window edges for valid regions.
+    public static let regionEdgeMarginPt: Double = 10.0
+
+    /// Maximum number of detected regions to return after filtering.
+    public static let regionMaxCount: Int = 20
+
+    /// Minimum detection size ratio for VNDetectRectanglesRequest.
+    public static let visionMinimumSize: Double = 0.02
+
+    /// Maximum observations for VNDetectRectanglesRequest.
+    public static let visionMaximumObservations: Int = 50
+
+    /// Minimum aspect ratio for VNDetectRectanglesRequest.
+    public static let visionMinimumAspectRatio: Double = 0.15
+
+    /// Maximum aspect ratio for VNDetectRectanglesRequest.
+    public static let visionMaximumAspectRatio: Double = 1.0
+
+    /// Minimum confidence for VNDetectRectanglesRequest.
+    public static let visionMinimumConfidence: Double = 0.6
+
+    /// Quadrature tolerance in degrees for VNDetectRectanglesRequest.
+    public static let visionQuadratureTolerance: Double = 15.0
+
+    // MARK: - Content Bounds Detection
+
+    /// Brightness threshold for dark pixel detection (0–255).
+    public static let brightnessThreshold: UInt8 = 20
+
+    // MARK: - Tap Point Calculation
+
+    /// Max label length for "short label" classification.
+    public static let tapMaxLabelLength: Int = 15
+
+    /// Max label width as fraction of window width for "short label".
+    public static let tapMaxLabelWidthFraction: Double = 0.4
+
+    /// Minimum gap above to trigger upward offset for icon labels.
+    public static let tapMinGapForOffset: Double = 50.0
+
+    /// Minimum short labels in a row to be classified as an icon grid row.
+    public static let tapIconRowMinLabels: Int = 3
+
+    /// Fixed upward offset applied to short labels when a gap is detected.
+    public static let tapIconOffset: Double = 30.0
+
+    /// Elements within this vertical distance are treated as the same row.
+    public static let tapRowTolerance: Double = 10.0
+
+    // MARK: - Grid Overlay
+
+    /// Points between grid lines in the mirroring window's coordinate space.
+    public static let gridSpacing: Double = 50.0
+
+    /// Alpha for grid lines.
+    public static let gridLineAlpha: Double = 0.3
+
+    /// Font size in points for coordinate labels.
+    public static let gridLabelFontSize: Double = 10.0
+
+    /// Show coordinate labels every N grid lines.
+    public static let gridLabelEveryN: Int = 2
+
+    // MARK: - Event Classification
+
+    /// Tap distance threshold in points — clicks within this distance are taps.
+    public static let eventTapDistanceThreshold: Double = 5.0
+
+    /// Swipe distance threshold in points — drags beyond this distance are swipes.
+    public static let eventSwipeDistanceThreshold: Double = 30.0
+
+    /// Long press threshold in seconds.
+    public static let eventLongPressThreshold: Double = 0.5
+
+    /// Maximum distance in points for nearest-label lookup during event recording.
+    public static let eventLabelMaxDistance: Double = 30.0
+
+    // MARK: - Karabiner Protocol
+
+    /// Heartbeat deadline in milliseconds for the vhidd server.
+    public static let karabinerHeartbeatDeadlineMs: UInt32 = 5000
+
+    /// Heartbeat interval in seconds.
+    public static let karabinerHeartbeatIntervalSec: Double = 3.0
+
+    /// Server liveness check interval in seconds.
+    public static let karabinerServerCheckIntervalSec: Double = 3.0
+
+    /// Timeout for waiting for virtual devices to become ready (seconds).
+    public static let karabinerDeviceReadyTimeoutSec: Double = 10.0
+
+    /// Buffer size for socket reads.
+    public static let karabinerSocketBufferSize: Int = 1024
+
+    // MARK: - Step Execution
+
+    /// Default timeout in seconds for wait_for steps.
+    public static let waitForTimeoutSeconds: Int = 15
+
+    /// Default milliseconds to wait between steps for UI settling.
+    public static let stepSettlingDelayMs: UInt32 = 500
+
+    /// Extra milliseconds added to observed delays for compiled replay safety margin.
+    public static let compiledSleepBufferMs: Int = 200
+
+    /// Poll interval for wait_for steps (microseconds).
+    public static let waitForPollIntervalUs: UInt32 = 1_000_000
+
+    /// Poll interval for measure steps (microseconds).
+    public static let measurePollIntervalUs: UInt32 = 500_000
+
+    /// Delay for Settings app to load (microseconds).
+    public static let settingsLoadUs: UInt32 = 1_500_000
+
+    /// Swipe distance for dismissing app cards in the App Switcher (points).
+    public static let appSwitcherSwipeDistance: Double = 300.0
+
+    /// Swipe duration for dismissing app cards in the App Switcher (milliseconds).
+    public static let appSwitcherSwipeDurationMs: Int = 200
+
+    /// UI settling delay after App Switcher or network toggle operations (microseconds).
+    public static let toolSettlingDelayUs: UInt32 = 500_000
+
+    // MARK: - Swipe & Scroll Defaults
+
+    /// Swipe distance as a fraction of window height.
+    public static let swipeDistanceFraction: Double = 0.3
+
+    /// Default swipe duration in milliseconds.
+    public static let defaultSwipeDurationMs: Int = 300
+
+    /// Default maximum scroll attempts before giving up.
+    public static let defaultScrollMaxAttempts: Int = 10
+
+    // MARK: - AI Provider
+
+    /// Default timeout for OpenAI API requests (seconds).
+    public static let openAITimeoutSeconds: Int = 30
+
+    /// Default timeout for Ollama API requests (seconds).
+    public static let ollamaTimeoutSeconds: Int = 120
+
+    /// Default timeout for Anthropic API requests (seconds).
+    public static let anthropicTimeoutSeconds: Int = 30
+
+    /// Default timeout for command-based AI agent processes (seconds).
+    public static let commandTimeoutSeconds: Int = 60
+
+    /// Default max tokens for AI model responses.
+    public static let defaultAIMaxTokens: Int = 1024
+
+    // MARK: - Input Tool Defaults
+
+    /// Default drag duration in milliseconds.
+    public static let defaultDragDurationMs: Int = 1000
+
+    /// Default long press duration in milliseconds.
+    public static let defaultLongPressDurationMs: Int = 500
+
+    /// Default measure timeout in seconds.
+    public static let defaultMeasureTimeoutSeconds: Double = 15.0
 }

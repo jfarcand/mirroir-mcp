@@ -97,17 +97,17 @@ enum AIAgentRegistry {
             name: "claude-sonnet-4-6", mode: .api, provider: .anthropic,
             model: "claude-sonnet-4-6-20250514", apiKeyEnvVar: "ANTHROPIC_API_KEY",
             baseURL: "https://api.anthropic.com", systemPrompt: nil,
-            maxTokens: 1024, command: nil, args: nil),
+            maxTokens: EnvConfig.defaultAIMaxTokens, command: nil, args: nil),
         "claude-haiku-4-5": AgentConfig(
             name: "claude-haiku-4-5", mode: .api, provider: .anthropic,
             model: "claude-haiku-4-5-20251001", apiKeyEnvVar: "ANTHROPIC_API_KEY",
             baseURL: "https://api.anthropic.com", systemPrompt: nil,
-            maxTokens: 1024, command: nil, args: nil),
+            maxTokens: EnvConfig.defaultAIMaxTokens, command: nil, args: nil),
         "gpt-4o": AgentConfig(
             name: "gpt-4o", mode: .api, provider: .openai,
             model: "gpt-4o", apiKeyEnvVar: "OPENAI_API_KEY",
             baseURL: "https://api.openai.com", systemPrompt: nil,
-            maxTokens: 1024, command: nil, args: nil),
+            maxTokens: EnvConfig.defaultAIMaxTokens, command: nil, args: nil),
     ]
 
     /// Resolve an agent name to its configuration.
@@ -126,7 +126,7 @@ enum AIAgentRegistry {
                 name: name, mode: .api, provider: .ollama,
                 model: modelName, apiKeyEnvVar: nil,
                 baseURL: "http://localhost:11434", systemPrompt: nil,
-                maxTokens: 1024, command: nil, args: nil)
+                maxTokens: EnvConfig.defaultAIMaxTokens, command: nil, args: nil)
         }
 
         // 3. Local profile: <cwd>/.iphone-mirroir-mcp/agents/<name>.yaml
@@ -206,7 +206,7 @@ enum AIAgentRegistry {
                 name: name, mode: .command, provider: nil,
                 model: nil, apiKeyEnvVar: nil, baseURL: nil,
                 systemPrompt: dict["system_prompt"],
-                maxTokens: Int(dict["max_tokens"] ?? "") ?? 1024,
+                maxTokens: Int(dict["max_tokens"] ?? "") ?? EnvConfig.defaultAIMaxTokens,
                 command: command, args: args)
         }
 
@@ -217,7 +217,7 @@ enum AIAgentRegistry {
             model: dict["model"], apiKeyEnvVar: dict["api_key_env"],
             baseURL: dict["base_url"],
             systemPrompt: dict["system_prompt"],
-            maxTokens: Int(dict["max_tokens"] ?? "") ?? 1024,
+            maxTokens: Int(dict["max_tokens"] ?? "") ?? EnvConfig.defaultAIMaxTokens,
             command: nil, args: nil)
     }
 

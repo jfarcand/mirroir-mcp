@@ -50,25 +50,25 @@ public struct TapPoint: Sendable {
 /// since Vision only detects the text label, not the icon itself.
 public enum TapPointCalculator {
     /// Max label length for "short label" classification.
-    static let maxLabelLength = 15
+    static var maxLabelLength: Int { EnvConfig.tapMaxLabelLength }
     /// Max label width as fraction of window width for "short label".
-    static let maxLabelWidthFraction = 0.4
+    static var maxLabelWidthFraction: Double { EnvConfig.tapMaxLabelWidthFraction }
     /// Minimum gap above to trigger upward offset. Set high enough to avoid
     /// false positives on in-app buttons (e.g. Waze shortcut pills, ~40pt gap)
     /// while still catching home screen icon labels (gaps typically 60-150pt
     /// between rows).
-    static let minGapForOffset: Double = 50.0
+    static var minGapForOffset: Double { EnvConfig.tapMinGapForOffset }
     /// Minimum short labels in a row to be classified as an icon grid row.
     /// Icon rows use the gap from the previous multi-element row, bypassing
     /// stray OCR text detected inside icons (e.g. Calendar date, Clock numbers).
-    static let iconRowMinLabels = 3
+    static var iconRowMinLabels: Int { EnvConfig.tapIconRowMinLabels }
     /// Fixed upward offset applied to short labels when a gap is detected.
     /// Matches the typical distance from an icon label to the icon center
     /// on iOS home screens (~30pt).
-    static let iconOffset: Double = 30.0
+    static var iconOffset: Double { EnvConfig.tapIconOffset }
     /// Elements within this vertical distance are treated as the same row.
     /// Ensures all labels in an icon row get the same gap calculation.
-    static let rowTolerance: Double = 10.0
+    static var rowTolerance: Double { EnvConfig.tapRowTolerance }
 
     /// Compute tap points from raw OCR elements, applying upward offsets
     /// to short labels that have significant gaps above them (indicating

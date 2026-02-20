@@ -53,7 +53,7 @@ extension IPhoneMirroirMCP {
                 }
 
                 let direction = args["direction"]?.asString() ?? "up"
-                let maxScrolls = args["max_scrolls"]?.asInt() ?? 10
+                let maxScrolls = args["max_scrolls"]?.asInt() ?? EnvConfig.defaultScrollMaxAttempts
 
                 // Check if already visible
                 if let describeResult = describer.describe(skipOCR: false),
@@ -67,7 +67,7 @@ extension IPhoneMirroirMCP {
 
                 let centerX = Double(windowInfo.size.width) / 2.0
                 let centerY = Double(windowInfo.size.height) / 2.0
-                let swipeDistance = Double(windowInfo.size.height) * 0.3
+                let swipeDistance = Double(windowInfo.size.height) * EnvConfig.swipeDistanceFraction
 
                 var previousTexts: [String] = []
 
@@ -91,11 +91,11 @@ extension IPhoneMirroirMCP {
                     }
 
                     if let error = input.swipe(fromX: fromX, fromY: fromY,
-                                                toX: toX, toY: toY, durationMs: 300) {
+                                                toX: toX, toY: toY, durationMs: EnvConfig.defaultSwipeDurationMs) {
                         return .error("Swipe failed: \(error)")
                     }
 
-                    usleep(500_000)  // 500ms settling delay
+                    usleep(EnvConfig.toolSettlingDelayUs)
 
                     if let describeResult = describer.describe(skipOCR: false) {
                         if ElementMatcher.isVisible(label: label, in: describeResult.elements) {

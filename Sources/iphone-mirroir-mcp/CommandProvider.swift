@@ -5,6 +5,7 @@
 // ABOUTME: Supports both stdin piping and ${PAYLOAD} arg substitution for CLI tools like claude/copilot.
 
 import Foundation
+import HelperLib
 
 /// Local command-based AI agent provider.
 /// Two modes depending on whether args contain `${PAYLOAD}`:
@@ -15,7 +16,7 @@ struct CommandProvider: AIAgentProviding {
     let args: [String]
     let systemPrompt: String?
 
-    private static let timeoutSeconds = 60
+    private static var timeoutSeconds: Int { EnvConfig.commandTimeoutSeconds }
     private static let payloadPlaceholder = "${PAYLOAD}"
 
     func diagnose(payload: DiagnosticPayload) -> AIDiagnosis? {

@@ -5,6 +5,7 @@
 // ABOUTME: Falls through to the normal StepExecutor for passthrough steps that are already OCR-free.
 
 import Foundation
+import HelperLib
 
 /// Replays compiled scenario steps using cached hints instead of live OCR.
 /// Tap steps use recorded coordinates, wait_for/assert steps use recorded delays,
@@ -17,7 +18,7 @@ final class CompiledStepExecutor {
     private let config: StepExecutorConfig
 
     /// Extra milliseconds added to observed delays for safety margin.
-    static let sleepBufferMs = 200
+    static var sleepBufferMs: Int { EnvConfig.compiledSleepBufferMs }
 
     init(bridge: MirroringBridging,
          input: InputProviding,
@@ -117,7 +118,7 @@ final class CompiledStepExecutor {
 
         let centerX = Double(windowInfo.size.width) / 2.0
         let centerY = Double(windowInfo.size.height) / 2.0
-        let swipeDistance = Double(windowInfo.size.height) * 0.3
+        let swipeDistance = Double(windowInfo.size.height) * EnvConfig.swipeDistanceFraction
 
         for i in 0..<count {
             let fromX: Double, fromY: Double, toX: Double, toY: Double
@@ -141,7 +142,7 @@ final class CompiledStepExecutor {
             }
 
             if let error = input.swipe(fromX: fromX, fromY: fromY,
-                                        toX: toX, toY: toY, durationMs: 300) {
+                                        toX: toX, toY: toY, durationMs: EnvConfig.defaultSwipeDurationMs) {
                 return StepResult(step: step, status: .failed,
                                   message: "Compiled scroll \(i + 1)/\(count) failed: \(error)",
                                   durationSeconds: elapsed(startTime))

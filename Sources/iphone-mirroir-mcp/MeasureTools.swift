@@ -68,8 +68,8 @@ extension IPhoneMirroirMCP {
 
                 // Start measuring
                 let measureStart = CFAbsoluteTimeGetCurrent()
-                let timeout = maxSeconds ?? 15.0
-                let pollIntervalUs: useconds_t = 500_000  // 0.5s
+                let timeout = maxSeconds ?? EnvConfig.defaultMeasureTimeoutSeconds
+                let pollIntervalUs: useconds_t = EnvConfig.measurePollIntervalUs
 
                 let maxPolls = Int(timeout * 2)
                 for _ in 0..<maxPolls {

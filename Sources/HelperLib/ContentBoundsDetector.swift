@@ -19,7 +19,7 @@ public enum ContentBoundsDetector {
     /// Brightness threshold: pixels with all RGB channels at or below this value
     /// are considered "dark" (border). Value chosen to tolerate slight compression
     /// artifacts while catching real content edges.
-    static let brightnessThreshold: UInt8 = 20
+    static var brightnessThreshold: UInt8 { EnvConfig.brightnessThreshold }
 
     /// Fractions of the image dimension at which scanlines are sampled.
     /// Using 30-70% avoids edge artifacts while covering the content interior.

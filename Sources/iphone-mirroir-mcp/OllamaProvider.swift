@@ -5,13 +5,14 @@
 // ABOUTME: Sends diagnostic payloads to localhost:11434/api/generate with streaming disabled.
 
 import Foundation
+import HelperLib
 
 /// Ollama local API provider for AI diagnosis.
 struct OllamaProvider: AIAgentProviding {
     let config: AgentConfig
 
     private static let generatePath = "/api/generate"
-    private static let timeoutSeconds = 120
+    private static var timeoutSeconds: Int { EnvConfig.ollamaTimeoutSeconds }
 
     func diagnose(payload: DiagnosticPayload) -> AIDiagnosis? {
         let baseURL = config.baseURL ?? "http://localhost:11434"

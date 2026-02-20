@@ -5,6 +5,7 @@
 // ABOUTME: Runs scenarios against a real device, capturing coordinates and timing into compiled JSON.
 
 import Foundation
+import HelperLib
 
 /// Orchestrates the `compile` subcommand: executes scenarios with a recording describer,
 /// captures OCR coordinates and timing, and writes `.compiled.json` files.
@@ -254,7 +255,7 @@ enum CompileCommand {
 
     static func parseArguments(_ args: [String]) -> CompileConfig {
         var scenarioArgs: [String] = []
-        var timeoutSeconds = 15
+        var timeoutSeconds = EnvConfig.waitForTimeoutSeconds
         var showHelp = false
 
         var i = 0

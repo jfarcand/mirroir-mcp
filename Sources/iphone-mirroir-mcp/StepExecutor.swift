@@ -33,8 +33,8 @@ struct StepExecutorConfig {
     let dryRun: Bool
 
     static let `default` = StepExecutorConfig(
-        waitForTimeoutSeconds: 15,
-        settlingDelayMs: 500,
+        waitForTimeoutSeconds: EnvConfig.waitForTimeoutSeconds,
+        settlingDelayMs: EnvConfig.stepSettlingDelayMs,
         screenshotDir: "./mirroir-test-results",
         dryRun: false
     )
@@ -207,7 +207,7 @@ final class StepExecutor {
 
         let centerX = Double(windowInfo.size.width) / 2.0
         let centerY = Double(windowInfo.size.height) / 2.0
-        let swipeDistance = Double(windowInfo.size.height) * 0.3
+        let swipeDistance = Double(windowInfo.size.height) * EnvConfig.swipeDistanceFraction
 
         let fromX: Double, fromY: Double, toX: Double, toY: Double
         switch direction.lowercased() {
@@ -230,7 +230,7 @@ final class StepExecutor {
         }
 
         if let error = input.swipe(fromX: fromX, fromY: fromY,
-                                    toX: toX, toY: toY, durationMs: 300) {
+                                    toX: toX, toY: toY, durationMs: EnvConfig.defaultSwipeDurationMs) {
             return StepResult(step: step, status: .failed, message: error,
                               durationSeconds: elapsed(startTime))
         }
@@ -242,7 +242,7 @@ final class StepExecutor {
     private func executeWaitFor(label: String, timeoutSeconds: Int,
                                 startTime: CFAbsoluteTime) -> StepResult {
         let step = ScenarioStep.waitFor(label: label, timeoutSeconds: timeoutSeconds)
-        let pollIntervalUs: useconds_t = 1_000_000  // 1 second
+        let pollIntervalUs: useconds_t = EnvConfig.waitForPollIntervalUs
 
         for _ in 0..<timeoutSeconds {
             if let describeResult = describer.describe(skipOCR: false),
@@ -400,7 +400,7 @@ final class StepExecutor {
 
         let centerX = Double(windowInfo.size.width) / 2.0
         let centerY = Double(windowInfo.size.height) / 2.0
-        let swipeDistance = Double(windowInfo.size.height) * 0.3
+        let swipeDistance = Double(windowInfo.size.height) * EnvConfig.swipeDistanceFraction
 
         var previousTexts: [String] = []
 
@@ -427,7 +427,7 @@ final class StepExecutor {
             }
 
             if let error = input.swipe(fromX: fromX, fromY: fromY,
-                                        toX: toX, toY: toY, durationMs: 300) {
+                                        toX: toX, toY: toY, durationMs: EnvConfig.defaultSwipeDurationMs) {
                 return StepResult(step: step, status: .failed,
                                   message: "Swipe failed: \(error)",
                                   durationSeconds: elapsed(startTime))
@@ -495,7 +495,7 @@ final class StepExecutor {
         let cardX = match.element.tapX
         let cardY = match.element.tapY
         if let error = input.swipe(fromX: cardX, fromY: cardY,
-                                    toX: cardX, toY: cardY - 300, durationMs: 200) {
+                                    toX: cardX, toY: cardY - EnvConfig.appSwitcherSwipeDistance, durationMs: EnvConfig.appSwitcherSwipeDurationMs) {
             _ = bridge.triggerMenuAction(menu: "View", item: "Home Screen")
             return StepResult(step: step, status: .failed,
                               message: "Failed to swipe app card: \(error)",
@@ -531,7 +531,7 @@ final class StepExecutor {
                               message: "Failed to launch Settings: \(error)",
                               durationSeconds: elapsed(startTime))
         }
-        usleep(1_500_000)  // 1.5s for Settings to load
+        usleep(EnvConfig.settingsLoadUs)  // Wait for Settings to load
 
         let targetLabel: String
         switch mode {
@@ -599,7 +599,7 @@ final class StepExecutor {
         // Start measuring
         let measureStart = CFAbsoluteTimeGetCurrent()
         let timeout = maxSeconds ?? Double(config.waitForTimeoutSeconds)
-        let pollIntervalUs: useconds_t = 500_000  // 0.5 second polls for finer timing
+        let pollIntervalUs: useconds_t = EnvConfig.measurePollIntervalUs
 
         let maxPolls = Int(timeout * 2)  // 2 polls per second
         for _ in 0..<maxPolls {

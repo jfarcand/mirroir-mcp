@@ -5,6 +5,7 @@
 // ABOUTME: Sends diagnostic payloads as user messages and parses structured JSON responses.
 
 import Foundation
+import HelperLib
 
 /// Anthropic Messages API provider for AI diagnosis.
 struct AnthropicProvider: AIAgentProviding {
@@ -12,7 +13,7 @@ struct AnthropicProvider: AIAgentProviding {
 
     private static let apiVersion = "2023-06-01"
     private static let messagesPath = "/v1/messages"
-    private static let timeoutSeconds = 30
+    private static var timeoutSeconds: Int { EnvConfig.anthropicTimeoutSeconds }
 
     func diagnose(payload: DiagnosticPayload) -> AIDiagnosis? {
         guard let apiKeyEnv = config.apiKeyEnvVar else {

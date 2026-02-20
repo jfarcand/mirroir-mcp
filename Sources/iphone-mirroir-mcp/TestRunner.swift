@@ -363,7 +363,7 @@ enum TestRunner {
         var scenarioArgs: [String] = []
         var junitPath: String?
         var screenshotDir = "./mirroir-test-results"
-        var timeoutSeconds = 15
+        var timeoutSeconds = EnvConfig.waitForTimeoutSeconds
         var verbose = false
         var dryRun = false
         var noCompiled = false

@@ -20,10 +20,10 @@ private let userDataTypeByte: UInt8 = 1
 
 /// Heartbeat deadline in milliseconds. The server considers the client dead
 /// if no heartbeat arrives within this window (matches C++ client default).
-private let heartbeatDeadlineMs: UInt32 = 5000
+private var heartbeatDeadlineMs: UInt32 { EnvConfig.karabinerHeartbeatDeadlineMs }
 
 /// Heartbeat interval in seconds (matches C++ local_datagram::client default).
-private let heartbeatIntervalSec: TimeInterval = 3.0
+private var heartbeatIntervalSec: TimeInterval { EnvConfig.karabinerHeartbeatIntervalSec }
 
 /// Request types sent to the vhidd server (matches request.hpp).
 enum KarabinerRequest: UInt8 {
@@ -84,7 +84,7 @@ final class KarabinerClient {
     private var monitorTimer: DispatchSourceTimer?
 
     /// Interval between server liveness checks.
-    private let serverCheckIntervalSec: TimeInterval = 3.0
+    private var serverCheckIntervalSec: TimeInterval { EnvConfig.karabinerServerCheckIntervalSec }
 
     deinit {
         shutdown()
@@ -129,7 +129,7 @@ final class KarabinerClient {
         initializePointing()
 
         // Wait for devices to become ready
-        try waitForDevicesReady(timeoutSec: 10.0)
+        try waitForDevicesReady(timeoutSec: EnvConfig.karabinerDeviceReadyTimeoutSec)
 
         // Start periodic server monitoring
         startServerMonitor()
@@ -354,7 +354,7 @@ final class KarabinerClient {
     /// while keeping latency low.
     private func waitForDevicesReady(timeoutSec: TimeInterval) throws {
         let deadline = Date().addingTimeInterval(timeoutSec)
-        var buf = [UInt8](repeating: 0, count: 1024)
+        var buf = [UInt8](repeating: 0, count: EnvConfig.karabinerSocketBufferSize)
         var attempt = 0
 
         while Date() < deadline {

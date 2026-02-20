@@ -5,6 +5,7 @@
 // ABOUTME: Uses regex-based parsing (no Yams dependency) reusing helpers from ScenarioTools.
 
 import Foundation
+import HelperLib
 
 /// A parsed scenario ready for execution.
 struct ScenarioDefinition {
@@ -216,7 +217,7 @@ enum ScenarioParser {
         case "shake":
             return .shake
         case "scroll_to":
-            return .scrollTo(label: value, direction: "up", maxScrolls: 10)
+            return .scrollTo(label: value, direction: "up", maxScrolls: EnvConfig.defaultScrollMaxAttempts)
         case "reset_app":
             return .resetApp(appName: value)
         case "set_network":
