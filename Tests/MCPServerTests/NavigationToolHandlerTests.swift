@@ -20,8 +20,9 @@ final class NavigationToolHandlerTests: XCTestCase {
         server = MCPServer(policy: policy)
         bridge = StubBridge()
         input = StubInput()
+        let registry = makeTestRegistry(bridge: bridge, input: input)
         IPhoneMirroirMCP.registerNavigationTools(
-            server: server, bridge: bridge, input: input, policy: policy
+            server: server, registry: registry, policy: policy
         )
     }
 
@@ -64,8 +65,9 @@ final class NavigationToolHandlerTests: XCTestCase {
         let config = PermissionConfig(allow: ["*"], blockedApps: ["Settings"])
         let policy = PermissionPolicy(skipPermissions: true, config: config)
         let policyServer = MCPServer(policy: policy)
+        let policyRegistry = makeTestRegistry(bridge: bridge, input: input)
         IPhoneMirroirMCP.registerNavigationTools(
-            server: policyServer, bridge: bridge, input: input, policy: policy
+            server: policyServer, registry: policyRegistry, policy: policy
         )
 
         let request = JSONRPCRequest(

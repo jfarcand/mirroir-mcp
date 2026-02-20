@@ -10,9 +10,7 @@ import HelperLib
 extension IPhoneMirroirMCP {
     static func registerNetworkTools(
         server: MCPServer,
-        bridge: any MirroringBridging,
-        input: any InputProviding,
-        describer: any ScreenDescribing
+        registry: TargetRegistry
     ) {
         // set_network — toggle network settings via the Settings app
         server.registerTool(MCPToolDefinition(
@@ -40,6 +38,14 @@ extension IPhoneMirroirMCP {
                 "required": .array([.string("mode")]),
             ],
             handler: { args in
+                let (ctx, err) = registry.resolveForTool(args)
+                guard let ctx else { return err! }
+                guard let menuBridge = ctx.bridge as? (any MenuActionCapable) else {
+                    return .error("Target '\(ctx.name)' does not support set_network")
+                }
+                let input = ctx.input
+                let describer = ctx.describer
+
                 guard let mode = args["mode"]?.asString() else {
                     return .error("Missing required parameter: mode (string)")
                 }
@@ -71,25 +77,25 @@ extension IPhoneMirroirMCP {
 
                 // Find and tap the setting row
                 guard let describeResult = describer.describe(skipOCR: false) else {
-                    _ = bridge.triggerMenuAction(menu: "View", item: "Home Screen")
+                    _ = menuBridge.triggerMenuAction(menu: "View", item: "Home Screen")
                     return .error("Failed to capture Settings screen")
                 }
 
                 guard let match = ElementMatcher.findMatch(label: targetLabel,
                                                              in: describeResult.elements) else {
-                    _ = bridge.triggerMenuAction(menu: "View", item: "Home Screen")
+                    _ = menuBridge.triggerMenuAction(menu: "View", item: "Home Screen")
                     return .error("'\(targetLabel)' not found in Settings")
                 }
 
                 if let error = input.tap(x: match.element.tapX, y: match.element.tapY) {
-                    _ = bridge.triggerMenuAction(menu: "View", item: "Home Screen")
+                    _ = menuBridge.triggerMenuAction(menu: "View", item: "Home Screen")
                     return .error("Failed to tap \(targetLabel): \(error)")
                 }
 
                 usleep(EnvConfig.toolSettlingDelayUs)
 
                 // Return to home screen
-                _ = bridge.triggerMenuAction(menu: "View", item: "Home Screen")
+                _ = menuBridge.triggerMenuAction(menu: "View", item: "Home Screen")
 
                 return .text("Toggled \(mode)")
             }

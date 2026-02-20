@@ -12,10 +12,12 @@ import Vision
 /// Runs OCR on the iPhone Mirroring window screenshot and returns detected
 /// text elements with their tap coordinates in the mirroring window's point space.
 final class ScreenDescriber: Sendable {
-    private let bridge: MirroringBridge
+    private let bridge: any WindowBridging
+    private let capture: any ScreenCapturing
 
-    init(bridge: MirroringBridge) {
+    init(bridge: any WindowBridging, capture: any ScreenCapturing) {
         self.bridge = bridge
+        self.capture = capture
     }
 
     /// Result of a describe operation: detected elements, navigation hints, plus the screenshot.
@@ -38,36 +40,8 @@ final class ScreenDescriber: Sendable {
     func describe(skipOCR: Bool = false) -> DescribeResult? {
         guard let info = bridge.getWindowInfo(), info.windowID != 0 else { return nil }
 
-        // Capture screenshot to temp file (same approach as ScreenCapture)
-        let tempPath = NSTemporaryDirectory()
-            + "iphone-mirroir-describe-\(ProcessInfo.processInfo.processIdentifier).png"
-
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: "/usr/sbin/screencapture")
-        process.arguments = ["-l", String(info.windowID), "-x", "-o", tempPath]
-        do {
-            try process.run()
-        } catch {
-            return nil
-        }
-
-        // Wait with timeout to prevent indefinite hangs
-        if !process.waitWithTimeout(seconds: 10) {
-            process.terminate()
-            return nil
-        }
-        guard process.terminationStatus == 0 else { return nil }
-
-        let fileURL = URL(fileURLWithPath: tempPath)
-        defer { try? FileManager.default.removeItem(at: fileURL) }
-
-        let data: Data
-        do {
-            data = try Data(contentsOf: fileURL)
-        } catch {
-            DebugLog.log("ScreenDescriber", "Failed to read screenshot: \(error)")
-            return nil
-        }
+        // Reuse the shared capture logic (window-ID with region fallback)
+        guard let data = capture.captureData() else { return nil }
 
         // Return grid-overlaid screenshot without running OCR
         if skipOCR {

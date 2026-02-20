@@ -67,7 +67,7 @@ enum TestRunner {
         let bridge = MirroringBridge()
         let capture = ScreenCapture(bridge: bridge)
         let input = InputSimulation(bridge: bridge)
-        let describer = ScreenDescriber(bridge: bridge)
+        let describer = ScreenDescriber(bridge: bridge, capture: capture)
 
         // Pre-flight check: verify mirroring is connected (unless dry run)
         if !config.dryRun {

@@ -487,4 +487,70 @@ final class StepExecutorTests: XCTestCase {
         XCTAssertEqual(result.status, .failed)
         XCTAssertTrue(result.message?.contains("timed out") ?? false)
     }
+
+    // MARK: - Switch Target
+
+    func testSwitchTargetWithoutRegistryFails() {
+        // The default executor has no registry
+        let result = executor.execute(
+            step: .switchTarget(name: "android"), stepIndex: 0, scenarioName: "test")
+        XCTAssertEqual(result.status, .failed)
+        XCTAssertTrue(result.message?.contains("No target registry") ?? false)
+    }
+
+    func testSwitchTargetWithRegistrySuccess() {
+        let bridge2 = StubBridge()
+        bridge2.targetName = "android"
+        let input2 = StubInput()
+        let describer2 = StubDescriber()
+        let capture2 = StubCapture()
+
+        let iphoneCtx = TargetContext(
+            name: "iphone", bridge: bridge, input: input,
+            capture: capture, describer: describer, recorder: StubRecorder(),
+            capabilities: [.menuActions])
+        let androidCtx = TargetContext(
+            name: "android", bridge: bridge2, input: input2,
+            capture: capture2, describer: describer2, recorder: StubRecorder(),
+            capabilities: [])
+        let registry = TargetRegistry(
+            targets: ["iphone": iphoneCtx, "android": androidCtx],
+            defaultName: "iphone")
+
+        let config = StepExecutorConfig(
+            waitForTimeoutSeconds: 2, settlingDelayMs: 0,
+            screenshotDir: NSTemporaryDirectory() + "test-switch-\(UUID().uuidString)",
+            dryRun: false)
+        let registryExecutor = StepExecutor(
+            bridge: bridge, input: input,
+            describer: describer, capture: capture,
+            config: config, registry: registry)
+
+        let result = registryExecutor.execute(
+            step: .switchTarget(name: "android"), stepIndex: 0, scenarioName: "test")
+        XCTAssertEqual(result.status, .passed)
+        XCTAssertTrue(result.message?.contains("android") ?? false)
+    }
+
+    func testSwitchTargetUnknownFails() {
+        let ctx = TargetContext(
+            name: "iphone", bridge: bridge, input: input,
+            capture: capture, describer: describer, recorder: StubRecorder(),
+            capabilities: [.menuActions])
+        let registry = TargetRegistry(targets: ["iphone": ctx], defaultName: "iphone")
+
+        let config = StepExecutorConfig(
+            waitForTimeoutSeconds: 2, settlingDelayMs: 0,
+            screenshotDir: NSTemporaryDirectory() + "test-switch-\(UUID().uuidString)",
+            dryRun: false)
+        let registryExecutor = StepExecutor(
+            bridge: bridge, input: input,
+            describer: describer, capture: capture,
+            config: config, registry: registry)
+
+        let result = registryExecutor.execute(
+            step: .switchTarget(name: "nonexistent"), stepIndex: 0, scenarioName: "test")
+        XCTAssertEqual(result.status, .failed)
+        XCTAssertTrue(result.message?.contains("Unknown target") ?? false)
+    }
 }

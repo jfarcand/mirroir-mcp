@@ -19,10 +19,10 @@ struct PermissionClassificationTests {
         #expect(overlap.isEmpty, "Readonly and mutating sets must not overlap: \(overlap)")
     }
 
-    @Test("all 26 tools are classified")
+    @Test("all 28 tools are classified")
     func allToolsClassified() {
         let total = PermissionPolicy.readonlyTools.count + PermissionPolicy.mutatingTools.count
-        #expect(total == 26, "Expected 26 tools, got \(total)")
+        #expect(total == 28, "Expected 28 tools, got \(total)")
     }
 
     @Test("readonly tools contains expected tools")
@@ -30,7 +30,8 @@ struct PermissionClassificationTests {
         let expected: Set<String> = [
             "screenshot", "describe_screen", "start_recording",
             "stop_recording", "get_orientation", "status",
-            "check_health", "list_scenarios", "get_scenario",
+            "check_health", "list_targets", "list_scenarios",
+            "get_scenario",
         ]
         #expect(PermissionPolicy.readonlyTools == expected)
     }
@@ -42,6 +43,7 @@ struct PermissionClassificationTests {
             "long_press", "double_tap", "shake", "launch_app",
             "open_url", "press_home", "press_app_switcher", "spotlight",
             "scroll_to", "reset_app", "measure", "set_network",
+            "switch_target",
         ]
         #expect(PermissionPolicy.mutatingTools == expected)
     }
@@ -76,6 +78,52 @@ struct PermissionScenarioTests {
         let policy = PermissionPolicy(skipPermissions: false, config: nil)
         #expect(policy.isToolVisible("list_scenarios") == true)
         #expect(policy.isToolVisible("get_scenario") == true)
+    }
+}
+
+// MARK: - Target Tool Classification
+
+@Suite("PermissionPolicy - Target Tools")
+struct PermissionTargetTests {
+
+    @Test("list_targets is readonly")
+    func listTargetsReadonly() {
+        #expect(PermissionPolicy.readonlyTools.contains("list_targets"))
+        #expect(!PermissionPolicy.mutatingTools.contains("list_targets"))
+    }
+
+    @Test("switch_target is mutating")
+    func switchTargetMutating() {
+        #expect(PermissionPolicy.mutatingTools.contains("switch_target"))
+        #expect(!PermissionPolicy.readonlyTools.contains("switch_target"))
+    }
+
+    @Test("list_targets is always allowed without config")
+    func listTargetsAlwaysAllowed() {
+        let policy = PermissionPolicy(skipPermissions: false, config: nil)
+        #expect(policy.checkTool("list_targets") == .allowed)
+    }
+
+    @Test("list_targets is always visible")
+    func listTargetsAlwaysVisible() {
+        let policy = PermissionPolicy(skipPermissions: false, config: nil)
+        #expect(policy.isToolVisible("list_targets") == true)
+    }
+
+    @Test("switch_target is denied by default")
+    func switchTargetDeniedByDefault() {
+        let policy = PermissionPolicy(skipPermissions: false, config: nil)
+        if case .denied = policy.checkTool("switch_target") {
+            // expected
+        } else {
+            Issue.record("switch_target should be denied without config")
+        }
+    }
+
+    @Test("switch_target is not visible by default")
+    func switchTargetNotVisibleByDefault() {
+        let policy = PermissionPolicy(skipPermissions: false, config: nil)
+        #expect(policy.isToolVisible("switch_target") == false)
     }
 }
 

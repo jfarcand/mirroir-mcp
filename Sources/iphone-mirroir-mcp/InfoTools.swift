@@ -10,9 +10,7 @@ import HelperLib
 extension IPhoneMirroirMCP {
     static func registerInfoTools(
         server: MCPServer,
-        bridge: any MirroringBridging,
-        input: any InputProviding,
-        capture: any ScreenCapturing
+        registry: TargetRegistry
     ) {
         // get_orientation — report device orientation
         server.registerTool(MCPToolDefinition(
@@ -27,10 +25,14 @@ extension IPhoneMirroirMCP {
                 "type": .string("object"),
                 "properties": .object([:]),
             ],
-            handler: { _ in
+            handler: { args in
+                let (ctx, err) = registry.resolveForTool(args)
+                guard let ctx else { return err! }
+                let bridge = ctx.bridge
+
                 guard let orientation = bridge.getOrientation() else {
                     return .error(
-                        "Cannot determine orientation. Is iPhone Mirroring running?")
+                        "Cannot determine orientation. Is target '\(ctx.name)' running?")
                 }
 
                 let info = bridge.getWindowInfo()
@@ -56,20 +58,26 @@ extension IPhoneMirroirMCP {
                 "type": .string("object"),
                 "properties": .object([:]),
             ],
-            handler: { _ in
+            handler: { args in
+                let (ctx, err) = registry.resolveForTool(args)
+                guard let ctx else { return err! }
+                let bridge = ctx.bridge
+                let input = ctx.input
+                let capture = ctx.capture
+
                 var checks: [String] = []
                 var allOk = true
 
-                // 1. iPhone Mirroring process
+                // 1. Target process
                 let process = bridge.findProcess()
                 if process != nil {
-                    checks.append("[ok] iPhone Mirroring app is running")
+                    checks.append("[ok] '\(ctx.name)' process is running")
                 } else {
-                    checks.append("[FAIL] iPhone Mirroring app is not running")
+                    checks.append("[FAIL] '\(ctx.name)' process is not running")
                     allOk = false
                 }
 
-                // 2. Mirroring window state
+                // 2. Window state
                 let state = bridge.getState()
                 switch state {
                 case .connected:
@@ -77,15 +85,15 @@ extension IPhoneMirroirMCP {
                     let size = info.map {
                         "\(Int($0.size.width))x\(Int($0.size.height))"
                     } ?? "unknown"
-                    checks.append("[ok] Mirroring connected (window: \(size))")
+                    checks.append("[ok] '\(ctx.name)' connected (window: \(size))")
                 case .paused:
-                    checks.append("[WARN] Mirroring is paused — click the window to resume")
+                    checks.append("[WARN] '\(ctx.name)' is paused — click the window to resume")
                     allOk = false
                 case .noWindow:
-                    checks.append("[FAIL] App running but no mirroring window found")
+                    checks.append("[FAIL] '\(ctx.name)' running but no window found")
                     allOk = false
                 case .notRunning:
-                    checks.append("[FAIL] No mirroring window — open iPhone Mirroring")
+                    checks.append("[FAIL] '\(ctx.name)' not running")
                     allOk = false
                 }
 
@@ -137,7 +145,12 @@ extension IPhoneMirroirMCP {
                 "type": .string("object"),
                 "properties": .object([:]),
             ],
-            handler: { _ in
+            handler: { args in
+                let (ctx, err) = registry.resolveForTool(args)
+                guard let ctx else { return err! }
+                let bridge = ctx.bridge
+                let input = ctx.input
+
                 let state = bridge.getState()
                 let mirroringStatus: String
                 switch state {
@@ -152,7 +165,7 @@ extension IPhoneMirroirMCP {
                 case .paused:
                     mirroringStatus = "Paused — connection paused, can resume"
                 case .notRunning:
-                    mirroringStatus = "Not running — iPhone Mirroring app is not open"
+                    mirroringStatus = "Not running — '\(ctx.name)' is not open"
                 case .noWindow:
                     mirroringStatus = "No window — app is running but no mirroring window found"
                 }

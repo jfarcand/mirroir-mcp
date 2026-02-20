@@ -24,9 +24,12 @@ final class ScreenToolHandlerTests: XCTestCase {
         capture = StubCapture()
         recorder = StubRecorder()
         describer = StubDescriber()
+        let registry = makeTestRegistry(
+            bridge: bridge, input: StubInput(),
+            capture: capture, recorder: recorder, describer: describer
+        )
         IPhoneMirroirMCP.registerScreenTools(
-            server: server, bridge: bridge, capture: capture,
-            recorder: recorder, describer: describer
+            server: server, registry: registry
         )
     }
 

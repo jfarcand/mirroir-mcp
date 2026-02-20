@@ -12,14 +12,15 @@ import Foundation
 
 // MARK: - StubBridge
 
-final class StubBridge: MirroringBridging, @unchecked Sendable {
+final class StubBridge: MenuActionCapable, @unchecked Sendable {
+    var targetName: String = "iphone"
     var windowInfo: WindowInfo? = WindowInfo(
         windowID: 1,
         position: .zero,
         size: CGSize(width: 410, height: 898),
         pid: 1
     )
-    var state: MirroringState = .connected
+    var state: WindowState = .connected
     var orientation: DeviceOrientation? = .portrait
     var menuActionResult = true
     var pressResumeResult = true
@@ -34,13 +35,15 @@ final class StubBridge: MirroringBridging, @unchecked Sendable {
         windowInfo
     }
 
-    func getState() -> MirroringState {
+    func getState() -> WindowState {
         state
     }
 
     func getOrientation() -> DeviceOrientation? {
         orientation
     }
+
+    func activate() {}
 
     func triggerMenuAction(menu: String, item: String) -> Bool {
         menuActionCalls.append((menu: menu, item: item))
@@ -74,17 +77,19 @@ final class StubInput: InputProviding, @unchecked Sendable {
     var swipeCalls: [(fromX: Double, fromY: Double, toX: Double, toY: Double)] = []
     var launchAppCalls: [String] = []
 
-    func tap(x: Double, y: Double) -> String? {
+    func tap(x: Double, y: Double, cursorMode: CursorMode? = nil) -> String? {
         tapCalls.append((x: x, y: y))
         return tapResult
     }
-    func swipe(fromX: Double, fromY: Double, toX: Double, toY: Double, durationMs: Int) -> String? {
+    func swipe(fromX: Double, fromY: Double, toX: Double, toY: Double,
+               durationMs: Int, cursorMode: CursorMode? = nil) -> String? {
         swipeCalls.append((fromX: fromX, fromY: fromY, toX: toX, toY: toY))
         return swipeResult
     }
-    func drag(fromX: Double, fromY: Double, toX: Double, toY: Double, durationMs: Int) -> String? { dragResult }
-    func longPress(x: Double, y: Double, durationMs: Int) -> String? { longPressResult }
-    func doubleTap(x: Double, y: Double) -> String? { doubleTapResult }
+    func drag(fromX: Double, fromY: Double, toX: Double, toY: Double,
+              durationMs: Int, cursorMode: CursorMode? = nil) -> String? { dragResult }
+    func longPress(x: Double, y: Double, durationMs: Int, cursorMode: CursorMode? = nil) -> String? { longPressResult }
+    func doubleTap(x: Double, y: Double, cursorMode: CursorMode? = nil) -> String? { doubleTapResult }
     func shake() -> TypeResult { shakeResult }
     func typeText(_ text: String) -> TypeResult { typeTextResult }
     func pressKey(keyName: String, modifiers: [String]) -> TypeResult { pressKeyResult }
@@ -101,6 +106,11 @@ final class StubInput: InputProviding, @unchecked Sendable {
 
 final class StubCapture: ScreenCapturing, @unchecked Sendable {
     var captureResult: String?
+
+    func captureData() -> Data? {
+        guard let captureResult else { return nil }
+        return Data(base64Encoded: captureResult)
+    }
 
     func captureBase64() -> String? {
         captureResult
@@ -136,5 +146,20 @@ final class StubDescriber: ScreenDescribing, @unchecked Sendable {
             return result
         }
         return describeResult
+    }
+}
+
+// MARK: - StubRecorder
+
+final class StubRecorder: ScreenRecording, @unchecked Sendable {
+    var startResult: String?
+    var stopResult: (filePath: String?, error: String?) = ("/tmp/test.mov", nil)
+
+    func startRecording(outputPath: String?) -> String? {
+        startResult
+    }
+
+    func stopRecording() -> (filePath: String?, error: String?) {
+        stopResult
     }
 }

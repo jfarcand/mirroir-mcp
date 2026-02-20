@@ -10,9 +10,7 @@ import HelperLib
 extension IPhoneMirroirMCP {
     static func registerAppManagementTools(
         server: MCPServer,
-        bridge: any MirroringBridging,
-        input: any InputProviding,
-        describer: any ScreenDescribing
+        registry: TargetRegistry
     ) {
         // reset_app — force-quit an app via the App Switcher
         server.registerTool(MCPToolDefinition(
@@ -34,26 +32,34 @@ extension IPhoneMirroirMCP {
                 "required": .array([.string("name")]),
             ],
             handler: { args in
+                let (ctx, err) = registry.resolveForTool(args)
+                guard let ctx else { return err! }
+                guard let menuBridge = ctx.bridge as? (any MenuActionCapable) else {
+                    return .error("Target '\(ctx.name)' does not support reset_app")
+                }
+                let input = ctx.input
+                let describer = ctx.describer
+
                 guard let appName = args["name"]?.asString() else {
                     return .error("Missing required parameter: name (string)")
                 }
 
                 // Open App Switcher
-                guard bridge.triggerMenuAction(menu: "View", item: "App Switcher") else {
-                    return .error("Failed to open App Switcher. Is iPhone Mirroring running?")
+                guard menuBridge.triggerMenuAction(menu: "View", item: "App Switcher") else {
+                    return .error("Failed to open App Switcher. Is '\(ctx.name)' running?")
                 }
 
                 usleep(EnvConfig.toolSettlingDelayUs)
 
                 // OCR to find the app card
                 guard let describeResult = describer.describe(skipOCR: false) else {
-                    _ = bridge.triggerMenuAction(menu: "View", item: "Home Screen")
+                    _ = menuBridge.triggerMenuAction(menu: "View", item: "Home Screen")
                     return .error("Failed to capture screen in App Switcher")
                 }
 
                 guard let match = ElementMatcher.findMatch(label: appName,
                                                              in: describeResult.elements) else {
-                    _ = bridge.triggerMenuAction(menu: "View", item: "Home Screen")
+                    _ = menuBridge.triggerMenuAction(menu: "View", item: "Home Screen")
                     return .text("'\(appName)' not in App Switcher (already quit)")
                 }
 
@@ -62,14 +68,14 @@ extension IPhoneMirroirMCP {
                 let cardY = match.element.tapY
                 if let error = input.swipe(fromX: cardX, fromY: cardY,
                                             toX: cardX, toY: cardY - EnvConfig.appSwitcherSwipeDistance, durationMs: EnvConfig.appSwitcherSwipeDurationMs) {
-                    _ = bridge.triggerMenuAction(menu: "View", item: "Home Screen")
+                    _ = menuBridge.triggerMenuAction(menu: "View", item: "Home Screen")
                     return .error("Failed to swipe app card: \(error)")
                 }
 
                 usleep(EnvConfig.toolSettlingDelayUs)
 
                 // Return to home screen
-                _ = bridge.triggerMenuAction(menu: "View", item: "Home Screen")
+                _ = menuBridge.triggerMenuAction(menu: "View", item: "Home Screen")
 
                 return .text("Force-quit '\(appName)'")
             }

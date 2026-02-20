@@ -14,7 +14,7 @@ import os
 ///
 /// Requires Screen Recording permission in System Preferences > Privacy & Security.
 final class ScreenRecorder: Sendable {
-    private let bridge: MirroringBridge
+    private let bridge: any WindowBridging
 
     /// Mutable recording state protected by an unfair lock.
     /// Uses @unchecked Sendable because Process is not Sendable but access
@@ -25,7 +25,7 @@ final class ScreenRecorder: Sendable {
     }
     private let state = OSAllocatedUnfairLock(initialState: RecordingState())
 
-    init(bridge: MirroringBridge) {
+    init(bridge: any WindowBridging) {
         self.bridge = bridge
     }
 
@@ -42,7 +42,7 @@ final class ScreenRecorder: Sendable {
         }
 
         guard let info = bridge.getWindowInfo(), info.windowID != 0 else {
-            return "iPhone Mirroring window not found"
+            return "Target window not found"
         }
 
         let path = outputPath ?? defaultRecordingPath()

@@ -10,9 +10,7 @@ import HelperLib
 extension IPhoneMirroirMCP {
     static func registerMeasureTools(
         server: MCPServer,
-        bridge: any MirroringBridging,
-        input: any InputProviding,
-        describer: any ScreenDescribing
+        registry: TargetRegistry
     ) {
         // measure — time how long it takes for a label to appear after an action
         server.registerTool(MCPToolDefinition(
@@ -49,6 +47,12 @@ extension IPhoneMirroirMCP {
                 "required": .array([.string("action"), .string("until")]),
             ],
             handler: { args in
+                let (ctx, err) = registry.resolveForTool(args)
+                guard let ctx else { return err! }
+                let bridge = ctx.bridge
+                let input = ctx.input
+                let describer = ctx.describer
+
                 guard let actionStr = args["action"]?.asString() else {
                     return .error("Missing required parameter: action (string)")
                 }
@@ -98,7 +102,7 @@ extension IPhoneMirroirMCP {
     /// Parse an action string like "tap:Label" or "launch:AppName" and execute it.
     private static func executeAction(
         _ actionStr: String,
-        bridge: any MirroringBridging,
+        bridge: any WindowBridging,
         input: any InputProviding,
         describer: any ScreenDescribing
     ) -> String? {

@@ -8,6 +8,11 @@ import Darwin
 import Foundation
 import HelperLib
 
+/// iPhone Mirroring capabilities for building the default target context.
+private let iphoneMirroringCapabilities: Set<TargetCapability> = [
+    .menuActions, .spotlight, .home, .appSwitcher,
+]
+
 @main
 struct IPhoneMirroirMCP {
     static func main() {
@@ -72,19 +77,96 @@ struct IPhoneMirroirMCP {
             DebugLog.persist("startup", "WARNING: hidden from tools/list: \(hiddenTools)")
         }
 
-        let bridge = MirroringBridge()
-        let capture = ScreenCapture(bridge: bridge)
-        let recorder = ScreenRecorder(bridge: bridge)
-        let input = InputSimulation(bridge: bridge)
-        let describer = ScreenDescriber(bridge: bridge)
+        let registry = buildTargetRegistry()
         let server = MCPServer(policy: policy)
 
-        registerTools(server: server, bridge: bridge, capture: capture,
-                      recorder: recorder, input: input, describer: describer,
-                      policy: policy)
+        // Log active targets
+        let targetNames = registry.allTargetNames
+        DebugLog.persist("startup", "Targets: \(targetNames) (active: \(registry.activeTargetName))")
+
+        registerTools(server: server, registry: registry, policy: policy)
 
         // Start the MCP server loop
         server.run()
+    }
+
+    /// Build a TargetRegistry from targets.json or fall back to a single iPhone target.
+    static func buildTargetRegistry() -> TargetRegistry {
+        if let file = TargetConfigLoader.load(), !file.targets.isEmpty {
+            return buildMultiTargetRegistry(configs: file.targets,
+                                            defaultName: file.defaultTarget)
+        }
+
+        // Single-target mode: identical behavior to pre-multi-target code
+        let bridge = MirroringBridge()
+        let capture = ScreenCapture(bridge: bridge)
+        let ctx = TargetContext(
+            name: "iphone",
+            bridge: bridge,
+            input: InputSimulation(bridge: bridge),
+            capture: capture,
+            describer: ScreenDescriber(bridge: bridge, capture: capture),
+            recorder: ScreenRecorder(bridge: bridge),
+            capabilities: iphoneMirroringCapabilities
+        )
+        return TargetRegistry(targets: ["iphone": ctx], defaultName: "iphone")
+    }
+
+    /// Build a TargetRegistry from multiple target configurations.
+    private static func buildMultiTargetRegistry(
+        configs: [String: TargetConfig],
+        defaultName: String?
+    ) -> TargetRegistry {
+        var targets = [String: TargetContext]()
+
+        for (name, config) in configs {
+            let bridge: any WindowBridging
+            let capabilities: Set<TargetCapability>
+
+            if config.type == "iphone-mirroring" {
+                bridge = MirroringBridge(
+                    targetName: name,
+                    bundleID: config.bundleID
+                )
+                capabilities = iphoneMirroringCapabilities
+            } else {
+                bridge = GenericWindowBridge(
+                    targetName: name,
+                    bundleID: config.bundleID ?? "",
+                    processName: config.processName,
+                    windowTitleContains: config.windowTitleContains
+                )
+                capabilities = []
+            }
+
+            let cursorMode: CursorMode = config.type == "iphone-mirroring"
+                ? .direct : .preserving
+            let capture = ScreenCapture(bridge: bridge)
+            targets[name] = TargetContext(
+                name: name,
+                bridge: bridge,
+                input: InputSimulation(bridge: bridge, cursorMode: cursorMode),
+                capture: capture,
+                describer: ScreenDescriber(bridge: bridge, capture: capture),
+                recorder: ScreenRecorder(bridge: bridge),
+                capabilities: capabilities
+            )
+        }
+
+        // Resolve default: use specified default if it exists, otherwise first alphabetical.
+        let sortedNames = targets.keys.sorted()
+        let resolvedDefault: String
+        if let specified = defaultName, targets[specified] != nil {
+            resolvedDefault = specified
+        } else {
+            if let specified = defaultName {
+                DebugLog.log("TargetRegistry",
+                    "Configured default '\(specified)' not found in targets \(sortedNames), "
+                    + "falling back to '\(sortedNames.first ?? "")'")
+            }
+            resolvedDefault = sortedNames.first!  // Safe: configs was checked !isEmpty above
+        }
+        return TargetRegistry(targets: targets, defaultName: resolvedDefault)
     }
 }
 

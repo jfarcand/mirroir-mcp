@@ -419,6 +419,7 @@ final class ScenarioFileTests: XCTestCase {
         case .resetApp: return "reset_app"
         case .setNetwork: return "set_network"
         case .measure: return "measure"
+        case .switchTarget: return "target"
         case .skipped(let type, _): return type
         }
     }

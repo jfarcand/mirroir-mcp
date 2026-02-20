@@ -10,10 +10,7 @@ import HelperLib
 extension IPhoneMirroirMCP {
     static func registerScreenTools(
         server: MCPServer,
-        bridge: any MirroringBridging,
-        capture: any ScreenCapturing,
-        recorder: any ScreenRecording,
-        describer: any ScreenDescribing
+        registry: TargetRegistry
     ) {
         // screenshot — capture the mirroring window
         server.registerTool(MCPToolDefinition(
@@ -27,20 +24,27 @@ extension IPhoneMirroirMCP {
                 "type": .string("object"),
                 "properties": .object([:]),
             ],
-            handler: { _ in
+            handler: { args in
+                let (ctx, err) = registry.resolveForTool(args)
+                guard let ctx else { return err! }
+                let bridge = ctx.bridge
+                let capture = ctx.capture
+
                 guard bridge.findProcess() != nil else {
-                    return .error("iPhone Mirroring app is not running")
+                    return .error("Target '\(ctx.name)' is not running")
                 }
 
                 let state = bridge.getState()
                 if state == .paused {
-                    _ = bridge.pressResume()
-                    usleep(EnvConfig.resumeFromPausedUs) // Wait 2s for connection to resume
+                    if let menuBridge = bridge as? (any MenuActionCapable) {
+                        _ = menuBridge.pressResume()
+                        usleep(EnvConfig.resumeFromPausedUs)
+                    }
                 }
 
                 guard let base64 = capture.captureBase64() else {
                     return .error(
-                        "Failed to capture screenshot. Is iPhone Mirroring window visible?")
+                        "Failed to capture screenshot. Is the '\(ctx.name)' window visible?")
                 }
 
                 return .image(base64)
@@ -72,20 +76,27 @@ extension IPhoneMirroirMCP {
                 ]),
             ],
             handler: { args in
+                let (ctx, err) = registry.resolveForTool(args)
+                guard let ctx else { return err! }
+                let bridge = ctx.bridge
+                let describer = ctx.describer
+
                 guard bridge.findProcess() != nil else {
-                    return .error("iPhone Mirroring app is not running")
+                    return .error("Target '\(ctx.name)' is not running")
                 }
                 let state = bridge.getState()
                 if state == .paused {
-                    _ = bridge.pressResume()
-                    usleep(EnvConfig.resumeFromPausedUs)
+                    if let menuBridge = bridge as? (any MenuActionCapable) {
+                        _ = menuBridge.pressResume()
+                        usleep(EnvConfig.resumeFromPausedUs)
+                    }
                 }
 
                 let skipOCR = args["skip_ocr"]?.asBool() ?? false
 
                 guard let result = describer.describe(skipOCR: skipOCR) else {
                     return .error(
-                        "Failed to capture/analyze screen. Is iPhone Mirroring window visible?")
+                        "Failed to capture/analyze screen. Is the '\(ctx.name)' window visible?")
                 }
 
                 if skipOCR {
@@ -144,6 +155,10 @@ extension IPhoneMirroirMCP {
                 ]),
             ],
             handler: { args in
+                let (ctx, err) = registry.resolveForTool(args)
+                guard let ctx else { return err! }
+                let recorder = ctx.recorder
+
                 let outputPath = args["output_path"]?.asString()
 
                 if let error = recorder.startRecording(outputPath: outputPath) {
@@ -165,7 +180,11 @@ extension IPhoneMirroirMCP {
                 "type": .string("object"),
                 "properties": .object([:]),
             ],
-            handler: { _ in
+            handler: { args in
+                let (ctx, err) = registry.resolveForTool(args)
+                guard let ctx else { return err! }
+                let recorder = ctx.recorder
+
                 let result = recorder.stopRecording()
                 if let error = result.error {
                     return .error(error)

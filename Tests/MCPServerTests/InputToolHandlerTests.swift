@@ -20,7 +20,8 @@ final class InputToolHandlerTests: XCTestCase {
         server = MCPServer(policy: policy)
         bridge = StubBridge()
         input = StubInput()
-        IPhoneMirroirMCP.registerInputTools(server: server, bridge: bridge, input: input)
+        let registry = makeTestRegistry(bridge: bridge, input: input)
+        IPhoneMirroirMCP.registerInputTools(server: server, registry: registry)
     }
 
     private func callTool(_ name: String, args: [String: JSONValue] = [:]) -> JSONRPCResponse {

@@ -54,7 +54,7 @@ enum RecordCommand {
 
         let describer: ScreenDescribing? = config.noOCR
             ? nil
-            : ScreenDescriber(bridge: bridge)
+            : ScreenDescriber(bridge: bridge, capture: ScreenCapture(bridge: bridge))
 
         let recorder = EventRecorder(bridge: bridge, describer: describer)
 
