@@ -37,6 +37,10 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - name: Clone scenarios repo
+        run: |
+          git clone https://github.com/jfarcand/iphone-mirroir-scenarios.git .iphone-mirroir-mcp/scenarios
+
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
