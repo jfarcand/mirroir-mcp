@@ -27,7 +27,7 @@ sudo rm -f "/usr/local/bin/mirroir"
 sudo rm -f "/Library/LaunchDaemons/$PLIST_NAME.plist"
 sudo rm -f "/var/run/iphone-mirroir-helper.sock"
 sudo rm -f "/var/log/iphone-mirroir-helper.log"
-rm -f "/tmp/iphone-mirroir-mcp-debug.log"
+rm -f "$HOME/.iphone-mirroir-mcp/debug.log"
 echo "Helper daemon removed."
 
 # --- Step 2: Remove permissions config ---

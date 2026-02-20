@@ -171,7 +171,7 @@ mirroir test --agent copilot scenario.yaml            # deterministic + AI via C
 
 **Built-in models:** `claude-sonnet-4-6`, `claude-haiku-4-5`, `gpt-4o`. Set the corresponding API key env var (`ANTHROPIC_API_KEY`, `OPENAI_API_KEY`).
 
-**Custom agents:** Place a YAML profile in `~/.iphone-mirroir-mcp/agents/`. Two modes:
+**Custom agents:** Place a YAML profile in `~/.iphone-mirroir-mcp/agents/` (global) or `<cwd>/.iphone-mirroir-mcp/agents/` (project-local, takes priority). Two modes:
 
 ```yaml
 # API mode — call a cloud provider
@@ -192,7 +192,7 @@ args: ["-p", "Analyze: ${PAYLOAD}"]
 
 Command mode supports `${PAYLOAD}` substitution in args for CLIs that take prompts as arguments (like `claude --print -p` or `copilot -p`). Without `${PAYLOAD}`, the diagnostic JSON is piped to stdin.
 
-The system prompt is loaded from `~/.iphone-mirroir-mcp/prompts/diagnosis.md` — edit it to customize AI behavior. The default prompt is installed from the repo-level `prompts/` directory.
+The system prompt is loaded from `~/.iphone-mirroir-mcp/prompts/diagnosis.md` (or `<cwd>/.iphone-mirroir-mcp/prompts/diagnosis.md`, project-local takes priority) — edit it to customize AI behavior. The default prompt is installed from the repo-level `prompts/` directory.
 
 All AI errors are non-fatal: deterministic diagnosis always runs regardless.
 

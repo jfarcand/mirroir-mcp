@@ -49,7 +49,13 @@ See [Architecture](architecture.md) for the full input path diagram.
 
 ## Does it work with non-US keyboard layouts?
 
-Yes. The server detects the active keyboard layout at startup and uses `UCKeyTranslate` to map characters to the correct HID keycodes. This supports layouts like Canadian-CSA, French (AZERTY), German (QWERTZ), and others.
+Yes, with opt-in configuration. Set the `IPHONE_KEYBOARD_LAYOUT` environment variable to your iPhone's hardware keyboard layout, and the server uses `UCKeyTranslate` to map characters to the correct HID keycodes:
+
+```bash
+export IPHONE_KEYBOARD_LAYOUT="Canadian-CSA"
+```
+
+Accepted formats: `"Canadian-CSA"` or `"com.apple.keylayout.Canadian-CSA"`. Supported layouts include Canadian-CSA, French (AZERTY), German (QWERTZ), and others. Without this variable, the server sends US QWERTY keycodes (which is correct if your iPhone uses a US keyboard layout).
 
 **Known gap:** Two characters on the ISO section key (`§` and `±` on Canadian-CSA) cannot be typed because macOS and iPhone Mirroring disagree on the key mapping for that physical key. These characters are silently skipped.
 

@@ -335,6 +335,7 @@ All timing and numeric constants can be overridden via environment variables. Th
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `IPHONE_MIRROIR_KEY_HOLD_US` | 20,000 (20ms) | Key hold duration for virtual keyboard |
+| `IPHONE_MIRROIR_DEAD_KEY_DELAY_US` | 30,000 (30ms) | Delay in dead-key compose sequences (accented characters) |
 | `IPHONE_MIRROIR_RECV_TIMEOUT_US` | 200,000 (200ms) | Socket receive timeout |
 
 ### Non-Timing Constants
@@ -346,6 +347,19 @@ All timing and numeric constants can be overridden via environment variables. Th
 | `IPHONE_MIRROIR_SCROLL_PIXEL_SCALE` | 8.0 | Divisor converting pixels to scroll ticks |
 | `IPHONE_MIRROIR_HID_TYPING_CHUNK_SIZE` | 15 | Characters per typing chunk |
 | `IPHONE_MIRROIR_STAFF_GROUP_ID` | 20 | Unix group ID for socket permissions |
+
+### App Identity
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `IPHONE_MIRROIR_BUNDLE_ID` | `com.apple.ScreenContinuity` | Target app bundle ID for process discovery |
+| `IPHONE_MIRROIR_PROCESS_NAME` | `iPhone Mirroring` | Target app display name for messages |
+
+### Keyboard Layout
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `IPHONE_KEYBOARD_LAYOUT` | *(not set)* | Opt-in non-US keyboard layout for character translation (e.g., `Canadian-CSA` or `com.apple.keylayout.Canadian-CSA`). When unset, US QWERTY keycodes are sent. |
 
 ## Code Conventions
 

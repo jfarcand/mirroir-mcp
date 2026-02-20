@@ -8,12 +8,14 @@ Pass `--debug` to enable verbose logging:
 npx -y iphone-mirroir-mcp --debug
 ```
 
-Logs are written to both stderr and `/tmp/iphone-mirroir-mcp-debug.log` (truncated on each startup). Logged events include permission checks, tap coordinates, focus state, and window geometry.
+Logs are written to both stderr and `~/.iphone-mirroir-mcp/debug.log` (truncated on each startup). Logged events include permission checks, tap coordinates, focus state, and window geometry.
+
+Even without `--debug`, the server always writes startup information to `~/.iphone-mirroir-mcp/debug.log` — permission mode, denied tools, and hidden tools. Check this file first when debugging permission issues.
 
 Tail the log in a separate terminal:
 
 ```bash
-tail -f /tmp/iphone-mirroir-mcp-debug.log
+tail -f ~/.iphone-mirroir-mcp/debug.log
 ```
 
 Combine with permission bypass for full-access debugging:

@@ -36,7 +36,7 @@ run "sudo rm -f /usr/local/bin/mirroir"
 run "sudo rm -f /Library/LaunchDaemons/com.jfarcand.iphone-mirroir-helper.plist"
 run "sudo rm -f /var/run/iphone-mirroir-helper.sock"
 run "sudo rm -f /var/log/iphone-mirroir-helper.log"
-run "rm -f /tmp/iphone-mirroir-mcp-debug.log"
+run "rm -f '$HOME/.iphone-mirroir-mcp/debug.log'"
 
 log "Helper daemon removed."
 
