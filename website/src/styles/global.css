@@ -464,6 +464,70 @@ section > p {
   margin-top: 0.15rem;
 }
 
+/* Pipeline grid (record → compile → test → diagnose) */
+.pipeline-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 1rem;
+  margin: 1.5rem 0;
+}
+
+.pipeline-step {
+  background: var(--color-code-bg);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  padding: 1rem;
+  text-align: center;
+}
+
+.pipeline-icon {
+  width: 2rem;
+  height: 2rem;
+  line-height: 2rem;
+  border-radius: 50%;
+  background: #4ade80;
+  color: #1a1008;
+  font-weight: 700;
+  font-size: 0.85rem;
+  margin: 0 auto 0.6rem;
+}
+
+.pipeline-step h3 {
+  font-size: 0.85rem;
+  font-weight: 600;
+  margin-bottom: 0.4rem;
+  color: var(--color-text);
+}
+
+.pipeline-step p {
+  font-size: 0.8rem;
+  color: var(--color-muted);
+  text-align: center;
+  margin-bottom: 0.6rem;
+  line-height: 1.4;
+}
+
+.pipeline-cmd {
+  margin-top: auto;
+}
+
+.pipeline-cmd code {
+  font-size: 0.75rem;
+  white-space: nowrap;
+}
+
+@media (max-width: 700px) {
+  .pipeline-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+@media (max-width: 500px) {
+  .pipeline-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
 /* Back link */
 .back-link {
   display: inline-block;

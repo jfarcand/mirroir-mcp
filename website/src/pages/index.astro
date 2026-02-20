@@ -244,7 +244,7 @@ try {
       <button class="copy-btn" data-copy={curlCmd}>Copy</button>
     </div>
     <p class="install-hint">
-      Paste that in a macOS Terminal. Clones the repo, builds from source, installs the helper daemon, and configures Karabiner.
+      Paste that in a macOS Terminal. Clones the repo, builds from source, installs the DriverKit virtual HID, and starts the helper daemon.
     </p>
     <p class="alt-install">
       or via <a href="https://www.npmjs.com/package/iphone-mirroir-mcp">npx</a>:
@@ -349,6 +349,54 @@ try {
         render(matches);
       });
     </script>
+  </section>
+
+  <!-- Test Runner + Compiled Scenarios + Agent Diagnosis -->
+  <section>
+    <h2>Test, compile, diagnose</h2>
+    <p>
+      Run scenarios deterministically from the CLI — no AI in the loop. Compile once to cache coordinates for zero-OCR replay. When something breaks, <code>--agent</code> tells you why.
+    </p>
+
+    <div class="pipeline-grid">
+      <div class="pipeline-step">
+        <div class="pipeline-icon">1</div>
+        <h3>Record</h3>
+        <p>Interact with the phone while <code>mirroir record</code> captures your actions as a scenario YAML file.</p>
+        <div class="pipeline-cmd">
+          <code>mirroir record -o login.yaml</code>
+        </div>
+      </div>
+      <div class="pipeline-step">
+        <div class="pipeline-icon">2</div>
+        <h3>Compile</h3>
+        <p>Run the scenario once against a real device. The compiler caches every coordinate, timing, and scroll count.</p>
+        <div class="pipeline-cmd">
+          <code>mirroir compile login</code>
+        </div>
+      </div>
+      <div class="pipeline-step">
+        <div class="pipeline-icon">3</div>
+        <h3>Test</h3>
+        <p>Replay with zero OCR — pure input injection. A 10-step scenario drops from 5+ seconds of OCR to under a second.</p>
+        <div class="pipeline-cmd">
+          <code>mirroir test login</code>
+        </div>
+      </div>
+      <div class="pipeline-step">
+        <div class="pipeline-icon">4</div>
+        <h3>Diagnose</h3>
+        <p>When a step fails, <code>--agent</code> compares expected vs. actual OCR and tells you the root cause and fix.</p>
+        <div class="pipeline-cmd">
+          <code>mirroir test --agent login</code>
+        </div>
+      </div>
+    </div>
+
+    <p>
+      Agent diagnosis runs in two tiers: deterministic OCR analysis first (free, no API key), then optionally an AI model for richer analysis.
+      Supports <a href="https://github.com/jfarcand/iphone-mirroir-mcp#agent-diagnosis">Anthropic, OpenAI, local Ollama, and CLI agents</a>.
+    </p>
   </section>
 
   <!-- What it does -->
@@ -463,8 +511,8 @@ try {
         <p>Yes. It operates at the screen level through iPhone Mirroring — no source code, SDK, or jailbreak required. If you can see it on screen, the AI can interact with it.</p>
       </details>
       <details>
-        <summary>Why Karabiner? Can I use it without Karabiner?</summary>
-        <p>iPhone Mirroring ignores programmatic <code>CGEvent</code> injection. Karabiner provides a DriverKit virtual HID device that appears as real hardware — the only path that works.</p>
+        <summary>Why does it need a DriverKit virtual HID?</summary>
+        <p>iPhone Mirroring ignores programmatic <code>CGEvent</code> injection — it only responds to the system HID path. The installer uses the <a href="https://github.com/pqrs-org/Karabiner-DriverKit-VirtualHIDDevice">standalone Karabiner DriverKit package</a> (just the virtual HID, no keyboard grabber). Existing Karabiner-Elements installs are detected and reused.</p>
       </details>
       <details>
         <summary>Can I restrict which tools the AI can use?</summary>
