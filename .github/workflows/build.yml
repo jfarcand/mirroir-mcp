@@ -16,7 +16,7 @@ jobs:
 
       - name: Clone scenarios repo
         run: |
-          git clone https://github.com/jfarcand/mirroir-scenarios.git .mirroir-mcp/scenarios
+          git clone https://github.com/jfarcand/iphone-mirroir-scenarios.git .mirroir-mcp/scenarios
 
       - name: Build (debug)
         run: swift build
