@@ -136,19 +136,19 @@ Three parallel jobs test each installation method end-to-end on `macos-15` runne
 Tests the one-line installer script that users run after cloning.
 
 ```
-brew install karabiner → fake socket → ./mirroir.sh → build FakeMirroring → launch →
+install standalone DriverKit pkg → fake socket → ./mirroir.sh → build FakeMirroring → launch →
   swift test --filter IntegrationTests (8 tests) →
   MCP initialize → MCP tools/call screenshot
 ```
 
-**CI accommodation:** `mirroir.sh` normally waits for Karabiner's DriverKit extension (120s timeout). In CI, a fake socket file is created to bypass this wait — the daemon starts but Karabiner HID is unavailable (expected).
+**CI accommodation:** `mirroir.sh` normally waits for the DriverKit extension (120s timeout). In CI, a fake socket file is created to bypass this wait — the daemon starts but Karabiner HID is unavailable (expected).
 
 ### Job 2: `homebrew-install` — Local Homebrew formula
 
 Tests the Homebrew installation path using a local tap.
 
 ```
-brew install karabiner → git archive tarball → brew tap-new local/test →
+install standalone DriverKit pkg → git archive tarball → brew tap-new local/test →
   generate formula with file:// URL → brew install local/test/iphone-mirroir-mcp →
   sudo brew services start → build FakeMirroring → launch →
   swift test --filter IntegrationTests (8 tests) →
@@ -160,7 +160,7 @@ brew install karabiner → git archive tarball → brew tap-new local/test →
 Tests the npm/npx installation path.
 
 ```
-brew install karabiner → swift build → stage binaries into npm/bin/ →
+install standalone DriverKit pkg → fake socket → swift build → stage binaries into npm/bin/ →
   node setup.js (daemon install) → build FakeMirroring → launch →
   swift test --filter IntegrationTests (8 tests) →
   MCP initialize → MCP tools/call screenshot

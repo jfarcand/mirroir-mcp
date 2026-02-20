@@ -18,10 +18,16 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install Karabiner-Elements
-        run: brew install --cask karabiner-elements
+      - name: Install standalone DriverKit package
+        run: |
+          DRIVERKIT_VERSION="6.10.0"
+          DRIVERKIT_PKG="Karabiner-DriverKit-VirtualHIDDevice-${DRIVERKIT_VERSION}.pkg"
+          curl -fSL -o "/tmp/${DRIVERKIT_PKG}" \
+            "https://github.com/pqrs-org/Karabiner-DriverKit-VirtualHIDDevice/releases/download/v${DRIVERKIT_VERSION}/${DRIVERKIT_PKG}"
+          sudo installer -pkg "/tmp/${DRIVERKIT_PKG}" -target /
+          rm -f "/tmp/${DRIVERKIT_PKG}"
 
-      - name: Create fake Karabiner socket (bypass DriverKit wait)
+      - name: Create fake DriverKit socket (bypass extension approval wait)
         run: |
           SOCK_DIR="/Library/Application Support/org.pqrs/tmp/rootonly/vhidd_server"
           sudo mkdir -p "$SOCK_DIR"
@@ -38,19 +44,15 @@ jobs:
           test -L /usr/local/bin/mirroir
           mirroir record --help 2>&1 | grep -q "Record user interactions"
 
-      - name: Verify Karabiner config has ignore rule
+      - name: Verify standalone DriverKit (no Karabiner ignore rule needed)
         run: |
-          python3 -c "
-          import json, os
-          with open(os.path.expanduser('~/.config/karabiner/karabiner.json')) as f:
-              config = json.load(f)
-          devices = config['profiles'][0]['devices']
-          match = [d for d in devices
-                   if d.get('identifiers',{}).get('product_id') == 592
-                   and d.get('ignore') is True]
-          assert len(match) >= 1, f'No ignore rule found: {devices}'
-          print('Karabiner ignore rule: OK')
-          "
+          # With standalone DriverKit (no Karabiner-Elements), mirroir.sh should NOT
+          # create a Karabiner config — there is no grabber to configure.
+          if [ -f "$HOME/.config/karabiner/karabiner.json" ]; then
+            echo "FAIL: Karabiner config should not exist with standalone DriverKit"
+            exit 1
+          fi
+          echo "No Karabiner config (standalone DriverKit): OK"
 
       - name: Verify daemon responds
         run: |
@@ -121,8 +123,14 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install Karabiner-Elements
-        run: brew install --cask karabiner-elements
+      - name: Install standalone DriverKit package
+        run: |
+          DRIVERKIT_VERSION="6.10.0"
+          DRIVERKIT_PKG="Karabiner-DriverKit-VirtualHIDDevice-${DRIVERKIT_VERSION}.pkg"
+          curl -fSL -o "/tmp/${DRIVERKIT_PKG}" \
+            "https://github.com/pqrs-org/Karabiner-DriverKit-VirtualHIDDevice/releases/download/v${DRIVERKIT_VERSION}/${DRIVERKIT_PKG}"
+          sudo installer -pkg "/tmp/${DRIVERKIT_PKG}" -target /
+          rm -f "/tmp/${DRIVERKIT_PKG}"
 
       - name: Create source tarball
         run: |
@@ -257,8 +265,20 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install Karabiner-Elements
-        run: brew install --cask karabiner-elements
+      - name: Install standalone DriverKit package
+        run: |
+          DRIVERKIT_VERSION="6.10.0"
+          DRIVERKIT_PKG="Karabiner-DriverKit-VirtualHIDDevice-${DRIVERKIT_VERSION}.pkg"
+          curl -fSL -o "/tmp/${DRIVERKIT_PKG}" \
+            "https://github.com/pqrs-org/Karabiner-DriverKit-VirtualHIDDevice/releases/download/v${DRIVERKIT_VERSION}/${DRIVERKIT_PKG}"
+          sudo installer -pkg "/tmp/${DRIVERKIT_PKG}" -target /
+          rm -f "/tmp/${DRIVERKIT_PKG}"
+
+      - name: Create fake DriverKit socket (for setup.js vhidd check)
+        run: |
+          SOCK_DIR="/Library/Application Support/org.pqrs/tmp/rootonly/vhidd_server"
+          sudo mkdir -p "$SOCK_DIR"
+          sudo touch "$SOCK_DIR/vhidd.sock"
 
       - name: Build release binaries
         run: swift build -c release

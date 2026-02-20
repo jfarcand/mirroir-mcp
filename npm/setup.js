@@ -10,6 +10,10 @@ const PLIST_NAME = "com.jfarcand.iphone-mirroir-helper";
 const HELPER_SOCK = "/var/run/iphone-mirroir-helper.sock";
 const HELPER_DEST = "/usr/local/bin/iphone-mirroir-helper";
 const PLIST_DEST = `/Library/LaunchDaemons/${PLIST_NAME}.plist`;
+const KARABINER_SOCK_DIR = "/Library/Application Support/org.pqrs/tmp/rootonly/vhidd_server";
+const DRIVERKIT_MANAGER = "/Applications/.Karabiner-VirtualHIDDevice-Manager.app/Contents/MacOS/Karabiner-VirtualHIDDevice-Manager";
+const DRIVERKIT_VERSION = "6.10.0";
+const DRIVERKIT_URL = `https://github.com/pqrs-org/Karabiner-DriverKit-VirtualHIDDevice/releases/download/v${DRIVERKIT_VERSION}/Karabiner-DriverKit-VirtualHIDDevice-${DRIVERKIT_VERSION}.pkg`;
 
 function main() {
   const binDir = path.join(__dirname, "bin");
@@ -26,19 +30,39 @@ function main() {
     process.exit(1);
   }
 
-  // Check if Karabiner-Elements is installed
-  if (!fs.existsSync("/Applications/Karabiner-Elements.app")) {
-    console.log("");
-    console.log("Karabiner-Elements is required but not installed.");
-    console.log("Install it first:");
-    console.log("  brew install --cask karabiner-elements");
-    console.log("");
-    console.log("Then open Karabiner-Elements and approve the DriverKit extension:");
-    console.log("  System Settings > General > Login Items & Extensions");
-    console.log("  Enable all toggles under Karabiner-Elements");
-    console.log("");
-    console.log("After that, re-run the MCP server and setup will continue.");
-    process.exit(1);
+  // Check if DriverKit virtual HID is available (works for both standalone and Karabiner-Elements)
+  if (!hasVhiddSocket()) {
+    if (fs.existsSync("/Applications/Karabiner-Elements.app")) {
+      console.log("");
+      console.log("Karabiner-Elements is installed but the DriverKit extension is not running.");
+      console.log("Approve the extension in System Settings:");
+      console.log("  System Settings > General > Login Items & Extensions");
+      console.log("  Enable all toggles under Karabiner-Elements");
+      console.log("");
+      console.log("After that, re-run setup.");
+      process.exit(1);
+    } else if (fs.existsSync(DRIVERKIT_MANAGER)) {
+      console.log("");
+      console.log("Standalone DriverKit is installed but the extension is not running.");
+      console.log("Activate it:");
+      console.log(`  ${DRIVERKIT_MANAGER} activate`);
+      console.log("");
+      console.log("Then approve in System Settings > General > Login Items & Extensions.");
+      console.log("After that, re-run setup.");
+      process.exit(1);
+    } else {
+      console.log("");
+      console.log("A DriverKit virtual HID device is required for tap and swipe input.");
+      console.log("");
+      console.log("Install the standalone Karabiner DriverKit package:");
+      console.log(`  curl -fSL -o /tmp/driverkit.pkg "${DRIVERKIT_URL}"`);
+      console.log("  sudo installer -pkg /tmp/driverkit.pkg -target /");
+      console.log(`  ${DRIVERKIT_MANAGER} activate`);
+      console.log("");
+      console.log("Then approve the extension in System Settings > General > Login Items & Extensions.");
+      console.log("After that, re-run setup.");
+      process.exit(1);
+    }
   }
 
   console.log("=== Setting up iphone-mirroir-helper daemon ===");
@@ -66,8 +90,14 @@ function main() {
   // Start daemon
   execSync(`sudo launchctl bootstrap system "${PLIST_DEST}"`, { stdio: "inherit" });
 
-  // Configure Karabiner ignore rule for the virtual keyboard
-  configureKarabiner();
+  // Configure Karabiner ignore rule only when Karabiner-Elements is installed
+  // (the ignore rule prevents the grabber from intercepting our virtual keyboard;
+  // standalone DriverKit has no grabber)
+  if (fs.existsSync("/Applications/Karabiner-Elements.app")) {
+    configureKarabiner();
+  } else {
+    console.log("Using standalone DriverKit (no Karabiner grabber, ignore rule not needed).");
+  }
 
   // Wait for helper to become ready
   console.log("");
@@ -139,6 +169,18 @@ function checkHelper() {
     const output = result.stdout ? result.stdout.toString() : "";
     return output.includes('"ok"');
   } catch (socketError) {
+    return false;
+  }
+}
+
+function hasVhiddSocket() {
+  try {
+    // Socket dir is mode 700 — glob expansion needs sudo bash -c
+    const result = spawnSync("sudo", ["bash", "-c",
+      `ls '${KARABINER_SOCK_DIR}'/*.sock`
+    ], { timeout: 5000, stdio: ["pipe", "pipe", "pipe"] });
+    return result.status === 0;
+  } catch (checkError) {
     return false;
   }
 }

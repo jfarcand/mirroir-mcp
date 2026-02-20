@@ -139,30 +139,41 @@ enum DoctorCommand {
     }
 
     static func checkKarabinerInstalled() -> DoctorCheck {
-        let appPath = "/Applications/Karabiner-Elements.app"
+        let karabinerAppPath = "/Applications/Karabiner-Elements.app"
+        let standaloneManagerPath = "/Applications/.Karabiner-VirtualHIDDevice-Manager.app"
         let fm = FileManager.default
 
-        guard fm.fileExists(atPath: appPath) else {
+        // Check for full Karabiner-Elements
+        if fm.fileExists(atPath: karabinerAppPath) {
+            let plistPath = karabinerAppPath + "/Contents/Info.plist"
+            var versionStr = "unknown version"
+            if let plist = NSDictionary(contentsOfFile: plistPath),
+               let version = plist["CFBundleShortVersionString"] as? String {
+                versionStr = "v\(version)"
+            }
             return DoctorCheck(
-                name: "Karabiner-Elements",
-                status: .failed,
-                detail: "not installed",
-                fixHint: "Install Karabiner-Elements: brew install --cask karabiner-elements"
+                name: "DriverKit provider",
+                status: .passed,
+                detail: "Karabiner-Elements (\(versionStr))",
+                fixHint: nil
             )
         }
 
-        let plistPath = appPath + "/Contents/Info.plist"
-        var versionStr = "unknown version"
-        if let plist = NSDictionary(contentsOfFile: plistPath),
-           let version = plist["CFBundleShortVersionString"] as? String {
-            versionStr = "v\(version)"
+        // Check for standalone DriverKit package
+        if fm.fileExists(atPath: standaloneManagerPath) {
+            return DoctorCheck(
+                name: "DriverKit provider",
+                status: .passed,
+                detail: "standalone Karabiner-DriverKit-VirtualHIDDevice",
+                fixHint: nil
+            )
         }
 
         return DoctorCheck(
-            name: "Karabiner-Elements",
-            status: .passed,
-            detail: "installed (\(versionStr))",
-            fixHint: nil
+            name: "DriverKit provider",
+            status: .failed,
+            detail: "not installed",
+            fixHint: "Install the standalone DriverKit package from https://github.com/pqrs-org/Karabiner-DriverKit-VirtualHIDDevice/releases or run mirroir.sh"
         )
     }
 
@@ -183,7 +194,7 @@ enum DoctorCommand {
             name: "DriverKit extension",
             status: .failed,
             detail: "not active",
-            fixHint: "Open Karabiner-Elements.app and approve the system extension in System Settings > General > Login Items & Extensions."
+            fixHint: "Approve the DriverKit system extension in System Settings > General > Login Items & Extensions."
         )
     }
 
@@ -260,13 +271,26 @@ enum DoctorCommand {
             name: "Virtual HID devices",
             status: .failed,
             detail: parts.joined(separator: ", "),
-            fixHint: "Karabiner virtual HID devices are not ready. Try: open /Applications/Karabiner-Elements.app and wait a few seconds."
+            fixHint: "Virtual HID devices are not ready. Approve the DriverKit extension in System Settings > General > Login Items & Extensions and wait a few seconds."
         )
     }
 
     static func checkKarabinerIgnoreRule() -> DoctorCheck {
-        let configPath = NSHomeDirectory() + "/.config/karabiner/karabiner.json"
         let fm = FileManager.default
+
+        // The ignore rule is only needed when Karabiner-Elements is installed (it has a
+        // keyboard grabber that would intercept our virtual keyboard). Standalone DriverKit
+        // has no grabber, so the rule is unnecessary.
+        guard fm.fileExists(atPath: "/Applications/Karabiner-Elements.app") else {
+            return DoctorCheck(
+                name: "Karabiner ignore rule",
+                status: .passed,
+                detail: "not needed (standalone DriverKit, no grabber)",
+                fixHint: nil
+            )
+        }
+
+        let configPath = NSHomeDirectory() + "/.config/karabiner/karabiner.json"
 
         guard fm.fileExists(atPath: configPath) else {
             return DoctorCheck(

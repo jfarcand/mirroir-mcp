@@ -35,7 +35,7 @@ struct HelperDaemon {
         } catch {
             log("WARNING: Karabiner not available: \(error)")
             log("Starting in degraded mode — status queries work, input commands will return errors.")
-            log("To enable full functionality, install Karabiner-Elements and activate the DriverKit extension.")
+            log("To enable full functionality, install the DriverKit package and activate the system extension.")
         }
 
         // Start the command server (blocks until stopped)

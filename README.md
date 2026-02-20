@@ -16,7 +16,7 @@ MCP server that controls a real iPhone through macOS iPhone Mirroring. [Screensh
 
 When automation breaks — a button moves, a label changes, timing drifts — [Agent Diagnosis](#agent-diagnosis) tells you *why* and how to fix it. Self-diagnosing automation, not just self-running.
 
-Input flows through [Karabiner](https://karabiner-elements.pqrs.org/) DriverKit virtual HID devices because iPhone Mirroring blocks standard CGEvent injection.
+Input flows through [Karabiner DriverKit](https://github.com/pqrs-org/Karabiner-DriverKit-VirtualHIDDevice) virtual HID devices because iPhone Mirroring blocks standard CGEvent injection. The installer uses the standalone DriverKit package (no keyboard grabber, no modifier corruption). Existing Karabiner-Elements installs are detected and reused automatically.
 
 ## Requirements
 
@@ -41,7 +41,7 @@ or via [Homebrew](https://tap.mirroir.dev):
 brew tap jfarcand/tap && brew install iphone-mirroir-mcp
 ```
 
-After install, approve the DriverKit extension if prompted: **System Settings > General > Login Items & Extensions** — enable all toggles under Karabiner-Elements. The first time you take a screenshot, macOS will prompt for **Screen Recording** and **Accessibility** permissions. Grant both.
+After install, approve the DriverKit system extension if prompted: **System Settings > General > Login Items & Extensions**. If you have Karabiner-Elements, enable all its toggles. If you installed the standalone DriverKit package, enable the Karabiner-DriverKit-VirtualHIDDevice toggle. The first time you take a screenshot, macOS will prompt for **Screen Recording** and **Accessibility** permissions. Grant both.
 
 <details>
 <summary>Per-client setup</summary>
@@ -116,7 +116,7 @@ cd iphone-mirroir-mcp
 ./mirroir.sh
 ```
 
-The installer handles everything: installs Karabiner if missing (with confirmation), waits for the DriverKit extension approval, builds both binaries, configures the Karabiner ignore rule, installs the helper daemon, and runs a verification check. Use the full path to the binary in your `.mcp.json`: `<repo>/.build/release/iphone-mirroir-mcp`.
+The installer handles everything: installs the standalone DriverKit package if no virtual HID is available (or reuses existing Karabiner-Elements), waits for extension approval, builds both binaries, configures the Karabiner ignore rule when needed, installs the helper daemon, and runs a verification check. Use the full path to the binary in your `.mcp.json`: `<repo>/.build/release/iphone-mirroir-mcp`.
 
 </details>
 
@@ -386,7 +386,7 @@ sudo brew services stop iphone-mirroir-mcp
 brew uninstall iphone-mirroir-mcp
 
 # From source — removes helper daemon, Karabiner config changes,
-# and optionally Karabiner-Elements itself
+# and optionally standalone DriverKit or Karabiner-Elements
 ./uninstall-mirroir.sh
 ```
 

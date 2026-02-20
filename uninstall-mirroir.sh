@@ -1,12 +1,13 @@
 #!/bin/bash
 # ABOUTME: Full uninstaller for iphone-mirroir-mcp.
-# ABOUTME: Removes helper daemon, Karabiner config changes, and optionally Karabiner-Elements itself.
+# ABOUTME: Removes helper daemon, Karabiner config changes, and optionally standalone DriverKit or Karabiner-Elements.
 
 set -e
 
 PLIST_NAME="com.jfarcand.iphone-mirroir-helper"
 HELPER_BIN="iphone-mirroir-helper"
 KARABINER_CONFIG="$HOME/.config/karabiner/karabiner.json"
+DRIVERKIT_MANAGER="/Applications/.Karabiner-VirtualHIDDevice-Manager.app/Contents/MacOS/Karabiner-VirtualHIDDevice-Manager"
 
 echo "=== Uninstalling iphone-mirroir-mcp ==="
 
@@ -50,15 +51,16 @@ else
     echo "No permissions config found."
 fi
 
-# --- Step 3: Remove Karabiner ignore rule ---
+# --- Step 3: Remove Karabiner ignore rule (if Karabiner-Elements is installed) ---
 
 echo ""
 echo "--- Karabiner config ---"
 
-if [ -f "$KARABINER_CONFIG" ]; then
-    if grep -q '"product_id": 592' "$KARABINER_CONFIG" 2>/dev/null || \
-       grep -q '"product_id":592' "$KARABINER_CONFIG" 2>/dev/null; then
-        python3 -c "
+if [ -d "/Applications/Karabiner-Elements.app" ]; then
+    if [ -f "$KARABINER_CONFIG" ]; then
+        if grep -q '"product_id": 592' "$KARABINER_CONFIG" 2>/dev/null || \
+           grep -q '"product_id":592' "$KARABINER_CONFIG" 2>/dev/null; then
+            python3 -c "
 import json
 with open('$KARABINER_CONFIG') as f:
     config = json.load(f)
@@ -73,14 +75,40 @@ with open('$KARABINER_CONFIG', 'w') as f:
     json.dump(config, f, indent=4)
 print('Removed iPhone Mirroring ignore rule from Karabiner config.')
 "
+        else
+            echo "No iPhone Mirroring ignore rule found in Karabiner config."
+        fi
     else
-        echo "No iPhone Mirroring ignore rule found in Karabiner config."
+        echo "No Karabiner config found."
     fi
 else
-    echo "No Karabiner config found."
+    echo "Not using Karabiner-Elements (no ignore rule to remove)."
 fi
 
-# --- Step 4: Optionally remove Karabiner-Elements ---
+# --- Step 4: Optionally remove standalone DriverKit or Karabiner-Elements ---
+
+# Check for standalone DriverKit
+if [ -f "$DRIVERKIT_MANAGER" ] && [ ! -d "/Applications/Karabiner-Elements.app" ]; then
+    echo ""
+    read -p "Uninstall standalone Karabiner DriverKit package? [y/N] " remove_driverkit
+    case "$remove_driverkit" in
+        [yY]*)
+            echo ""
+            echo "--- Removing standalone DriverKit ---"
+            echo "Deactivating system extension..."
+            "$DRIVERKIT_MANAGER" deactivate 2>/dev/null || true
+            sudo rm -rf "/Applications/.Karabiner-VirtualHIDDevice-Manager.app"
+            sudo rm -rf "/Library/Application Support/org.pqrs/Karabiner-DriverKit-VirtualHIDDevice"
+            echo "Standalone DriverKit removed."
+            echo "Note: The DriverKit kernel extension persists until reboot."
+            ;;
+        *)
+            echo "Keeping standalone DriverKit installed."
+            ;;
+    esac
+fi
+
+# Check for Karabiner-Elements
 
 # Detect Karabiner by app, brew cask, or running processes
 KARABINER_INSTALLED=false

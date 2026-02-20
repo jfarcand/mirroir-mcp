@@ -43,5 +43,5 @@ fi
 echo ""
 
 # Delegate to mirroir.sh, reopening stdin from the terminal so interactive
-# prompts (e.g. "Install Karabiner? [Y/n]") work when piped through curl.
+# prompts (e.g. "Install standalone DriverKit? [Y/n]") work when piped through curl.
 exec "$INSTALL_DIR/mirroir.sh" </dev/tty

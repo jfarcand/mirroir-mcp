@@ -32,63 +32,22 @@ jobs:
           file .build/release/$HELPER_BIN
           echo "Both binaries built successfully."
 
-      # --- Karabiner-Elements ---
+      # --- Standalone DriverKit ---
 
-      - name: Install Karabiner-Elements
-        run: brew install --cask karabiner-elements
-
-      - name: Verify Karabiner app installed
+      - name: Install standalone DriverKit package
         run: |
-          test -d "/Applications/Karabiner-Elements.app" \
-            || { echo "FAIL: Karabiner-Elements.app not in /Applications"; exit 1; }
-          echo "Karabiner-Elements.app installed."
+          DRIVERKIT_VERSION="6.10.0"
+          DRIVERKIT_PKG="Karabiner-DriverKit-VirtualHIDDevice-${DRIVERKIT_VERSION}.pkg"
+          curl -fSL -o "/tmp/${DRIVERKIT_PKG}" \
+            "https://github.com/pqrs-org/Karabiner-DriverKit-VirtualHIDDevice/releases/download/v${DRIVERKIT_VERSION}/${DRIVERKIT_PKG}"
+          sudo installer -pkg "/tmp/${DRIVERKIT_PKG}" -target /
+          rm -f "/tmp/${DRIVERKIT_PKG}"
 
-      # --- Karabiner config ---
-
-      - name: Generate Karabiner config with ignore rule
+      - name: Verify standalone DriverKit Manager installed
         run: |
-          CONFIG="$HOME/.config/karabiner/karabiner.json"
-          mkdir -p "$(dirname "$CONFIG")"
-
-          # No existing config on a fresh runner, so create one (same logic as mirroir.sh)
-          cat > "$CONFIG" << 'KARABINER_EOF'
-          {
-              "profiles": [
-                  {
-                      "devices": [
-                          {
-                              "identifiers": {
-                                  "is_keyboard": true,
-                                  "product_id": 592,
-                                  "vendor_id": 1452
-                              },
-                              "ignore": true
-                          }
-                      ],
-                      "name": "Default profile",
-                      "selected": true,
-                      "virtual_hid_keyboard": { "keyboard_type_v2": "ansi" }
-                  }
-              ]
-          }
-          KARABINER_EOF
-          echo "Created Karabiner config."
-
-      - name: Verify Karabiner config contains ignore rule
-        run: |
-          python3 -c "
-          import json, sys, os
-          config_path = os.path.expanduser('~/.config/karabiner/karabiner.json')
-          with open(config_path) as f:
-              config = json.load(f)
-          devices = config['profiles'][0]['devices']
-          match = [d for d in devices
-                   if d.get('identifiers', {}).get('product_id') == 592
-                   and d.get('identifiers', {}).get('vendor_id') == 1452
-                   and d.get('ignore') is True]
-          assert len(match) == 1, f'Expected 1 ignore rule, found {len(match)}'
-          print('Karabiner ignore rule: OK')
-          "
+          test -f "/Applications/.Karabiner-VirtualHIDDevice-Manager.app/Contents/MacOS/Karabiner-VirtualHIDDevice-Manager" \
+            || { echo "FAIL: DriverKit Manager not found"; exit 1; }
+          echo "Standalone DriverKit Manager installed."
 
       # --- Helper daemon ---
 

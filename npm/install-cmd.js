@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // ABOUTME: Interactive one-command installer for iphone-mirroir-mcp.
-// ABOUTME: Handles Karabiner install, helper daemon setup, and MCP client configuration.
+// ABOUTME: Handles standalone DriverKit install (or reuses Karabiner-Elements), helper daemon setup, and MCP client configuration.
 
 const { execSync, execFileSync, spawnSync } = require("child_process");
 const fs = require("fs");
@@ -9,50 +9,86 @@ const readline = require("readline");
 
 const HELPER_SOCK = "/var/run/iphone-mirroir-helper.sock";
 const KARABINER_APP = "/Applications/Karabiner-Elements.app";
+const DRIVERKIT_MANAGER = "/Applications/.Karabiner-VirtualHIDDevice-Manager.app/Contents/MacOS/Karabiner-VirtualHIDDevice-Manager";
+const DRIVERKIT_VERSION = "6.10.0";
+const DRIVERKIT_PKG = `Karabiner-DriverKit-VirtualHIDDevice-${DRIVERKIT_VERSION}.pkg`;
+const DRIVERKIT_URL = `https://github.com/pqrs-org/Karabiner-DriverKit-VirtualHIDDevice/releases/download/v${DRIVERKIT_VERSION}/${DRIVERKIT_PKG}`;
+const KARABINER_SOCK_DIR = "/Library/Application Support/org.pqrs/tmp/rootonly/vhidd_server";
 const SETUP_SCRIPT = path.join(__dirname, "setup.js");
 const BIN_DIR = path.join(__dirname, "bin");
 const REPO_ROOT = path.dirname(__dirname);
 
-// --- Karabiner ---
+// --- DriverKit ---
 
-function isKarabinerInstalled() {
-  return fs.existsSync(KARABINER_APP);
+function hasVhiddSocket() {
+  try {
+    const result = spawnSync("sudo", ["bash", "-c",
+      `ls '${KARABINER_SOCK_DIR}'/*.sock`
+    ], { timeout: 5000, stdio: ["pipe", "pipe", "pipe"] });
+    return result.status === 0;
+  } catch (checkErr) {
+    return false;
+  }
 }
 
-function ensureKarabiner() {
-  if (isKarabinerInstalled()) {
-    console.log("[1/3] Karabiner-Elements is installed.");
+function ensureDriverKit() {
+  if (hasVhiddSocket()) {
+    const provider = fs.existsSync(KARABINER_APP) ? "Karabiner-Elements" : "standalone DriverKit";
+    console.log(`[1/3] DriverKit virtual HID is running (${provider}).`);
     return;
   }
 
-  console.log("[1/3] Karabiner-Elements not found. Installing via Homebrew...");
-
-  try {
-    execSync("which brew", { stdio: "ignore" });
-  } catch (noBrew) {
-    console.error("Homebrew is not installed. Install it from https://brew.sh then re-run.");
-    process.exit(1);
+  if (fs.existsSync(KARABINER_APP)) {
+    console.log("[1/3] Karabiner-Elements is installed but the DriverKit extension is not running.");
+    console.log("  Approve the extension in System Settings:");
+    console.log("  System Settings > General > Login Items & Extensions");
+    console.log("  Enable all toggles under Karabiner-Elements");
+    console.log("");
+    console.log("Press Enter once you have approved the extension...");
+    spawnSync("bash", ["-c", "read -r"], { stdio: "inherit" });
+    return;
   }
 
-  try {
-    execSync("brew install --cask karabiner-elements", { stdio: "inherit" });
-  } catch (brewErr) {
-    console.error("Failed to install Karabiner-Elements via Homebrew.");
-    console.error("Install manually from https://karabiner-elements.pqrs.org/ then re-run.");
-    process.exit(1);
+  if (fs.existsSync(DRIVERKIT_MANAGER)) {
+    console.log("[1/3] Standalone DriverKit is installed but the extension is not running.");
+    console.log("  Activating...");
+    try {
+      execSync(`"${DRIVERKIT_MANAGER}" activate`, { stdio: "inherit" });
+    } catch (activateErr) {
+      // Activation may fail if already activated — continue
+    }
+    console.log("  Approve the extension in System Settings > General > Login Items & Extensions.");
+    console.log("");
+    console.log("Press Enter once you have approved the extension...");
+    spawnSync("bash", ["-c", "read -r"], { stdio: "inherit" });
+    return;
   }
 
-  // Open Karabiner using the full path (LaunchServices may not have indexed it yet)
+  console.log("[1/3] Installing standalone Karabiner DriverKit package...");
+
+  const tmpPkg = `/tmp/${DRIVERKIT_PKG}`;
   try {
-    execSync(`open "${KARABINER_APP}"`, { stdio: "inherit" });
-  } catch (openErr) {
-    // Not fatal — user can open it manually
+    execSync(`curl -fSL -o "${tmpPkg}" "${DRIVERKIT_URL}"`, { stdio: "inherit" });
+    execSync(`sudo installer -pkg "${tmpPkg}" -target /`, { stdio: "inherit" });
+    execSync(`rm -f "${tmpPkg}"`, { stdio: "ignore" });
+  } catch (installErr) {
+    console.error("Failed to install DriverKit package.");
+    console.error(`Download manually from: https://github.com/pqrs-org/Karabiner-DriverKit-VirtualHIDDevice/releases`);
+    process.exit(1);
   }
 
   console.log("");
-  console.log("Karabiner-Elements installed. You must approve the DriverKit extension:");
+  console.log("Activating DriverKit system extension...");
+  try {
+    execSync(`"${DRIVERKIT_MANAGER}" activate`, { stdio: "inherit" });
+  } catch (activateErr) {
+    // Continue — user will approve in System Settings
+  }
+
+  console.log("");
+  console.log("Approve the system extension in System Settings:");
   console.log("  System Settings > General > Login Items & Extensions");
-  console.log("  Enable all toggles under Karabiner-Elements");
+  console.log("  Enable the Karabiner-DriverKit-VirtualHIDDevice toggle");
   console.log("");
   console.log("Press Enter once you have approved the extension...");
 
@@ -341,7 +377,7 @@ async function main() {
   console.log("=== iphone-mirroir-mcp installer ===");
   console.log("");
 
-  ensureKarabiner();
+  ensureDriverKit();
   ensureHelper();
   await configureMcpClient();
 

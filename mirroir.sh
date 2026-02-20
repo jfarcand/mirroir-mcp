@@ -1,6 +1,6 @@
 #!/bin/bash
 # ABOUTME: One-step installer for iphone-mirroir-mcp.
-# ABOUTME: Installs Karabiner if needed, builds both binaries, configures everything, and verifies the setup.
+# ABOUTME: Installs standalone DriverKit virtual HID (or reuses existing Karabiner-Elements), builds binaries, and verifies setup.
 
 set -e
 
@@ -11,6 +11,11 @@ MCP_BIN="iphone-mirroir-mcp"
 KARABINER_CONFIG="$HOME/.config/karabiner/karabiner.json"
 KARABINER_SOCK_DIR="/Library/Application Support/org.pqrs/tmp/rootonly/vhidd_server"
 KARABINER_WAIT_TIMEOUT=120
+
+DRIVERKIT_VERSION="6.10.0"
+DRIVERKIT_PKG="Karabiner-DriverKit-VirtualHIDDevice-${DRIVERKIT_VERSION}.pkg"
+DRIVERKIT_URL="https://github.com/pqrs-org/Karabiner-DriverKit-VirtualHIDDevice/releases/download/v${DRIVERKIT_VERSION}/${DRIVERKIT_PKG}"
+DRIVERKIT_MANAGER="/Applications/.Karabiner-VirtualHIDDevice-Manager.app/Contents/MacOS/Karabiner-VirtualHIDDevice-Manager"
 
 cd "$SCRIPT_DIR"
 
@@ -26,12 +31,7 @@ fi
 
 echo "Swift: $(swift --version 2>&1 | head -1)"
 
-if ! command -v brew >/dev/null 2>&1; then
-    echo "Error: Homebrew not found. Install it from https://brew.sh"
-    exit 1
-fi
-
-# --- Step 2: Install Karabiner-Elements if missing ---
+# --- Step 2: Ensure DriverKit virtual HID is available ---
 
 if ! sudo bash -c "ls '$KARABINER_SOCK_DIR'/*.sock" >/dev/null 2>&1; then
     if [ -d "/Applications/Karabiner-Elements.app" ]; then
@@ -42,48 +42,58 @@ if ! sudo bash -c "ls '$KARABINER_SOCK_DIR'/*.sock" >/dev/null 2>&1; then
         echo "  2. Open System Settings > General > Login Items & Extensions"
         echo "  3. Under 'Karabiner-Elements', enable all toggles"
         echo "  4. Enter your password when prompted"
+    elif [ -f "$DRIVERKIT_MANAGER" ]; then
+        echo ""
+        echo "Standalone DriverKit is installed but the extension is not running."
+        echo "Activating..."
+        "$DRIVERKIT_MANAGER" activate
+        echo ""
+        echo "Approve the system extension in System Settings:"
+        echo "  System Settings > General > Login Items & Extensions"
+        echo "  Enable the Karabiner-DriverKit-VirtualHIDDevice toggle"
     else
         echo ""
-        echo "Karabiner-Elements is required for tap and swipe input."
-        read -p "Install it now via Homebrew? [Y/n] " answer
+        echo "A DriverKit virtual HID device is required for tap and swipe input."
+        read -p "Install standalone Karabiner DriverKit package? [Y/n] " answer
         case "$answer" in
-            [nN]*) echo "Skipping. Install manually: brew install --cask karabiner-elements"; exit 1 ;;
+            [nN]*) echo "Skipping. Install manually from: https://github.com/pqrs-org/Karabiner-DriverKit-VirtualHIDDevice/releases"; exit 1 ;;
         esac
-        # Use reinstall to handle stale brew state from incomplete uninstalls
-        if brew list --cask karabiner-elements >/dev/null 2>&1; then
-            brew reinstall --cask karabiner-elements
-        else
-            brew install --cask karabiner-elements
-        fi
 
-        if [ ! -d "/Applications/Karabiner-Elements.app" ]; then
-            echo "Error: Karabiner-Elements.app not found after install."
-            echo "Try manually: brew reinstall --cask karabiner-elements"
+        echo "Downloading Karabiner-DriverKit-VirtualHIDDevice v${DRIVERKIT_VERSION}..."
+        TMP_PKG="/tmp/${DRIVERKIT_PKG}"
+        curl -fSL -o "$TMP_PKG" "$DRIVERKIT_URL"
+
+        echo "Installing..."
+        sudo installer -pkg "$TMP_PKG" -target /
+        rm -f "$TMP_PKG"
+
+        if [ ! -f "$DRIVERKIT_MANAGER" ]; then
+            echo "Error: DriverKit Manager not found after install."
+            echo "Try downloading manually from:"
+            echo "  https://github.com/pqrs-org/Karabiner-DriverKit-VirtualHIDDevice/releases"
             exit 1
         fi
 
         echo ""
-        echo "Karabiner-Elements installed. Opening it now..."
-        open /Applications/Karabiner-Elements.app
+        echo "Activating DriverKit system extension..."
+        "$DRIVERKIT_MANAGER" activate
         echo ""
-        echo "To approve the DriverKit system extension:"
-        echo "  1. Select ANSI keyboard type when Karabiner prompts you"
-        echo "  2. Open System Settings > General > Login Items & Extensions"
-        echo "  3. Under 'Karabiner-Elements', enable all toggles"
-        echo "  4. Enter your password when prompted"
+        echo "Approve the system extension in System Settings:"
+        echo "  System Settings > General > Login Items & Extensions"
+        echo "  Enable the Karabiner-DriverKit-VirtualHIDDevice toggle"
         echo ""
         echo "If macOS shows a 'System Extension Blocked' alert, click"
         echo "'Open System Settings' and approve it there."
     fi
 
     echo ""
-    echo "Waiting for Karabiner DriverKit extension (up to ${KARABINER_WAIT_TIMEOUT}s)..."
+    echo "Waiting for DriverKit extension (up to ${KARABINER_WAIT_TIMEOUT}s)..."
     elapsed=0
     while ! sudo bash -c "ls '$KARABINER_SOCK_DIR'/*.sock" >/dev/null 2>&1; do
         if [ "$elapsed" -ge "$KARABINER_WAIT_TIMEOUT" ]; then
             echo ""
-            echo "Timed out waiting for Karabiner DriverKit extension."
-            echo "Open Karabiner-Elements, approve the extension, and re-run this script."
+            echo "Timed out waiting for DriverKit extension."
+            echo "Approve the extension in System Settings and re-run this script."
             exit 1
         fi
         sleep 2
@@ -93,7 +103,7 @@ if ! sudo bash -c "ls '$KARABINER_SOCK_DIR'/*.sock" >/dev/null 2>&1; then
     printf "\r  ready.            \n"
 fi
 
-echo "Karabiner: running"
+echo "DriverKit: running"
 
 # --- Step 3: Build ---
 
@@ -108,20 +118,23 @@ echo "Built: .build/release/$HELPER_BIN"
 ln -sf "$MCP_BIN" ".build/release/mirroir"
 echo "Symlink: .build/release/mirroir -> $MCP_BIN"
 
-# --- Step 4: Configure Karabiner ignore rule ---
+# --- Step 4: Configure Karabiner ignore rule (only when Karabiner-Elements is installed) ---
+# The ignore rule prevents Karabiner's keyboard grabber from intercepting our virtual keyboard.
+# With standalone DriverKit there is no grabber, so the rule is unnecessary.
 
 echo ""
 echo "=== Configuring Karabiner ==="
 
-IGNORE_RULE='{"identifiers":{"is_keyboard":true,"product_id":592,"vendor_id":1452},"ignore":true}'
+if [ -d "/Applications/Karabiner-Elements.app" ]; then
+    IGNORE_RULE='{"identifiers":{"is_keyboard":true,"product_id":592,"vendor_id":1452},"ignore":true}'
 
-if [ -f "$KARABINER_CONFIG" ]; then
-    if grep -q '"product_id": 592' "$KARABINER_CONFIG" 2>/dev/null || \
-       grep -q '"product_id":592' "$KARABINER_CONFIG" 2>/dev/null; then
-        echo "Karabiner ignore rule already configured."
-    else
-        # Add the device ignore rule to the first profile
-        python3 -c "
+    if [ -f "$KARABINER_CONFIG" ]; then
+        if grep -q '"product_id": 592' "$KARABINER_CONFIG" 2>/dev/null || \
+           grep -q '"product_id":592' "$KARABINER_CONFIG" 2>/dev/null; then
+            echo "Karabiner ignore rule already configured."
+        else
+            # Add the device ignore rule to the first profile
+            python3 -c "
 import json, sys
 with open('$KARABINER_CONFIG') as f:
     config = json.load(f)
@@ -133,10 +146,10 @@ with open('$KARABINER_CONFIG', 'w') as f:
     json.dump(config, f, indent=4)
 print('Added device ignore rule to Karabiner config.')
 "
-    fi
-else
-    mkdir -p "$(dirname "$KARABINER_CONFIG")"
-    cat > "$KARABINER_CONFIG" << 'KARABINER_EOF'
+        fi
+    else
+        mkdir -p "$(dirname "$KARABINER_CONFIG")"
+        cat > "$KARABINER_CONFIG" << 'KARABINER_EOF'
 {
     "profiles": [
         {
@@ -157,7 +170,10 @@ else
     ]
 }
 KARABINER_EOF
-    echo "Created Karabiner config with device ignore rule."
+        echo "Created Karabiner config with device ignore rule."
+    fi
+else
+    echo "Using standalone DriverKit (no Karabiner grabber, ignore rule not needed)."
 fi
 
 # --- Step 5: Install helper daemon ---
@@ -253,13 +269,13 @@ else
     FAIL=$((FAIL + 1))
 fi
 
-# Check Karabiner pointing device (informational — may take time after fresh install)
+# Check virtual pointing device (informational — may take time after fresh install)
 if [ -n "$STATUS" ] && echo "$STATUS" | python3 -c "import json,sys; d=json.load(sys.stdin); sys.exit(0 if d.get('pointing_ready') else 1)" 2>/dev/null; then
-    echo "  [ok] Karabiner virtual pointing device ready"
+    echo "  [ok] Virtual pointing device ready"
     PASS=$((PASS + 1))
 else
-    echo "  [warn] Karabiner virtual pointing device not ready yet"
-    echo "         Open Karabiner-Elements and approve the DriverKit extension."
+    echo "  [warn] Virtual pointing device not ready yet"
+    echo "         Approve the DriverKit extension in System Settings > General > Login Items & Extensions."
     PASS=$((PASS + 1))
 fi
 
