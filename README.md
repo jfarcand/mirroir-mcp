@@ -14,6 +14,8 @@
 
 MCP server that controls a real iPhone through macOS iPhone Mirroring. [Screenshot, tap, swipe, type, scroll_to, measure](docs/tools.md) — from any MCP client. Works with any app on screen, no source code required.
 
+When automation breaks — a button moves, a label changes, timing drifts — [Agent Diagnosis](#agent-diagnosis) tells you *why* and how to fix it. Self-diagnosing automation, not just self-running.
+
 Input flows through [Karabiner](https://karabiner-elements.pqrs.org/) DriverKit virtual HID devices because iPhone Mirroring blocks standard CGEvent injection.
 
 ## Requirements
@@ -153,6 +155,47 @@ recording. I need a video of the scroll lag I'm seeing.
 
 > **Tip:** `describe_screen` supports `skip_ocr: true` to return only the grid-overlaid screenshot without running Vision OCR, letting the MCP client use its own vision model instead (costs more tokens but can identify icons, images, and non-text UI elements).
 
+## Agent Diagnosis
+
+UI automation is brittle. A button moves, a label changes, timing drifts, and your test silently fails. You stare at screenshots trying to figure out what went wrong. `--agent` fixes this: when a compiled scenario fails, it diagnoses *why* the step failed and tells you exactly how to fix it.
+
+Diagnosis runs in two tiers. First, deterministic OCR analysis compares the compiled coordinates against what's actually on screen — fast, free, no API key needed. If you pass a model name, it sends the diagnostic context (expected vs. actual OCR, failure screenshots, step metadata) to an AI for richer analysis: root cause, suggested YAML edits, and whether recompilation will fix it.
+
+```bash
+mirroir test --agent scenario.yaml                    # deterministic OCR diagnosis
+mirroir test --agent claude-sonnet-4-6 scenario.yaml  # deterministic + AI via Anthropic
+mirroir test --agent gpt-4o scenario.yaml             # deterministic + AI via OpenAI
+mirroir test --agent ollama:llama3 scenario.yaml      # deterministic + AI via local Ollama
+mirroir test --agent copilot scenario.yaml            # deterministic + AI via Copilot CLI
+```
+
+**Built-in models:** `claude-sonnet-4-6`, `claude-haiku-4-5`, `gpt-4o`. Set the corresponding API key env var (`ANTHROPIC_API_KEY`, `OPENAI_API_KEY`).
+
+**Custom agents:** Place a YAML profile in `~/.iphone-mirroir-mcp/agents/`. Two modes:
+
+```yaml
+# API mode — call a cloud provider
+name: my-agent
+mode: api
+provider: anthropic
+model: claude-sonnet-4-6-20250514
+api_key_env: MY_KEY
+```
+
+```yaml
+# Command mode — run a local CLI
+name: my-agent
+mode: command
+command: copilot
+args: ["-p", "Analyze: ${PAYLOAD}"]
+```
+
+Command mode supports `${PAYLOAD}` substitution in args for CLIs that take prompts as arguments (like `claude --print -p` or `copilot -p`). Without `${PAYLOAD}`, the diagnostic JSON is piped to stdin.
+
+The system prompt is loaded from `~/.iphone-mirroir-mcp/prompts/diagnosis.md` — edit it to customize AI behavior. The default prompt is installed from the repo-level `prompts/` directory.
+
+All AI errors are non-fatal: deterministic diagnosis always runs regardless.
+
 ## Scenarios
 
 Scenarios are YAML files that describe multi-step automation flows as intents, not scripts. Steps like `tap: "Email"` don't specify coordinates — the AI finds the element by fuzzy OCR matching and adapts to unexpected dialogs, screen layout changes, and timing.
@@ -283,44 +326,7 @@ Each OCR-dependent step (~500ms per call) becomes a direct tap at cached coordin
 
 Compiled files are invalidated automatically when the source YAML changes (SHA-256 hash), the window dimensions change, or the format version bumps. See [Compiled Scenarios](docs/compiled-scenarios.md) for the file format, architecture, and design rationale.
 
-### Agent Diagnosis
-
-When a compiled scenario fails, `--agent` diagnoses the failure. Without a model name, it runs deterministic OCR analysis (element moved? missing? timing?). With a model name, it sends the diagnostic context to an AI for richer analysis.
-
-```bash
-mirroir test --agent scenario.yaml                    # deterministic OCR diagnosis
-mirroir test --agent claude-sonnet-4-6 scenario.yaml  # deterministic + AI via Anthropic
-mirroir test --agent gpt-4o scenario.yaml             # deterministic + AI via OpenAI
-mirroir test --agent ollama:llama3 scenario.yaml      # deterministic + AI via local Ollama
-mirroir test --agent copilot scenario.yaml            # deterministic + AI via Copilot CLI
-```
-
-**Built-in models:** `claude-sonnet-4-6`, `claude-haiku-4-5`, `gpt-4o`. Set the corresponding API key env var (`ANTHROPIC_API_KEY`, `OPENAI_API_KEY`).
-
-**Custom agents:** Place a YAML profile in `~/.iphone-mirroir-mcp/agents/`. Two modes:
-
-```yaml
-# API mode — call a cloud provider
-name: my-agent
-mode: api
-provider: anthropic
-model: claude-sonnet-4-6-20250514
-api_key_env: MY_KEY
-```
-
-```yaml
-# Command mode — run a local CLI
-name: my-agent
-mode: command
-command: copilot
-args: ["-p", "Analyze: ${PAYLOAD}"]
-```
-
-Command mode supports `${PAYLOAD}` substitution in args for CLIs that take prompts as arguments (like `claude --print -p` or `copilot -p`). Without `${PAYLOAD}`, the diagnostic JSON is piped to stdin.
-
-The system prompt is loaded from `~/.iphone-mirroir-mcp/prompts/diagnosis.md` — edit it to customize AI behavior. The default prompt is installed from the repo-level `prompts/` directory.
-
-All AI errors are non-fatal: deterministic diagnosis always runs regardless.
+When a compiled step fails, use `--agent` for AI-powered failure diagnosis. See [Agent Diagnosis](#agent-diagnosis).
 
 ## Recorder
 
