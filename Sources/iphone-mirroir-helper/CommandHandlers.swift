@@ -255,6 +255,7 @@ extension CommandServer {
                 continue
             }
 
+            let isDeadKey = sequence.steps.count > 1
             for (stepIndex, step) in sequence.steps.enumerated() {
                 if stepIndex > 0 {
                     // Delay between dead-key trigger and base character
@@ -262,7 +263,9 @@ extension CommandServer {
                 }
                 karabiner.typeKey(keycode: step.keycode, modifiers: step.modifiers)
             }
-            usleep(EnvConfig.keystrokeDelayUs)
+            // Dead-key sequences need extra settle time for iOS to clear compose
+            // state and release the Option modifier before the next character.
+            usleep(isDeadKey ? EnvConfig.deadKeyDelayUs : EnvConfig.keystrokeDelayUs)
         }
 
         // Restore cursor and reconnect physical mouse after all typing is done
