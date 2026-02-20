@@ -1,0 +1,13 @@
+{
+  "default_target": "iphone",
+  "targets": {
+    "iphone": {
+      "type": "iphone-mirroring"
+    },
+    "android": {
+      "type": "generic-window",
+      "process_name": "qemu-system-aarch64",
+      "window_title_contains": "Android Emulator"
+    }
+  }
+}
