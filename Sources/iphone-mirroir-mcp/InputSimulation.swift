@@ -419,7 +419,7 @@ final class InputSimulation: Sendable {
 
         for char in text {
             let substituted = layoutSubstitution[char] ?? char
-            let method: TypeMethod = HIDKeyMap.lookup(substituted) != nil ? .hid : .paste
+            let method: TypeMethod = HIDKeyMap.lookupSequence(substituted) != nil ? .hid : .paste
             // For HID segments, use the substituted character (US QWERTY equivalent).
             // For paste segments, use the original character (paste is layout-independent).
             let outputChar = method == .hid ? substituted : char

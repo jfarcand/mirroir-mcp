@@ -248,14 +248,20 @@ extension CommandServer {
         var skippedChars = [String]()
 
         for char in text {
-            guard let mapping = HIDKeyMap.lookup(char) else {
+            guard let sequence = HIDKeyMap.lookupSequence(char) else {
                 let codepoint = char.unicodeScalars.first.map { "U+\(String($0.value, radix: 16, uppercase: true))" } ?? "?"
                 logHelper("No HID mapping for character: '\(char)' (\(codepoint))")
                 skippedChars.append(String(char))
                 continue
             }
 
-            karabiner.typeKey(keycode: mapping.keycode, modifiers: mapping.modifiers)
+            for (stepIndex, step) in sequence.steps.enumerated() {
+                if stepIndex > 0 {
+                    // Delay between dead-key trigger and base character
+                    usleep(EnvConfig.deadKeyDelayUs)
+                }
+                karabiner.typeKey(keycode: step.keycode, modifiers: step.modifiers)
+            }
             usleep(EnvConfig.keystrokeDelayUs)
         }
 

@@ -163,4 +163,139 @@ struct HIDKeyMapTests {
         }
         #expect(unmapped.isEmpty, "Unmapped printable ASCII: \(unmapped)")
     }
+
+    // MARK: - Dead-Key Sequences: Acute (Option+e)
+
+    @Test("é requires 2-step dead-key: Option+e then e")
+    func acuteE() {
+        let seq = HIDKeyMap.lookupSequence("é")
+        #expect(seq != nil)
+        #expect(seq!.steps.count == 2)
+        // Step 1: Option+e (dead acute)
+        #expect(seq!.steps[0].keycode == 0x08)
+        #expect(seq!.steps[0].modifiers == .leftOption)
+        // Step 2: e (base character)
+        #expect(seq!.steps[1].keycode == 0x08)
+        #expect(seq!.steps[1].modifiers == [])
+    }
+
+    @Test("É requires 2-step dead-key: Option+e then Shift+e")
+    func acuteUpperE() {
+        let seq = HIDKeyMap.lookupSequence("É")
+        #expect(seq != nil)
+        #expect(seq!.steps.count == 2)
+        #expect(seq!.steps[0].modifiers == .leftOption)
+        #expect(seq!.steps[1].keycode == 0x08)
+        #expect(seq!.steps[1].modifiers == .leftShift)
+    }
+
+    @Test("all acute accented characters are mapped")
+    func acuteFamily() {
+        for char: Character in ["é", "É", "á", "Á", "í", "Í", "ó", "Ó", "ú", "Ú"] {
+            let seq = HIDKeyMap.lookupSequence(char)
+            #expect(seq != nil, "Missing dead-key mapping for '\(char)'")
+            #expect(seq!.steps.count == 2, "'\(char)' should be a 2-step sequence")
+            #expect(seq!.steps[0].modifiers.contains(.leftOption), "'\(char)' step 0 should use Option")
+            #expect(seq!.steps[0].keycode == 0x08, "'\(char)' acute trigger should be keycode 0x08 (e)")
+        }
+    }
+
+    // MARK: - Dead-Key Sequences: Grave (Option+`)
+
+    @Test("all grave accented characters are mapped")
+    func graveFamily() {
+        for char: Character in ["è", "È", "à", "À", "ì", "Ì", "ò", "Ò", "ù", "Ù"] {
+            let seq = HIDKeyMap.lookupSequence(char)
+            #expect(seq != nil, "Missing dead-key mapping for '\(char)'")
+            #expect(seq!.steps.count == 2, "'\(char)' should be a 2-step sequence")
+            #expect(seq!.steps[0].keycode == 0x35, "'\(char)' grave trigger should be keycode 0x35 (`)")
+        }
+    }
+
+    // MARK: - Dead-Key Sequences: Umlaut (Option+u)
+
+    @Test("all umlaut accented characters are mapped")
+    func umlautFamily() {
+        for char: Character in ["ü", "Ü", "ö", "Ö", "ä", "Ä", "ë", "Ë", "ï", "Ï", "ÿ", "Ÿ"] {
+            let seq = HIDKeyMap.lookupSequence(char)
+            #expect(seq != nil, "Missing dead-key mapping for '\(char)'")
+            #expect(seq!.steps.count == 2, "'\(char)' should be a 2-step sequence")
+            #expect(seq!.steps[0].keycode == 0x18, "'\(char)' umlaut trigger should be keycode 0x18 (u)")
+        }
+    }
+
+    // MARK: - Dead-Key Sequences: Circumflex (Option+i)
+
+    @Test("all circumflex accented characters are mapped")
+    func circumflexFamily() {
+        for char: Character in ["ê", "Ê", "â", "Â", "î", "Î", "ô", "Ô", "û", "Û"] {
+            let seq = HIDKeyMap.lookupSequence(char)
+            #expect(seq != nil, "Missing dead-key mapping for '\(char)'")
+            #expect(seq!.steps.count == 2, "'\(char)' should be a 2-step sequence")
+            #expect(seq!.steps[0].keycode == 0x0C, "'\(char)' circumflex trigger should be keycode 0x0C (i)")
+        }
+    }
+
+    // MARK: - Dead-Key Sequences: Tilde (Option+n)
+
+    @Test("all tilde accented characters are mapped")
+    func tildeFamily() {
+        for char: Character in ["ñ", "Ñ", "ã", "Ã", "õ", "Õ"] {
+            let seq = HIDKeyMap.lookupSequence(char)
+            #expect(seq != nil, "Missing dead-key mapping for '\(char)'")
+            #expect(seq!.steps.count == 2, "'\(char)' should be a 2-step sequence")
+            #expect(seq!.steps[0].keycode == 0x11, "'\(char)' tilde trigger should be keycode 0x11 (n)")
+        }
+    }
+
+    // MARK: - Direct Option Characters
+
+    @Test("ç is a single-step Option+c sequence")
+    func cedilla() {
+        let seq = HIDKeyMap.lookupSequence("ç")
+        #expect(seq != nil)
+        #expect(seq!.steps.count == 1)
+        #expect(seq!.steps[0].keycode == 0x06)
+        #expect(seq!.steps[0].modifiers == .leftOption)
+    }
+
+    @Test("Ç is a single-step Option+Shift+c sequence")
+    func cedillaUpper() {
+        let seq = HIDKeyMap.lookupSequence("Ç")
+        #expect(seq != nil)
+        #expect(seq!.steps.count == 1)
+        #expect(seq!.steps[0].keycode == 0x06)
+        #expect(seq!.steps[0].modifiers == [.leftOption, .leftShift])
+    }
+
+    // MARK: - lookupSequence Backward Compatibility
+
+    @Test("lookupSequence returns 1-step for regular ASCII characters")
+    func lookupSequenceBackwardCompat() {
+        let seq = HIDKeyMap.lookupSequence("a")
+        #expect(seq != nil)
+        #expect(seq!.steps.count == 1)
+        #expect(seq!.steps[0].keycode == 0x04)
+        #expect(seq!.steps[0].modifiers == [])
+    }
+
+    @Test("lookupSequence returns nil for genuinely untypeable characters")
+    func lookupSequenceUntypeable() {
+        #expect(HIDKeyMap.lookupSequence("\u{1F600}") == nil)  // emoji 😀
+        #expect(HIDKeyMap.lookupSequence("\u{4E2D}") == nil)   // CJK 中
+    }
+
+    @Test("uppercase accented chars have shift on base step")
+    func uppercaseAccentedShift() {
+        let cases: [(Character, UInt16)] = [
+            ("É", 0x08), ("À", 0x04), ("Ü", 0x18), ("Ê", 0x08), ("Ñ", 0x11),
+        ]
+        for (char, expectedBase) in cases {
+            let seq = HIDKeyMap.lookupSequence(char)
+            #expect(seq != nil, "Missing sequence for '\(char)'")
+            #expect(seq!.steps.count == 2, "'\(char)' should be 2-step")
+            #expect(seq!.steps[1].keycode == expectedBase, "'\(char)' wrong base keycode")
+            #expect(seq!.steps[1].modifiers.contains(.leftShift), "'\(char)' base step should have shift")
+        }
+    }
 }

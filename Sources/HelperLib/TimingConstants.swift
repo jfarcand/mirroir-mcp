@@ -72,6 +72,10 @@ public enum TimingConstants {
     /// Hold duration for a single key press via Karabiner HID (microseconds).
     public static let keyHoldUs: UInt32 = 20_000
 
+    /// Delay between dead-key trigger and base character for compose sequences (microseconds).
+    /// Dead-key input requires the compose state to settle before the base character arrives.
+    public static let deadKeyDelayUs: UInt32 = 30_000
+
     /// Receive timeout for Karabiner socket responses (microseconds).
     public static let recvTimeoutUs: Int32 = 200_000
 

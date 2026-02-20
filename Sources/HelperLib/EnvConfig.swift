@@ -98,6 +98,10 @@ public enum EnvConfig {
         readUInt32("IPHONE_MIRROIR_KEY_HOLD_US", default: TimingConstants.keyHoldUs)
     }
 
+    public static var deadKeyDelayUs: UInt32 {
+        readUInt32("IPHONE_MIRROIR_DEAD_KEY_DELAY_US", default: TimingConstants.deadKeyDelayUs)
+    }
+
     public static var recvTimeoutUs: Int32 {
         readInt32("IPHONE_MIRROIR_RECV_TIMEOUT_US", default: TimingConstants.recvTimeoutUs)
     }

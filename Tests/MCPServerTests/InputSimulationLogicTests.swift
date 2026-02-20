@@ -85,4 +85,48 @@ final class InputSimulationLogicTests: XCTestCase {
         let segments = simulation.buildTypeSegments("")
         XCTAssertTrue(segments.isEmpty)
     }
+
+    // MARK: - buildTypeSegments with Accented Characters
+
+    func testBuildTypeSegmentsCafeAllHID() {
+        // "café" — all characters (c, a, f, é) have HID mappings now
+        let segments = simulation.buildTypeSegments("café")
+        XCTAssertEqual(segments.count, 1)
+        XCTAssertEqual(segments.first?.method, .hid)
+        XCTAssertEqual(segments.first?.text, "café")
+    }
+
+    func testBuildTypeSegmentsResumeAllHID() {
+        // "résumé" — all characters have HID mappings via dead-key sequences
+        let segments = simulation.buildTypeSegments("résumé")
+        XCTAssertEqual(segments.count, 1)
+        XCTAssertEqual(segments.first?.method, .hid)
+        XCTAssertEqual(segments.first?.text, "résumé")
+    }
+
+    func testBuildTypeSegmentsMixedHIDAndPaste() {
+        // "résumé 😀" — accented chars are HID, emoji is paste
+        let segments = simulation.buildTypeSegments("résumé 😀")
+        XCTAssertEqual(segments.count, 2)
+        XCTAssertEqual(segments[0].method, .hid)
+        XCTAssertEqual(segments[0].text, "résumé ")
+        XCTAssertEqual(segments[1].method, .paste)
+        XCTAssertEqual(segments[1].text, "😀")
+    }
+
+    func testBuildTypeSegmentsNaiveAllHID() {
+        // "naïve" — ï is in the umlaut dead-key family
+        let segments = simulation.buildTypeSegments("naïve")
+        XCTAssertEqual(segments.count, 1)
+        XCTAssertEqual(segments.first?.method, .hid)
+        XCTAssertEqual(segments.first?.text, "naïve")
+    }
+
+    func testBuildTypeSegmentsCedilla() {
+        // "garçon" — ç is a direct Option+c character
+        let segments = simulation.buildTypeSegments("garçon")
+        XCTAssertEqual(segments.count, 1)
+        XCTAssertEqual(segments.first?.method, .hid)
+        XCTAssertEqual(segments.first?.text, "garçon")
+    }
 }
