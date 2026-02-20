@@ -18,10 +18,17 @@ final class ScreenDescriber: Sendable {
         self.bridge = bridge
     }
 
-    /// Result of a describe operation: detected elements plus the screenshot for visual context.
+    /// Result of a describe operation: detected elements, navigation hints, plus the screenshot.
     struct DescribeResult: Sendable {
         let elements: [TapPoint]
+        let hints: [String]
         let screenshotBase64: String
+
+        init(elements: [TapPoint], hints: [String] = [], screenshotBase64: String) {
+            self.elements = elements
+            self.hints = hints
+            self.screenshotBase64 = screenshotBase64
+        }
     }
 
     /// Capture the mirroring window, run OCR, and return detected text elements
@@ -65,7 +72,7 @@ final class ScreenDescriber: Sendable {
         // Return grid-overlaid screenshot without running OCR
         if skipOCR {
             let griddedData = GridOverlay.addOverlay(to: data, windowSize: info.size) ?? data
-            return DescribeResult(elements: [], screenshotBase64: griddedData.base64EncodedString())
+            return DescribeResult(elements: [], hints: [], screenshotBase64: griddedData.base64EncodedString())
         }
 
         // Create CGImage for Vision (OCR runs on the clean image, before grid overlay)
@@ -83,12 +90,12 @@ final class ScreenDescriber: Sendable {
             try handler.perform([request])
         } catch {
             let fallback = GridOverlay.addOverlay(to: data, windowSize: info.size) ?? data
-            return DescribeResult(elements: [], screenshotBase64: fallback.base64EncodedString())
+            return DescribeResult(elements: [], hints: [], screenshotBase64: fallback.base64EncodedString())
         }
 
         guard let observations = request.results else {
             let fallback = GridOverlay.addOverlay(to: data, windowSize: info.size) ?? data
-            return DescribeResult(elements: [], screenshotBase64: fallback.base64EncodedString())
+            return DescribeResult(elements: [], hints: [], screenshotBase64: fallback.base64EncodedString())
         }
 
         let windowWidth = Double(info.size.width)
@@ -132,10 +139,15 @@ final class ScreenDescriber: Sendable {
             elements: rawElements, windowWidth: windowWidth
         )
 
+        // Detect navigation patterns and generate keyboard shortcut hints
+        let hints = NavigationHintDetector.detect(
+            elements: elements, windowHeight: windowHeight
+        )
+
         let griddedData = GridOverlay.addOverlay(to: data, windowSize: info.size) ?? data
         let base64 = griddedData.base64EncodedString()
 
-        return DescribeResult(elements: elements, screenshotBase64: base64)
+        return DescribeResult(elements: elements, hints: hints, screenshotBase64: base64)
     }
 
 }

@@ -57,7 +57,9 @@ extension IPhoneMirroirMCP {
                 and the screenshot image. Coordinates are in the same point system as the \
                 tap tool (0,0 = top-left of mirroring window). \
                 Set skip_ocr to true to skip Vision OCR and return only the grid-overlaid \
-                screenshot, letting the MCP client use its own vision model.
+                screenshot, letting the MCP client use its own vision model. \
+                Note: tapping nav bar back buttons ("<") is unreliable in iPhone Mirroring. \
+                Use press_key with key="[" modifiers=["command"] for back navigation instead.
                 """,
             inputSchema: [
                 "type": .string("object"),
@@ -102,6 +104,13 @@ extension IPhoneMirroirMCP {
                 }
                 if result.elements.isEmpty {
                     lines.append("(no text detected)")
+                }
+                if !result.hints.isEmpty {
+                    lines.append("")
+                    lines.append("Hints:")
+                    for hint in result.hints {
+                        lines.append("- \(hint)")
+                    }
                 }
                 let description = lines.joined(separator: "\n")
 

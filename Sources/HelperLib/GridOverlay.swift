@@ -2,7 +2,7 @@
 // Licensed under the Apache License, Version 2.0
 //
 // ABOUTME: Draws a coordinate grid overlay on screenshot PNG data for AI coordinate reference.
-// ABOUTME: Grid lines appear every 50 points with labeled axes; operates in CG pixel space.
+// ABOUTME: Grid lines appear every 25 points with labeled axes every 50pt; operates in CG pixel space.
 
 import CoreGraphics
 import CoreText
@@ -13,11 +13,13 @@ import ImageIO
 /// elements to precise tap coordinates.
 public enum GridOverlay {
     /// Points between grid lines in the mirroring window's coordinate space.
-    public static let gridSpacing: CGFloat = 50.0
+    public static let gridSpacing: CGFloat = 25.0
     /// Alpha for grid lines — subtle but visible on both light and dark backgrounds.
     static let gridLineAlpha: CGFloat = 0.3
     /// Font size in points for coordinate labels (scaled for Retina internally).
-    static let gridLabelFontSize: CGFloat = 10.0
+    static let gridLabelFontSize: CGFloat = 8.0
+    /// Show coordinate labels every N grid lines to reduce clutter at high density.
+    static let labelEveryN: Int = 2
 
     /// Overlay a coordinate grid on raw PNG data.
     ///
@@ -61,22 +63,27 @@ public enum GridOverlay {
         let fontSize = gridLabelFontSize * max(scaleX, scaleY)
 
         // Vertical lines (constant x)
+        var lineIndex = 1
         var x = spacing
         while x < windowSize.width {
             let px = x * scaleX
             ctx.move(to: CGPoint(x: px, y: 0))
             ctx.addLine(to: CGPoint(x: px, y: CGFloat(pixelHeight)))
             ctx.strokePath()
-            drawLabel(
-                "\(Int(x))",
-                in: ctx,
-                at: CGPoint(x: px + 2, y: CGFloat(pixelHeight) - fontSize - 4),
-                fontSize: fontSize
-            )
+            if lineIndex % labelEveryN == 0 {
+                drawLabel(
+                    "\(Int(x))",
+                    in: ctx,
+                    at: CGPoint(x: px + 2, y: CGFloat(pixelHeight) - fontSize - 4),
+                    fontSize: fontSize
+                )
+            }
             x += spacing
+            lineIndex += 1
         }
 
         // Horizontal lines (constant y)
+        lineIndex = 1
         var y = spacing
         while y < windowSize.height {
             // CG origin is bottom-left; mirroring window origin is top-left.
@@ -84,13 +91,16 @@ public enum GridOverlay {
             ctx.move(to: CGPoint(x: 0, y: py))
             ctx.addLine(to: CGPoint(x: CGFloat(pixelWidth), y: py))
             ctx.strokePath()
-            drawLabel(
-                "\(Int(y))",
-                in: ctx,
-                at: CGPoint(x: 4, y: py + 2),
-                fontSize: fontSize
-            )
+            if lineIndex % labelEveryN == 0 {
+                drawLabel(
+                    "\(Int(y))",
+                    in: ctx,
+                    at: CGPoint(x: 4, y: py + 2),
+                    fontSize: fontSize
+                )
+            }
             y += spacing
+            lineIndex += 1
         }
 
         // Encode back to PNG
