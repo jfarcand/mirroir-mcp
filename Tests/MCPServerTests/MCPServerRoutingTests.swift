@@ -40,7 +40,7 @@ final class MCPServerRoutingTests: XCTestCase {
             return XCTFail("Expected serverInfo object")
         }
         XCTAssertEqual(serverInfo["name"], .string("iphone-mirroir-mcp"))
-        XCTAssertEqual(serverInfo["version"], .string("0.14.0"))
+        XCTAssertEqual(serverInfo["version"], .string("0.14.1"))
 
         guard case .object(let capabilities) = result["capabilities"] else {
             return XCTFail("Expected capabilities object")

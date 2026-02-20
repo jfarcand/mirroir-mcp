@@ -9,7 +9,7 @@ const fs = require("fs");
 const path = require("path");
 const { execSync } = require("child_process");
 
-const VERSION = "0.14.0";
+const VERSION = "0.14.1";
 const REPO = "jfarcand/iphone-mirroir-mcp";
 const BINARY = "iphone-mirroir-mcp";
 
