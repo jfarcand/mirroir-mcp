@@ -24,5 +24,6 @@ extension MirroirMCP {
         registerMeasureTools(server: server, registry: registry)
         registerNetworkTools(server: server, registry: registry)
         registerTargetTools(server: server, registry: registry)
+        registerCompilationTools(server: server, registry: registry)
     }
 }

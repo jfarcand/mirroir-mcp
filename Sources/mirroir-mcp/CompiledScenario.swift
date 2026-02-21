@@ -22,9 +22,9 @@ struct CompiledScenario: Codable, Equatable {
     static let currentVersion = 1
 }
 
-/// Metadata about the source scenario YAML used to detect staleness.
+/// Metadata about the source scenario file used to detect staleness.
 struct SourceInfo: Codable, Equatable {
-    /// SHA-256 hash of the source YAML content.
+    /// SHA-256 hash of the source scenario file content.
     let sha256: String
     /// ISO 8601 timestamp of when the scenario was compiled.
     let compiledAt: String
@@ -111,16 +111,18 @@ enum CompiledAction: String, Codable, Equatable {
 /// File I/O for compiled scenario JSON files.
 enum CompiledScenarioIO {
 
-    /// Derive the compiled JSON path from a YAML scenario path.
+    /// Derive the compiled JSON path from a scenario file path.
+    /// Works for both `.yaml` and `.md` since `deletingPathExtension` handles either.
     /// `apps/settings/check-about.yaml` → `apps/settings/check-about.compiled.json`
-    static func compiledPath(for yamlPath: String) -> String {
-        let base = (yamlPath as NSString).deletingPathExtension
+    /// `apps/settings/check-about.md` → `apps/settings/check-about.compiled.json`
+    static func compiledPath(for scenarioPath: String) -> String {
+        let base = (scenarioPath as NSString).deletingPathExtension
         return base + ".compiled.json"
     }
 
     /// Load a compiled scenario from disk. Returns nil if file doesn't exist.
-    static func load(for yamlPath: String) throws -> CompiledScenario? {
-        let path = compiledPath(for: yamlPath)
+    static func load(for scenarioPath: String) throws -> CompiledScenario? {
+        let path = compiledPath(for: scenarioPath)
         guard FileManager.default.fileExists(atPath: path) else { return nil }
 
         let data = try Data(contentsOf: URL(fileURLWithPath: path))
@@ -128,9 +130,9 @@ enum CompiledScenarioIO {
         return try decoder.decode(CompiledScenario.self, from: data)
     }
 
-    /// Save a compiled scenario to disk alongside its YAML source.
-    static func save(_ compiled: CompiledScenario, for yamlPath: String) throws {
-        let path = compiledPath(for: yamlPath)
+    /// Save a compiled scenario to disk alongside its source file.
+    static func save(_ compiled: CompiledScenario, for scenarioPath: String) throws {
+        let path = compiledPath(for: scenarioPath)
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
         let data = try encoder.encode(compiled)
@@ -152,9 +154,9 @@ enum CompiledScenarioIO {
         return digest.map { String(format: "%02x", $0) }.joined()
     }
 
-    /// Check if a compiled scenario is stale relative to its source YAML.
+    /// Check if a compiled scenario is stale relative to its source file.
     static func checkStaleness(compiled: CompiledScenario,
-                                yamlPath: String,
+                                scenarioPath: String,
                                 windowWidth: Double,
                                 windowHeight: Double) -> StalenessResult {
         // Version check
@@ -163,9 +165,9 @@ enum CompiledScenarioIO {
         }
 
         // Source hash check
-        if let currentHash = try? sha256(of: yamlPath),
+        if let currentHash = try? sha256(of: scenarioPath),
            currentHash != compiled.source.sha256 {
-            return .stale(reason: "source YAML has changed since compilation")
+            return .stale(reason: "source file has changed since compilation")
         }
 
         // Dimension check

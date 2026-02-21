@@ -290,6 +290,7 @@ Convert existing YAML scenarios to the SKILL.md format:
 ```bash
 mirroir migrate apps/settings/check-about.yaml           # single file
 mirroir migrate --dir ~/.mirroir-mcp/scenarios            # entire directory
+mirroir migrate --output-dir ./converted/ scenario.yaml   # write .md files to alternate directory
 mirroir migrate --dry-run apps/mail/email-triage.yaml     # preview without writing
 ```
 
@@ -354,11 +355,12 @@ mirroir test --dry-run apps/settings/*.yaml
 | `--timeout <seconds>` | `wait_for` timeout (default: 15) |
 | `--verbose` | Show step-by-step detail |
 | `--dry-run` | Parse and validate without executing |
+| `--no-compiled` | Skip compiled scenarios, force full OCR |
 | `--agent [model]` | Diagnose compiled failures (see [Agent Diagnosis](#agent-diagnosis)) |
 
 The test runner uses the same OCR and input subsystems as the MCP server. Steps like `tap: "General"` find the element via Vision OCR and tap at the detected coordinates. `wait_for` polls OCR until the label appears or times out. AI-only steps (`remember`, `condition`, `repeat`) are skipped with a warning.
 
-Scenario resolution searches `<cwd>/.mirroir-mcp/scenarios/` and `~/.mirroir-mcp/scenarios/` — same directories as `list_scenarios`. Pass a `.yaml` or `.md` path to run a specific file, or a name to search the scenario directories.
+The test runner executes YAML scenarios only — SKILL.md files contain natural-language steps that require AI interpretation and cannot be run deterministically. When resolving by name (e.g., `mirroir test check-about`), only `.yaml` files are matched. Pass a direct `.yaml` path to run a specific file. Scenario resolution searches `<cwd>/.mirroir-mcp/scenarios/` and `~/.mirroir-mcp/scenarios/` — same directories as `list_scenarios`.
 
 Exit code is `0` when all scenarios pass, `1` when any step fails.
 
@@ -512,7 +514,7 @@ See [`TimingConstants.swift`](Sources/HelperLib/TimingConstants.swift) for all a
 
 | | |
 |---|---|
-| [Tools Reference](docs/tools.md) | All 26 tools, parameters, and input workflows |
+| [Tools Reference](docs/tools.md) | All 28 tools, parameters, and input workflows |
 | [FAQ](docs/faq.md) | Security, focus stealing, DriverKit, keyboard layouts |
 | [Security](docs/security.md) | Threat model, kill switch, and recommendations |
 | [Permissions](docs/permissions.md) | Fail-closed permission model and config file |

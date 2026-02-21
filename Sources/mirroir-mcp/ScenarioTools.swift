@@ -76,6 +76,11 @@ extension MirroirMCP {
                     do {
                         var content = try String(contentsOfFile: path, encoding: .utf8)
                         content = substituteEnvVars(in: content)
+
+                        // Append compilation status for AI decision-making
+                        let status = compilationStatus(for: path)
+                        content += "\n\n\(status)"
+
                         return .text(content)
                     } catch {
                         return .error(
@@ -415,5 +420,27 @@ extension MirroirMCP {
         }
 
         return (nil, [])
+    }
+
+    /// Check compilation status for a scenario file and return a status string.
+    /// Used by get_scenario to inform the AI whether compilation is needed.
+    static func compilationStatus(for scenarioPath: String) -> String {
+        guard let compiled = try? CompiledScenarioIO.load(for: scenarioPath) else {
+            return "[Not compiled \u{2014} use record_step after each step to compile]"
+        }
+
+        // Check staleness without window dimensions (skip dimension check for get_scenario
+        // since the AI may not be connected to a device yet)
+        let staleness = CompiledScenarioIO.checkStaleness(
+            compiled: compiled, scenarioPath: scenarioPath,
+            windowWidth: compiled.device.windowWidth,
+            windowHeight: compiled.device.windowHeight)
+
+        switch staleness {
+        case .fresh:
+            return "[Compiled: fresh]"
+        case .stale(let reason):
+            return "[Compiled: stale \u{2014} \(reason)]"
+        }
     }
 }

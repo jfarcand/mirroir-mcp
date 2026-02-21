@@ -1,6 +1,6 @@
 # Tools Reference
 
-All 26 tools exposed by the MCP server. Mutating tools require [permission](permissions.md) to appear in `tools/list`.
+All 28 tools exposed by the MCP server. Mutating tools require [permission](permissions.md) to appear in `tools/list`.
 
 ## Tool List
 
@@ -31,7 +31,9 @@ All 26 tools exposed by the MCP server. Mutating tools require [permission](perm
 | `status` | — | Connection state, window geometry, and device readiness |
 | `check_health` | — | Comprehensive setup diagnostic: mirroring, helper, DriverKit, screen capture |
 | `list_scenarios` | — | List available scenarios (SKILL.md and YAML) from project-local and global config dirs |
-| `get_scenario` | `name` | Read a scenario file (SKILL.md or YAML) with ${VAR} env substitution |
+| `get_scenario` | `name` | Read a scenario file (SKILL.md or YAML) with ${VAR} env substitution. Appends compilation status. |
+| `record_step` | `step_index`, `type`, `label`?, `tap_x`?, `tap_y`?, `confidence`?, `match_strategy`?, `elapsed_ms`?, `scroll_count`?, `scroll_direction`? | Record a compiled step during AI-driven scenario execution |
+| `save_compiled` | `scenario_name` | Save accumulated compiled steps as .compiled.json next to the source scenario |
 
 ## Coordinates
 
@@ -130,9 +132,10 @@ Test the login screen with valid credentials.
 Convert existing YAML scenarios with `mirroir migrate`:
 
 ```bash
-mirroir migrate scenario.yaml              # convert a single file
-mirroir migrate --dir path/to/scenarios/   # convert all YAML files in a directory
-mirroir migrate --dry-run scenario.yaml    # preview without writing
+mirroir migrate scenario.yaml                            # convert a single file
+mirroir migrate --dir path/to/scenarios/                 # convert all YAML files in a directory
+mirroir migrate --output-dir ./converted/ scenario.yaml  # write .md files to alternate directory
+mirroir migrate --dry-run scenario.yaml                  # preview without writing
 ```
 
 ### YAML Format (Legacy)
@@ -171,10 +174,12 @@ Steps are intents — the AI maps each to the appropriate MCP tool calls:
 | `tap: "Label"` | calls `describe_screen` to find element, then `tap` |
 | `type` | calls `type_text` |
 | `swipe: "up"` | calls `swipe` with appropriate coordinates |
+| `long_press: "Label"` | calls `describe_screen` to find element, then `long_press` |
+| `drag: { from, to }` | calls `describe_screen` to find elements, then `drag` between them |
 | `wait_for: "Label"` | polls `describe_screen` until element appears |
 | `assert_visible` / `assert_not_visible` | checks via `describe_screen` |
 | `screenshot: "label"` | captures and labels in report |
-| `press_key` | calls `press_key` |
+| `press_key` | calls `press_key` with optional modifiers |
 | `press_home` | calls `press_home` to return to home screen |
 | `open_url` | calls `open_url` |
 | `shake` | calls `shake` |
@@ -182,6 +187,7 @@ Steps are intents — the AI maps each to the appropriate MCP tool calls:
 | `reset_app: "AppName"` | calls `reset_app` — force-quit via App Switcher |
 | `set_network: "mode"` | calls `set_network` — toggle airplane/wifi/cellular |
 | `measure: { action, until, max }` | calls `measure` — time screen transitions |
+| `target: "name"` | calls `switch_target` — switch to a different automation target window |
 | `remember: "instruction"` | AI reads dynamic data from screen and holds it for later steps |
 | `condition:` | Branch based on screen state — see below |
 | `repeat:` | Loop over steps until a screen condition is met — see below |

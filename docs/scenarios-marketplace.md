@@ -6,7 +6,7 @@ Scenarios are files that describe multi-step iPhone automation flows as intents,
 
 The system has two layers:
 
-1. **This repository** (`mirroir-mcp`) — provides 26 MCP tools for iPhone interaction
+1. **This repository** (`mirroir-mcp`) — provides 28 MCP tools for iPhone interaction
 2. **Scenario repositories** (e.g., [jfarcand/mirroir-scenarios](https://github.com/jfarcand/mirroir-scenarios)) — provide reusable scenario files (SKILL.md or YAML) + plugin discovery
 
 Scenarios are intentionally simple. Steps like `tap: "Email"` don't specify pixel coordinates — the AI uses `describe_screen` for fuzzy OCR matching and adapts to unexpected dialogs, layout changes, and timing differences.
@@ -84,8 +84,10 @@ Send a direct message to a contact in Slack.
 Convert existing YAML scenarios with `mirroir migrate`:
 
 ```bash
-mirroir migrate scenario.yaml              # convert a single file
-mirroir migrate --dir path/to/scenarios/   # convert all YAML files in a directory
+mirroir migrate scenario.yaml                            # convert a single file
+mirroir migrate --dir path/to/scenarios/                 # convert all YAML files in a directory
+mirroir migrate --output-dir ./converted/ scenario.yaml  # write .md files to alternate directory
+mirroir migrate --dry-run scenario.yaml                  # preview without writing
 ```
 
 ### YAML Format (Legacy)
@@ -103,6 +105,7 @@ mirroir migrate --dir path/to/scenarios/   # convert all YAML files in a directo
 
 | Field | Type | Description |
 |-------|------|-------------|
+| `version` | integer | Scenario format version (default: 1). Used for future format evolution. |
 | `ios_min` | string | Minimum iOS version (e.g., `"17.0"`) |
 | `locale` | string | Expected device locale (e.g., `"fr-CA"`) |
 | `tags` | list | Categorization tags (e.g., `["productivity", "messaging"]`) |
@@ -136,13 +139,20 @@ Each step is a single key-value pair in the `steps` list. The AI interprets each
 | `launch` | App name (string) | `launch_app` | Open an app via Spotlight search |
 | `tap` | Element text (string) | `describe_screen` + `tap` | Find element by OCR text match, tap its coordinates |
 | `type` | Text to type (string) | `type_text` | Type text into the currently focused field |
-| `press_key` | Key name (string) | `press_key` | Press a special key (return, escape, tab, etc.) |
+| `press_key` | Key name (string) | `press_key` | Press a special key (return, escape, tab, etc.) with optional modifiers |
 | `swipe` | Direction (string) | `swipe` | Swipe in a direction (up, down, left, right) |
 | `wait_for` | Element text (string) | `describe_screen` (poll) | Wait until text appears on screen (retry with describe_screen) |
 | `assert_visible` | Element text (string) | `describe_screen` | Verify text is visible; fail the scenario if not found |
+| `assert_not_visible` | Element text (string) | `describe_screen` | Verify text is NOT visible; fail the scenario if found |
 | `screenshot` | Label (string) | `screenshot` | Capture a screenshot with a descriptive label |
 | `shake` | `true` | `shake` | Trigger a shake gesture (debug menus, undo) |
 | `press_home` | `true` | `press_home` | Return to the home screen |
+| `open_url` | URL (string) | `open_url` | Open a URL in Safari |
+| `scroll_to` | Element text (string) | `scroll_to` | Scroll until a text element becomes visible via OCR |
+| `reset_app` | App name (string) | `reset_app` | Force-quit an app via the App Switcher |
+| `set_network` | Mode (string) | `set_network` | Toggle network settings (airplane_on/off, wifi_on/off, cellular_on/off) |
+| `measure` | Object with `action`, `until`, `max`? | `measure` | Time a screen transition after an action |
+| `target` | Target name (string) | `switch_target` | Switch to a different automation target window |
 | `remember` | Instruction (string) | _(AI-interpreted)_ | Tell the AI to extract and remember data from the current screen |
 | `long_press` | Element text (string) | `describe_screen` + `long_press` | Find element by OCR, long press on it |
 | `drag` | Object with `from`/`to` | `describe_screen` + `drag` | Find elements by OCR, drag between them |

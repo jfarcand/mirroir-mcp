@@ -101,7 +101,7 @@ enum TestRunner {
             for scenario in scenarios {
                 if let compiled = try? CompiledScenarioIO.load(for: scenario.filePath) {
                     let staleness = CompiledScenarioIO.checkStaleness(
-                        compiled: compiled, yamlPath: scenario.filePath,
+                        compiled: compiled, scenarioPath: scenario.filePath,
                         windowWidth: windowWidth, windowHeight: windowHeight)
                     switch staleness {
                     case .fresh:
