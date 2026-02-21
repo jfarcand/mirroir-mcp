@@ -86,7 +86,7 @@ jobs:
           lines = sys.stdin.readlines()
           obj = json.loads(lines[1])
           tools = [t['name'] for t in obj['result']['tools']]
-          expected = {'screenshot','start_recording','stop_recording','tap','swipe','drag','type_text','press_key','long_press','double_tap','shake','launch_app','open_url','press_home','press_app_switcher','spotlight','get_orientation','status','check_health','describe_screen','list_scenarios','get_scenario','scroll_to','reset_app','measure','set_network','list_targets','switch_target'}
+          expected = {'screenshot','start_recording','stop_recording','tap','swipe','drag','type_text','press_key','long_press','double_tap','shake','launch_app','open_url','press_home','press_app_switcher','spotlight','get_orientation','status','check_health','describe_screen','list_scenarios','get_scenario','scroll_to','reset_app','measure','set_network','list_targets','switch_target','record_step','save_compiled'}
           assert set(tools) == expected, f'Expected: {expected}\nGot: {set(tools)}\nMissing: {expected - set(tools)}\nExtra: {set(tools) - expected}'
           print(f'tools/list: {len(tools)} tools registered')
           "
@@ -145,7 +145,7 @@ jobs:
           lines = sys.stdin.readlines()
           obj = json.loads(lines[1])
           tools = [t['name'] for t in obj['result']['tools']]
-          assert len(tools) == 28, f'--yolo should show all 28 tools, got {len(tools)}: {tools}'
+          assert len(tools) == 30, f'--yolo should show all 30 tools, got {len(tools)}: {tools}'
           print(f'--yolo alias: {len(tools)} tools (OK)')
           "
 
