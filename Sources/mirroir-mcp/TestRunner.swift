@@ -454,8 +454,9 @@ enum TestRunner {
                 continue
             }
 
-            // Try to resolve as scenario name
-            let (path, ambiguous) = MirroirMCP.resolveScenario(name: arg, dirs: dirs)
+            // Try to resolve as scenario name (yamlOnly: deterministic runner needs YAML)
+            let (path, ambiguous) = MirroirMCP.resolveScenario(
+                name: arg, dirs: dirs, yamlOnly: true)
             if let path = path {
                 files.append(path)
             } else if !ambiguous.isEmpty {

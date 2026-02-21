@@ -26,7 +26,9 @@ mirroir-mcp/
 │   │   ├── MeasureTools.swift        # measure — time screen transitions
 │   │   ├── NetworkTools.swift        # set_network — toggle airplane/wifi/cellular
 │   │   ├── InfoTools.swift           # status, get_orientation, check_health
-│   │   ├── ScenarioTools.swift       # list_scenarios, get_scenario
+│   │   ├── ScenarioTools.swift       # list_scenarios, get_scenario (SKILL.md + YAML)
+│   │   ├── SkillMdParser.swift      # SKILL.md front matter parser
+│   │   ├── MigrateCommand.swift     # mirroir migrate — YAML → SKILL.md conversion
 │   │   ├── Protocols.swift           # DI protocol abstractions
 │   │   ├── MirroringBridge.swift     # AX window discovery + menu actions
 │   │   ├── InputSimulation.swift     # Coordinate mapping + focus management
@@ -36,7 +38,7 @@ mirroir-mcp/
 │   │   ├── HelperClient.swift        # Unix socket client to helper daemon
 │   │   ├── DebugLog.swift            # Debug logging to stderr + file
 │   │   ├── TestRunner.swift          # `mirroir test` orchestrator
-│   │   ├── ScenarioParser.swift      # YAML → structured ScenarioStep list
+│   │   ├── ScenarioParser.swift      # YAML → structured ScenarioStep list (used by test runner)
 │   │   ├── StepExecutor.swift        # Runs steps against real subsystems
 │   │   ├── ElementMatcher.swift      # Fuzzy OCR text matching (exact/case/substring)
 │   │   ├── ConsoleReporter.swift     # Terminal output formatting for test runner
@@ -74,7 +76,7 @@ mirroir-mcp/
 │   ├── HelperLibTests/         # Swift Testing — shared library utilities
 │   ├── TestRunnerTests/        # Swift Testing — test runner, recorder, scenario parser
 │   ├── IntegrationTests/       # XCTest — FakeMirroring integration (requires running app)
-│   └── Fixtures/               # Test scenario YAML files
+│   └── Fixtures/               # Test scenario files (YAML + SKILL.md)
 │
 ├── scripts/                    # Install/uninstall helper scripts
 ├── Resources/                  # LaunchDaemon plist

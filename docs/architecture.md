@@ -157,8 +157,8 @@ sequenceDiagram
     participant Stdio as stdin/stdout
 
     Main->>Main: signal(SIGPIPE, SIG_IGN)
-    Main->>Main: Check for subcommands (test, record)
-    Note over Main: "test" → TestRunner.run() (exit)<br/>"record" → RecordCommand.run() (exit)
+    Main->>Main: Check for subcommands (test, record, compile, migrate, doctor)
+    Note over Main: "test" → TestRunner.run() (exit)<br/>"record" → RecordCommand.run() (exit)<br/>"migrate" → MigrateCommand.run() (exit)
     Main->>Main: Parse CLI flags (--debug, --dangerously-skip-permissions, --yolo)
     Main->>Policy: loadConfig() — check local then global permissions.json
     Main->>Policy: PermissionPolicy(skipPermissions, config)
@@ -787,9 +787,30 @@ It is built as an SPM executable target, packaged into a `.app` bundle by `scrip
 
 The `mirroir-mcp` binary doubles as the `mirroir` CLI (via symlink). Subcommands are dispatched in `main()` before MCP server initialization — they create their own subsystem instances and exit directly.
 
+### `mirroir migrate` — YAML to SKILL.md Converter
+
+Converts YAML scenario files to SKILL.md format. SKILL.md uses YAML front matter for metadata and a markdown body with natural-language steps — the format AI agents natively understand.
+
+```
+main() → MigrateCommand.run(arguments)
+         │
+         ├── Parse YAML header (name, app, description, tags, etc.)
+         ├── Generate YAML front matter (--- delimited)
+         ├── Convert steps to numbered markdown prose
+         └── Write .md file alongside the .yaml source
+```
+
+| Flag | Description |
+|------|-------------|
+| `--dry-run` | Preview converted output without writing files |
+| `--output-dir <path>` | Write `.md` files to a different directory |
+| `--dir <path>` | Convert all YAML files in a directory recursively |
+
+**Ref:** `Sources/mirroir-mcp/MigrateCommand.swift`
+
 ### `mirroir test` — Deterministic Scenario Runner
 
-Executes scenario YAML files without AI in the loop. Steps run sequentially: OCR finds elements, taps land on coordinates, assertions pass or fail.
+Executes scenario files (YAML or SKILL.md) without AI in the loop. Steps run sequentially: OCR finds elements, taps land on coordinates, assertions pass or fail.
 
 ```
 main() → TestRunner.run(arguments)
@@ -807,6 +828,8 @@ main() → TestRunner.run(arguments)
 |-----------|------|---------|
 | `TestRunner` | `TestRunner.swift` | CLI arg parsing, scenario resolution, orchestration |
 | `ScenarioParser` | `ScenarioParser.swift` | YAML → `ScenarioDefinition` with `[ScenarioStep]` |
+| `SkillMdParser` | `SkillMdParser.swift` | SKILL.md front matter parsing (name, app, tags, etc.) |
+| `MigrateCommand` | `MigrateCommand.swift` | YAML → SKILL.md conversion engine |
 | `StepExecutor` | `StepExecutor.swift` | Runs each step against real subsystems |
 | `ElementMatcher` | `ElementMatcher.swift` | Fuzzy OCR text matching (exact → case-insensitive → substring) |
 | `ConsoleReporter` | `ConsoleReporter.swift` | Per-step/per-scenario terminal formatting |

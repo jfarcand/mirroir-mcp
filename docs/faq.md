@@ -23,7 +23,7 @@ Every input tool (`tap`, `type_text`, `swipe`, etc.) must make iPhone Mirroring 
 
 - **Separate macOS Space** — Put iPhone Mirroring in its own Space. Your cursor position and text selection in the other Space are preserved.
 - **Batch interactions** — Run a sequence of phone commands together rather than interleaving with terminal work.
-- **Scenarios** — Chain multiple steps in a YAML scenario. Focus is acquired once rather than per-tool-call.
+- **Scenarios** — Chain multiple steps in a scenario (SKILL.md or YAML). Focus is acquired once rather than per-tool-call.
 
 Read-only tools (`screenshot`, `describe_screen`, `start_recording`, `stop_recording`, `status`, `get_orientation`, `check_health`, `list_scenarios`, `get_scenario`) do **not** steal focus.
 

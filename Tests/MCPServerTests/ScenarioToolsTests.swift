@@ -357,6 +357,193 @@ final class ScenarioToolsTests: XCTestCase {
         XCTAssertNotNil(path)
     }
 
+    // MARK: - findScenarioFiles (.md + .yaml)
+
+    func testFindScenarioFilesIncludesMd() {
+        createFile("a.yaml", content: "name: A")
+        createFile("b.md", content: "---\nname: B\n---\n\nBody")
+        createFile("c.txt", content: "not a scenario")
+
+        let results = MirroirMCP.findScenarioFiles(in: tmpDir)
+        XCTAssertTrue(results.contains("a.yaml"))
+        XCTAssertTrue(results.contains("b.md"))
+        XCTAssertFalse(results.contains("c.txt"))
+    }
+
+    func testFindScenarioFilesMdBeforeYamlForSameStem() {
+        createFile("test.yaml", content: "name: YAML")
+        createFile("test.md", content: "---\nname: MD\n---\n\nBody")
+
+        let results = MirroirMCP.findScenarioFiles(in: tmpDir)
+        // .md should come before .yaml for the same stem
+        let mdIndex = results.firstIndex(of: "test.md")
+        let yamlIndex = results.firstIndex(of: "test.yaml")
+        XCTAssertNotNil(mdIndex)
+        XCTAssertNotNil(yamlIndex)
+        XCTAssertTrue(mdIndex! < yamlIndex!)
+    }
+
+    // MARK: - discoverScenarios with .md
+
+    func testDiscoverMdFiles() {
+        // Create a scenario dir structure that mimics what discoverScenarios expects
+        let scenarioDir = tmpDir + "/scenarios"
+        createFile("scenarios/test.md",
+                    content: "---\nname: MD Scenario\n---\n\nDescription here.",
+                    baseDir: tmpDir)
+
+        // Directly test findScenarioFiles and extractScenarioHeader on the dir
+        let files = MirroirMCP.findScenarioFiles(in: scenarioDir)
+        XCTAssertEqual(files, ["test.md"])
+
+        let filePath = scenarioDir + "/" + files[0]
+        let info = MirroirMCP.extractScenarioHeader(from: filePath, source: "local")
+        XCTAssertEqual(info.name, "MD Scenario")
+        XCTAssertEqual(info.description, "Description here.")
+    }
+
+    func testMdOverridesYamlInDiscovery() {
+        // When both .md and .yaml exist with the same stem, .md wins
+        let scenarioDir = tmpDir + "/scenarios"
+        createFile("scenarios/test.yaml", content: "name: YAML Version\ndescription: from yaml",
+                    baseDir: tmpDir)
+        createFile("scenarios/test.md",
+                    content: "---\nname: MD Version\n---\n\nFrom markdown.",
+                    baseDir: tmpDir)
+
+        let files = MirroirMCP.findScenarioFiles(in: scenarioDir)
+        // Both files should be found
+        XCTAssertTrue(files.contains("test.md"))
+        XCTAssertTrue(files.contains("test.yaml"))
+
+        // Simulate discoverScenarios dedup: first seen stem wins
+        var seenStems = Set<String>()
+        var results: [MirroirMCP.ScenarioInfo] = []
+        for relPath in files {
+            let stem = MirroirMCP.scenarioStem(relPath)
+            if seenStems.contains(stem) { continue }
+            seenStems.insert(stem)
+            let filePath = scenarioDir + "/" + relPath
+            let info = MirroirMCP.extractScenarioHeader(from: filePath, source: "local")
+            results.append(info)
+        }
+
+        XCTAssertEqual(results.count, 1)
+        XCTAssertEqual(results[0].name, "MD Version")
+    }
+
+    // MARK: - resolveScenario with .md
+
+    func testResolveMdFile() {
+        createFile("test.md", content: "---\nname: MD Test\n---\n\nBody")
+        let (path, ambiguous) = MirroirMCP.resolveScenario(
+            name: "test", dirs: [tmpDir])
+        XCTAssertNotNil(path)
+        XCTAssertTrue(path!.hasSuffix("test.md"))
+        XCTAssertTrue(ambiguous.isEmpty)
+    }
+
+    func testResolveMdPreferredOverYaml() {
+        createFile("test.yaml", content: "name: YAML")
+        createFile("test.md", content: "---\nname: MD\n---\n\nBody")
+
+        let (path, ambiguous) = MirroirMCP.resolveScenario(
+            name: "test", dirs: [tmpDir])
+        XCTAssertNotNil(path)
+        XCTAssertTrue(path!.hasSuffix("test.md"), "Expected .md to be preferred over .yaml")
+        XCTAssertTrue(ambiguous.isEmpty)
+    }
+
+    func testResolveMdWithExplicitExtension() {
+        createFile("test.md", content: "---\nname: MD\n---\n\nBody")
+        let (path, _) = MirroirMCP.resolveScenario(
+            name: "test.md", dirs: [tmpDir])
+        XCTAssertNotNil(path)
+        XCTAssertTrue(path!.hasSuffix("test.md"))
+    }
+
+    func testResolveYamlStillWorksWhenNoMd() {
+        createFile("test.yaml", content: "name: YAML Only")
+        let (path, _) = MirroirMCP.resolveScenario(
+            name: "test", dirs: [tmpDir])
+        XCTAssertNotNil(path)
+        XCTAssertTrue(path!.hasSuffix("test.yaml"))
+    }
+
+    func testResolveMdInSubdirectory() {
+        createFile("apps/slack/send.md",
+                    content: "---\nname: Send\n---\n\nBody")
+        let (path, ambiguous) = MirroirMCP.resolveScenario(
+            name: "apps/slack/send", dirs: [tmpDir])
+        XCTAssertNotNil(path)
+        XCTAssertTrue(path!.hasSuffix("send.md"))
+        XCTAssertTrue(ambiguous.isEmpty)
+    }
+
+    // MARK: - resolveScenario with yamlOnly
+
+    func testResolveYamlOnlySkipsMd() {
+        // When both .md and .yaml exist, yamlOnly: true returns the .yaml
+        createFile("test.yaml", content: "name: YAML Version")
+        createFile("test.md", content: "---\nname: MD Version\n---\n\nBody")
+
+        let (path, ambiguous) = MirroirMCP.resolveScenario(
+            name: "test", dirs: [tmpDir], yamlOnly: true)
+        XCTAssertNotNil(path)
+        XCTAssertTrue(path!.hasSuffix("test.yaml"),
+            "yamlOnly should resolve to .yaml, got: \(path!)")
+        XCTAssertTrue(ambiguous.isEmpty)
+    }
+
+    func testResolveYamlOnlyPhase2() {
+        // Basename resolution with yamlOnly: true finds YAML in subdirectory
+        createFile("apps/slack/send.yaml", content: "name: Slack Send")
+        createFile("apps/slack/send.md", content: "---\nname: Slack Send MD\n---\n\nBody")
+
+        let (path, ambiguous) = MirroirMCP.resolveScenario(
+            name: "send", dirs: [tmpDir], yamlOnly: true)
+        XCTAssertNotNil(path)
+        XCTAssertTrue(path!.hasSuffix("send.yaml"),
+            "yamlOnly Phase 2 should resolve to .yaml, got: \(path!)")
+        XCTAssertTrue(ambiguous.isEmpty)
+    }
+
+    func testResolveYamlOnlyMdOnlyFileNotFound() {
+        // When only .md exists, yamlOnly: true should not find it
+        createFile("test.md", content: "---\nname: MD Only\n---\n\nBody")
+
+        let (path, ambiguous) = MirroirMCP.resolveScenario(
+            name: "test", dirs: [tmpDir], yamlOnly: true)
+        XCTAssertNil(path, "yamlOnly should not resolve .md-only scenarios")
+        XCTAssertTrue(ambiguous.isEmpty)
+    }
+
+    func testResolveYamlOnlyDefaultFalse() {
+        // Default behavior (yamlOnly not specified) still prefers .md
+        createFile("test.yaml", content: "name: YAML")
+        createFile("test.md", content: "---\nname: MD\n---\n\nBody")
+
+        let (path, _) = MirroirMCP.resolveScenario(
+            name: "test", dirs: [tmpDir])
+        XCTAssertNotNil(path)
+        XCTAssertTrue(path!.hasSuffix("test.md"),
+            "Default behavior should prefer .md")
+    }
+
+    // MARK: - scenarioStem
+
+    func testScenarioStemYaml() {
+        XCTAssertEqual(MirroirMCP.scenarioStem("apps/slack/send.yaml"), "apps/slack/send")
+    }
+
+    func testScenarioStemMd() {
+        XCTAssertEqual(MirroirMCP.scenarioStem("apps/slack/send.md"), "apps/slack/send")
+    }
+
+    func testScenarioStemNoExtension() {
+        XCTAssertEqual(MirroirMCP.scenarioStem("apps/slack/send"), "apps/slack/send")
+    }
+
     // MARK: - Helpers
 
     @discardableResult

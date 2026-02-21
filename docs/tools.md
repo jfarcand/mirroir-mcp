@@ -30,8 +30,8 @@ All 26 tools exposed by the MCP server. Mutating tools require [permission](perm
 | `get_orientation` | — | Report portrait/landscape and window dimensions |
 | `status` | — | Connection state, window geometry, and device readiness |
 | `check_health` | — | Comprehensive setup diagnostic: mirroring, helper, DriverKit, screen capture |
-| `list_scenarios` | — | List available YAML scenarios from project-local and global config dirs |
-| `get_scenario` | `name` | Read a scenario YAML file with ${VAR} env substitution |
+| `list_scenarios` | — | List available scenarios (SKILL.md and YAML) from project-local and global config dirs |
+| `get_scenario` | `name` | Read a scenario file (SKILL.md or YAML) with ${VAR} env substitution |
 
 ## Coordinates
 
@@ -87,7 +87,7 @@ This is the most environment-dependent tool — it relies on the Settings app UI
 
 ## Scenarios
 
-Scenarios are YAML files that describe multi-step test flows as intents, not scripts. The server provides two readonly tools for scenario discovery and reading — the AI is the execution engine that interprets steps and calls existing MCP tools.
+Scenarios are files that describe multi-step test flows as intents, not scripts. They can be written in **SKILL.md** format (YAML front matter + markdown body — the recommended format) or **YAML** format (legacy). The server provides two readonly tools for scenario discovery and reading — the AI is the execution engine that interprets steps and calls existing MCP tools.
 
 ### Why AI Execution?
 
@@ -100,9 +100,42 @@ Steps like `tap: "Email"` don't specify coordinates — the AI calls `describe_s
 <cwd>/.mirroir-mcp/scenarios/      # project-local (overrides global)
 ```
 
-Both directories are scanned recursively, so you can organize scenarios into subdirectories (e.g. `apps/slack/send-message.yaml`). Project-local scenarios with the same relative path override global ones.
+Both directories are scanned recursively, so you can organize scenarios into subdirectories (e.g. `apps/slack/send-message.md`). Project-local scenarios with the same relative path override global ones. When both a `.md` and `.yaml` file exist with the same stem name, the `.md` file takes precedence.
 
-### YAML Format
+### SKILL.md Format (Recommended)
+
+SKILL.md uses YAML front matter for metadata and a markdown body with natural-language steps. This is what AI agents natively understand — no YAML step syntax to learn.
+
+```markdown
+---
+version: 1
+name: Login Flow
+app: Expo Go
+tags: ["auth", "login"]
+---
+
+Test the login screen with valid credentials.
+
+## Steps
+
+1. Launch **Expo Go**
+2. Wait for "Email" to appear
+3. Tap "Email"
+4. Type "${TEST_EMAIL}"
+5. Tap "Sign In"
+6. Verify "Welcome" is visible
+7. Screenshot: "final_state"
+```
+
+Convert existing YAML scenarios with `mirroir migrate`:
+
+```bash
+mirroir migrate scenario.yaml              # convert a single file
+mirroir migrate --dir path/to/scenarios/   # convert all YAML files in a directory
+mirroir migrate --dry-run scenario.yaml    # preview without writing
+```
+
+### YAML Format (Legacy)
 
 ```yaml
 name: Login Flow
@@ -121,7 +154,7 @@ steps:
 
 ### Variable Substitution
 
-`${VAR}` placeholders are resolved from environment variables when `get_scenario` reads the file. Use `${VAR:-default}` to provide a fallback value when the variable is unset. Unresolved variables without defaults are left as-is so the AI can flag them.
+`${VAR}` placeholders are resolved from environment variables when `get_scenario` reads the file (both SKILL.md and YAML formats). Use `${VAR:-default}` to provide a fallback value when the variable is unset. Unresolved variables without defaults are left as-is so the AI can flag them.
 
 ```yaml
 - type: "${RECIPIENT:-Phil Tremblay}"   # uses env var, falls back to "Phil Tremblay"

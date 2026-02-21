@@ -198,9 +198,54 @@ All AI errors are non-fatal: deterministic diagnosis always runs regardless.
 
 ## Scenarios
 
-Scenarios are YAML files that describe multi-step automation flows as intents, not scripts. Steps like `tap: "Email"` don't specify coordinates — the AI finds the element by fuzzy OCR matching and adapts to unexpected dialogs, screen layout changes, and timing.
+Scenarios describe multi-step automation flows as intents, not scripts. Steps like `tap: "Email"` don't specify coordinates — the AI finds the element by fuzzy OCR matching and adapts to unexpected dialogs, screen layout changes, and timing.
 
-**Cross-app workflow** — get your commute ETA from Waze, then text it to someone via iMessage:
+Two formats are supported: **SKILL.md** (recommended) and **YAML** (legacy). SKILL.md uses YAML front matter for metadata and natural-language markdown for steps — the format AI agents natively understand. When both `foo.md` and `foo.yaml` exist, the `.md` file takes precedence.
+
+**SKILL.md format** — natural-language steps the AI reads and executes directly:
+
+```markdown
+---
+version: 1
+name: Commute ETA Notification
+app: Waze, Messages
+ios_min: "17.0"
+locale: "fr_CA"
+tags: ["workflow", "cross-app", "waze", "messages"]
+---
+
+Get commute ETA from Waze, then send it via iMessage.
+
+## Steps
+
+1. Launch **Waze**
+2. Wait for "Où va-t-on ?" to appear
+3. Tap "Où va-t-on ?"
+4. Wait for "${DESTINATION:-Travail}" to appear
+5. Tap "${DESTINATION:-Travail}"
+6. Wait for "Y aller" to appear
+7. Tap "Y aller"
+8. Wait for "min" to appear
+9. Remember: Read the commute time and ETA from the navigation screen.
+10. Press Home
+11. Launch **Messages**
+12. Wait for "Messages" to appear
+13. Tap "New Message"
+14. Wait for "À :" to appear
+15. Tap "À :"
+16. Type "${RECIPIENT}"
+17. Wait for "${RECIPIENT}" to appear
+18. Tap "${RECIPIENT}"
+19. Wait for "iMessage" to appear
+20. Tap "iMessage"
+21. Type "${MESSAGE_PREFIX:-On my way!} {commute_time} to the office (ETA {eta})"
+22. Press **Return**
+23. Wait for "Distribué" to appear
+24. Screenshot: "message_sent"
+```
+
+<details>
+<summary>Equivalent YAML format</summary>
 
 ```yaml
 name: Commute ETA Notification
@@ -234,7 +279,19 @@ steps:
   - screenshot: "message_sent"
 ```
 
-`${VAR}` placeholders are resolved from environment variables. Use `${VAR:-default}` for fallback values. Place scenarios in `~/.mirroir-mcp/scenarios/` (global) or `<cwd>/.mirroir-mcp/scenarios/` (project-local). Both directories are scanned recursively.
+</details>
+
+`${VAR}` placeholders are resolved from environment variables. Use `${VAR:-default}` for fallback values. Place scenarios (`.md` or `.yaml`) in `~/.mirroir-mcp/scenarios/` (global) or `<cwd>/.mirroir-mcp/scenarios/` (project-local). Both directories are scanned recursively.
+
+### Migrate YAML to SKILL.md
+
+Convert existing YAML scenarios to the SKILL.md format:
+
+```bash
+mirroir migrate apps/settings/check-about.yaml           # single file
+mirroir migrate --dir ~/.mirroir-mcp/scenarios            # entire directory
+mirroir migrate --dry-run apps/mail/email-triage.yaml     # preview without writing
+```
 
 ### Scenario Marketplace
 
@@ -301,7 +358,7 @@ mirroir test --dry-run apps/settings/*.yaml
 
 The test runner uses the same OCR and input subsystems as the MCP server. Steps like `tap: "General"` find the element via Vision OCR and tap at the detected coordinates. `wait_for` polls OCR until the label appears or times out. AI-only steps (`remember`, `condition`, `repeat`) are skipped with a warning.
 
-Scenario resolution searches `<cwd>/.mirroir-mcp/scenarios/` and `~/.mirroir-mcp/scenarios/` — same directories as `list_scenarios`. Pass a `.yaml` path to run a specific file, or a name to search the scenario directories.
+Scenario resolution searches `<cwd>/.mirroir-mcp/scenarios/` and `~/.mirroir-mcp/scenarios/` — same directories as `list_scenarios`. Pass a `.yaml` or `.md` path to run a specific file, or a name to search the scenario directories.
 
 Exit code is `0` when all scenarios pass, `1` when any step fails.
 

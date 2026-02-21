@@ -1,6 +1,6 @@
 # Compiled Scenarios
 
-JIT compilation for UI automation. A compiled scenario eliminates all OCR calls by capturing coordinates, timing, and scroll sequences during a learning run. The compiled file is fully self-contained — executable without AI or OCR, pure input injection plus timing. Like compiling source to machine code.
+JIT compilation for UI automation. A compiled scenario eliminates all OCR calls by capturing coordinates, timing, and scroll sequences during a learning run. The compiled file is fully self-contained — executable without AI or OCR, pure input injection plus timing. Like compiling source to machine code. Compilation works with both YAML and SKILL.md scenario formats.
 
 ## The Problem
 
@@ -10,12 +10,12 @@ For regression suites running dozens of scenarios, OCR dominates the total runti
 
 ## The Solution: Compile Once, Replay Forever
 
-Run the scenario once against a real device in "learning mode." The compiler observes everything — which element matched, at what coordinates, with what confidence, how long each `wait_for` took, how many scrolls `scroll_to` needed. It saves all of this into a `.compiled.json` file alongside the source YAML.
+Run the scenario once against a real device in "learning mode." The compiler observes everything — which element matched, at what coordinates, with what confidence, how long each `wait_for` took, how many scrolls `scroll_to` needed. It saves all of this into a `.compiled.json` file alongside the source scenario file.
 
 On subsequent runs, the test runner detects the compiled file and replays the scenario using cached data — zero OCR, zero AI, zero non-determinism.
 
 ```
-Source:     apps/settings/check-about.yaml
+Source:     apps/settings/check-about.md (or .yaml)
 Compiled:   apps/settings/check-about.compiled.json
 ```
 
@@ -28,7 +28,7 @@ mirroir compile apps/settings/check-about
 ```
 
 The compiler:
-1. Resolves and parses the YAML scenario
+1. Resolves and parses the scenario (YAML or SKILL.md)
 2. Wraps the OCR subsystem in a `RecordingDescriber` that caches every result
 3. Executes each step against the real device, exactly like `mirroir test`
 4. After each step, reads the cached OCR data to build `StepHints`:
@@ -38,7 +38,7 @@ The compiler:
    - **scroll_to** → captures number of scrolls and direction used
    - **launch, type, swipe, press_key, home, shake, open_url** → marked as `passthrough` (already OCR-free)
    - **screenshot** → marked as `passthrough` (still captures, useful for verification)
-5. Saves the compiled JSON with a SHA-256 hash of the source YAML
+5. Saves the compiled JSON with a SHA-256 hash of the source scenario
 
 ### Step 2: Replay
 
@@ -132,7 +132,7 @@ The compiled file is invalidated when any of these change:
 
 | Condition | What Happens |
 |-----------|-------------|
-| Source YAML edited | SHA-256 mismatch → warning, falls back to full OCR |
+| Source scenario edited | SHA-256 mismatch → warning, falls back to full OCR |
 | Window dimensions changed | Device mismatch → warning, falls back to full OCR |
 | Format version bumped | Version mismatch → warning, falls back to full OCR |
 
@@ -146,16 +146,16 @@ There is no auto-recompilation. Compilation requires a real device with the app 
 
 ## Where Compiled Files Live
 
-Compiled `.json` files live alongside their source `.yaml` files. For scenarios in the [mirroir-scenarios](https://github.com/jfarcand/mirroir-scenarios) repository:
+Compiled `.json` files live alongside their source scenario files (`.md` or `.yaml`). For scenarios in the [mirroir-scenarios](https://github.com/jfarcand/mirroir-scenarios) repository:
 
 ```
 mirroir-scenarios/
   apps/
     settings/
-      check-about.yaml              ← source (committed)
+      check-about.md                ← source SKILL.md (committed)
       check-about.compiled.json     ← compiled (committed or gitignored, your choice)
     clock/
-      set-timer.yaml
+      set-timer.md
       set-timer.compiled.json
 ```
 
@@ -203,9 +203,9 @@ AI-only steps (`remember`, `condition`, `repeat`, `verify`, `summarize`) require
 
 ## Design Rationale
 
-**Why JSON, not YAML or Markdown?** Compiled scenarios are machine-generated, machine-consumed. No human writes them. No AI reads them. JSON gives type-safe `Codable` round-trips with zero parsing ambiguity, numeric precision for coordinates, and schema enforcement on decode. YAML would need the Yams dependency the project avoids. Markdown would need a custom parser with no type safety.
+**Why JSON for compiled output?** Compiled scenarios are machine-generated, machine-consumed. No human writes them. No AI reads them. JSON gives type-safe `Codable` round-trips with zero parsing ambiguity, numeric precision for coordinates, and schema enforcement on decode.
 
-**Why a companion file, not inline YAML annotations?** The source YAML stays clean and readable. Compiled data is a build artifact, not source. Keeping them separate means you can gitignore compiled files if you prefer, or commit them for reproducible CI runs.
+**Why a companion file, not inline annotations?** The source scenario stays clean and readable. Compiled data is a build artifact, not source. Keeping them separate means you can gitignore compiled files if you prefer, or commit them for reproducible CI runs.
 
 **Why no auto-recompile on staleness?** Compilation requires a real device with the app in the correct starting state. Auto-recompiling on a mismatched hash could produce wrong coordinates if the app changed. Explicit compilation gives the operator control over when and how the learning run happens.
 
