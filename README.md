@@ -368,7 +368,9 @@ Exit code is `0` when all scenarios pass, `1` when any step fails.
 
 Compile a scenario once against a real device to capture coordinates, timing, and scroll counts. Replay with zero OCR — pure input injection plus timing. Like JIT compilation for UI automation.
 
-**Compile (learning run):**
+**AI auto-compilation (recommended):** When an AI agent executes a scenario via MCP tools, it auto-compiles as a side-effect of the first run. The `get_scenario` tool reports compilation status (`[Not compiled]`, `[Compiled: fresh]`, or `[Compiled: stale]`), and the AI calls `record_step` after each step followed by `save_compiled` to write the `.compiled.json` file.
+
+**CLI compilation (alternative):**
 
 ```bash
 mirroir compile apps/settings/check-about
@@ -383,7 +385,7 @@ mirroir test --no-compiled check-about        # force full OCR
 
 Each OCR-dependent step (~500ms per call) becomes a direct tap at cached coordinates, a timed sleep, or a replayed scroll sequence. A 10-step scenario that spent 5+ seconds on OCR runs in under a second.
 
-Compiled files are invalidated automatically when the source YAML changes (SHA-256 hash), the window dimensions change, or the format version bumps. See [Compiled Scenarios](docs/compiled-scenarios.md) for the file format, architecture, and design rationale.
+Compiled files are invalidated automatically when the source scenario changes (SHA-256 hash), the window dimensions change, or the format version bumps. See [Compiled Scenarios](docs/compiled-scenarios.md) for the file format, architecture, and design rationale.
 
 When a compiled step fails, use `--agent` for AI-powered failure diagnosis. See [Agent Diagnosis](#agent-diagnosis).
 

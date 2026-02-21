@@ -172,7 +172,7 @@ sequenceDiagram
     Main->>Server: MCPServer(policy)
 
     Main->>Server: registerTools(server, bridge, capture, recorder, input, describer, policy)
-    Note over Server: Delegates to 5 category registrars:<br/>registerScreenTools()<br/>registerInputTools()<br/>registerNavigationTools()<br/>registerInfoTools()<br/>registerScenarioTools()
+    Note over Server: Delegates to category registrars:<br/>registerScreenTools()<br/>registerInputTools()<br/>registerNavigationTools()<br/>registerInfoTools()<br/>registerScenarioTools()<br/>registerCompilationTools()
 
     Main->>Server: server.run()
     Server->>Stdio: Blocking readLine() loop (JSON-RPC over stdio)
@@ -248,6 +248,7 @@ The server supports two MCP protocol versions, negotiating the client's preferre
 | `registerNavigationTools` | `NavigationTools.swift` | `launch_app`, `open_url`, `press_home`, `press_app_switcher`, `spotlight` |
 | `registerInfoTools` | `InfoTools.swift` | `status`, `get_orientation`, `check_health` |
 | `registerScenarioTools` | `ScenarioTools.swift` | `list_scenarios`, `get_scenario` |
+| `registerCompilationTools` | `CompilationTools.swift` | `record_step`, `save_compiled` |
 | `registerScrollToTools` | `ScrollToTools.swift` | `scroll_to` |
 | `registerAppManagementTools` | `AppManagementTools.swift` | `reset_app` |
 | `registerMeasureTools` | `MeasureTools.swift` | `measure` |
@@ -614,7 +615,7 @@ flowchart TD
 
 **Resolution order:** readonly → skip → deny → allow → fail-closed
 
-**Readonly tools** (always allowed): `screenshot`, `describe_screen`, `start_recording`, `stop_recording`, `get_orientation`, `status`, `list_scenarios`, `get_scenario`
+**Readonly tools** (always allowed): `screenshot`, `describe_screen`, `start_recording`, `stop_recording`, `get_orientation`, `status`, `list_scenarios`, `get_scenario`, `record_step`, `save_compiled`
 
 **Mutating tools** (require permission): `tap`, `swipe`, `drag`, `type_text`, `press_key`, `long_press`, `double_tap`, `shake`, `launch_app`, `open_url`, `press_home`, `press_app_switcher`, `spotlight`, `scroll_to`, `reset_app`, `measure`, `set_network`
 

@@ -384,7 +384,7 @@ try {
   <section>
     <h2>Test, compile, diagnose</h2>
     <p>
-      Run scenarios deterministically from the CLI — no AI in the loop. Compile once to cache coordinates for zero-OCR replay. When something breaks, <code>--agent</code> tells you why.
+      Run scenarios deterministically from the CLI &mdash; no AI in the loop. The AI auto-compiles on first execution, or use <code>mirroir compile</code> to cache coordinates for zero-OCR replay. When something breaks, <code>--agent</code> tells you why.
     </p>
 
     <div class="pipeline-grid">
@@ -399,7 +399,7 @@ try {
       <div class="pipeline-step">
         <div class="pipeline-icon">2</div>
         <h3>Compile</h3>
-        <p>Run the scenario once against a real device. The compiler caches every coordinate, timing, and scroll count.</p>
+        <p>The AI auto-compiles on first execution via MCP tools &mdash; or use <code>mirroir compile</code> from the CLI. Either way, coordinates, timing, and scroll counts are cached.</p>
         <div class="pipeline-cmd">
           <code>mirroir compile login</code>
         </div>
@@ -476,8 +476,10 @@ try {
           <li><code>reset_app</code> <span>Force-quit app via App Switcher</span></li>
           <li><code>set_network</code> <span>Toggle airplane, Wi-Fi, cellular</span></li>
           <li><code>measure</code> <span>Time screen transitions</span></li>
-          <li><code>list_scenarios</code> <span>List available YAML scenarios</span></li>
-          <li><code>get_scenario</code> <span>Read scenario with env substitution</span></li>
+          <li><code>list_scenarios</code> <span>List available scenarios</span></li>
+          <li><code>get_scenario</code> <span>Read scenario with env substitution + compilation status</span></li>
+          <li><code>record_step</code> <span>Record a compiled step during execution</span></li>
+          <li><code>save_compiled</code> <span>Save compiled .json for zero-OCR replay</span></li>
         </ul>
       </div>
     </div>
