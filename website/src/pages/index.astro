@@ -200,19 +200,24 @@ try {
   <!-- Demo Videos -->
   <section class="demo-section">
     <h2>See it in action</h2>
-    <div class="demo-grid">
-      <div class="demo-col">
-        <h3>Login Flow</h3>
-        <video autoplay loop muted playsinline>
-          <source src={`${import.meta.env.BASE_URL}video1-expo-login.mp4`} type="video/mp4" />
-        </video>
+    <div class="carousel demo-carousel">
+      <div class="carousel-track">
+        <div class="carousel-slide demo-slide">
+          <h3>Login Flow</h3>
+          <video autoplay loop muted playsinline>
+            <source src={`${import.meta.env.BASE_URL}video1-expo-login.mp4`} type="video/mp4" />
+          </video>
+        </div>
+        <div class="carousel-slide demo-slide">
+          <h3>Cross-App Workflow</h3>
+          <video autoplay loop muted playsinline>
+            <source src={`${import.meta.env.BASE_URL}video2-waze-slack.mp4`} type="video/mp4" />
+          </video>
+        </div>
       </div>
-      <div class="demo-col">
-        <h3>Cross-App Workflow</h3>
-        <video autoplay loop muted playsinline>
-          <source src={`${import.meta.env.BASE_URL}video2-waze-slack.mp4`} type="video/mp4" />
-        </video>
-      </div>
+      <button class="carousel-prev" aria-label="Previous">&#8249;</button>
+      <button class="carousel-next" aria-label="Next">&#8250;</button>
+      <div class="carousel-dots"></div>
     </div>
     <div class="demo-lightbox" id="demo-lightbox">
       <video autoplay loop muted playsinline id="demo-lightbox-video"></video>
@@ -221,7 +226,7 @@ try {
       const lightbox = document.getElementById("demo-lightbox")!;
       const lbVideo = document.getElementById("demo-lightbox-video")! as HTMLVideoElement;
 
-      document.querySelectorAll(".demo-col video").forEach((vid) => {
+      document.querySelectorAll(".demo-slide video").forEach((vid) => {
         vid.addEventListener("click", () => {
           const src = (vid as HTMLVideoElement).querySelector("source")!.src;
           lbVideo.innerHTML = "";
@@ -287,19 +292,24 @@ try {
       Test an app or automate your morning routine. Share them on the <a href="https://github.com/jfarcand/mirroir-scenarios">community repository</a>.
     </p>
 
-    <div class="scenario-grid">
-      <div class="scenario-col">
-        <h3>Branching + looping</h3>
-        <Code code={scenarioExpo} lang="yaml" theme="github-dark" />
+    <div class="carousel scenario-carousel">
+      <div class="carousel-track">
+        <div class="carousel-slide scenario-slide">
+          <h3>Branching + looping</h3>
+          <Code code={scenarioExpo} lang="yaml" theme="github-dark" />
+        </div>
+        <div class="carousel-slide scenario-slide">
+          <h3>Cross-app workflow</h3>
+          <Code code={scenarioWaze} lang="yaml" theme="github-dark" />
+        </div>
+        <div class="carousel-slide scenario-slide">
+          <h3>macOS window</h3>
+          <Code code={scenarioSpotify} lang="yaml" theme="github-dark" />
+        </div>
       </div>
-      <div class="scenario-col">
-        <h3>Cross-app workflow</h3>
-        <Code code={scenarioWaze} lang="yaml" theme="github-dark" />
-      </div>
-      <div class="scenario-col">
-        <h3>macOS window</h3>
-        <Code code={scenarioSpotify} lang="yaml" theme="github-dark" />
-      </div>
+      <button class="carousel-prev" aria-label="Previous">&#8249;</button>
+      <button class="carousel-next" aria-label="Next">&#8250;</button>
+      <div class="carousel-dots"></div>
     </div>
 
     <p>
@@ -546,6 +556,73 @@ try {
       <a href="https://github.com/jfarcand/mirroir-mcp/blob/main/docs/faq.md">Read the full FAQ</a>
     </p>
   </section>
+
+  <!-- Carousel initialization -->
+  <script>
+    document.querySelectorAll(".carousel").forEach((carousel) => {
+      const track = carousel.querySelector(".carousel-track") as HTMLElement;
+      const slides = Array.from(carousel.querySelectorAll(".carousel-slide")) as HTMLElement[];
+      const prevBtn = carousel.querySelector(".carousel-prev") as HTMLButtonElement;
+      const nextBtn = carousel.querySelector(".carousel-next") as HTMLButtonElement;
+      const dotsContainer = carousel.querySelector(".carousel-dots")!;
+
+      if (slides.length < 2) {
+        prevBtn.style.display = "none";
+        nextBtn.style.display = "none";
+        dotsContainer.remove();
+        return;
+      }
+
+      let currentIndex = 0;
+
+      slides.forEach((_, i) => {
+        const dot = document.createElement("button");
+        dot.classList.add("carousel-dot");
+        dot.setAttribute("aria-label", `Go to slide ${i + 1}`);
+        if (i === 0) dot.classList.add("active");
+        dot.addEventListener("click", () => goTo(i));
+        dotsContainer.appendChild(dot);
+      });
+
+      function goTo(index: number) {
+        currentIndex = Math.max(0, Math.min(index, slides.length - 1));
+        track.scrollTo({
+          left: slides[currentIndex].offsetLeft - track.offsetLeft,
+          behavior: "smooth",
+        });
+        updateUI();
+      }
+
+      function updateUI() {
+        prevBtn.disabled = currentIndex === 0;
+        nextBtn.disabled = currentIndex === slides.length - 1;
+        dotsContainer.querySelectorAll(".carousel-dot").forEach((dot, i) => {
+          dot.classList.toggle("active", i === currentIndex);
+        });
+      }
+
+      prevBtn.addEventListener("click", () => goTo(currentIndex - 1));
+      nextBtn.addEventListener("click", () => goTo(currentIndex + 1));
+
+      const observer = new IntersectionObserver(
+        (entries) => {
+          entries.forEach((entry) => {
+            if (entry.isIntersecting) {
+              const index = slides.indexOf(entry.target as HTMLElement);
+              if (index >= 0) {
+                currentIndex = index;
+                updateUI();
+              }
+            }
+          });
+        },
+        { root: track, threshold: 0.6 }
+      );
+      slides.forEach((slide) => observer.observe(slide));
+
+      updateUI();
+    });
+  </script>
 
   <!-- Footer -->
   <footer>
