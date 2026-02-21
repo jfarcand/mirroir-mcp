@@ -13,82 +13,92 @@ const permissionsCode = `{
   "blockedApps": ["Wallet", "Banking"]
 }`;
 
-const scenarioExpo = `name: Expo Go Signup + Onboarding
+const scenarioExpo = `---
+version: 1
+name: Expo Go Signup + Onboarding
 app: Expo Go
-description: >
-  Sign up, handle error or success,
-  then swipe through onboarding.
+tags: ["expo", "signup", "onboarding"]
+---
 
-steps:
-  - launch: "Expo Go"
-  - wait_for: "LoginDemo"
-  - tap: "LoginDemo"
-  - tap: "Sign Up"
-  - tap: "Email"
-  - type: "\${TEST_EMAIL}"
-  - tap: "Password"
-  - type: "\${TEST_PASSWORD}"
-  - tap: "Create Account"
-  - condition:
-      if_visible: "already exists"
-      then:
-        - tap: "Sign In Instead"
-        - tap: "Email"
-        - type: "\${TEST_EMAIL}"
-        - tap: "Password"
-        - type: "\${TEST_PASSWORD}"
-        - tap: "Sign In"
-      else:
-        - wait_for: "Welcome"
-  - assert_visible: "Welcome"
-  - screenshot: "authenticated"
-  - repeat:
-      until_visible: "Get Started"
-      max: 5
-      steps:
-        - swipe: "left"
-        - screenshot: "onboarding"
-  - tap: "Get Started"
-  - assert_visible: "Dashboard"
-  - screenshot: "complete"`;
+Sign up, handle error or success, then swipe through onboarding.
 
-const scenarioWaze = `name: Commute ETA Notification
+## Steps
+
+1. Launch **Expo Go**
+2. Wait for "LoginDemo" to appear
+3. Tap "LoginDemo"
+4. Tap "Sign Up"
+5. Tap "Email"
+6. Type "\${TEST_EMAIL}"
+7. Tap "Password"
+8. Type "\${TEST_PASSWORD}"
+9. Tap "Create Account"
+10. If "already exists" is visible:
+    - Tap "Sign In Instead"
+    - Tap "Email"
+    - Type "\${TEST_EMAIL}"
+    - Tap "Password"
+    - Type "\${TEST_PASSWORD}"
+    - Tap "Sign In"
+11. Otherwise:
+    - Wait for "Welcome" to appear
+12. Verify "Welcome" is visible
+13. Screenshot: "authenticated"
+14. Repeat until "Get Started" is visible (max 5 iterations):
+    - Swipe left
+    - Screenshot: "onboarding"
+15. Tap "Get Started"
+16. Verify "Dashboard" is visible
+17. Screenshot: "complete"`;
+
+const scenarioWaze = `---
+version: 1
+name: Commute ETA Notification
 app: Waze, Messages
-description: Get ETA from Waze, text it via iMessage.
+tags: ["waze", "messages", "cross-app", "commute"]
+---
 
-steps:
-  - launch: "Waze"
-  - wait_for: "Where to?"
-  - tap: "Where to?"
-  - tap: "\${DESTINATION:-Work}"
-  - tap: "Go"
-  - wait_for: "min"
-  - remember: "Read the commute ETA."
-  - press_home: true
-  - launch: "Messages"
-  - tap: "New Message"
-  - tap: "To:"
-  - type: "\${RECIPIENT}"
-  - tap: "\${RECIPIENT}"
-  - tap: "iMessage"
-  - type: "On my way! ETA {eta}"
-  - press_key: "return"
-  - screenshot: "message_sent"`;
+Get ETA from Waze, text it via iMessage.
 
-const scenarioSpotify = `name: Play a Song
-target: spotify
+## Steps
+
+1. Launch **Waze**
+2. Wait for "Where to?" to appear
+3. Tap "Where to?"
+4. Tap "\${DESTINATION:-Work}"
+5. Tap "Go"
+6. Wait for "min" to appear
+7. Remember: Read the commute ETA.
+8. Press Home
+9. Launch **Messages**
+10. Tap "New Message"
+11. Tap "To:"
+12. Type "\${RECIPIENT}"
+13. Tap "\${RECIPIENT}"
+14. Tap "iMessage"
+15. Type "On my way! ETA {eta}"
+16. Press **Return**
+17. Screenshot: "message_sent"`;
+
+const scenarioSpotify = `---
+version: 1
+name: Play a Song
 app: Spotify (macOS)
-description: Search for a song and play it.
+tags: ["spotify", "macos", "music", "multi-target"]
+---
 
-steps:
-  - switch_target: "spotify"
-  - tap: "Search"
-  - wait_for: "What do you want to listen to?"
-  - type: "\${SONG:-Bohemian Rhapsody}"
-  - wait_for: "\${SONG:-Bohemian Rhapsody}"
-  - tap: "\${SONG:-Bohemian Rhapsody}"
-  - assert_visible: "Playing"
-  - screenshot: "now_playing"`;
+Search for a song on the Spotify macOS app and play it.
+
+## Steps
+
+1. Switch to target "spotify"
+2. Tap "Search"
+3. Wait for "What do you want to listen to?" to appear
+4. Type "\${SONG:-Bohemian Rhapsody}"
+5. Wait for "\${SONG:-Bohemian Rhapsody}" to appear
+6. Tap "\${SONG:-Bohemian Rhapsody}"
+7. Verify "Playing" is visible
+8. Screenshot: "now_playing"`;
 
 const scenariosRepo = "jfarcand/mirroir-scenarios";
 const scenariosBase = `https://github.com/${scenariosRepo}`;
@@ -286,8 +296,8 @@ try {
   <section>
     <h2>Scenarios: intents, not scripts</h2>
     <p>
-      Scenarios are reusable YAML files that describe automation flows as intents, not scripts.
-      Steps like <code>tap: "Email"</code> don't specify coordinates — the AI finds
+      Scenarios are SKILL.md files — YAML front matter plus numbered markdown steps — that describe automation flows as intents, not scripts.
+      Steps like <code>Tap "Email"</code> don't specify coordinates — the AI finds
       the element by OCR matching and adapts to unexpected dialogs and layout changes.
       Test an app or automate your morning routine. Share them on the <a href="https://github.com/jfarcand/mirroir-scenarios">community repository</a>.
     </p>
@@ -296,15 +306,15 @@ try {
       <div class="carousel-track">
         <div class="carousel-slide scenario-slide">
           <h3>Branching + looping</h3>
-          <Code code={scenarioExpo} lang="yaml" theme="github-dark" />
+          <Code code={scenarioExpo} lang="markdown" theme="github-dark" />
         </div>
         <div class="carousel-slide scenario-slide">
           <h3>Cross-app workflow</h3>
-          <Code code={scenarioWaze} lang="yaml" theme="github-dark" />
+          <Code code={scenarioWaze} lang="markdown" theme="github-dark" />
         </div>
         <div class="carousel-slide scenario-slide">
           <h3>macOS window</h3>
-          <Code code={scenarioSpotify} lang="yaml" theme="github-dark" />
+          <Code code={scenarioSpotify} lang="markdown" theme="github-dark" />
         </div>
       </div>
       <button class="carousel-prev" aria-label="Previous">&#8249;</button>

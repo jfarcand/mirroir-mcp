@@ -299,6 +299,50 @@ final class CompilationToolsTests: XCTestCase {
             "Expected staleness reason to mention 'changed', got: \(status)")
     }
 
+    func testCompilationStatusIgnoresDimensions() throws {
+        // compilationStatus should only check version + hash, not dimensions.
+        // This validates the fix for the circular dimension comparison bug where
+        // compiled.device dimensions were used as "current" dimensions.
+        let scenarioPath = createScenarioFile("dimensions.md", content: "# Dimensions\nBody")
+
+        let hash = try CompiledScenarioIO.sha256(of: scenarioPath)
+        let compiled = CompiledScenario(
+            version: CompiledScenario.currentVersion,
+            source: SourceInfo(sha256: hash, compiledAt: "2026-02-21T10:00:00Z"),
+            device: DeviceInfo(windowWidth: 999, windowHeight: 1, orientation: "landscape"),
+            steps: [
+                CompiledStep(index: 0, type: "launch", label: "App",
+                             hints: .passthrough()),
+            ]
+        )
+        try CompiledScenarioIO.save(compiled, for: scenarioPath)
+
+        // compilationStatus should report fresh because hash matches,
+        // even though dimensions are unusual — dimension check is deferred to the test runner
+        let status = MirroirMCP.compilationStatus(for: scenarioPath)
+        XCTAssertEqual(status, "[Compiled: fresh]",
+            "compilationStatus should not check dimensions; got: \(status)")
+    }
+
+    func testCompilationStatusDetectsVersionMismatch() throws {
+        let scenarioPath = createScenarioFile("version.md", content: "# Version\nBody")
+
+        let hash = try CompiledScenarioIO.sha256(of: scenarioPath)
+        let compiled = CompiledScenario(
+            version: 999,
+            source: SourceInfo(sha256: hash, compiledAt: "2026-02-21T10:00:00Z"),
+            device: DeviceInfo(windowWidth: 410, windowHeight: 898, orientation: "portrait"),
+            steps: []
+        )
+        try CompiledScenarioIO.save(compiled, for: scenarioPath)
+
+        let status = MirroirMCP.compilationStatus(for: scenarioPath)
+        XCTAssertTrue(status.contains("[Compiled: stale"),
+            "Expected stale for version mismatch, got: \(status)")
+        XCTAssertTrue(status.contains("version"),
+            "Expected reason to mention version, got: \(status)")
+    }
+
     func testCompiledPathForMdMatchesYamlPattern() {
         // Verify that .md files get .compiled.json just like .yaml files
         let mdPath = CompiledScenarioIO.compiledPath(for: "apps/test.md")

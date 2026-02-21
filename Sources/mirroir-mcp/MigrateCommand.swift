@@ -45,6 +45,7 @@ enum MigrateCommand {
             let result = migrateFile(
                 filePath: filePath,
                 outputDir: config.outputDir,
+                sourceBaseDir: config.directory,
                 dryRun: config.dryRun
             )
             if !result {
@@ -58,8 +59,15 @@ enum MigrateCommand {
     }
 
     /// Migrate a single YAML file to SKILL.md format.
+    /// When `sourceBaseDir` is set (from `--dir`), relative paths under it are preserved
+    /// in `outputDir`. Without a base dir, only the filename is placed in `outputDir`.
     /// Returns true on success, false on failure.
-    static func migrateFile(filePath: String, outputDir: String?, dryRun: Bool) -> Bool {
+    static func migrateFile(
+        filePath: String,
+        outputDir: String?,
+        sourceBaseDir: String? = nil,
+        dryRun: Bool
+    ) -> Bool {
         let content: String
         do {
             content = try String(contentsOfFile: filePath, encoding: .utf8)
@@ -77,7 +85,8 @@ enum MigrateCommand {
             return true
         }
 
-        let outputPath = resolveOutputPath(yamlPath: filePath, outputDir: outputDir)
+        let outputPath = resolveOutputPath(
+            yamlPath: filePath, outputDir: outputDir, sourceBaseDir: sourceBaseDir)
         do {
             let dir = (outputPath as NSString).deletingLastPathComponent
             try FileManager.default.createDirectory(
@@ -640,18 +649,34 @@ enum MigrateCommand {
 
     /// Resolve the output path for a migrated file.
     /// Same directory and stem name, but with `.md` extension.
-    private static func resolveOutputPath(yamlPath: String, outputDir: String?) -> String {
-        let stem = ((yamlPath as NSString).lastPathComponent as NSString)
-            .deletingPathExtension
-        let filename = stem + ".md"
-
+    /// When `sourceBaseDir` is provided, preserves subdirectory structure relative to it
+    /// inside `outputDir`. Without a base dir, places only the filename in `outputDir`.
+    static func resolveOutputPath(
+        yamlPath: String,
+        outputDir: String?,
+        sourceBaseDir: String? = nil
+    ) -> String {
         if let outputDir = outputDir {
-            // Preserve subdirectory structure relative to the YAML's parent
-            return outputDir + "/" + filename
+            // Compute relative path from the source base directory
+            if let baseDir = sourceBaseDir {
+                let prefix = baseDir.hasSuffix("/") ? baseDir : baseDir + "/"
+                if yamlPath.hasPrefix(prefix) {
+                    let relPath = String(yamlPath.dropFirst(prefix.count))
+                    let relStem = (relPath as NSString).deletingPathExtension
+                    return outputDir + "/" + relStem + ".md"
+                }
+            }
+            // No base dir or path doesn't start with base — use filename only
+            let stem = ((yamlPath as NSString).lastPathComponent as NSString)
+                .deletingPathExtension
+            return outputDir + "/" + stem + ".md"
         }
 
+        // No output dir — place .md next to the source .yaml
         let dir = (yamlPath as NSString).deletingLastPathComponent
-        return dir + "/" + filename
+        let stem = ((yamlPath as NSString).lastPathComponent as NSString)
+            .deletingPathExtension
+        return dir + "/" + stem + ".md"
     }
 
     // MARK: - Argument Parsing

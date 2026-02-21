@@ -424,23 +424,24 @@ extension MirroirMCP {
 
     /// Check compilation status for a scenario file and return a status string.
     /// Used by get_scenario to inform the AI whether compilation is needed.
+    /// Only checks version and source hash — dimension staleness is deferred to the
+    /// test runner which has actual window dimensions from the active target.
     static func compilationStatus(for scenarioPath: String) -> String {
         guard let compiled = try? CompiledScenarioIO.load(for: scenarioPath) else {
             return "[Not compiled \u{2014} use record_step after each step to compile]"
         }
 
-        // Check staleness without window dimensions (skip dimension check for get_scenario
-        // since the AI may not be connected to a device yet)
-        let staleness = CompiledScenarioIO.checkStaleness(
-            compiled: compiled, scenarioPath: scenarioPath,
-            windowWidth: compiled.device.windowWidth,
-            windowHeight: compiled.device.windowHeight)
-
-        switch staleness {
-        case .fresh:
-            return "[Compiled: fresh]"
-        case .stale(let reason):
-            return "[Compiled: stale \u{2014} \(reason)]"
+        // Version check
+        if compiled.version != CompiledScenario.currentVersion {
+            return "[Compiled: stale \u{2014} compiled version \(compiled.version) != current \(CompiledScenario.currentVersion)]"
         }
+
+        // Source hash check
+        if let currentHash = try? CompiledScenarioIO.sha256(of: scenarioPath),
+           currentHash != compiled.source.sha256 {
+            return "[Compiled: stale \u{2014} source file has changed since compilation]"
+        }
+
+        return "[Compiled: fresh]"
     }
 }

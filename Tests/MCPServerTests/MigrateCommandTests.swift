@@ -330,6 +330,118 @@ final class MigrateCommandTests: XCTestCase {
             "Turn off Cellular")
     }
 
+    // MARK: - Output Dir Path Preservation
+
+    func testResolveOutputPathPreservesSubdirectories() {
+        // When --dir provides the base, subdirectory structure should be preserved
+        let result = MigrateCommand.resolveOutputPath(
+            yamlPath: "/src/scenarios/apps/settings/check-about.yaml",
+            outputDir: "/output",
+            sourceBaseDir: "/src/scenarios")
+
+        XCTAssertEqual(result, "/output/apps/settings/check-about.md")
+    }
+
+    func testResolveOutputPathPreservesSubdirsWithTrailingSlash() {
+        let result = MigrateCommand.resolveOutputPath(
+            yamlPath: "/src/scenarios/apps/settings/check-about.yaml",
+            outputDir: "/output",
+            sourceBaseDir: "/src/scenarios/")
+
+        XCTAssertEqual(result, "/output/apps/settings/check-about.md")
+    }
+
+    func testResolveOutputPathFlattensWithoutBaseDir() {
+        // When no base dir (individual files), only filename is used
+        let result = MigrateCommand.resolveOutputPath(
+            yamlPath: "/somewhere/apps/settings/check-about.yaml",
+            outputDir: "/output",
+            sourceBaseDir: nil)
+
+        XCTAssertEqual(result, "/output/check-about.md")
+    }
+
+    func testResolveOutputPathNextToSourceWithoutOutputDir() {
+        let result = MigrateCommand.resolveOutputPath(
+            yamlPath: "/src/scenarios/apps/check-about.yaml",
+            outputDir: nil,
+            sourceBaseDir: nil)
+
+        XCTAssertEqual(result, "/src/scenarios/apps/check-about.md")
+    }
+
+    func testMigrateOutputDirPreservesDirectoryStructure() throws {
+        let tmpDir = NSTemporaryDirectory() + "migrate-outdir-\(UUID().uuidString)"
+        let srcDir = tmpDir + "/src"
+        let outDir = tmpDir + "/out"
+        try FileManager.default.createDirectory(
+            atPath: srcDir + "/apps/settings", withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(
+            atPath: srcDir + "/workflows", withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(atPath: tmpDir) }
+
+        let yaml1 = "name: About\napp: Settings\ndescription: Check\n\nsteps:\n  - launch: \"Settings\"\n"
+        let yaml2 = "name: Morning\napp: Waze\ndescription: Routine\n\nsteps:\n  - launch: \"Waze\"\n"
+        try yaml1.write(toFile: srcDir + "/apps/settings/about.yaml",
+                        atomically: true, encoding: .utf8)
+        try yaml2.write(toFile: srcDir + "/workflows/morning.yaml",
+                        atomically: true, encoding: .utf8)
+
+        // Migrate with sourceBaseDir
+        let r1 = MigrateCommand.migrateFile(
+            filePath: srcDir + "/apps/settings/about.yaml",
+            outputDir: outDir, sourceBaseDir: srcDir, dryRun: false)
+        let r2 = MigrateCommand.migrateFile(
+            filePath: srcDir + "/workflows/morning.yaml",
+            outputDir: outDir, sourceBaseDir: srcDir, dryRun: false)
+
+        XCTAssertTrue(r1)
+        XCTAssertTrue(r2)
+
+        // Subdirectory structure should be preserved
+        XCTAssertTrue(FileManager.default.fileExists(
+            atPath: outDir + "/apps/settings/about.md"),
+            "Expected apps/settings/about.md in output dir")
+        XCTAssertTrue(FileManager.default.fileExists(
+            atPath: outDir + "/workflows/morning.md"),
+            "Expected workflows/morning.md in output dir")
+    }
+
+    func testMigrateOutputDirNoCollisionForSameFilename() throws {
+        // Two files with the same filename in different subdirs should not collide
+        let tmpDir = NSTemporaryDirectory() + "migrate-collision-\(UUID().uuidString)"
+        let srcDir = tmpDir + "/src"
+        let outDir = tmpDir + "/out"
+        try FileManager.default.createDirectory(
+            atPath: srcDir + "/apps/mail", withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(
+            atPath: srcDir + "/apps/slack", withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(atPath: tmpDir) }
+
+        let yaml1 = "name: Mail Login\napp: Mail\ndescription: Login\n\nsteps:\n  - launch: \"Mail\"\n"
+        let yaml2 = "name: Slack Login\napp: Slack\ndescription: Login\n\nsteps:\n  - launch: \"Slack\"\n"
+        try yaml1.write(toFile: srcDir + "/apps/mail/login.yaml",
+                        atomically: true, encoding: .utf8)
+        try yaml2.write(toFile: srcDir + "/apps/slack/login.yaml",
+                        atomically: true, encoding: .utf8)
+
+        let r1 = MigrateCommand.migrateFile(
+            filePath: srcDir + "/apps/mail/login.yaml",
+            outputDir: outDir, sourceBaseDir: srcDir, dryRun: false)
+        let r2 = MigrateCommand.migrateFile(
+            filePath: srcDir + "/apps/slack/login.yaml",
+            outputDir: outDir, sourceBaseDir: srcDir, dryRun: false)
+
+        XCTAssertTrue(r1)
+        XCTAssertTrue(r2)
+
+        // Both files should exist in separate subdirectories
+        let mailContent = try String(contentsOfFile: outDir + "/apps/mail/login.md", encoding: .utf8)
+        let slackContent = try String(contentsOfFile: outDir + "/apps/slack/login.md", encoding: .utf8)
+        XCTAssertTrue(mailContent.contains("Mail Login"))
+        XCTAssertTrue(slackContent.contains("Slack Login"))
+    }
+
     // MARK: - No Steps
 
     func testMigrateNoSteps() {
