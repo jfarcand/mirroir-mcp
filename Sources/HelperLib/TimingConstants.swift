@@ -99,6 +99,10 @@ public enum TimingConstants {
     /// getting stuck when a client disconnects uncleanly.
     public static let clientRecvTimeoutSec: Int = 30
 
+    /// Number of consecutive recv timeouts before dropping an idle client.
+    /// With `clientRecvTimeoutSec = 30`, this gives ~120 seconds before disconnect.
+    public static let clientIdleMaxTimeouts: Int = 4
+
     // MARK: - Content Bounds Detection
 
     /// Brightness threshold for dark pixel detection (0–255).

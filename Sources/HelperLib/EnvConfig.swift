@@ -145,6 +145,12 @@ public enum EnvConfig {
         readInt("clientRecvTimeoutSec", default: TimingConstants.clientRecvTimeoutSec)
     }
 
+    /// Number of consecutive recv timeouts before dropping an idle client.
+    /// With `clientRecvTimeoutSec = 30`, the default of 4 gives ~120 seconds.
+    public static var clientIdleMaxTimeouts: Int {
+        readInt("clientIdleMaxTimeouts", default: TimingConstants.clientIdleMaxTimeouts)
+    }
+
     // MARK: - Content Bounds Detection
 
     public static var brightnessThreshold: UInt8 {

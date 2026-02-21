@@ -32,7 +32,7 @@ final class CommandServer {
     // stop() is only called from the signal handler which immediately calls exit(0),
     // so there is no concurrent access with the accept loop.
     private var listenFd: Int32 = -1
-    private var running = false
+    var running = false
 
     init(karabiner: any KarabinerProviding) {
         self.karabiner = karabiner
@@ -97,11 +97,12 @@ final class CommandServer {
                 continue
             }
 
-            // Set a receive timeout so recv() doesn't block forever when a client
-            // disconnects uncleanly (e.g. MCP server killed). Without this, the
-            // accept loop gets stuck in handleClient and can't accept new connections.
+            // Set receive and send timeouts so the accept loop doesn't get stuck
+            // when a client disconnects uncleanly or stops reading responses.
             var timeout = timeval(tv_sec: Int(EnvConfig.clientRecvTimeoutSec), tv_usec: 0)
             setsockopt(clientFd, SOL_SOCKET, SO_RCVTIMEO, &timeout,
+                       socklen_t(MemoryLayout<timeval>.size))
+            setsockopt(clientFd, SOL_SOCKET, SO_SNDTIMEO, &timeout,
                        socklen_t(MemoryLayout<timeval>.size))
 
             // Handle one client at a time (MCP server is the only client).
@@ -128,10 +129,12 @@ final class CommandServer {
     private static let maxCommandSize = 65_536
 
     /// Read newline-delimited JSON from the client and dispatch commands.
-    private func handleClient(fd: Int32) {
+    func handleClient(fd: Int32) {
         logHelper("Client connected")
         var buffer = Data()
         var readBuf = [UInt8](repeating: 0, count: 4096)
+        let maxIdleTimeouts = EnvConfig.clientIdleMaxTimeouts
+        var consecutiveIdleTimeouts = 0
 
         while running {
             let bytesRead = recv(fd, &readBuf, readBuf.count, 0)
@@ -139,12 +142,18 @@ final class CommandServer {
             if bytesRead < 0 {
                 let recvErrno = errno
                 if recvErrno == EAGAIN || recvErrno == EWOULDBLOCK {
-                    // SO_RCVTIMEO fired — client is idle, loop back to check `running`
+                    consecutiveIdleTimeouts += 1
+                    if consecutiveIdleTimeouts >= maxIdleTimeouts {
+                        let idleSec = consecutiveIdleTimeouts * EnvConfig.clientRecvTimeoutSec
+                        logHelper("Client idle for \(idleSec)s (\(consecutiveIdleTimeouts) timeouts), dropping")
+                        break
+                    }
                     continue
                 }
                 logHelper("recv() failed: \(String(cString: strerror(recvErrno)))")
                 break
             }
+            consecutiveIdleTimeouts = 0
 
             buffer.append(contentsOf: readBuf[0..<bytesRead])
 
