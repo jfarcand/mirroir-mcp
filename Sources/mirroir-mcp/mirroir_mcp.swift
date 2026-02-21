@@ -36,6 +36,10 @@ struct MirroirMCP {
             let exitCode = CompileCommand.run(arguments: Array(args.dropFirst(2)))
             Darwin.exit(exitCode)
         }
+        if args.count >= 2 && args[1] == "migrate" {
+            let exitCode = MigrateCommand.run(arguments: Array(args.dropFirst(2)))
+            Darwin.exit(exitCode)
+        }
         if args.count >= 2 && args[1] == "doctor" {
             let exitCode = DoctorCommand.run(arguments: Array(args.dropFirst(2)))
             Darwin.exit(exitCode)

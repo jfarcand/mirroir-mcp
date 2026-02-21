@@ -1,13 +1,13 @@
 # Scenarios & Marketplace
 
-Scenarios are YAML files that describe multi-step iPhone automation flows as intents, not scripts. The MCP server provides the tools; scenarios teach the AI what to do with them.
+Scenarios are files that describe multi-step iPhone automation flows as intents, not scripts. They can be written in **SKILL.md** format (recommended) or **YAML** format (legacy). The MCP server provides the tools; scenarios teach the AI what to do with them.
 
 ## Overview
 
 The system has two layers:
 
-1. **This repository** (`mirroir-mcp`) — provides 26 MCP tools for iPhone interaction
-2. **Scenario repositories** (e.g., [jfarcand/mirroir-scenarios](https://github.com/jfarcand/mirroir-scenarios)) — provide reusable YAML scenario files + plugin discovery
+1. **This repository** (`mirroir-mcp`) — provides 28 MCP tools for iPhone interaction
+2. **Scenario repositories** (e.g., [jfarcand/mirroir-scenarios](https://github.com/jfarcand/mirroir-scenarios)) — provide reusable scenario files (SKILL.md or YAML) + plugin discovery
 
 Scenarios are intentionally simple. Steps like `tap: "Email"` don't specify pixel coordinates — the AI uses `describe_screen` for fuzzy OCR matching and adapts to unexpected dialogs, layout changes, and timing differences.
 
@@ -35,7 +35,7 @@ Plugin metadata lives in `.github/plugin/marketplace.json` in the scenario repos
 
 ### Manual Installation
 
-Clone or copy scenario YAML files into one of the scan directories:
+Clone or copy scenario files (`.md` or `.yaml`) into one of the scan directories:
 
 ```bash
 # Global — available in all projects
@@ -44,12 +44,53 @@ git clone https://github.com/jfarcand/mirroir-scenarios.git \
 
 # Project-local — available only in current project
 mkdir -p .mirroir-mcp/scenarios/
-cp my-scenario.yaml .mirroir-mcp/scenarios/
+cp my-scenario.md .mirroir-mcp/scenarios/
 ```
 
-Project-local scenarios with the same filename override global ones.
+Project-local scenarios with the same filename override global ones. When both a `.md` and `.yaml` file exist with the same stem name, the `.md` file takes precedence.
 
-## Scenario YAML Format
+## Scenario Format
+
+Scenarios can be written in SKILL.md (recommended) or YAML (legacy). Both formats support the same fields and step types.
+
+### SKILL.md Format (Recommended)
+
+SKILL.md uses YAML front matter for metadata and a markdown body with natural-language steps:
+
+```markdown
+---
+version: 1
+name: Send Slack Message
+app: Slack
+tags: ["messaging", "slack"]
+---
+
+Send a direct message to a contact in Slack.
+
+## Steps
+
+1. Launch **Slack**
+2. Wait for "Home" to appear
+3. Tap "Direct Messages"
+4. Wait for "${RECIPIENT}" to appear
+5. Tap "${RECIPIENT}"
+6. Wait for "Message" to appear
+7. Tap "Message"
+8. Type "${MESSAGE:-Hey, just checking in!}"
+9. Press **Return**
+10. Screenshot: "message_sent"
+```
+
+Convert existing YAML scenarios with `mirroir migrate`:
+
+```bash
+mirroir migrate scenario.yaml                            # convert a single file
+mirroir migrate --dir path/to/scenarios/                 # convert all YAML files in a directory
+mirroir migrate --output-dir ./converted/ scenario.yaml  # write .md files to alternate directory
+mirroir migrate --dry-run scenario.yaml                  # preview without writing
+```
+
+### YAML Format (Legacy)
 
 ### Required Fields
 
@@ -64,6 +105,7 @@ Project-local scenarios with the same filename override global ones.
 
 | Field | Type | Description |
 |-------|------|-------------|
+| `version` | integer | Scenario format version (default: 1). Used for future format evolution. |
 | `ios_min` | string | Minimum iOS version (e.g., `"17.0"`) |
 | `locale` | string | Expected device locale (e.g., `"fr-CA"`) |
 | `tags` | list | Categorization tags (e.g., `["productivity", "messaging"]`) |
@@ -97,13 +139,20 @@ Each step is a single key-value pair in the `steps` list. The AI interprets each
 | `launch` | App name (string) | `launch_app` | Open an app via Spotlight search |
 | `tap` | Element text (string) | `describe_screen` + `tap` | Find element by OCR text match, tap its coordinates |
 | `type` | Text to type (string) | `type_text` | Type text into the currently focused field |
-| `press_key` | Key name (string) | `press_key` | Press a special key (return, escape, tab, etc.) |
+| `press_key` | Key name (string) | `press_key` | Press a special key (return, escape, tab, etc.) with optional modifiers |
 | `swipe` | Direction (string) | `swipe` | Swipe in a direction (up, down, left, right) |
 | `wait_for` | Element text (string) | `describe_screen` (poll) | Wait until text appears on screen (retry with describe_screen) |
 | `assert_visible` | Element text (string) | `describe_screen` | Verify text is visible; fail the scenario if not found |
+| `assert_not_visible` | Element text (string) | `describe_screen` | Verify text is NOT visible; fail the scenario if found |
 | `screenshot` | Label (string) | `screenshot` | Capture a screenshot with a descriptive label |
 | `shake` | `true` | `shake` | Trigger a shake gesture (debug menus, undo) |
 | `press_home` | `true` | `press_home` | Return to the home screen |
+| `open_url` | URL (string) | `open_url` | Open a URL in Safari |
+| `scroll_to` | Element text (string) | `scroll_to` | Scroll until a text element becomes visible via OCR |
+| `reset_app` | App name (string) | `reset_app` | Force-quit an app via the App Switcher |
+| `set_network` | Mode (string) | `set_network` | Toggle network settings (airplane_on/off, wifi_on/off, cellular_on/off) |
+| `measure` | Object with `action`, `until`, `max`? | `measure` | Time a screen transition after an action |
+| `target` | Target name (string) | `switch_target` | Switch to a different automation target window |
 | `remember` | Instruction (string) | _(AI-interpreted)_ | Tell the AI to extract and remember data from the current screen |
 | `long_press` | Element text (string) | `describe_screen` + `long_press` | Find element by OCR, long press on it |
 | `drag` | Object with `from`/`to` | `describe_screen` + `drag` | Find elements by OCR, drag between them |
@@ -146,7 +195,7 @@ Loop modes: `while_visible: "Label"` (continue while present), `until_visible: "
 
 ### Environment Variables: `${VAR}`
 
-Variables wrapped in `${...}` are resolved from environment variables at `get_scenario` time (before the AI sees the YAML).
+Variables wrapped in `${...}` are resolved from environment variables at `get_scenario` time (before the AI sees the scenario content). This works for both SKILL.md and YAML formats.
 
 ```yaml
 - type: "${TEST_EMAIL}"           # Required — left as ${TEST_EMAIL} if unset
@@ -193,7 +242,7 @@ This enables cross-app data flows — read data from one app, switch apps, then 
 
 ## Scenario Validation
 
-Scenario YAML files should be validated for:
+Scenario files should be validated for:
 
 - **Required fields:** `name`, `app`, `description`, `steps` must all be present
 - **Step types:** Each step key must be a recognized step type
@@ -208,7 +257,7 @@ Scenarios are maintained in the [mirroir-scenarios](https://github.com/jfarcand/
 
 Checklist for adding a new scenario:
 
-1. **Create the YAML file** in the appropriate directory under `scenarios/`
+1. **Create the scenario file** (`.md` for SKILL.md format, or `.yaml` for legacy) in the appropriate directory under `scenarios/`
    - `apps/<app-name>/` for app-specific scenarios
    - `testing/<framework>/` for test automation scenarios
 

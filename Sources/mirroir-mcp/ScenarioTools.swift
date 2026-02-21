@@ -2,14 +2,14 @@
 // Licensed under the Apache License, Version 2.0
 //
 // ABOUTME: Registers scenario-related MCP tools: list_scenarios, get_scenario.
-// ABOUTME: Handles YAML scenario discovery, header parsing, and environment variable substitution.
+// ABOUTME: Handles YAML and SKILL.md scenario discovery, header parsing, and environment variable substitution.
 
 import Foundation
 import HelperLib
 
 extension MirroirMCP {
     static func registerScenarioTools(server: MCPServer) {
-        // list_scenarios — discover available YAML scenarios from config directories
+        // list_scenarios — discover available scenarios from config directories
         server.registerTool(MCPToolDefinition(
             name: "list_scenarios",
             description: """
@@ -28,7 +28,7 @@ extension MirroirMCP {
                 if scenarios.isEmpty {
                     return .text(
                         "No scenarios found.\n" +
-                        "Place .yaml files in <cwd>/.mirroir-mcp/scenarios/ or " +
+                        "Place .yaml or .md files in <cwd>/.mirroir-mcp/scenarios/ or " +
                         "~/.mirroir-mcp/scenarios/")
                 }
 
@@ -50,7 +50,8 @@ extension MirroirMCP {
                 Read a scenario YAML file by name and return its contents with \
                 ${VAR} placeholders resolved from environment variables. Looks in \
                 project-local directory first, then global. The AI interprets the \
-                YAML steps and executes them using existing MCP tools.
+                YAML steps and executes them using existing MCP tools. \
+                Supports both YAML (.yaml) and SKILL.md (.md) formats.
                 """,
             inputSchema: [
                 "type": .string("object"),
@@ -75,6 +76,11 @@ extension MirroirMCP {
                     do {
                         var content = try String(contentsOfFile: path, encoding: .utf8)
                         content = substituteEnvVars(in: content)
+
+                        // Append compilation status for AI decision-making
+                        let status = compilationStatus(for: path)
+                        content += "\n\n\(status)"
+
                         return .text(content)
                     } catch {
                         return .error(
@@ -115,18 +121,21 @@ extension MirroirMCP {
         let source: String
     }
 
-    /// Recursively scan scenario directories and return metadata for each .yaml file found.
-    /// Project-local files override global files with the same relative path.
+    /// Recursively scan scenario directories and return metadata for each scenario file found.
+    /// Supports both .yaml and .md (SKILL.md) formats. When both exist with the same stem,
+    /// the .md file takes precedence. Project-local files override global files with the same
+    /// relative path.
     static func discoverScenarios() -> [ScenarioInfo] {
         let dirs = PermissionPolicy.scenarioDirs
-        var seenRelPaths = Set<String>()
+        var seenStems = Set<String>()
         var results: [ScenarioInfo] = []
 
         for dir in dirs {
             let source = dir.hasPrefix(PermissionPolicy.globalConfigDir) ? "global" : "local"
-            for relPath in findYAMLFiles(in: dir) {
-                if seenRelPaths.contains(relPath) { continue }
-                seenRelPaths.insert(relPath)
+            for relPath in findScenarioFiles(in: dir) {
+                let stem = scenarioStem(relPath)
+                if seenStems.contains(stem) { continue }
+                seenStems.insert(stem)
 
                 let filePath = dir + "/" + relPath
                 let info = extractScenarioHeader(from: filePath, source: source)
@@ -135,6 +144,32 @@ extension MirroirMCP {
         }
 
         return results
+    }
+
+    /// Recursively find all scenario files (.md and .yaml) under a directory.
+    /// Returns relative paths sorted with .md files before .yaml files for the same stem,
+    /// ensuring .md takes precedence during discovery.
+    static func findScenarioFiles(in baseDir: String) -> [String] {
+        let fm = FileManager.default
+        guard let enumerator = fm.enumerator(atPath: baseDir) else { return [] }
+
+        var relPaths: [String] = []
+        while let entry = enumerator.nextObject() as? String {
+            if entry.hasSuffix(".yaml") || entry.hasSuffix(".md") {
+                relPaths.append(entry)
+            }
+        }
+
+        // Sort with .md before .yaml for the same stem, so .md wins during dedup
+        return relPaths.sorted { a, b in
+            let stemA = scenarioStem(a)
+            let stemB = scenarioStem(b)
+            if stemA == stemB {
+                // .md comes first
+                return a.hasSuffix(".md")
+            }
+            return a < b
+        }
     }
 
     /// Recursively find all .yaml files under a directory, returning relative paths sorted.
@@ -151,12 +186,29 @@ extension MirroirMCP {
         return relPaths.sorted()
     }
 
-    /// Extract name and description from the first lines of a YAML scenario file.
-    /// Looks for `name:` and `description:` keys in the file header.
-    /// Handles YAML block scalars (`>` and `|`) by collecting indented continuation lines.
+    /// Extract the stem (path without extension) from a scenario relative path.
+    /// Used for deduplication when both .md and .yaml exist.
+    static func scenarioStem(_ relPath: String) -> String {
+        if relPath.hasSuffix(".yaml") {
+            return String(relPath.dropLast(5))
+        }
+        if relPath.hasSuffix(".md") {
+            return String(relPath.dropLast(3))
+        }
+        return relPath
+    }
+
+    /// Extract name and description from a scenario file (YAML or SKILL.md).
+    /// For .md files, parses the YAML front matter. For .yaml files, looks for
+    /// `name:` and `description:` keys in the file header.
     static func extractScenarioHeader(from path: String, source: String) -> ScenarioInfo {
-        let fallbackName = (path as NSString).lastPathComponent
-            .replacingOccurrences(of: ".yaml", with: "")
+        let filename = (path as NSString).lastPathComponent
+        let fallbackName: String
+        if filename.hasSuffix(".md") {
+            fallbackName = String(filename.dropLast(3))
+        } else {
+            fallbackName = filename.replacingOccurrences(of: ".yaml", with: "")
+        }
 
         let content: String
         do {
@@ -164,6 +216,12 @@ extension MirroirMCP {
         } catch {
             DebugLog.log("ScenarioTools", "Failed to read scenario header at \(path): \(error)")
             return ScenarioInfo(name: fallbackName, description: "", source: source)
+        }
+
+        if path.hasSuffix(".md") {
+            let header = SkillMdParser.parseHeader(content: content, fallbackName: fallbackName)
+            return ScenarioInfo(
+                name: header.name, description: header.description, source: source)
         }
 
         return extractScenarioHeader(from: content, fallbackName: fallbackName, source: source)
@@ -276,40 +334,79 @@ extension MirroirMCP {
     }
 
     /// Resolve a scenario name to a file path, supporting both exact relative paths and basename lookup.
+    /// Supports both .yaml and .md extensions. When both exist, .md takes precedence (unless yamlOnly).
+    /// When `yamlOnly` is true, only .yaml files are considered — used by the deterministic test runner
+    /// and compiler which cannot execute natural-language markdown.
     /// Returns (resolvedPath, ambiguousMatches). If resolvedPath is non-nil, it's the unique match.
     /// If ambiguousMatches is non-empty, multiple files matched the basename.
     static func resolveScenario(
         name: String,
-        dirs: [String]
+        dirs: [String],
+        yamlOnly: Bool = false
     ) -> (path: String?, ambiguous: [String]) {
-        let filename = name.hasSuffix(".yaml") ? name : name + ".yaml"
+        // Determine the stem and whether the user specified an extension
+        let stem: String
+        let hasExtension: Bool
+        if name.hasSuffix(".yaml") {
+            stem = String(name.dropLast(5))
+            hasExtension = true
+        } else if name.hasSuffix(".md") {
+            stem = String(name.dropLast(3))
+            hasExtension = true
+        } else {
+            stem = name
+            hasExtension = false
+        }
 
         // Phase 1: Try exact relative path match (project-local first)
-        for dir in dirs {
-            let candidate = dir + "/" + filename
-            if FileManager.default.fileExists(atPath: candidate) {
-                return (candidate, [])
+        // When yamlOnly, only try .yaml; otherwise try .md first (preferred), then .yaml
+        let candidates: [String]
+        if hasExtension {
+            candidates = [name]
+        } else if yamlOnly {
+            candidates = [stem + ".yaml"]
+        } else {
+            candidates = [stem + ".md", stem + ".yaml"]
+        }
+
+        for candidate in candidates {
+            for dir in dirs {
+                let path = dir + "/" + candidate
+                if FileManager.default.fileExists(atPath: path) {
+                    return (path, [])
+                }
             }
         }
 
         // Phase 2: Try basename match across all directories
-        // Deduplicate by relative path so local overrides global
-        let targetBasename = (filename as NSString).lastPathComponent
-        var seen = Set<String>()
+        // Deduplicate by stem so local overrides global and .md overrides .yaml
+        let targetStem: String
+        if hasExtension {
+            targetStem = ((name as NSString).lastPathComponent as NSString).deletingPathExtension
+        } else {
+            targetStem = (name as NSString).lastPathComponent
+        }
+
+        var seenStems = Set<String>()
         var matches: [String] = []
 
         for dir in dirs {
-            for relPath in findYAMLFiles(in: dir) {
+            // When yamlOnly, only search YAML files; otherwise search all scenario files
+            let files = yamlOnly ? findYAMLFiles(in: dir) : findScenarioFiles(in: dir)
+            for relPath in files {
                 let basename = (relPath as NSString).lastPathComponent
-                if basename == targetBasename && !seen.contains(relPath) {
-                    seen.insert(relPath)
+                let baseStem = scenarioStem(basename)
+                if baseStem == targetStem {
+                    let fullStem = scenarioStem(relPath)
+                    if seenStems.contains(fullStem) { continue }
+                    seenStems.insert(fullStem)
                     matches.append(relPath)
                 }
             }
         }
 
         if matches.count == 1 {
-            // Unique basename match — find which dir it's in
+            // Unique stem match — find which dir it's in
             for dir in dirs {
                 let candidate = dir + "/" + matches[0]
                 if FileManager.default.fileExists(atPath: candidate) {
@@ -323,5 +420,27 @@ extension MirroirMCP {
         }
 
         return (nil, [])
+    }
+
+    /// Check compilation status for a scenario file and return a status string.
+    /// Used by get_scenario to inform the AI whether compilation is needed.
+    static func compilationStatus(for scenarioPath: String) -> String {
+        guard let compiled = try? CompiledScenarioIO.load(for: scenarioPath) else {
+            return "[Not compiled \u{2014} use record_step after each step to compile]"
+        }
+
+        // Check staleness without window dimensions (skip dimension check for get_scenario
+        // since the AI may not be connected to a device yet)
+        let staleness = CompiledScenarioIO.checkStaleness(
+            compiled: compiled, scenarioPath: scenarioPath,
+            windowWidth: compiled.device.windowWidth,
+            windowHeight: compiled.device.windowHeight)
+
+        switch staleness {
+        case .fresh:
+            return "[Compiled: fresh]"
+        case .stale(let reason):
+            return "[Compiled: stale \u{2014} \(reason)]"
+        }
     }
 }

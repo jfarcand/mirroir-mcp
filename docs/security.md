@@ -27,4 +27,4 @@ See [Permissions](permissions.md) for configuration details and examples.
 - **Use a separate macOS Space** for iPhone Mirroring to isolate it from your work.
 - **Configure `blockedApps`** to prevent the AI from opening sensitive apps (banking, payments).
 - **Start with a narrow allow list** — only enable the tools your workflow actually needs.
-- **Review scenarios before running them** — `get_scenario` shows the full YAML before execution.
+- **Review scenarios before running them** — `get_scenario` shows the full scenario content before execution.

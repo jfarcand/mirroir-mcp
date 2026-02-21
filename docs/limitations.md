@@ -19,7 +19,7 @@ Read-only tools (`screenshot`, `describe_screen`, `start_recording`, `stop_recor
 | Strategy | How It Helps |
 |----------|-------------|
 | **Separate macOS Space** | Put iPhone Mirroring in its own Space. The activation triggers a Space switch, so your cursor position and text selection in the other Space are preserved. |
-| **Scenario runner** | Chain multiple steps in a single scenario. Focus is acquired once at the start rather than stolen between each individual tool call. |
+| **Scenario runner** | Chain multiple steps in a single scenario (SKILL.md or YAML). Focus is acquired once at the start rather than stolen between each individual tool call. |
 | **Batch your MCP work** | Run a sequence of phone interactions together, then return to your other work. Interleaving phone commands with terminal typing will cause repeated focus switches. |
 
 ### Alternatives That Don't Work

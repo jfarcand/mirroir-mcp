@@ -69,6 +69,11 @@ final class CompiledScenarioTests: XCTestCase {
         XCTAssertEqual(result, "/home/user/scenarios/login.compiled.json")
     }
 
+    func testCompiledPathFromMd() {
+        let result = CompiledScenarioIO.compiledPath(for: "apps/settings/check-about.md")
+        XCTAssertEqual(result, "apps/settings/check-about.compiled.json")
+    }
+
     // MARK: - SHA-256
 
     func testSHA256Consistency() {
@@ -110,7 +115,7 @@ final class CompiledScenarioTests: XCTestCase {
         )
 
         let result = CompiledScenarioIO.checkStaleness(
-            compiled: compiled, yamlPath: yamlPath,
+            compiled: compiled, scenarioPath: yamlPath,
             windowWidth: 410, windowHeight: 898)
         XCTAssertEqual(result, .fresh)
     }
@@ -131,7 +136,7 @@ final class CompiledScenarioTests: XCTestCase {
         )
 
         let result = CompiledScenarioIO.checkStaleness(
-            compiled: compiled, yamlPath: yamlPath,
+            compiled: compiled, scenarioPath: yamlPath,
             windowWidth: 410, windowHeight: 898)
         if case .stale(let reason) = result {
             XCTAssertTrue(reason.contains("changed"))
@@ -159,7 +164,7 @@ final class CompiledScenarioTests: XCTestCase {
 
         // Different window dimensions
         let result = CompiledScenarioIO.checkStaleness(
-            compiled: compiled, yamlPath: yamlPath,
+            compiled: compiled, scenarioPath: yamlPath,
             windowWidth: 390, windowHeight: 844)
         if case .stale(let reason) = result {
             XCTAssertTrue(reason.contains("dimensions"))
@@ -177,7 +182,7 @@ final class CompiledScenarioTests: XCTestCase {
         )
 
         let result = CompiledScenarioIO.checkStaleness(
-            compiled: compiled, yamlPath: "/nonexistent.yaml",
+            compiled: compiled, scenarioPath: "/nonexistent.yaml",
             windowWidth: 410, windowHeight: 898)
         if case .stale(let reason) = result {
             XCTAssertTrue(reason.contains("version"))

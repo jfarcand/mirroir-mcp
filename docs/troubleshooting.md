@@ -62,7 +62,7 @@ If not responding, restart: `sudo brew services restart mirroir-mcp` or `sudo ./
 
 **Compiled scenario fails but you don't know why** — Use `--agent` to diagnose failures. Deterministic OCR analysis runs first (free, no API key), then optionally sends context to an AI for richer root-cause analysis:
 ```bash
-mirroir test --agent scenario.yaml                    # deterministic OCR diagnosis
+mirroir test --agent scenario.yaml                    # deterministic OCR diagnosis (YAML or SKILL.md)
 mirroir test --agent claude-sonnet-4-6 scenario.yaml  # deterministic + AI diagnosis
 ```
 See the [Agent Diagnosis](../README.md#agent-diagnosis) section for all supported providers and custom agent configuration.

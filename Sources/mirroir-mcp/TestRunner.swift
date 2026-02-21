@@ -101,7 +101,7 @@ enum TestRunner {
             for scenario in scenarios {
                 if let compiled = try? CompiledScenarioIO.load(for: scenario.filePath) {
                     let staleness = CompiledScenarioIO.checkStaleness(
-                        compiled: compiled, yamlPath: scenario.filePath,
+                        compiled: compiled, scenarioPath: scenario.filePath,
                         windowWidth: windowWidth, windowHeight: windowHeight)
                     switch staleness {
                     case .fresh:
@@ -454,8 +454,9 @@ enum TestRunner {
                 continue
             }
 
-            // Try to resolve as scenario name
-            let (path, ambiguous) = MirroirMCP.resolveScenario(name: arg, dirs: dirs)
+            // Try to resolve as scenario name (yamlOnly: deterministic runner needs YAML)
+            let (path, ambiguous) = MirroirMCP.resolveScenario(
+                name: arg, dirs: dirs, yamlOnly: true)
             if let path = path {
                 files.append(path)
             } else if !ambiguous.isEmpty {
