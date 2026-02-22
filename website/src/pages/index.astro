@@ -461,7 +461,7 @@ if (!skillsAvailable) {
           dlLink.className = "skill-dl";
           dlLink.href = s.rawUrl;
           dlLink.download = "";
-          dlLink.title = "Download YAML";
+          dlLink.title = "Download skill";
           dlLink.textContent = "\u2193";
           dlLink.rel = "noopener noreferrer";
           row.appendChild(dlLink);
@@ -508,9 +508,9 @@ if (!skillsAvailable) {
       <div class="pipeline-step">
         <div class="pipeline-icon">1</div>
         <h3>Record</h3>
-        <p>Interact with the phone while <code>mirroir record</code> captures your actions as a skill YAML file.</p>
+        <p>Interact with the phone while <code>mirroir record</code> captures your actions as a SKILL.md file.</p>
         <div class="pipeline-cmd">
-          <code>mirroir record -o login.yaml</code>
+          <code>mirroir record -o login.md</code>
         </div>
       </div>
       <div class="pipeline-step">
