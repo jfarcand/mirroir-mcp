@@ -6,6 +6,7 @@
 
 import Darwin
 import Foundation
+import HelperLib
 import os
 
 /// Client for communicating with the mirroir-helper LaunchDaemon.
@@ -164,15 +165,7 @@ final class HelperClient: Sendable {
         let fd = socket(AF_UNIX, SOCK_STREAM, 0)
         guard fd >= 0 else { return false }
 
-        var addr = sockaddr_un()
-        addr.sun_family = sa_family_t(AF_UNIX)
-        let pathBytes = Array(socketPath.utf8)
-        withUnsafeMutableBytes(of: &addr.sun_path) { sunPath in
-            for i in 0..<min(pathBytes.count, sunPath.count - 1) {
-                sunPath[i] = pathBytes[i]
-            }
-            sunPath[min(pathBytes.count, sunPath.count - 1)] = 0
-        }
+        var addr = makeUnixAddress(path: socketPath)
 
         let result = withUnsafePointer(to: &addr) { ptr in
             ptr.withMemoryRebound(to: sockaddr.self, capacity: 1) { sockPtr in

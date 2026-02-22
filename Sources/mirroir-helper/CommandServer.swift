@@ -53,15 +53,7 @@ final class CommandServer {
             throw HelperError.socketFailed(errno: errno)
         }
 
-        var addr = sockaddr_un()
-        addr.sun_family = sa_family_t(AF_UNIX)
-        let pathBytes = Array(helperSocketPath.utf8)
-        withUnsafeMutableBytes(of: &addr.sun_path) { sunPath in
-            for i in 0..<min(pathBytes.count, sunPath.count - 1) {
-                sunPath[i] = pathBytes[i]
-            }
-            sunPath[min(pathBytes.count, sunPath.count - 1)] = 0
-        }
+        var addr = makeUnixAddress(path: helperSocketPath)
 
         let bindResult = withUnsafePointer(to: &addr) { ptr in
             ptr.withMemoryRebound(to: sockaddr.self, capacity: 1) { sockPtr in

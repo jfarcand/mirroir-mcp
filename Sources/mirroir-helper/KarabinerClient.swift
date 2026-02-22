@@ -492,20 +492,6 @@ final class KarabinerClient {
         monitorTimer = timer
     }
 
-    // MARK: - Private: Helpers
-
-    private func makeUnixAddress(path: String) -> sockaddr_un {
-        var addr = sockaddr_un()
-        addr.sun_family = sa_family_t(AF_UNIX)
-        let pathBytes = Array(path.utf8)
-        withUnsafeMutableBytes(of: &addr.sun_path) { sunPath in
-            for i in 0..<min(pathBytes.count, sunPath.count - 1) {
-                sunPath[i] = pathBytes[i]
-            }
-            sunPath[min(pathBytes.count, sunPath.count - 1)] = 0
-        }
-        return addr
-    }
 }
 
 // MARK: - Errors
