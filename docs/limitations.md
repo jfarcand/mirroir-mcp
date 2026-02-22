@@ -12,14 +12,14 @@ Karabiner's virtual HID keyboard and pointing device deliver events through the 
 
 If you are typing in a terminal or editor and an MCP tool fires, iPhone Mirroring will become frontmost and your terminal loses focus. After the tool completes, iPhone Mirroring retains focus — the server intentionally does not switch back to avoid per-call Space jitter.
 
-Read-only tools (`screenshot`, `describe_screen`, `start_recording`, `stop_recording`, `status`, `get_orientation`, `check_health`, `list_scenarios`, `get_scenario`) use the Accessibility API and do **not** steal focus.
+Read-only tools (`screenshot`, `describe_screen`, `start_recording`, `stop_recording`, `status`, `get_orientation`, `check_health`, `list_skills`, `get_skill`) use the Accessibility API and do **not** steal focus.
 
 ### Mitigations
 
 | Strategy | How It Helps |
 |----------|-------------|
 | **Separate macOS Space** | Put iPhone Mirroring in its own Space. The activation triggers a Space switch, so your cursor position and text selection in the other Space are preserved. |
-| **Scenario runner** | Chain multiple steps in a single scenario (SKILL.md or YAML). Focus is acquired once at the start rather than stolen between each individual tool call. |
+| **Skill runner** | Chain multiple steps in a single skill (SKILL.md or YAML). Focus is acquired once at the start rather than stolen between each individual tool call. |
 | **Batch your MCP work** | Run a sequence of phone interactions together, then return to your other work. Interleaving phone commands with terminal typing will cause repeated focus switches. |
 
 ### Alternatives That Don't Work

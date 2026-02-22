@@ -202,8 +202,8 @@ struct AIAgentProviderTests {
     @Test("DiagnosticPayload encodes to JSON correctly")
     func diagnosticPayloadEncoding() throws {
         let payload = DiagnosticPayload(
-            scenarioName: "test-scenario",
-            scenarioFilePath: "/tmp/test.yaml",
+            skillName: "test-skill",
+            skillFilePath: "/tmp/test.yaml",
             failedSteps: [
                 DiagnosticPayload.FailedStep(
                     stepIndex: 2, stepType: "tap", label: "Settings",
@@ -219,8 +219,8 @@ struct AIAgentProviderTests {
         let data = try JSONEncoder().encode(payload)
         let json = try JSONSerialization.jsonObject(with: data) as! [String: Any]
 
-        #expect(json["scenarioName"] as? String == "test-scenario")
-        #expect(json["scenarioFilePath"] as? String == "/tmp/test.yaml")
+        #expect(json["skillName"] as? String == "test-skill")
+        #expect(json["skillFilePath"] as? String == "/tmp/test.yaml")
 
         let steps = json["failedSteps"] as! [[String: Any]]
         #expect(steps.count == 1)
@@ -303,20 +303,20 @@ struct AIAgentProviderTests {
             modelUsed: "stub")
 
         let payload = DiagnosticPayload(
-            scenarioName: "test", scenarioFilePath: "/tmp/t.yaml", failedSteps: [])
+            skillName: "test", skillFilePath: "/tmp/t.yaml", failedSteps: [])
 
         let result = stub.diagnose(payload: payload)
         #expect(result != nil)
         #expect(result!.analysis == "Test analysis")
         #expect(stub.lastPayload != nil)
-        #expect(stub.lastPayload!.scenarioName == "test")
+        #expect(stub.lastPayload!.skillName == "test")
     }
 
     @Test("StubAIProvider returns nil when no result configured")
     func stubProviderReturnsNil() {
         let stub = StubAIProvider()
         let payload = DiagnosticPayload(
-            scenarioName: "test", scenarioFilePath: "/tmp/t.yaml", failedSteps: [])
+            skillName: "test", skillFilePath: "/tmp/t.yaml", failedSteps: [])
 
         let result = stub.diagnose(payload: payload)
         #expect(result == nil)
@@ -338,11 +338,11 @@ struct AIAgentProviderTests {
 
         let payload = AgentDiagnostic.buildPayload(
             recommendations: recs,
-            scenarioName: "settings-test",
-            scenarioFilePath: "/tmp/settings.yaml")
+            skillName: "settings-test",
+            skillFilePath: "/tmp/settings.yaml")
 
-        #expect(payload.scenarioName == "settings-test")
-        #expect(payload.scenarioFilePath == "/tmp/settings.yaml")
+        #expect(payload.skillName == "settings-test")
+        #expect(payload.skillFilePath == "/tmp/settings.yaml")
         #expect(payload.failedSteps.count == 1)
         #expect(payload.failedSteps[0].stepIndex == 0)
         #expect(payload.failedSteps[0].stepType == "tap")

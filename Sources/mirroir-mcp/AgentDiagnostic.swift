@@ -1,7 +1,7 @@
 // Copyright 2026 jfarcand@apache.org
 // Licensed under the Apache License, Version 2.0
 //
-// ABOUTME: Diagnoses compiled scenario failures by running one OCR call on the actual screen.
+// ABOUTME: Diagnoses compiled skill failures by running one OCR call on the actual screen.
 // ABOUTME: Compares compiled hints against reality and produces actionable patch recommendations.
 
 import Foundation
@@ -30,7 +30,7 @@ enum AgentDiagnostic {
     /// Diagnose a compiled step failure by OCR-ing the current screen.
     /// Returns a recommendation with specific patches, or nil if diagnosis isn't possible.
     static func diagnose(
-        step: ScenarioStep,
+        step: SkillStep,
         compiledStep: CompiledStep,
         failureMessage: String?,
         describer: ScreenDescribing
@@ -233,10 +233,10 @@ enum AgentDiagnostic {
     // MARK: - Report Formatting
 
     /// Format a diagnostic report to stderr.
-    static func printReport(recommendations: [Recommendation], scenarioName: String) {
+    static func printReport(recommendations: [Recommendation], skillName: String) {
         guard !recommendations.isEmpty else { return }
 
-        fputs("\n--- Agent Diagnostic: \(scenarioName) ---\n", stderr)
+        fputs("\n--- Agent Diagnostic: \(skillName) ---\n", stderr)
 
         for rec in recommendations {
             let label = rec.label.map { " \"\($0)\"" } ?? ""
@@ -264,8 +264,8 @@ enum AgentDiagnostic {
     /// Build a diagnostic payload from deterministic recommendations for AI analysis.
     static func buildPayload(
         recommendations: [Recommendation],
-        scenarioName: String,
-        scenarioFilePath: String
+        skillName: String,
+        skillFilePath: String
     ) -> DiagnosticPayload {
         let steps = recommendations.map { rec in
             DiagnosticPayload.FailedStep(
@@ -280,14 +280,14 @@ enum AgentDiagnostic {
             )
         }
         return DiagnosticPayload(
-            scenarioName: scenarioName,
-            scenarioFilePath: scenarioFilePath,
+            skillName: skillName,
+            skillFilePath: skillFilePath,
             failedSteps: steps)
     }
 
     /// Print AI diagnosis results to stderr.
-    static func printAIReport(diagnosis: AIDiagnosis, scenarioName: String) {
-        fputs("\n--- AI Diagnosis (\(diagnosis.modelUsed)): \(scenarioName) ---\n", stderr)
+    static func printAIReport(diagnosis: AIDiagnosis, skillName: String) {
+        fputs("\n--- AI Diagnosis (\(diagnosis.modelUsed)): \(skillName) ---\n", stderr)
         fputs("\nAnalysis: \(diagnosis.analysis)\n", stderr)
 
         if !diagnosis.suggestedFixes.isEmpty {
@@ -304,8 +304,8 @@ enum AgentDiagnostic {
 
 /// Diagnostic context sent to an AI agent for analysis.
 struct DiagnosticPayload: Codable {
-    let scenarioName: String
-    let scenarioFilePath: String
+    let skillName: String
+    let skillFilePath: String
     let failedSteps: [FailedStep]
 
     struct FailedStep: Codable {

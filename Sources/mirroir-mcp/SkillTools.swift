@@ -1,22 +1,22 @@
 // Copyright 2026 jfarcand@apache.org
 // Licensed under the Apache License, Version 2.0
 //
-// ABOUTME: Registers scenario-related MCP tools: list_scenarios, get_scenario.
-// ABOUTME: Handles YAML and SKILL.md scenario discovery, header parsing, and environment variable substitution.
+// ABOUTME: Registers skill-related MCP tools: list_skills, get_skill.
+// ABOUTME: Handles YAML and SKILL.md skill discovery, header parsing, and environment variable substitution.
 
 import Foundation
 import HelperLib
 
 extension MirroirMCP {
-    static func registerScenarioTools(server: MCPServer) {
-        // list_scenarios — discover available scenarios from config directories
+    static func registerSkillTools(server: MCPServer) {
+        // list_skills — discover available skills from config directories
         server.registerTool(MCPToolDefinition(
-            name: "list_scenarios",
+            name: "list_skills",
             description: """
-                List all available test scenarios from both project-local and global \
-                config directories. Returns scenario names and descriptions extracted \
-                from YAML files in <cwd>/.mirroir-mcp/scenarios/ and \
-                ~/.mirroir-mcp/scenarios/. Project-local scenarios with the \
+                List all available test skills from both project-local and global \
+                config directories. Returns skill names and descriptions extracted \
+                from YAML files in <cwd>/.mirroir-mcp/skills/ and \
+                ~/.mirroir-mcp/skills/. Project-local skills with the \
                 same filename override global ones.
                 """,
             inputSchema: [
@@ -24,30 +24,30 @@ extension MirroirMCP {
                 "properties": .object([:]),
             ],
             handler: { _ in
-                let scenarios = discoverScenarios()
-                if scenarios.isEmpty {
+                let skills = discoverSkills()
+                if skills.isEmpty {
                     return .text(
-                        "No scenarios found.\n" +
-                        "Place .yaml or .md files in <cwd>/.mirroir-mcp/scenarios/ or " +
-                        "~/.mirroir-mcp/scenarios/")
+                        "No skills found.\n" +
+                        "Place .yaml or .md files in <cwd>/.mirroir-mcp/skills/ or " +
+                        "~/.mirroir-mcp/skills/")
                 }
 
                 var lines: [String] = []
-                for scenario in scenarios {
-                    let desc = scenario.description.isEmpty
+                for skill in skills {
+                    let desc = skill.description.isEmpty
                         ? "(no description)"
-                        : scenario.description
-                    lines.append("- \(scenario.name): \(desc)  [\(scenario.source)]")
+                        : skill.description
+                    lines.append("- \(skill.name): \(desc)  [\(skill.source)]")
                 }
                 return .text(lines.joined(separator: "\n"))
             }
         ))
 
-        // get_scenario — read a scenario file with environment variable substitution
+        // get_skill — read a skill file with environment variable substitution
         server.registerTool(MCPToolDefinition(
-            name: "get_scenario",
+            name: "get_skill",
             description: """
-                Read a scenario YAML file by name and return its contents with \
+                Read a skill YAML file by name and return its contents with \
                 ${VAR} placeholders resolved from environment variables. Looks in \
                 project-local directory first, then global. The AI interprets the \
                 YAML steps and executes them using existing MCP tools. \
@@ -59,7 +59,7 @@ extension MirroirMCP {
                     "name": .object([
                         "type": .string("string"),
                         "description": .string(
-                            "Scenario name or path (e.g. 'login-flow' or 'slack/send-message')"),
+                            "Skill name or path (e.g. 'login-flow' or 'slack/send-message')"),
                     ])
                 ]),
                 "required": .array([.string("name")]),
@@ -69,8 +69,8 @@ extension MirroirMCP {
                     return .error("Missing required parameter: name (string)")
                 }
 
-                let dirs = PermissionPolicy.scenarioDirs
-                let (resolvedPath, ambiguous) = resolveScenario(name: name, dirs: dirs)
+                let dirs = PermissionPolicy.skillDirs
+                let (resolvedPath, ambiguous) = resolveSkill(name: name, dirs: dirs)
 
                 if let path = resolvedPath {
                     do {
@@ -84,61 +84,61 @@ extension MirroirMCP {
                         return .text(content)
                     } catch {
                         return .error(
-                            "Failed to read scenario at \(path): \(error.localizedDescription)")
+                            "Failed to read skill at \(path): \(error.localizedDescription)")
                     }
                 }
 
                 if !ambiguous.isEmpty {
                     let matches = ambiguous.map { "  - \($0)" }.joined(separator: "\n")
                     return .error(
-                        "Ambiguous scenario name '\(name)'. Multiple matches found:\n\(matches)\n" +
+                        "Ambiguous skill name '\(name)'. Multiple matches found:\n\(matches)\n" +
                         "Use the full path (e.g. 'apps/slack/\(name)') to disambiguate.")
                 }
 
-                // Not found — show available scenarios to help the user
-                let scenarios = discoverScenarios()
-                if scenarios.isEmpty {
+                // Not found — show available skills to help the user
+                let skills = discoverSkills()
+                if skills.isEmpty {
                     let searchedDirs = dirs.joined(separator: ", ")
                     return .error(
-                        "Scenario '\(name)' not found. No scenarios installed.\n" +
+                        "Skill '\(name)' not found. No skills installed.\n" +
                         "Searched: \(searchedDirs)\n" +
-                        "Install scenarios: https://github.com/jfarcand/mirroir-scenarios")
+                        "Install skills: https://github.com/jfarcand/mirroir-skills")
                 }
 
-                let available = scenarios.map { "  - \($0.name)" }.joined(separator: "\n")
+                let available = skills.map { "  - \($0.name)" }.joined(separator: "\n")
                 return .error(
-                    "Scenario '\(name)' not found. Available scenarios:\n\(available)")
+                    "Skill '\(name)' not found. Available skills:\n\(available)")
             }
         ))
     }
 
-    // MARK: Scenario Helpers
+    // MARK: Skill Helpers
 
-    /// Metadata extracted from a scenario YAML file header.
-    struct ScenarioInfo {
+    /// Metadata extracted from a skill YAML file header.
+    struct SkillInfo {
         let name: String
         let description: String
         let source: String
     }
 
-    /// Recursively scan scenario directories and return metadata for each scenario file found.
+    /// Recursively scan skill directories and return metadata for each skill file found.
     /// Supports both .yaml and .md (SKILL.md) formats. When both exist with the same stem,
     /// the .md file takes precedence. Project-local files override global files with the same
     /// relative path.
-    static func discoverScenarios() -> [ScenarioInfo] {
-        let dirs = PermissionPolicy.scenarioDirs
+    static func discoverSkills() -> [SkillInfo] {
+        let dirs = PermissionPolicy.skillDirs
         var seenStems = Set<String>()
-        var results: [ScenarioInfo] = []
+        var results: [SkillInfo] = []
 
         for dir in dirs {
             let source = dir.hasPrefix(PermissionPolicy.globalConfigDir) ? "global" : "local"
-            for relPath in findScenarioFiles(in: dir) {
-                let stem = scenarioStem(relPath)
+            for relPath in findSkillFiles(in: dir) {
+                let stem = skillStem(relPath)
                 if seenStems.contains(stem) { continue }
                 seenStems.insert(stem)
 
                 let filePath = dir + "/" + relPath
-                let info = extractScenarioHeader(from: filePath, source: source)
+                let info = extractSkillHeader(from: filePath, source: source)
                 results.append(info)
             }
         }
@@ -146,18 +146,18 @@ extension MirroirMCP {
         return results
     }
 
-    /// Recursively find all scenario files (.md and .yaml) under a directory.
+    /// Recursively find all skill files (.md and .yaml) under a directory.
     /// Returns relative paths sorted with .md files before .yaml files for the same stem,
     /// ensuring .md takes precedence during discovery.
-    static func findScenarioFiles(in baseDir: String) -> [String] {
+    static func findSkillFiles(in baseDir: String) -> [String] {
         let results = findFiles(in: baseDir) {
             $0.hasSuffix(".yaml") || $0.hasSuffix(".md")
         }
 
         // Sort with .md before .yaml for the same stem, so .md wins during dedup
         return results.sorted { a, b in
-            let stemA = scenarioStem(a)
-            let stemB = scenarioStem(b)
+            let stemA = skillStem(a)
+            let stemB = skillStem(b)
             if stemA == stemB {
                 // .md comes first
                 return a.hasSuffix(".md")
@@ -191,9 +191,9 @@ extension MirroirMCP {
         return relPaths.sorted()
     }
 
-    /// Extract the stem (path without extension) from a scenario relative path.
+    /// Extract the stem (path without extension) from a skill relative path.
     /// Used for deduplication when both .md and .yaml exist.
-    static func scenarioStem(_ relPath: String) -> String {
+    static func skillStem(_ relPath: String) -> String {
         if relPath.hasSuffix(".yaml") {
             return String(relPath.dropLast(5))
         }
@@ -203,10 +203,10 @@ extension MirroirMCP {
         return relPath
     }
 
-    /// Extract name and description from a scenario file (YAML or SKILL.md).
+    /// Extract name and description from a skill file (YAML or SKILL.md).
     /// For .md files, parses the YAML front matter. For .yaml files, looks for
     /// `name:` and `description:` keys in the file header.
-    static func extractScenarioHeader(from path: String, source: String) -> ScenarioInfo {
+    static func extractSkillHeader(from path: String, source: String) -> SkillInfo {
         let filename = (path as NSString).lastPathComponent
         let fallbackName: String
         if filename.hasSuffix(".md") {
@@ -219,25 +219,25 @@ extension MirroirMCP {
         do {
             content = try String(contentsOfFile: path, encoding: .utf8)
         } catch {
-            DebugLog.log("ScenarioTools", "Failed to read scenario header at \(path): \(error)")
-            return ScenarioInfo(name: fallbackName, description: "", source: source)
+            DebugLog.log("SkillTools", "Failed to read skill header at \(path): \(error)")
+            return SkillInfo(name: fallbackName, description: "", source: source)
         }
 
         if path.hasSuffix(".md") {
             let header = SkillMdParser.parseHeader(content: content, fallbackName: fallbackName)
-            return ScenarioInfo(
+            return SkillInfo(
                 name: header.name, description: header.description, source: source)
         }
 
-        return extractScenarioHeader(from: content, fallbackName: fallbackName, source: source)
+        return extractSkillHeader(from: content, fallbackName: fallbackName, source: source)
     }
 
-    /// Parse scenario header from YAML content string.
-    static func extractScenarioHeader(
+    /// Parse skill header from YAML content string.
+    static func extractSkillHeader(
         from content: String,
         fallbackName: String,
         source: String
-    ) -> ScenarioInfo {
+    ) -> SkillInfo {
         var name = fallbackName
         var description = ""
 
@@ -282,7 +282,7 @@ extension MirroirMCP {
             }
         }
 
-        return ScenarioInfo(name: name, description: description, source: source)
+        return SkillInfo(name: name, description: description, source: source)
     }
 
     /// Extract the value portion of a simple "key: value" YAML line, stripping quotes.
@@ -310,7 +310,7 @@ extension MirroirMCP {
         do {
             regex = try NSRegularExpression(pattern: pattern)
         } catch {
-            DebugLog.log("ScenarioTools", "Regex compilation failed: \(error)")
+            DebugLog.log("SkillTools", "Regex compilation failed: \(error)")
             return result
         }
 
@@ -338,13 +338,13 @@ extension MirroirMCP {
         return result
     }
 
-    /// Resolve a scenario name to a file path, supporting both exact relative paths and basename lookup.
+    /// Resolve a skill name to a file path, supporting both exact relative paths and basename lookup.
     /// Supports both .yaml and .md extensions. When both exist, .md takes precedence (unless yamlOnly).
     /// When `yamlOnly` is true, only .yaml files are considered — used by the deterministic test runner
     /// and compiler which cannot execute natural-language markdown.
     /// Returns (resolvedPath, ambiguousMatches). If resolvedPath is non-nil, it's the unique match.
     /// If ambiguousMatches is non-empty, multiple files matched the basename.
-    static func resolveScenario(
+    static func resolveSkill(
         name: String,
         dirs: [String],
         yamlOnly: Bool = false
@@ -396,13 +396,13 @@ extension MirroirMCP {
         var matches: [String] = []
 
         for dir in dirs {
-            // When yamlOnly, only search YAML files; otherwise search all scenario files
-            let files = yamlOnly ? findYAMLFiles(in: dir) : findScenarioFiles(in: dir)
+            // When yamlOnly, only search YAML files; otherwise search all skill files
+            let files = yamlOnly ? findYAMLFiles(in: dir) : findSkillFiles(in: dir)
             for relPath in files {
                 let basename = (relPath as NSString).lastPathComponent
-                let baseStem = scenarioStem(basename)
+                let baseStem = skillStem(basename)
                 if baseStem == targetStem {
-                    let fullStem = scenarioStem(relPath)
+                    let fullStem = skillStem(relPath)
                     if seenStems.contains(fullStem) { continue }
                     seenStems.insert(fullStem)
                     matches.append(relPath)
@@ -427,22 +427,22 @@ extension MirroirMCP {
         return (nil, [])
     }
 
-    /// Check compilation status for a scenario file and return a status string.
-    /// Used by get_scenario to inform the AI whether compilation is needed.
+    /// Check compilation status for a skill file and return a status string.
+    /// Used by get_skill to inform the AI whether compilation is needed.
     /// Only checks version and source hash — dimension staleness is deferred to the
     /// test runner which has actual window dimensions from the active target.
-    static func compilationStatus(for scenarioPath: String) -> String {
-        guard let compiled = try? CompiledScenarioIO.load(for: scenarioPath) else {
+    static func compilationStatus(for skillPath: String) -> String {
+        guard let compiled = try? CompiledSkillIO.load(for: skillPath) else {
             return "[Not compiled \u{2014} use record_step after each step to compile]"
         }
 
         // Version check
-        if compiled.version != CompiledScenario.currentVersion {
-            return "[Compiled: stale \u{2014} compiled version \(compiled.version) != current \(CompiledScenario.currentVersion)]"
+        if compiled.version != CompiledSkill.currentVersion {
+            return "[Compiled: stale \u{2014} compiled version \(compiled.version) != current \(CompiledSkill.currentVersion)]"
         }
 
         // Source hash check
-        if let currentHash = try? CompiledScenarioIO.sha256(of: scenarioPath),
+        if let currentHash = try? CompiledSkillIO.sha256(of: skillPath),
            currentHash != compiled.source.sha256 {
             return "[Compiled: stale \u{2014} source file has changed since compilation]"
         }

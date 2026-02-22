@@ -23,14 +23,14 @@ final class ConsoleReporterTests: XCTestCase {
         XCTAssertEqual(ConsoleReporter.formatStatus(.skipped), "SKIP")
     }
 
-    // MARK: - ScenarioResult Counts
+    // MARK: - SkillResult Counts
 
-    func testScenarioResultCountsAllPass() {
+    func testSkillResultCountsAllPass() {
         let steps = [
             StepResult(step: .home, status: .passed, message: nil, durationSeconds: 0.1),
             StepResult(step: .shake, status: .passed, message: nil, durationSeconds: 0.2),
         ]
-        let result = ConsoleReporter.ScenarioResult(
+        let result = ConsoleReporter.SkillResult(
             name: "Test", filePath: "test.yaml",
             stepResults: steps, durationSeconds: 0.5)
 
@@ -43,7 +43,7 @@ final class ConsoleReporterTests: XCTestCase {
         XCTAssertEqual(skipped, 0)
     }
 
-    func testScenarioResultCountsMixed() {
+    func testSkillResultCountsMixed() {
         let steps = [
             StepResult(step: .home, status: .passed, message: nil, durationSeconds: 0.1),
             StepResult(step: .tap(label: "X"), status: .failed,
@@ -51,7 +51,7 @@ final class ConsoleReporterTests: XCTestCase {
             StepResult(step: .skipped(stepType: "remember", reason: "AI-only"),
                        status: .skipped, message: "AI-only", durationSeconds: 0.0),
         ]
-        let result = ConsoleReporter.ScenarioResult(
+        let result = ConsoleReporter.SkillResult(
             name: "Mixed", filePath: "test.yaml",
             stepResults: steps, durationSeconds: 0.5)
 
@@ -66,23 +66,23 @@ final class ConsoleReporterTests: XCTestCase {
 
     // MARK: - Summary Logic
 
-    func testSummaryPassedScenariosCount() {
-        let allPass = ConsoleReporter.ScenarioResult(
+    func testSummaryPassedSkillsCount() {
+        let allPass = ConsoleReporter.SkillResult(
             name: "Pass", filePath: "p.yaml",
             stepResults: [StepResult(step: .home, status: .passed,
                                      message: nil, durationSeconds: 0.1)],
             durationSeconds: 0.2)
-        let withFail = ConsoleReporter.ScenarioResult(
+        let withFail = ConsoleReporter.SkillResult(
             name: "Fail", filePath: "f.yaml",
             stepResults: [StepResult(step: .tap(label: "X"), status: .failed,
                                      message: "err", durationSeconds: 0.1)],
             durationSeconds: 0.2)
 
         let results = [allPass, withFail]
-        let passedScenarios = results.filter { scenarioResult in
-            !scenarioResult.stepResults.contains { $0.status == .failed }
+        let passedSkills = results.filter { skillResult in
+            !skillResult.stepResults.contains { $0.status == .failed }
         }.count
 
-        XCTAssertEqual(passedScenarios, 1)
+        XCTAssertEqual(passedSkills, 1)
     }
 }

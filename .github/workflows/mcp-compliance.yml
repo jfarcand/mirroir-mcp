@@ -37,9 +37,9 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Clone scenarios repo
+      - name: Clone skills repo
         run: |
-          git clone https://github.com/jfarcand/mirroir-scenarios.git .mirroir-mcp/scenarios
+          git clone https://github.com/jfarcand/mirroir-skills.git .mirroir-mcp/skills
 
       - name: Setup Python
         uses: actions/setup-python@v5

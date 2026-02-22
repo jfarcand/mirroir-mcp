@@ -1,20 +1,20 @@
 // Copyright 2026 jfarcand@apache.org
 // Licensed under the Apache License, Version 2.0
 //
-// ABOUTME: Converts recorded user interactions into scenario YAML format.
-// ABOUTME: Produces YAML compatible with the scenario parser and test runner.
+// ABOUTME: Converts recorded user interactions into skill YAML format.
+// ABOUTME: Produces YAML compatible with the skill parser and test runner.
 
 import Foundation
 
-/// Generates scenario YAML from a sequence of recorded events.
-/// Produces output compatible with ScenarioParser and the `mirroir test` runner.
+/// Generates skill YAML from a sequence of recorded events.
+/// Produces output compatible with SkillParser and the `mirroir test` runner.
 enum YAMLGenerator {
 
-    /// Generate a complete scenario YAML document from recorded events.
+    /// Generate a complete skill YAML document from recorded events.
     /// - Parameters:
     ///   - events: The recorded user interactions
-    ///   - name: Scenario name for the YAML header
-    ///   - description: Scenario description
+    ///   - name: Skill name for the YAML header
+    ///   - description: Skill description
     ///   - appName: Optional app name for the header
     /// - Returns: The YAML string ready to write to a file
     static func generate(

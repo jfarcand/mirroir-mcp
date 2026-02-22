@@ -1,7 +1,7 @@
 // Copyright 2026 jfarcand@apache.org
 // Licensed under the Apache License, Version 2.0
 //
-// ABOUTME: Tests for AgentDiagnostic — compiled scenario failure diagnosis.
+// ABOUTME: Tests for AgentDiagnostic — compiled skill failure diagnosis.
 // ABOUTME: Verifies tap drift detection, sleep timing analysis, scroll recommendations, and report formatting.
 
 import Foundation
@@ -30,7 +30,7 @@ struct AgentDiagnosticTests {
 
     @Test("Returns nil when compiled step has no hints")
     func noHintsReturnsNil() {
-        let step = ScenarioStep.tap(label: "AirDrop")
+        let step = SkillStep.tap(label: "AirDrop")
         let compiled = CompiledStep(index: 0, type: "tap", label: "AirDrop", hints: nil)
         let describer = makeDescriber(elements: [])
 
@@ -47,7 +47,7 @@ struct AgentDiagnosticTests {
     func ocrFailureReturnsDiagnosis() {
         let hints = StepHints.tap(x: 100, y: 200, confidence: 0.9, strategy: "exact")
         let compiled = CompiledStep(index: 0, type: "tap", label: "AirDrop", hints: hints)
-        let step = ScenarioStep.tap(label: "AirDrop")
+        let step = SkillStep.tap(label: "AirDrop")
 
         let describer = StubDescriber()
         describer.describeResult = nil
@@ -66,7 +66,7 @@ struct AgentDiagnosticTests {
     func tapElementMoved() {
         let hints = StepHints.tap(x: 100, y: 200, confidence: 0.9, strategy: "exact")
         let compiled = CompiledStep(index: 2, type: "tap", label: "AirDrop", hints: hints)
-        let step = ScenarioStep.tap(label: "AirDrop")
+        let step = SkillStep.tap(label: "AirDrop")
 
         let describer = makeDescriber(elements: [
             makeTapPoint("AirDrop", x: 150, y: 250)
@@ -93,7 +93,7 @@ struct AgentDiagnosticTests {
     func tapAbsorbedAtSamePosition() {
         let hints = StepHints.tap(x: 100, y: 200, confidence: 0.9, strategy: "exact")
         let compiled = CompiledStep(index: 0, type: "tap", label: "AirDrop", hints: hints)
-        let step = ScenarioStep.tap(label: "AirDrop")
+        let step = SkillStep.tap(label: "AirDrop")
 
         let describer = makeDescriber(elements: [
             makeTapPoint("AirDrop", x: 102, y: 201)
@@ -111,7 +111,7 @@ struct AgentDiagnosticTests {
     func tapElementNotFound() {
         let hints = StepHints.tap(x: 100, y: 200, confidence: 0.9, strategy: "exact")
         let compiled = CompiledStep(index: 0, type: "tap", label: "AirDrop", hints: hints)
-        let step = ScenarioStep.tap(label: "AirDrop")
+        let step = SkillStep.tap(label: "AirDrop")
 
         let describer = makeDescriber(elements: [
             makeTapPoint("Wi-Fi", x: 100, y: 300),
@@ -134,7 +134,7 @@ struct AgentDiagnosticTests {
     func waitForElementVisibleSuggestsLongerDelay() {
         let hints = StepHints.sleep(delayMs: 500)
         let compiled = CompiledStep(index: 1, type: "wait_for", label: "General", hints: hints)
-        let step = ScenarioStep.waitFor(label: "General", timeoutSeconds: nil)
+        let step = SkillStep.waitFor(label: "General", timeoutSeconds: nil)
 
         let describer = makeDescriber(elements: [
             makeTapPoint("General", x: 200, y: 340)
@@ -157,7 +157,7 @@ struct AgentDiagnosticTests {
         let hints = StepHints.sleep(delayMs: 200)
         let compiled = CompiledStep(
             index: 3, type: "assert_visible", label: "Model Name", hints: hints)
-        let step = ScenarioStep.assertVisible(label: "Model Name")
+        let step = SkillStep.assertVisible(label: "Model Name")
 
         let describer = makeDescriber(elements: [
             makeTapPoint("Settings", x: 200, y: 100)
@@ -177,7 +177,7 @@ struct AgentDiagnosticTests {
         let hints = StepHints.sleep(delayMs: 200)
         let compiled = CompiledStep(
             index: 0, type: "assert_not_visible", label: "Error", hints: hints)
-        let step = ScenarioStep.assertNotVisible(label: "Error")
+        let step = SkillStep.assertNotVisible(label: "Error")
 
         let describer = makeDescriber(elements: [
             makeTapPoint("Settings", x: 200, y: 100)
@@ -196,7 +196,7 @@ struct AgentDiagnosticTests {
         let hints = StepHints.sleep(delayMs: 200)
         let compiled = CompiledStep(
             index: 0, type: "assert_not_visible", label: "Error", hints: hints)
-        let step = ScenarioStep.assertNotVisible(label: "Error")
+        let step = SkillStep.assertNotVisible(label: "Error")
 
         let describer = makeDescriber(elements: [
             makeTapPoint("Error", x: 200, y: 100)
@@ -216,7 +216,7 @@ struct AgentDiagnosticTests {
         let hints = StepHints.scrollSequence(count: 3, direction: "up")
         let compiled = CompiledStep(
             index: 4, type: "scroll_to", label: "About", hints: hints)
-        let step = ScenarioStep.scrollTo(label: "About", direction: "up", maxScrolls: 10)
+        let step = SkillStep.scrollTo(label: "About", direction: "up", maxScrolls: 10)
 
         let describer = makeDescriber(elements: [
             makeTapPoint("About", x: 200, y: 500)
@@ -235,7 +235,7 @@ struct AgentDiagnosticTests {
         let hints = StepHints.scrollSequence(count: 2, direction: "up")
         let compiled = CompiledStep(
             index: 4, type: "scroll_to", label: "About", hints: hints)
-        let step = ScenarioStep.scrollTo(label: "About", direction: "up", maxScrolls: 10)
+        let step = SkillStep.scrollTo(label: "About", direction: "up", maxScrolls: 10)
 
         let describer = makeDescriber(elements: [
             makeTapPoint("General", x: 200, y: 300),
@@ -261,7 +261,7 @@ struct AgentDiagnosticTests {
         let hints = StepHints.passthrough()
         let compiled = CompiledStep(
             index: 0, type: "launch", label: "Settings", hints: hints)
-        let step = ScenarioStep.launch(appName: "Settings")
+        let step = SkillStep.launch(appName: "Settings")
 
         let describer = makeDescriber(elements: [
             makeTapPoint("Home", x: 200, y: 400)
@@ -295,7 +295,7 @@ struct AgentDiagnosticTests {
         let savedStderr = dup(STDERR_FILENO)
         dup2(pipe.fileHandleForWriting.fileDescriptor, STDERR_FILENO)
 
-        AgentDiagnostic.printReport(recommendations: recs, scenarioName: "test-scenario")
+        AgentDiagnostic.printReport(recommendations: recs, skillName: "test-skill")
 
         fflush(stderr)
         dup2(savedStderr, STDERR_FILENO)
@@ -305,7 +305,7 @@ struct AgentDiagnosticTests {
         let data = pipe.fileHandleForReading.readDataToEndOfFile()
         let output = String(data: data, encoding: .utf8) ?? ""
 
-        #expect(output.contains("Agent Diagnostic: test-scenario"))
+        #expect(output.contains("Agent Diagnostic: test-skill"))
         #expect(output.contains("Step 3 [tap \"AirDrop\"]"))
         #expect(output.contains("Fix: tapX: 100.0 -> 150.0"))
         #expect(output.contains("recompile"))
@@ -317,7 +317,7 @@ struct AgentDiagnosticTests {
         let savedStderr = dup(STDERR_FILENO)
         dup2(pipe.fileHandleForWriting.fileDescriptor, STDERR_FILENO)
 
-        AgentDiagnostic.printReport(recommendations: [], scenarioName: "empty")
+        AgentDiagnostic.printReport(recommendations: [], skillName: "empty")
 
         fflush(stderr)
         dup2(savedStderr, STDERR_FILENO)

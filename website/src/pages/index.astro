@@ -2,6 +2,8 @@
 import Layout from "../layouts/Layout.astro";
 import { Code } from "astro:components";
 import "../styles/global.css";
+import { readFileSync, existsSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 
 const curlCmd = '/bin/bash -c "$(curl -fsSL https://mirroir.dev/get-mirroir.sh)"';
 const npxCmd = "npx -y mirroir-mcp install";
@@ -13,7 +15,7 @@ const permissionsCode = `{
   "blockedApps": ["Wallet", "Banking"]
 }`;
 
-const scenarioExpo = `---
+const skillExpo = `---
 version: 1
 name: Expo Go Signup + Onboarding
 app: Expo Go
@@ -51,7 +53,7 @@ Sign up, handle error or success, then swipe through onboarding.
 16. Verify "Dashboard" is visible
 17. Screenshot: "complete"`;
 
-const scenarioWaze = `---
+const skillWaze = `---
 version: 1
 name: Commute ETA Notification
 app: Waze, Messages
@@ -80,7 +82,7 @@ Get ETA from Waze, text it via iMessage.
 16. Press **Return**
 17. Screenshot: "message_sent"`;
 
-const scenarioSpotify = `---
+const skillSpotify = `---
 version: 1
 name: Play a Song
 app: Spotify (macOS)
@@ -100,11 +102,11 @@ Search for a song on the Spotify macOS app and play it.
 7. Verify "Playing" is visible
 8. Screenshot: "now_playing"`;
 
-const scenariosRepo = "jfarcand/mirroir-scenarios";
-const scenariosBase = `https://github.com/${scenariosRepo}`;
-const rawBase = `https://raw.githubusercontent.com/${scenariosRepo}/main`;
+const skillsRepo = "jfarcand/mirroir-skills";
+const skillsBase = `https://github.com/${skillsRepo}`;
+const rawBase = `https://raw.githubusercontent.com/${skillsRepo}/main`;
 
-interface Scenario {
+interface Skill {
   name: string;
   description: string;
   app: string;
@@ -114,79 +116,91 @@ interface Scenario {
   rawUrl: string;
 }
 
-const ghHeaders: Record<string, string> = {
-  Accept: "application/vnd.github.v3+json",
-};
-const ghToken = import.meta.env.GITHUB_TOKEN ?? process.env.GITHUB_TOKEN;
-if (ghToken) {
-  ghHeaders.Authorization = `Bearer ${ghToken}`;
+// Read pre-generated skills index from filesystem (produced by scripts/generate-skills-index.mjs).
+// Falls back to GitHub API if the file doesn't exist, and to an empty list on error.
+const indexPath = fileURLToPath(new URL("../data/skills-index.json", import.meta.url));
+let skills: Skill[] = [];
+let skillsAvailable = false;
+
+if (existsSync(indexPath)) {
+  try {
+    skills = JSON.parse(readFileSync(indexPath, "utf-8"));
+    skillsAvailable = skills.length > 0;
+  } catch {
+    // Corrupted file — continue with empty list
+  }
 }
 
-let scenarios: Scenario[] = [];
-try {
-  const treeRes = await fetch(
-    `https://api.github.com/repos/${scenariosRepo}/git/trees/main?recursive=1`,
-    { headers: ghHeaders }
-  );
-  const tree = await treeRes.json();
-  const yamlFiles = (tree.tree ?? []).filter(
-    (f: { path: string }) => f.path.endsWith(".yaml") || f.path.endsWith(".yml")
-  );
-
-  // Extract a top-level YAML scalar value, handling both inline strings
-  // and block scalars (> folded, | literal). For block scalars, collects
-  // indented continuation lines and joins them into a single string.
-  function yamlValue(content: string, key: string): string {
-    const lineMatch = content.match(new RegExp(`^${key}:\\s*(.*)$`, "m"));
-    if (!lineMatch) return "";
-    const rest = lineMatch[1].trim();
-    // Inline value (most common): "description: some text here"
-    if (rest && rest !== ">" && rest !== "|") return rest;
-    // Block scalar: collect indented continuation lines
-    const lines = content.split("\n");
-    const startIdx = lines.findIndex((l) => l.match(new RegExp(`^${key}:`)));
-    if (startIdx < 0) return rest;
-    const blockLines: string[] = [];
-    for (let i = startIdx + 1; i < lines.length; i++) {
-      if (/^\s+\S/.test(lines[i])) {
-        blockLines.push(lines[i].trim());
-      } else if (lines[i].trim() === "") {
-        blockLines.push("");
-      } else {
-        break;
-      }
-    }
-    // Take just the first paragraph for the description card
-    const firstPara: string[] = [];
-    for (const line of blockLines) {
-      if (line === "") break;
-      firstPara.push(line);
-    }
-    return firstPara.join(" ");
+if (!skillsAvailable) {
+  // Fallback: fetch from GitHub API at build time (rate-limited)
+  const ghHeaders: Record<string, string> = {
+    Accept: "application/vnd.github.v3+json",
+  };
+  const ghToken = import.meta.env.GITHUB_TOKEN ?? process.env.GITHUB_TOKEN;
+  if (ghToken) {
+    ghHeaders.Authorization = `Bearer ${ghToken}`;
   }
 
-  const fetches = yamlFiles.map(async (f: { path: string }) => {
-    const res = await fetch(
-      `https://api.github.com/repos/${scenariosRepo}/contents/${f.path}`,
+  try {
+    const treeRes = await fetch(
+      `https://api.github.com/repos/${skillsRepo}/git/trees/main?recursive=1`,
       { headers: ghHeaders }
     );
-    const data = await res.json();
-    const content = atob(data.content.replace(/\n/g, ""));
-    const parts = f.path.split("/");
-    const category = parts.length > 1 ? parts.slice(0, -1).join("/") : "";
-    return {
-      name: yamlValue(content, "name") || f.path,
-      description: yamlValue(content, "description"),
-      app: yamlValue(content, "app"),
-      path: f.path,
-      category,
-      url: `${scenariosBase}/blob/main/${f.path}`,
-      rawUrl: `${rawBase}/${f.path}`,
-    };
-  });
-  scenarios = await Promise.all(fetches);
-} catch {
-  // Build continues with empty list if GitHub API is unreachable
+    const tree = await treeRes.json();
+    const yamlFiles = (tree.tree ?? []).filter(
+      (f: { path: string }) => f.path.endsWith(".yaml") || f.path.endsWith(".yml")
+    );
+
+    function yamlValue(content: string, key: string): string {
+      const lineMatch = content.match(new RegExp(`^${key}:\\s*(.*)$`, "m"));
+      if (!lineMatch) return "";
+      const rest = lineMatch[1].trim();
+      if (rest && rest !== ">" && rest !== "|") return rest;
+      const lines = content.split("\n");
+      const startIdx = lines.findIndex((l) => l.match(new RegExp(`^${key}:`)));
+      if (startIdx < 0) return rest;
+      const blockLines: string[] = [];
+      for (let i = startIdx + 1; i < lines.length; i++) {
+        if (/^\s+\S/.test(lines[i])) {
+          blockLines.push(lines[i].trim());
+        } else if (lines[i].trim() === "") {
+          blockLines.push("");
+        } else {
+          break;
+        }
+      }
+      const firstPara: string[] = [];
+      for (const line of blockLines) {
+        if (line === "") break;
+        firstPara.push(line);
+      }
+      return firstPara.join(" ");
+    }
+
+    const fetches = yamlFiles.map(async (f: { path: string }) => {
+      const res = await fetch(
+        `https://api.github.com/repos/${skillsRepo}/contents/${f.path}`,
+        { headers: ghHeaders }
+      );
+      const data = await res.json();
+      const content = atob(data.content.replace(/\n/g, ""));
+      const parts = f.path.split("/");
+      const category = parts.length > 1 ? parts.slice(0, -1).join("/") : "";
+      return {
+        name: yamlValue(content, "name") || f.path,
+        description: yamlValue(content, "description"),
+        app: yamlValue(content, "app"),
+        path: f.path,
+        category,
+        url: `${skillsBase}/blob/main/${f.path}`,
+        rawUrl: `${rawBase}/${f.path}`,
+      };
+    });
+    skills = await Promise.all(fetches);
+    skillsAvailable = skills.length > 0;
+  } catch {
+    // Build continues with empty list if GitHub API is unreachable
+  }
 }
 
 ---
@@ -203,8 +217,12 @@ try {
       Give your AI an iPhone.
     </p>
     <p class="subtitle">
-      We built an MCP server to control iPhones through macOS iPhone Mirroring. Then we realized the same tools — screenshot, tap, swipe, type — work on any macOS window. Same security model. Same scenarios. Same AI.
+      An MCP server that controls a real iPhone via macOS iPhone Mirroring &mdash; and any macOS window too.
     </p>
+    <div class="hero-cta">
+      <a href="#install" class="btn-primary">Install</a>
+      <a href="https://github.com/jfarcand/mirroir-mcp" class="btn-secondary" rel="noopener noreferrer">GitHub</a>
+    </div>
   </header>
 
   <!-- Demo Videos -->
@@ -214,13 +232,13 @@ try {
       <div class="carousel-track">
         <div class="carousel-slide demo-slide">
           <h3>Login Flow</h3>
-          <video autoplay loop muted playsinline>
+          <video loop muted playsinline>
             <source src={`${import.meta.env.BASE_URL}video1-expo-login.mp4`} type="video/mp4" />
           </video>
         </div>
         <div class="carousel-slide demo-slide">
           <h3>Cross-App Workflow</h3>
-          <video autoplay loop muted playsinline>
+          <video loop muted playsinline>
             <source src={`${import.meta.env.BASE_URL}video2-waze-slack.mp4`} type="video/mp4" />
           </video>
         </div>
@@ -229,45 +247,92 @@ try {
       <button class="carousel-next" aria-label="Next">&#8250;</button>
       <div class="carousel-dots"></div>
     </div>
-    <div class="demo-lightbox" id="demo-lightbox">
-      <video autoplay loop muted playsinline id="demo-lightbox-video"></video>
+    <div class="demo-lightbox" id="demo-lightbox" role="dialog" aria-label="Video lightbox" aria-modal="true">
+      <button class="lightbox-close" aria-label="Close lightbox">&times;</button>
+      <video loop muted playsinline id="demo-lightbox-video"></video>
     </div>
     <script>
+      // Autoplay videos only when reduced-motion is not preferred
+      const prefersReducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+      if (!prefersReducedMotion) {
+        document.querySelectorAll(".demo-slide video").forEach((vid) => {
+          (vid as HTMLVideoElement).autoplay = true;
+          (vid as HTMLVideoElement).play().catch(() => {});
+        });
+      }
+
       const lightbox = document.getElementById("demo-lightbox")!;
       const lbVideo = document.getElementById("demo-lightbox-video")! as HTMLVideoElement;
+      const lbClose = lightbox.querySelector(".lightbox-close")! as HTMLButtonElement;
+      let triggerElement: HTMLElement | null = null;
+
+      function openLightbox(src: string, trigger: HTMLElement) {
+        triggerElement = trigger;
+        lbVideo.innerHTML = "";
+        const source = document.createElement("source");
+        source.src = src;
+        source.type = "video/mp4";
+        lbVideo.appendChild(source);
+        lbVideo.load();
+        lbVideo.play();
+        lightbox.classList.add("active");
+        document.documentElement.classList.add("scroll-lock");
+        lbClose.focus();
+      }
+
+      function closeLightbox() {
+        lightbox.classList.remove("active");
+        document.documentElement.classList.remove("scroll-lock");
+        lbVideo.pause();
+        if (triggerElement) {
+          triggerElement.focus();
+          triggerElement = null;
+        }
+      }
 
       document.querySelectorAll(".demo-slide video").forEach((vid) => {
         vid.addEventListener("click", () => {
           const src = (vid as HTMLVideoElement).querySelector("source")!.src;
-          lbVideo.innerHTML = "";
-          const source = document.createElement("source");
-          source.src = src;
-          source.type = "video/mp4";
-          lbVideo.appendChild(source);
-          lbVideo.load();
-          lbVideo.play();
-          lightbox.classList.add("active");
+          openLightbox(src, vid as HTMLElement);
         });
       });
 
+      lbClose.addEventListener("click", closeLightbox);
+
       lightbox.addEventListener("click", (e) => {
         if (e.target === lightbox) {
-          lightbox.classList.remove("active");
-          lbVideo.pause();
+          closeLightbox();
         }
       });
 
       document.addEventListener("keydown", (e) => {
-        if (e.key === "Escape" && lightbox.classList.contains("active")) {
-          lightbox.classList.remove("active");
-          lbVideo.pause();
+        if (!lightbox.classList.contains("active")) return;
+        if (e.key === "Escape") {
+          closeLightbox();
+        }
+        // Focus trap: cycle between close button and video
+        if (e.key === "Tab") {
+          const focusable = [lbClose, lbVideo];
+          const first = focusable[0];
+          const last = focusable[focusable.length - 1];
+          if (e.shiftKey) {
+            if (document.activeElement === first) {
+              e.preventDefault();
+              last.focus();
+            }
+          } else {
+            if (document.activeElement === last) {
+              e.preventDefault();
+              first.focus();
+            }
+          }
         }
       });
     </script>
   </section>
 
   <!-- Install -->
-  <section>
+  <section id="install">
     <h2>Install mirroir-mcp</h2>
     <div class="install-block">
       <code><span class="prompt">$</span> {curlCmd}</code>
@@ -277,14 +342,14 @@ try {
       Paste that in a macOS Terminal. Clones the repo, builds from source, installs the DriverKit virtual HID, and starts the helper daemon.
     </p>
     <p class="alt-install">
-      or via <a href="https://www.npmjs.com/package/mirroir-mcp">npx</a>:
+      or via <a href="https://www.npmjs.com/package/mirroir-mcp" rel="noopener noreferrer">npx</a>:
     </p>
     <div class="install-block install-block-alt">
       <code><span class="prompt">$</span> {npxCmd}</code>
       <button class="copy-btn" data-copy={npxCmd}>Copy</button>
     </div>
     <p class="alt-install">
-      or via <a href="https://tap.mirroir.dev">Homebrew</a>:
+      or via <a href="https://tap.mirroir.dev" rel="noopener noreferrer">Homebrew</a>:
     </p>
     <div class="install-block install-block-alt">
       <code><span class="prompt">$</span> {brewCmd}</code>
@@ -292,29 +357,29 @@ try {
     </div>
   </section>
 
-  <!-- Scenarios -->
+  <!-- Skills -->
   <section>
-    <h2>Scenarios: intents, not scripts</h2>
+    <h2>Skills: intents, not scripts</h2>
     <p>
-      Scenarios are SKILL.md files — YAML front matter plus numbered markdown steps — that describe automation flows as intents, not scripts.
+      Skills are SKILL.md files — YAML front matter plus numbered markdown steps — that describe automation flows as intents, not scripts.
       Steps like <code>Tap "Email"</code> don't specify coordinates — the AI finds
       the element by OCR matching and adapts to unexpected dialogs and layout changes.
-      Test an app or automate your morning routine. Share them on the <a href="https://github.com/jfarcand/mirroir-scenarios">community repository</a>.
+      Test an app or automate your morning routine. Share them on the <a href="https://github.com/jfarcand/mirroir-skills" rel="noopener noreferrer">community repository</a>.
     </p>
 
-    <div class="carousel scenario-carousel">
+    <div class="carousel skill-carousel">
       <div class="carousel-track">
-        <div class="carousel-slide scenario-slide">
+        <div class="carousel-slide skill-slide">
           <h3>Branching + looping</h3>
-          <Code code={scenarioExpo} lang="markdown" theme="github-dark" />
+          <Code code={skillExpo} lang="markdown" theme="github-dark" />
         </div>
-        <div class="carousel-slide scenario-slide">
+        <div class="carousel-slide skill-slide">
           <h3>Cross-app workflow</h3>
-          <Code code={scenarioWaze} lang="markdown" theme="github-dark" />
+          <Code code={skillWaze} lang="markdown" theme="github-dark" />
         </div>
-        <div class="carousel-slide scenario-slide">
+        <div class="carousel-slide skill-slide">
           <h3>macOS window</h3>
-          <Code code={scenarioSpotify} lang="markdown" theme="github-dark" />
+          <Code code={skillSpotify} lang="markdown" theme="github-dark" />
         </div>
       </div>
       <button class="carousel-prev" aria-label="Previous">&#8249;</button>
@@ -324,7 +389,7 @@ try {
 
     <p>
       <code>$&#123;VAR&#125;</code> placeholders resolve from environment variables.
-      Install scenarios in Claude Code<sup>*</sup>:
+      Install skills in Claude Code<sup>*</sup>:
     </p>
     <div class="install-block install-block-alt">
       <code><span class="prompt">$</span> claude plugin marketplace add marketplace.mirroir.dev</code>
@@ -334,52 +399,97 @@ try {
       <sup>*</sup> Also supported by GitHub Copilot.
     </p>
 
-    <h3 class="search-heading">Search the community scenario library</h3>
-    <div class="scenario-search-wrap">
+    <h3 class="search-heading">Search the community skill library</h3>
+    <div class="skill-search-wrap">
       <input
         type="text"
-        id="scenario-q"
-        placeholder="Search scenarios... (e.g. login, slack, calendar)"
+        id="skill-q"
+        placeholder="Search skills... (e.g. login, slack, calendar)"
         autocomplete="off"
       />
-      <ul id="scenario-results"></ul>
+      <ul id="skill-results"></ul>
     </div>
-    <script id="scenario-data" type="application/json" set:html={JSON.stringify(scenarios)} />
-    <script>
-      const scenarios = JSON.parse(
-        document.getElementById("scenario-data")!.textContent ?? "[]"
+    <script id="skill-data" type="application/json" set:html={JSON.stringify(skills)} />
+    <script define:vars={{ skillsAvailable }}>
+      const skills = JSON.parse(
+        document.getElementById("skill-data").textContent ?? "[]"
       );
-      const input = document.getElementById("scenario-q")!;
-      const results = document.getElementById("scenario-results")!;
+      const indexAvailable = skillsAvailable;
+      const input = document.getElementById("skill-q");
+      const results = document.getElementById("skill-results");
 
-      function render(matches: typeof scenarios) {
-        if (!matches.length) {
-          results.innerHTML = "";
+      function clearResults() {
+        while (results.firstChild) {
+          results.removeChild(results.firstChild);
+        }
+      }
+
+      function showStatus(message) {
+        clearResults();
+        const li = document.createElement("li");
+        li.className = "skill-status";
+        li.textContent = message;
+        results.appendChild(li);
+      }
+
+      function render(matches) {
+        clearResults();
+        if (!indexAvailable) {
+          showStatus("Skill index unavailable — try again later.");
           return;
         }
-        results.innerHTML = matches
-          .map(
-            (s: any) =>
-              `<li>
-                <div class="scenario-row">
-                  <a href="${s.url}" target="_blank">${s.name}</a>
-                  <span class="scenario-app">${s.app}</span>
-                  <a class="scenario-dl" href="${s.rawUrl}" download title="Download YAML">\u2193</a>
-                </div>
-                ${s.description ? `<span class="scenario-desc">${s.description}</span>` : ""}
-              </li>`
-          )
-          .join("");
+        if (!matches.length) {
+          showStatus("No matching skills.");
+          return;
+        }
+        for (const s of matches) {
+          const li = document.createElement("li");
+
+          const row = document.createElement("div");
+          row.className = "skill-row";
+
+          const nameLink = document.createElement("a");
+          nameLink.href = s.url;
+          nameLink.target = "_blank";
+          nameLink.rel = "noopener noreferrer";
+          nameLink.textContent = s.name;
+          row.appendChild(nameLink);
+
+          const appBadge = document.createElement("span");
+          appBadge.className = "skill-app";
+          appBadge.textContent = s.app;
+          row.appendChild(appBadge);
+
+          const dlLink = document.createElement("a");
+          dlLink.className = "skill-dl";
+          dlLink.href = s.rawUrl;
+          dlLink.download = "";
+          dlLink.title = "Download YAML";
+          dlLink.textContent = "\u2193";
+          dlLink.rel = "noopener noreferrer";
+          row.appendChild(dlLink);
+
+          li.appendChild(row);
+
+          if (s.description) {
+            const desc = document.createElement("span");
+            desc.className = "skill-desc";
+            desc.textContent = s.description;
+            li.appendChild(desc);
+          }
+
+          results.appendChild(li);
+        }
       }
 
       input.addEventListener("input", () => {
-        const q = (input as HTMLInputElement).value.toLowerCase().trim();
+        const q = input.value.toLowerCase().trim();
         if (!q) {
-          render([]);
+          clearResults();
           return;
         }
-        const matches = scenarios.filter(
-          (s: any) =>
+        const matches = skills.filter(
+          (s) =>
             s.name.toLowerCase().includes(q) ||
             s.description.toLowerCase().includes(q) ||
             s.app.toLowerCase().includes(q) ||
@@ -390,18 +500,18 @@ try {
     </script>
   </section>
 
-  <!-- Test Runner + Compiled Scenarios + Agent Diagnosis -->
+  <!-- Test Runner + Compiled Skills + Agent Diagnosis -->
   <section>
     <h2>Test, compile, diagnose</h2>
     <p>
-      Run scenarios deterministically from the CLI &mdash; no AI in the loop. The AI auto-compiles on first execution, or use <code>mirroir compile</code> to cache coordinates for zero-OCR replay. When something breaks, <code>--agent</code> tells you why.
+      Run skills deterministically from the CLI &mdash; no AI in the loop. The AI auto-compiles on first execution, or use <code>mirroir compile</code> to cache coordinates for zero-OCR replay. When something breaks, <code>--agent</code> tells you why.
     </p>
 
     <div class="pipeline-grid">
       <div class="pipeline-step">
         <div class="pipeline-icon">1</div>
         <h3>Record</h3>
-        <p>Interact with the phone while <code>mirroir record</code> captures your actions as a scenario YAML file.</p>
+        <p>Interact with the phone while <code>mirroir record</code> captures your actions as a skill YAML file.</p>
         <div class="pipeline-cmd">
           <code>mirroir record -o login.yaml</code>
         </div>
@@ -417,7 +527,7 @@ try {
       <div class="pipeline-step">
         <div class="pipeline-icon">3</div>
         <h3>Test</h3>
-        <p>Replay with zero OCR — pure input injection. A 10-step scenario drops from 5+ seconds of OCR to under a second.</p>
+        <p>Replay with zero OCR — pure input injection. A 10-step skill drops from 5+ seconds of OCR to under a second.</p>
         <div class="pipeline-cmd">
           <code>mirroir test login</code>
         </div>
@@ -434,7 +544,7 @@ try {
 
     <p>
       Agent diagnosis runs in two tiers: deterministic OCR analysis first (free, no API key), then optionally an AI model for richer analysis.
-      Supports <a href="https://github.com/jfarcand/mirroir-mcp#agent-diagnosis">Anthropic, OpenAI, local Ollama, and CLI agents</a>.
+      Supports <a href="https://github.com/jfarcand/mirroir-mcp#agent-diagnosis" rel="noopener noreferrer">Anthropic, OpenAI, local Ollama, and CLI agents</a>.
     </p>
   </section>
 
@@ -486,8 +596,8 @@ try {
           <li><code>reset_app</code> <span>Force-quit app via App Switcher</span></li>
           <li><code>set_network</code> <span>Toggle airplane, Wi-Fi, cellular</span></li>
           <li><code>measure</code> <span>Time screen transitions</span></li>
-          <li><code>list_scenarios</code> <span>List available scenarios</span></li>
-          <li><code>get_scenario</code> <span>Read scenario with env substitution + compilation status</span></li>
+          <li><code>list_skills</code> <span>List available skills</span></li>
+          <li><code>get_skill</code> <span>Read skill with env substitution + compilation status</span></li>
           <li><code>record_step</code> <span>Record a compiled step during execution</span></li>
           <li><code>save_compiled</code> <span>Save compiled .json for zero-OCR replay</span></li>
         </ul>
@@ -503,18 +613,18 @@ try {
     <div class="client-group">
       <h3>Agents</h3>
       <div class="client-list">
-        <a href="https://docs.anthropic.com/en/docs/claude-code"><span>Claude Code</span></a>
-        <a href="https://chatgpt.com"><span>ChatGPT</span></a>
-        <a href="https://cursor.com"><span>Cursor</span></a>
-        <a href="https://github.com/features/copilot"><span>GitHub Copilot</span></a>
+        <a href="https://docs.anthropic.com/en/docs/claude-code" rel="noopener noreferrer"><span>Claude Code</span></a>
+        <a href="https://chatgpt.com" rel="noopener noreferrer"><span>ChatGPT</span></a>
+        <a href="https://cursor.com" rel="noopener noreferrer"><span>Cursor</span></a>
+        <a href="https://github.com/features/copilot" rel="noopener noreferrer"><span>GitHub Copilot</span></a>
       </div>
     </div>
 
     <div class="client-group">
       <h3>Frameworks</h3>
       <div class="client-list">
-        <a href="https://github.com/langchain-ai/langgraph"><span>LangGraph</span></a>
-        <a href="https://strandsagents.com"><span>Strands Agents</span></a>
+        <a href="https://github.com/langchain-ai/langgraph" rel="noopener noreferrer"><span>LangGraph</span></a>
+        <a href="https://strandsagents.com" rel="noopener noreferrer"><span>Strands Agents</span></a>
       </div>
     </div>
   </section>
@@ -553,7 +663,7 @@ try {
       </details>
       <details>
         <summary>Why does it need a DriverKit virtual HID?</summary>
-        <p>iPhone Mirroring ignores programmatic <code>CGEvent</code> injection — it only responds to the system HID path. The installer uses the <a href="https://github.com/pqrs-org/Karabiner-DriverKit-VirtualHIDDevice">standalone Karabiner DriverKit package</a> (just the virtual HID, no keyboard grabber). Existing Karabiner-Elements installs are detected and reused.</p>
+        <p>iPhone Mirroring ignores programmatic <code>CGEvent</code> injection — it only responds to the system HID path. The installer uses the <a href="https://github.com/pqrs-org/Karabiner-DriverKit-VirtualHIDDevice" rel="noopener noreferrer">standalone Karabiner DriverKit package</a> (just the virtual HID, no keyboard grabber). Existing Karabiner-Elements installs are detected and reused.</p>
       </details>
       <details>
         <summary>Can it control macOS apps too, not just iPhone?</summary>
@@ -565,7 +675,7 @@ try {
       </details>
     </div>
     <p>
-      <a href="https://github.com/jfarcand/mirroir-mcp/blob/main/docs/faq.md">Read the full FAQ</a>
+      <a href="https://github.com/jfarcand/mirroir-mcp/blob/main/docs/faq.md" rel="noopener noreferrer">Read the full FAQ</a>
     </p>
   </section>
 

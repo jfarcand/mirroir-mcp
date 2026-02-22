@@ -213,8 +213,8 @@ final class EventClassifierTests: XCTestCase {
 
     func testParseDefaultArguments() {
         let config = RecordCommand.parseArguments([])
-        XCTAssertEqual(config.outputPath, "recorded-scenario.yaml")
-        XCTAssertEqual(config.scenarioName, "Recorded Scenario")
+        XCTAssertEqual(config.outputPath, "recorded-skill.yaml")
+        XCTAssertEqual(config.skillName, "Recorded Skill")
         XCTAssertFalse(config.noOCR)
         XCTAssertFalse(config.showHelp)
         XCTAssertNil(config.appName)
@@ -232,7 +232,7 @@ final class EventClassifierTests: XCTestCase {
 
     func testParseName() {
         let config = RecordCommand.parseArguments(["--name", "Login Flow"])
-        XCTAssertEqual(config.scenarioName, "Login Flow")
+        XCTAssertEqual(config.skillName, "Login Flow")
     }
 
     func testParseAppName() {
@@ -259,7 +259,7 @@ final class EventClassifierTests: XCTestCase {
             "--no-ocr"
         ])
         XCTAssertEqual(config.outputPath, "test.yaml")
-        XCTAssertEqual(config.scenarioName, "Test Flow")
+        XCTAssertEqual(config.skillName, "Test Flow")
         XCTAssertEqual(config.description, "A test recording")
         XCTAssertEqual(config.appName, "MyApp")
         XCTAssertTrue(config.noOCR)

@@ -94,7 +94,7 @@ flowchart TD
         TH --> ST[ScreenTools]
         TH --> IT[InputTools]
         TH --> NT[NavigationTools]
-        TH --> ScT[ScenarioTools]
+        TH --> ScT[SkillTools]
         TH --> InfT[InfoTools]
 
         ST --> Bridge[MirroringBridge]
@@ -172,7 +172,7 @@ sequenceDiagram
     Main->>Server: MCPServer(policy)
 
     Main->>Server: registerTools(server, bridge, capture, recorder, input, describer, policy)
-    Note over Server: Delegates to category registrars:<br/>registerScreenTools()<br/>registerInputTools()<br/>registerNavigationTools()<br/>registerInfoTools()<br/>registerScenarioTools()<br/>registerCompilationTools()
+    Note over Server: Delegates to category registrars:<br/>registerScreenTools()<br/>registerInputTools()<br/>registerNavigationTools()<br/>registerInfoTools()<br/>registerSkillTools()<br/>registerCompilationTools()
 
     Main->>Server: server.run()
     Server->>Stdio: Blocking readLine() loop (JSON-RPC over stdio)
@@ -247,7 +247,7 @@ The server supports two MCP protocol versions, negotiating the client's preferre
 | `registerInputTools` | `InputTools.swift` | `tap`, `swipe`, `drag`, `type_text`, `press_key`, `long_press`, `double_tap`, `shake` |
 | `registerNavigationTools` | `NavigationTools.swift` | `launch_app`, `open_url`, `press_home`, `press_app_switcher`, `spotlight` |
 | `registerInfoTools` | `InfoTools.swift` | `status`, `get_orientation`, `check_health` |
-| `registerScenarioTools` | `ScenarioTools.swift` | `list_scenarios`, `get_scenario` |
+| `registerSkillTools` | `SkillTools.swift` | `list_skills`, `get_skill` |
 | `registerCompilationTools` | `CompilationTools.swift` | `record_step`, `save_compiled` |
 | `registerScrollToTools` | `ScrollToTools.swift` | `scroll_to` |
 | `registerAppManagementTools` | `AppManagementTools.swift` | `reset_app` |
@@ -615,7 +615,7 @@ flowchart TD
 
 **Resolution order:** readonly → skip → deny → allow → fail-closed
 
-**Readonly tools** (always allowed): `screenshot`, `describe_screen`, `start_recording`, `stop_recording`, `get_orientation`, `status`, `list_scenarios`, `get_scenario`, `record_step`, `save_compiled`
+**Readonly tools** (always allowed): `screenshot`, `describe_screen`, `start_recording`, `stop_recording`, `get_orientation`, `status`, `list_skills`, `get_skill`, `record_step`, `save_compiled`
 
 **Mutating tools** (require permission): `tap`, `swipe`, `drag`, `type_text`, `press_key`, `long_press`, `double_tap`, `shake`, `launch_app`, `open_url`, `press_home`, `press_app_switcher`, `spotlight`, `scroll_to`, `reset_app`, `measure`, `set_network`
 
@@ -790,7 +790,7 @@ The `mirroir-mcp` binary doubles as the `mirroir` CLI (via symlink). Subcommands
 
 ### `mirroir migrate` — YAML to SKILL.md Converter
 
-Converts YAML scenario files to SKILL.md format. SKILL.md uses YAML front matter for metadata and a markdown body with natural-language steps — the format AI agents natively understand.
+Converts YAML skill files to SKILL.md format. SKILL.md uses YAML front matter for metadata and a markdown body with natural-language steps — the format AI agents natively understand.
 
 ```
 main() → MigrateCommand.run(arguments)
@@ -809,14 +809,14 @@ main() → MigrateCommand.run(arguments)
 
 **Ref:** `Sources/mirroir-mcp/MigrateCommand.swift`
 
-### `mirroir test` — Deterministic Scenario Runner
+### `mirroir test` — Deterministic Skill Runner
 
-Executes scenario files (YAML or SKILL.md) without AI in the loop. Steps run sequentially: OCR finds elements, taps land on coordinates, assertions pass or fail.
+Executes skill files (YAML or SKILL.md) without AI in the loop. Steps run sequentially: OCR finds elements, taps land on coordinates, assertions pass or fail.
 
 ```
 main() → TestRunner.run(arguments)
          │
-         ├── ScenarioParser.parse()     ← YAML → [ScenarioStep]
+         ├── SkillParser.parse()     ← YAML → [SkillStep]
          ├── StepExecutor.execute()     ← step → subsystem calls
          │   ├── ElementMatcher.find()  ← fuzzy OCR text matching
          │   ├── InputProviding.tap()   ← via real subsystems
@@ -827,13 +827,13 @@ main() → TestRunner.run(arguments)
 
 | Component | File | Purpose |
 |-----------|------|---------|
-| `TestRunner` | `TestRunner.swift` | CLI arg parsing, scenario resolution, orchestration |
-| `ScenarioParser` | `ScenarioParser.swift` | YAML → `ScenarioDefinition` with `[ScenarioStep]` |
+| `TestRunner` | `TestRunner.swift` | CLI arg parsing, skill resolution, orchestration |
+| `SkillParser` | `SkillParser.swift` | YAML → `SkillDefinition` with `[SkillStep]` |
 | `SkillMdParser` | `SkillMdParser.swift` | SKILL.md front matter parsing (name, app, tags, etc.) |
 | `MigrateCommand` | `MigrateCommand.swift` | YAML → SKILL.md conversion engine |
 | `StepExecutor` | `StepExecutor.swift` | Runs each step against real subsystems |
 | `ElementMatcher` | `ElementMatcher.swift` | Fuzzy OCR text matching (exact → case-insensitive → substring) |
-| `ConsoleReporter` | `ConsoleReporter.swift` | Per-step/per-scenario terminal formatting |
+| `ConsoleReporter` | `ConsoleReporter.swift` | Per-step/per-skill terminal formatting |
 | `JUnitReporter` | `JUnitReporter.swift` | JUnit XML generation for CI integration |
 | `AgentDiagnostic` | `AgentDiagnostic.swift` | Deterministic OCR-based failure diagnosis + AI payload builder |
 | `AIAgentRegistry` | `AIAgentProvider.swift` | Agent config model, built-in registry, YAML profile loader, resolver |
@@ -844,7 +844,7 @@ main() → TestRunner.run(arguments)
 
 ### `mirroir record` — Interaction Recorder
 
-Captures live user interactions with iPhone Mirroring as scenario YAML via a passive CGEvent tap.
+Captures live user interactions with iPhone Mirroring as skill YAML via a passive CGEvent tap.
 
 ```
 main() → RecordCommand.run(arguments)
@@ -854,7 +854,7 @@ main() → RecordCommand.run(arguments)
          │   ├── mouseUp → classify      ← tap vs swipe vs long_press
          │   └── keyDown → buffer        ← group into type/press_key steps
          ├── (Ctrl+C) → EventRecorder.stop()
-         └── YAMLGenerator.generate()    ← events → scenario YAML file
+         └── YAMLGenerator.generate()    ← events → skill YAML file
 ```
 
 | Component | File | Purpose |
@@ -862,4 +862,4 @@ main() → RecordCommand.run(arguments)
 | `RecordCommand` | `RecordCommand.swift` | CLI arg parsing, signal handling, output |
 | `EventRecorder` | `EventRecorder.swift` | CGEvent tap setup, mouse/key event handling |
 | `EventClassifier` | `EventRecorder.swift` | Pure classification logic (distance/duration thresholds) |
-| `YAMLGenerator` | `YAMLGenerator.swift` | Converts `[RecordedEvent]` → scenario YAML |
+| `YAMLGenerator` | `YAMLGenerator.swift` | Converts `[RecordedEvent]` → skill YAML |

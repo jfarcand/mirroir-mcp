@@ -1,15 +1,15 @@
 // Copyright 2026 jfarcand@apache.org
 // Licensed under the Apache License, Version 2.0
 //
-// ABOUTME: Executes individual scenario steps against real subsystems via protocol abstractions.
-// ABOUTME: Maps each ScenarioStep to the appropriate subsystem call (OCR, input, capture).
+// ABOUTME: Executes individual skill steps against real subsystems via protocol abstractions.
+// ABOUTME: Maps each SkillStep to the appropriate subsystem call (OCR, input, capture).
 
 import Foundation
 import HelperLib
 
 /// Result of executing a single step.
 struct StepResult {
-    let step: ScenarioStep
+    let step: SkillStep
     let status: StepStatus
     let message: String?
     let durationSeconds: Double
@@ -40,7 +40,7 @@ struct StepExecutorConfig {
     )
 }
 
-/// Executes scenario steps against system subsystems via protocol abstractions.
+/// Executes skill steps against system subsystems via protocol abstractions.
 ///
 /// **Threading contract**: StepExecutor is designed for single-threaded,
 /// sequential step execution. All calls to `execute()` must happen on the
@@ -81,7 +81,7 @@ final class StepExecutor {
     private var capture: any ScreenCapturing { subsystems.capture }
 
     /// Execute a single step and return the result.
-    func execute(step: ScenarioStep, stepIndex: Int, scenarioName: String) -> StepResult {
+    func execute(step: SkillStep, stepIndex: Int, skillName: String) -> StepResult {
         let startTime = CFAbsoluteTimeGetCurrent()
 
         if config.dryRun {
@@ -113,7 +113,7 @@ final class StepExecutor {
         case .assertNotVisible(let label):
             result = executeAssertNotVisible(label: label, startTime: startTime)
         case .screenshot(let label):
-            result = executeScreenshot(label: label, scenarioName: scenarioName,
+            result = executeScreenshot(label: label, skillName: skillName,
                                        startTime: startTime)
         case .home:
             result = executeHome(startTime: startTime)
@@ -131,7 +131,7 @@ final class StepExecutor {
         case .measure(let name, let action, let until, let maxSeconds):
             result = executeMeasure(name: name, action: action, until: until,
                                      maxSeconds: maxSeconds, stepIndex: stepIndex,
-                                     scenarioName: scenarioName, startTime: startTime)
+                                     skillName: skillName, startTime: startTime)
         case .switchTarget(let name):
             result = executeSwitchTarget(name: name, startTime: startTime)
         case .skipped(let stepType, let reason):
@@ -143,7 +143,7 @@ final class StepExecutor {
 
         // Save failure screenshot for debugging
         if result.status == .failed {
-            captureFailureScreenshot(stepIndex: stepIndex, scenarioName: scenarioName)
+            captureFailureScreenshot(stepIndex: stepIndex, skillName: skillName)
         }
 
         // Inter-step settling delay
@@ -157,7 +157,7 @@ final class StepExecutor {
     // MARK: - Step Implementations
 
     private func executeLaunch(appName: String, startTime: CFAbsoluteTime) -> StepResult {
-        let step = ScenarioStep.launch(appName: appName)
+        let step = SkillStep.launch(appName: appName)
         if let error = input.launchApp(name: appName) {
             return StepResult(step: step, status: .failed, message: error,
                               durationSeconds: elapsed(startTime))
@@ -167,7 +167,7 @@ final class StepExecutor {
     }
 
     private func executeTap(label: String, startTime: CFAbsoluteTime) -> StepResult {
-        let step = ScenarioStep.tap(label: label)
+        let step = SkillStep.tap(label: label)
 
         guard let describeResult = describer.describe(skipOCR: false) else {
             return StepResult(step: step, status: .failed,
@@ -193,7 +193,7 @@ final class StepExecutor {
     }
 
     private func executeType(text: String, startTime: CFAbsoluteTime) -> StepResult {
-        let step = ScenarioStep.type(text: text)
+        let step = SkillStep.type(text: text)
         let result = input.typeText(text)
         if !result.success {
             return StepResult(step: step, status: .failed,
@@ -206,7 +206,7 @@ final class StepExecutor {
 
     private func executePressKey(keyName: String, modifiers: [String],
                                  startTime: CFAbsoluteTime) -> StepResult {
-        let step = ScenarioStep.pressKey(keyName: keyName, modifiers: modifiers)
+        let step = SkillStep.pressKey(keyName: keyName, modifiers: modifiers)
         let result = input.pressKey(keyName: keyName, modifiers: modifiers)
         if !result.success {
             return StepResult(step: step, status: .failed,
@@ -218,7 +218,7 @@ final class StepExecutor {
     }
 
     private func executeSwipe(direction: String, startTime: CFAbsoluteTime) -> StepResult {
-        let step = ScenarioStep.swipe(direction: direction)
+        let step = SkillStep.swipe(direction: direction)
 
         // Get window size for computing swipe coordinates
         guard let windowInfo = bridge.getWindowInfo() else {
@@ -263,7 +263,7 @@ final class StepExecutor {
 
     private func executeWaitFor(label: String, timeoutSeconds: Int,
                                 startTime: CFAbsoluteTime) -> StepResult {
-        let step = ScenarioStep.waitFor(label: label, timeoutSeconds: timeoutSeconds)
+        let step = SkillStep.waitFor(label: label, timeoutSeconds: timeoutSeconds)
         let pollIntervalUs: useconds_t = EnvConfig.waitForPollIntervalUs
 
         for _ in 0..<timeoutSeconds {
@@ -288,7 +288,7 @@ final class StepExecutor {
     }
 
     private func executeAssertVisible(label: String, startTime: CFAbsoluteTime) -> StepResult {
-        let step = ScenarioStep.assertVisible(label: label)
+        let step = SkillStep.assertVisible(label: label)
 
         guard let describeResult = describer.describe(skipOCR: false) else {
             return StepResult(step: step, status: .failed,
@@ -308,7 +308,7 @@ final class StepExecutor {
     }
 
     private func executeAssertNotVisible(label: String, startTime: CFAbsoluteTime) -> StepResult {
-        let step = ScenarioStep.assertNotVisible(label: label)
+        let step = SkillStep.assertNotVisible(label: label)
 
         guard let describeResult = describer.describe(skipOCR: false) else {
             // If we can't describe the screen, we can't confirm visibility either way
@@ -327,9 +327,9 @@ final class StepExecutor {
                           durationSeconds: elapsed(startTime))
     }
 
-    private func executeScreenshot(label: String, scenarioName: String,
+    private func executeScreenshot(label: String, skillName: String,
                                    startTime: CFAbsoluteTime) -> StepResult {
-        let step = ScenarioStep.screenshot(label: label)
+        let step = SkillStep.screenshot(label: label)
 
         guard let base64 = capture.captureBase64() else {
             return StepResult(step: step, status: .failed,
@@ -347,7 +347,7 @@ final class StepExecutor {
         try? FileManager.default.createDirectory(
             atPath: dir, withIntermediateDirectories: true)
 
-        let safeName = scenarioName.replacingOccurrences(of: " ", with: "_")
+        let safeName = skillName.replacingOccurrences(of: " ", with: "_")
         let safeLabel = label.replacingOccurrences(of: " ", with: "_")
         let filename = "\(safeName)_\(safeLabel).png"
         let path = (dir as NSString).appendingPathComponent(filename)
@@ -366,7 +366,7 @@ final class StepExecutor {
     }
 
     private func executeHome(startTime: CFAbsoluteTime) -> StepResult {
-        let step = ScenarioStep.home
+        let step = SkillStep.home
         guard let menuBridge = bridge as? (any MenuActionCapable) else {
             return StepResult(step: step, status: .failed,
                               message: "Target '\(bridge.targetName)' does not support the home button",
@@ -383,7 +383,7 @@ final class StepExecutor {
     }
 
     private func executeOpenURL(url: String, startTime: CFAbsoluteTime) -> StepResult {
-        let step = ScenarioStep.openURL(url: url)
+        let step = SkillStep.openURL(url: url)
         if let error = input.openURL(url) {
             return StepResult(step: step, status: .failed, message: error,
                               durationSeconds: elapsed(startTime))
@@ -393,7 +393,7 @@ final class StepExecutor {
     }
 
     private func executeShake(startTime: CFAbsoluteTime) -> StepResult {
-        let step = ScenarioStep.shake
+        let step = SkillStep.shake
         let result = input.shake()
         if !result.success {
             return StepResult(step: step, status: .failed,
@@ -408,7 +408,7 @@ final class StepExecutor {
 
     private func executeScrollTo(label: String, direction: String, maxScrolls: Int,
                                   startTime: CFAbsoluteTime) -> StepResult {
-        let step = ScenarioStep.scrollTo(label: label, direction: direction,
+        let step = SkillStep.scrollTo(label: label, direction: direction,
                                           maxScrolls: maxScrolls)
 
         // Check if already visible
@@ -489,7 +489,7 @@ final class StepExecutor {
     // MARK: - reset_app
 
     private func executeResetApp(appName: String, startTime: CFAbsoluteTime) -> StepResult {
-        let step = ScenarioStep.resetApp(appName: appName)
+        let step = SkillStep.resetApp(appName: appName)
         guard let menuBridge = self.menuBridge else {
             return StepResult(step: step, status: .failed,
                               message: "Target '\(bridge.targetName)' does not support reset_app",
@@ -544,7 +544,7 @@ final class StepExecutor {
     // MARK: - set_network
 
     private func executeSetNetwork(mode: String, startTime: CFAbsoluteTime) -> StepResult {
-        let step = ScenarioStep.setNetwork(mode: mode)
+        let step = SkillStep.setNetwork(mode: mode)
         guard let menuBridge = self.menuBridge else {
             return StepResult(step: step, status: .failed,
                               message: "Target '\(bridge.targetName)' does not support set_network",
@@ -613,16 +613,16 @@ final class StepExecutor {
 
     // MARK: - measure
 
-    private func executeMeasure(name: String, action: ScenarioStep, until: String,
+    private func executeMeasure(name: String, action: SkillStep, until: String,
                                  maxSeconds: Double?, stepIndex: Int,
-                                 scenarioName: String,
+                                 skillName: String,
                                  startTime: CFAbsoluteTime) -> StepResult {
-        let step = ScenarioStep.measure(name: name, action: action,
+        let step = SkillStep.measure(name: name, action: action,
                                          until: until, maxSeconds: maxSeconds)
 
         // Execute the nested action
         let actionResult = execute(step: action, stepIndex: stepIndex,
-                                    scenarioName: scenarioName)
+                                    skillName: skillName)
         if actionResult.status == .failed {
             return StepResult(step: step, status: .failed,
                               message: "Action failed: \(actionResult.message ?? "unknown")",
@@ -660,7 +660,7 @@ final class StepExecutor {
     // MARK: - switch_target
 
     private func executeSwitchTarget(name: String, startTime: CFAbsoluteTime) -> StepResult {
-        let step = ScenarioStep.switchTarget(name: name)
+        let step = SkillStep.switchTarget(name: name)
 
         guard let registry = registry else {
             return StepResult(step: step, status: .failed,
@@ -699,7 +699,7 @@ final class StepExecutor {
     }
 
     /// Save a screenshot for debugging when a step fails.
-    private func captureFailureScreenshot(stepIndex: Int, scenarioName: String) {
+    private func captureFailureScreenshot(stepIndex: Int, skillName: String) {
         guard let base64 = capture.captureBase64(),
               let data = Data(base64Encoded: base64) else { return }
 
@@ -707,7 +707,7 @@ final class StepExecutor {
         try? FileManager.default.createDirectory(
             atPath: dir, withIntermediateDirectories: true)
 
-        let safeName = scenarioName.replacingOccurrences(of: " ", with: "_")
+        let safeName = skillName.replacingOccurrences(of: " ", with: "_")
         let filename = "\(safeName)_failure_step\(stepIndex + 1).png"
         let path = (dir as NSString).appendingPathComponent(filename)
         try? data.write(to: URL(fileURLWithPath: path))

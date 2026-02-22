@@ -12,7 +12,7 @@
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue)](LICENSE)
 [![macOS 15+](https://img.shields.io/badge/macOS-15%2B-black?logo=apple)](https://support.apple.com/en-us/105071)
 
-We built an MCP server to control iPhones through macOS iPhone Mirroring — then realized the same tools work on any macOS window. [Screenshot, tap, swipe, type, scroll_to, measure](docs/tools.md) — from any MCP client. Same security model. Same scenarios. Same AI. No source code required.
+We built an MCP server to control iPhones through macOS iPhone Mirroring — then realized the same tools work on any macOS window. [Screenshot, tap, swipe, type, scroll_to, measure](docs/tools.md) — from any MCP client. Same security model. Same skills. Same AI. No source code required.
 
 When automation breaks — a button moves, a label changes, timing drifts — [Agent Diagnosis](#agent-diagnosis) tells you *why* and how to fix it. Self-diagnosing automation, not just self-running.
 
@@ -157,16 +157,16 @@ recording. I need a video of the scroll lag I'm seeing.
 
 ## Agent Diagnosis
 
-UI automation is brittle. A button moves, a label changes, timing drifts, and your test silently fails. You stare at screenshots trying to figure out what went wrong. `--agent` fixes this: when a compiled scenario fails, it diagnoses *why* the step failed and tells you exactly how to fix it.
+UI automation is brittle. A button moves, a label changes, timing drifts, and your test silently fails. You stare at screenshots trying to figure out what went wrong. `--agent` fixes this: when a compiled skill fails, it diagnoses *why* the step failed and tells you exactly how to fix it.
 
 Diagnosis runs in two tiers. First, deterministic OCR analysis compares the compiled coordinates against what's actually on screen — fast, free, no API key needed. If you pass a model name, it sends the diagnostic context (expected vs. actual OCR, failure screenshots, step metadata) to an AI for richer analysis: root cause, suggested YAML edits, and whether recompilation will fix it.
 
 ```bash
-mirroir test --agent scenario.yaml                    # deterministic OCR diagnosis
-mirroir test --agent claude-sonnet-4-6 scenario.yaml  # deterministic + AI via Anthropic
-mirroir test --agent gpt-4o scenario.yaml             # deterministic + AI via OpenAI
-mirroir test --agent ollama:llama3 scenario.yaml      # deterministic + AI via local Ollama
-mirroir test --agent copilot scenario.yaml            # deterministic + AI via Copilot CLI
+mirroir test --agent skill.yaml                    # deterministic OCR diagnosis
+mirroir test --agent claude-sonnet-4-6 skill.yaml  # deterministic + AI via Anthropic
+mirroir test --agent gpt-4o skill.yaml             # deterministic + AI via OpenAI
+mirroir test --agent ollama:llama3 skill.yaml      # deterministic + AI via local Ollama
+mirroir test --agent copilot skill.yaml            # deterministic + AI via Copilot CLI
 ```
 
 **Built-in models:** `claude-sonnet-4-6`, `claude-haiku-4-5`, `gpt-4o`. Set the corresponding API key env var (`ANTHROPIC_API_KEY`, `OPENAI_API_KEY`).
@@ -196,9 +196,9 @@ The system prompt is loaded from `~/.mirroir-mcp/prompts/diagnosis.md` (or `<cwd
 
 All AI errors are non-fatal: deterministic diagnosis always runs regardless.
 
-## Scenarios
+## Skills
 
-Scenarios describe multi-step automation flows as intents, not scripts. Steps like `tap: "Email"` don't specify coordinates — the AI finds the element by fuzzy OCR matching and adapts to unexpected dialogs, screen layout changes, and timing.
+Skills describe multi-step automation flows as intents, not scripts. Steps like `tap: "Email"` don't specify coordinates — the AI finds the element by fuzzy OCR matching and adapts to unexpected dialogs, screen layout changes, and timing.
 
 Two formats are supported: **SKILL.md** (recommended) and **YAML** (legacy). SKILL.md uses YAML front matter for metadata and natural-language markdown for steps — the format AI agents natively understand. When both `foo.md` and `foo.yaml` exist, the `.md` file takes precedence.
 
@@ -281,68 +281,68 @@ steps:
 
 </details>
 
-`${VAR}` placeholders are resolved from environment variables. Use `${VAR:-default}` for fallback values. Place scenarios (`.md` or `.yaml`) in `~/.mirroir-mcp/scenarios/` (global) or `<cwd>/.mirroir-mcp/scenarios/` (project-local). Both directories are scanned recursively.
+`${VAR}` placeholders are resolved from environment variables. Use `${VAR:-default}` for fallback values. Place skills (`.md` or `.yaml`) in `~/.mirroir-mcp/skills/` (global) or `<cwd>/.mirroir-mcp/skills/` (project-local). Both directories are scanned recursively.
 
 ### Migrate YAML to SKILL.md
 
-Convert existing YAML scenarios to the SKILL.md format:
+Convert existing YAML skills to the SKILL.md format:
 
 ```bash
 mirroir migrate apps/settings/check-about.yaml           # single file
-mirroir migrate --dir ~/.mirroir-mcp/scenarios            # entire directory
-mirroir migrate --output-dir ./converted/ scenario.yaml   # write .md files to alternate directory
+mirroir migrate --dir ~/.mirroir-mcp/skills               # entire directory
+mirroir migrate --output-dir ./converted/ skill.yaml      # write .md files to alternate directory
 mirroir migrate --dry-run apps/mail/email-triage.yaml     # preview without writing
 ```
 
-### Scenario Marketplace
+### Skill Marketplace
 
-Ready-to-use scenarios that automate anything a human can do on an iPhone — tap, type, navigate, chain apps together. If you can do it manually, you can script it. Install from [jfarcand/mirroir-scenarios](https://github.com/jfarcand/mirroir-scenarios):
+Ready-to-use skills that automate anything a human can do on an iPhone — tap, type, navigate, chain apps together. If you can do it manually, you can script it. Install from [jfarcand/mirroir-skills](https://github.com/jfarcand/mirroir-skills):
 
 #### Claude Code
 
 ```bash
-claude plugin marketplace add jfarcand/mirroir-scenarios
-claude plugin install scenarios@mirroir-scenarios
+claude plugin marketplace add jfarcand/mirroir-skills
+claude plugin install skills@mirroir-skills
 ```
 
 #### GitHub Copilot CLI
 
 ```bash
-copilot plugin marketplace add jfarcand/mirroir-scenarios
-copilot plugin install scenarios@mirroir-scenarios
+copilot plugin marketplace add jfarcand/mirroir-skills
+copilot plugin install skills@mirroir-skills
 ```
 
 #### Manual (all other clients)
 
 ```bash
-git clone https://github.com/jfarcand/mirroir-scenarios ~/.mirroir-mcp/scenarios
+git clone https://github.com/jfarcand/mirroir-skills ~/.mirroir-mcp/skills
 ```
 
-Once installed, scenarios are available through the `list_scenarios` and `get_scenario` tools. Claude Code and Copilot CLI load the [SKILL.md](https://github.com/jfarcand/mirroir-scenarios/blob/main/plugins/scenarios/skills/scenarios/SKILL.md) automatically, which teaches the AI how to interpret and execute each step type. For other clients, ask the AI to call `list_scenarios` and then execute the steps.
+Once installed, skills are available through the `list_skills` and `get_skill` tools. Claude Code and Copilot CLI load the [SKILL.md](https://github.com/jfarcand/mirroir-skills/blob/main/plugins/skills/skills/skills/SKILL.md) automatically, which teaches the AI how to interpret and execute each step type. For other clients, ask the AI to call `list_skills` and then execute the steps.
 
-See [Tools Reference](docs/tools.md#scenarios) for the full step type reference and directory layout.
+See [Tools Reference](docs/tools.md#skills) for the full step type reference and directory layout.
 
 ## Test Runner
 
-Run scenarios deterministically from the command line — no AI in the loop. Steps execute sequentially: OCR finds elements, taps land on coordinates, assertions pass or fail. Designed for CI, regression testing, and scripted automation.
+Run skills deterministically from the command line — no AI in the loop. Steps execute sequentially: OCR finds elements, taps land on coordinates, assertions pass or fail. Designed for CI, regression testing, and scripted automation.
 
 ```bash
-mirroir test [options] <scenario>...
+mirroir test [options] <skill>...
 ```
 
-**Run a scenario:**
+**Run a skill:**
 
 ```bash
 mirroir test apps/settings/check-about
 ```
 
-**Run all scenarios with JUnit output:**
+**Run all skills with JUnit output:**
 
 ```bash
 mirroir test --junit results.xml --verbose
 ```
 
-**Validate scenarios without executing (dry run):**
+**Validate skills without executing (dry run):**
 
 ```bash
 mirroir test --dry-run apps/settings/*.yaml
@@ -355,20 +355,20 @@ mirroir test --dry-run apps/settings/*.yaml
 | `--timeout <seconds>` | `wait_for` timeout (default: 15) |
 | `--verbose` | Show step-by-step detail |
 | `--dry-run` | Parse and validate without executing |
-| `--no-compiled` | Skip compiled scenarios, force full OCR |
+| `--no-compiled` | Skip compiled skills, force full OCR |
 | `--agent [model]` | Diagnose compiled failures (see [Agent Diagnosis](#agent-diagnosis)) |
 
 The test runner uses the same OCR and input subsystems as the MCP server. Steps like `tap: "General"` find the element via Vision OCR and tap at the detected coordinates. `wait_for` polls OCR until the label appears or times out. AI-only steps (`remember`, `condition`, `repeat`) are skipped with a warning.
 
-The test runner executes YAML scenarios only — SKILL.md files contain natural-language steps that require AI interpretation and cannot be run deterministically. When resolving by name (e.g., `mirroir test check-about`), only `.yaml` files are matched. Pass a direct `.yaml` path to run a specific file. Scenario resolution searches `<cwd>/.mirroir-mcp/scenarios/` and `~/.mirroir-mcp/scenarios/` — same directories as `list_scenarios`.
+The test runner executes YAML skills only — SKILL.md files contain natural-language steps that require AI interpretation and cannot be run deterministically. When resolving by name (e.g., `mirroir test check-about`), only `.yaml` files are matched. Pass a direct `.yaml` path to run a specific file. Skill resolution searches `<cwd>/.mirroir-mcp/skills/` and `~/.mirroir-mcp/skills/` — same directories as `list_skills`.
 
-Exit code is `0` when all scenarios pass, `1` when any step fails.
+Exit code is `0` when all skills pass, `1` when any step fails.
 
-### Compiled Scenarios
+### Compiled Skills
 
-Compile a scenario once against a real device to capture coordinates, timing, and scroll counts. Replay with zero OCR — pure input injection plus timing. Like JIT compilation for UI automation.
+Compile a skill once against a real device to capture coordinates, timing, and scroll counts. Replay with zero OCR — pure input injection plus timing. Like JIT compilation for UI automation.
 
-**AI auto-compilation (recommended):** When an AI agent executes a scenario via MCP tools, it auto-compiles as a side-effect of the first run. The `get_scenario` tool reports compilation status (`[Not compiled]`, `[Compiled: fresh]`, or `[Compiled: stale]`), and the AI calls `record_step` after each step followed by `save_compiled` to write the `.compiled.json` file.
+**AI auto-compilation (recommended):** When an AI agent executes a skill via MCP tools, it auto-compiles as a side-effect of the first run. The `get_skill` tool reports compilation status (`[Not compiled]`, `[Compiled: fresh]`, or `[Compiled: stale]`), and the AI calls `record_step` after each step followed by `save_compiled` to write the `.compiled.json` file.
 
 **CLI compilation (alternative):**
 
@@ -383,15 +383,15 @@ mirroir test apps/settings/check-about       # auto-detects .compiled.json
 mirroir test --no-compiled check-about        # force full OCR
 ```
 
-Each OCR-dependent step (~500ms per call) becomes a direct tap at cached coordinates, a timed sleep, or a replayed scroll sequence. A 10-step scenario that spent 5+ seconds on OCR runs in under a second.
+Each OCR-dependent step (~500ms per call) becomes a direct tap at cached coordinates, a timed sleep, or a replayed scroll sequence. A 10-step skill that spent 5+ seconds on OCR runs in under a second.
 
-Compiled files are invalidated automatically when the source scenario changes (SHA-256 hash), the window dimensions change, or the format version bumps. See [Compiled Scenarios](docs/compiled-scenarios.md) for the file format, architecture, and design rationale.
+Compiled files are invalidated automatically when the source skill changes (SHA-256 hash), the window dimensions change, or the format version bumps. See [Compiled Skills](docs/compiled-skills.md) for the file format, architecture, and design rationale.
 
 When a compiled step fails, use `--agent` for AI-powered failure diagnosis. See [Agent Diagnosis](#agent-diagnosis).
 
 ## Recorder
 
-Record user interactions with iPhone Mirroring as a scenario YAML file. Click, swipe, and type on the mirrored iPhone — the recorder captures everything via a passive CGEvent tap, labels taps with OCR, and outputs a ready-to-edit scenario.
+Record user interactions with iPhone Mirroring as a skill YAML file. Click, swipe, and type on the mirrored iPhone — the recorder captures everything via a passive CGEvent tap, labels taps with OCR, and outputs a ready-to-edit skill.
 
 ```bash
 mirroir record [options]
@@ -411,9 +411,9 @@ mirroir record --no-ocr -o quick-capture.yaml
 
 | Option | Description |
 |---|---|
-| `--output, -o <path>` | Output file (default: `recorded-scenario.yaml`), use `-` for stdout |
-| `--name, -n <name>` | Scenario name (default: "Recorded Scenario") |
-| `--description <text>` | Scenario description |
+| `--output, -o <path>` | Output file (default: `recorded-skill.yaml`), use `-` for stdout |
+| `--name, -n <name>` | Skill name (default: "Recorded Skill") |
+| `--description <text>` | Skill description |
 | `--app <name>` | App name for the YAML header |
 | `--no-ocr` | Skip OCR label detection (faster, coordinates only) |
 
@@ -506,7 +506,7 @@ Environment variables use screaming snake case with an `MIRROIR_` prefix. For ex
 | `clickHoldUs` | 80000 | μs | Increase if taps aren't registering |
 | `searchResultsPopulateUs` | 1000000 | μs | Increase on slower devices where Spotlight results take longer |
 | `gridSpacing` | 25.0 | points | Increase for less visual clutter, decrease for finer positioning |
-| `waitForTimeoutSeconds` | 15 | seconds | Increase for slow-loading screens in scenarios |
+| `waitForTimeoutSeconds` | 15 | seconds | Increase for slow-loading screens in skills |
 
 See [`TimingConstants.swift`](Sources/HelperLib/TimingConstants.swift) for all available keys and their defaults.
 
@@ -522,11 +522,11 @@ See [`TimingConstants.swift`](Sources/HelperLib/TimingConstants.swift) for all a
 | [Permissions](docs/permissions.md) | Fail-closed permission model and config file |
 | [Architecture](docs/architecture.md) | System diagram and how input reaches the iPhone |
 | [Known Limitations](docs/limitations.md) | Focus stealing, keyboard layout gaps, autocorrect |
-| [Compiled Scenarios](docs/compiled-scenarios.md) | JIT compilation for zero-OCR scenario replay |
+| [Compiled Skills](docs/compiled-skills.md) | JIT compilation for zero-OCR skill replay |
 | [Testing](docs/testing.md) | FakeMirroring, integration tests, and CI strategy |
 | [Troubleshooting](docs/troubleshooting.md) | Debug mode and common issues |
 | [Contributing](CONTRIBUTING.md) | How to add tools, commands, and tests |
-| [Scenarios Marketplace](docs/scenarios-marketplace.md) | Scenario format, plugin discovery, and authoring |
+| [Skills Marketplace](docs/skills-marketplace.md) | Skill format, plugin discovery, and authoring |
 | [Contributor License Agreement](CLA.md) | CLA for all contributions |
 
 ## Contributing

@@ -2,15 +2,15 @@
 // Licensed under the Apache License, Version 2.0
 //
 // ABOUTME: CLI orchestration for the `compile` subcommand.
-// ABOUTME: Runs scenarios against a real device, capturing coordinates and timing into compiled JSON.
+// ABOUTME: Runs skills against a real device, capturing coordinates and timing into compiled JSON.
 
 import Foundation
 import HelperLib
 
-/// Orchestrates the `compile` subcommand: executes scenarios with a recording describer,
+/// Orchestrates the `compile` subcommand: executes skills with a recording describer,
 /// captures OCR coordinates and timing, and writes `.compiled.json` files.
 ///
-/// Usage: `mirroir-mcp compile [options] <scenario...>`
+/// Usage: `mirroir-mcp compile [options] <skill...>`
 enum CompileCommand {
 
     /// Parse arguments and run the compiler. Returns exit code (0 = success, 1 = error).
@@ -22,17 +22,17 @@ enum CompileCommand {
             return 0
         }
 
-        // Resolve scenario files
-        let scenarioFiles: [String]
+        // Resolve skill files
+        let skillFiles: [String]
         do {
-            scenarioFiles = try TestRunner.resolveScenarioFiles(config.scenarioArgs)
+            skillFiles = try TestRunner.resolveSkillFiles(config.skillArgs)
         } catch {
             fputs("Error: \(error.localizedDescription)\n", stderr)
             return 1
         }
 
-        if scenarioFiles.isEmpty {
-            fputs("No scenarios found.\n", stderr)
+        if skillFiles.isEmpty {
+            fputs("No skills found.\n", stderr)
             return 1
         }
 
@@ -73,25 +73,25 @@ enum CompileCommand {
         let windowHeight = Double(windowInfo.size.height)
         let orientation = bridge.getOrientation()?.rawValue ?? "portrait"
 
-        fputs("mirroir compile: \(scenarioFiles.count) scenario(s) to compile\n", stderr)
+        fputs("mirroir compile: \(skillFiles.count) skill(s) to compile\n", stderr)
         fputs("  Window: \(Int(windowWidth))x\(Int(windowHeight)) (\(orientation))\n\n", stderr)
 
         var anyFailed = false
 
-        for filePath in scenarioFiles {
-            let scenario: ScenarioDefinition
+        for filePath in skillFiles {
+            let skill: SkillDefinition
             do {
-                scenario = try ScenarioParser.parse(filePath: filePath)
+                skill = try SkillParser.parse(filePath: filePath)
             } catch {
                 fputs("Error parsing \(filePath): \(error.localizedDescription)\n", stderr)
                 anyFailed = true
                 continue
             }
 
-            fputs("Compiling: \(scenario.name) (\(scenario.steps.count) steps)\n", stderr)
+            fputs("Compiling: \(skill.name) (\(skill.steps.count) steps)\n", stderr)
 
-            let compiled = compileScenario(
-                scenario: scenario,
+            let compiled = compileSkill(
+                skill: skill,
                 executor: executor,
                 recordingDescriber: recordingDescriber,
                 filePath: filePath,
@@ -107,8 +107,8 @@ enum CompileCommand {
             }
 
             do {
-                try CompiledScenarioIO.save(compiled, for: filePath)
-                let outputPath = CompiledScenarioIO.compiledPath(for: filePath)
+                try CompiledSkillIO.save(compiled, for: filePath)
+                let outputPath = CompiledSkillIO.compiledPath(for: filePath)
                 let compiledSteps = compiled.steps.filter { $0.hints != nil }.count
                 let passthroughSteps = compiled.steps.filter {
                     $0.hints?.compiledAction == .passthrough
@@ -124,35 +124,35 @@ enum CompileCommand {
         return anyFailed ? 1 : 0
     }
 
-    /// Run a scenario with the recording describer and build a CompiledScenario.
+    /// Run a skill with the recording describer and build a CompiledSkill.
     /// Returns nil if any step fails.
-    static func compileScenario(
-        scenario: ScenarioDefinition,
+    static func compileSkill(
+        skill: SkillDefinition,
         executor: StepExecutor,
         recordingDescriber: RecordingDescriber,
         filePath: String,
         windowWidth: Double,
         windowHeight: Double,
         orientation: String
-    ) -> CompiledScenario? {
+    ) -> CompiledSkill? {
         var compiledSteps: [CompiledStep] = []
         let sourceHash: String
         do {
-            sourceHash = try CompiledScenarioIO.sha256(of: filePath)
+            sourceHash = try CompiledSkillIO.sha256(of: filePath)
         } catch {
             fputs("  Warning: cannot hash source file: \(error.localizedDescription)\n", stderr)
             sourceHash = ""
         }
 
-        for (index, step) in scenario.steps.enumerated() {
+        for (index, step) in skill.steps.enumerated() {
             let startTime = CFAbsoluteTimeGetCurrent()
             let result = executor.execute(step: step, stepIndex: index,
-                                           scenarioName: scenario.name)
+                                           skillName: skill.name)
 
             let elapsedMs = Int((CFAbsoluteTimeGetCurrent() - startTime) * 1000)
             let statusTag = result.status == .passed ? "PASS" : result.status.rawValue
 
-            fputs("  [\(index + 1)/\(scenario.steps.count)] \(step.displayName)  \(statusTag)\n", stderr)
+            fputs("  [\(index + 1)/\(skill.steps.count)] \(step.displayName)  \(statusTag)\n", stderr)
 
             if result.status == .failed {
                 fputs("    Error: \(result.message ?? "unknown")\n", stderr)
@@ -177,8 +177,8 @@ enum CompileCommand {
         let formatter = ISO8601DateFormatter()
         let compiledAt = formatter.string(from: Date())
 
-        return CompiledScenario(
-            version: CompiledScenario.currentVersion,
+        return CompiledSkill(
+            version: CompiledSkill.currentVersion,
             source: SourceInfo(sha256: sourceHash, compiledAt: compiledAt),
             device: DeviceInfo(windowWidth: windowWidth, windowHeight: windowHeight,
                                orientation: orientation),
@@ -188,7 +188,7 @@ enum CompileCommand {
 
     /// Build StepHints from the step execution result and the recording describer state.
     private static func buildHints(
-        step: ScenarioStep,
+        step: SkillStep,
         result: StepResult,
         describer: RecordingDescriber,
         elapsedMs: Int
@@ -248,13 +248,13 @@ enum CompileCommand {
     // MARK: - Argument Parsing
 
     struct CompileConfig {
-        let scenarioArgs: [String]
+        let skillArgs: [String]
         let timeoutSeconds: Int
         let showHelp: Bool
     }
 
     static func parseArguments(_ args: [String]) -> CompileConfig {
-        var scenarioArgs: [String] = []
+        var skillArgs: [String] = []
         var timeoutSeconds = EnvConfig.waitForTimeoutSeconds
         var showHelp = false
 
@@ -269,14 +269,14 @@ enum CompileCommand {
                 if i < args.count, let t = Int(args[i]) { timeoutSeconds = t }
             default:
                 if !arg.hasPrefix("-") {
-                    scenarioArgs.append(arg)
+                    skillArgs.append(arg)
                 }
             }
             i += 1
         }
 
         return CompileConfig(
-            scenarioArgs: scenarioArgs,
+            skillArgs: skillArgs,
             timeoutSeconds: timeoutSeconds,
             showHelp: showHelp
         )
@@ -284,13 +284,13 @@ enum CompileCommand {
 
     static func printUsage() {
         let usage = """
-        Usage: mirroir-mcp compile [options] <scenario...>
+        Usage: mirroir-mcp compile [options] <skill...>
 
-        Run scenarios against a real device to capture coordinates and timing.
+        Run skills against a real device to capture coordinates and timing.
         Produces .compiled.json files for OCR-free replay via `test`.
 
         Arguments:
-          <scenario>          Scenario name or .yaml file path (multiple allowed)
+          <skill>             Skill name or .yaml file path (multiple allowed)
 
         Options:
           --timeout <sec>     wait_for timeout in seconds (default: 15)

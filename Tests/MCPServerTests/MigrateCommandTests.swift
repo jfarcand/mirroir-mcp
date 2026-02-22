@@ -1,7 +1,7 @@
 // Copyright 2026 jfarcand@apache.org
 // Licensed under the Apache License, Version 2.0
 //
-// ABOUTME: Tests for MigrateCommand: YAML scenario to SKILL.md conversion.
+// ABOUTME: Tests for MigrateCommand: YAML skill to SKILL.md conversion.
 // ABOUTME: Validates step conversion, conditions, repeats, env var preservation, and comments.
 
 import XCTest
@@ -9,9 +9,9 @@ import XCTest
 
 final class MigrateCommandTests: XCTestCase {
 
-    // MARK: - Simple Scenario
+    // MARK: - Simple Skill
 
-    func testMigrateSimpleScenario() {
+    func testMigrateSimpleSkill() {
         let yaml = """
         name: Read Device Info
         app: Settings
@@ -135,7 +135,7 @@ final class MigrateCommandTests: XCTestCase {
 
     func testMigrateWithComments() {
         let yaml = """
-        # This scenario tests basic Settings navigation
+        # This skill tests basic Settings navigation
         name: Check About
         app: Settings
         description: Check device info
@@ -148,7 +148,7 @@ final class MigrateCommandTests: XCTestCase {
 
         let md = MigrateCommand.convertYAMLToSkillMd(content: yaml, filePath: "test.yaml")
 
-        XCTAssertTrue(md.contains("> Note: This scenario tests basic Settings navigation"))
+        XCTAssertTrue(md.contains("> Note: This skill tests basic Settings navigation"))
     }
 
     // MARK: - Block Scalar Description
@@ -335,18 +335,18 @@ final class MigrateCommandTests: XCTestCase {
     func testResolveOutputPathPreservesSubdirectories() {
         // When --dir provides the base, subdirectory structure should be preserved
         let result = MigrateCommand.resolveOutputPath(
-            yamlPath: "/src/scenarios/apps/settings/check-about.yaml",
+            yamlPath: "/src/skills/apps/settings/check-about.yaml",
             outputDir: "/output",
-            sourceBaseDir: "/src/scenarios")
+            sourceBaseDir: "/src/skills")
 
         XCTAssertEqual(result, "/output/apps/settings/check-about.md")
     }
 
     func testResolveOutputPathPreservesSubdirsWithTrailingSlash() {
         let result = MigrateCommand.resolveOutputPath(
-            yamlPath: "/src/scenarios/apps/settings/check-about.yaml",
+            yamlPath: "/src/skills/apps/settings/check-about.yaml",
             outputDir: "/output",
-            sourceBaseDir: "/src/scenarios/")
+            sourceBaseDir: "/src/skills/")
 
         XCTAssertEqual(result, "/output/apps/settings/check-about.md")
     }
@@ -363,11 +363,11 @@ final class MigrateCommandTests: XCTestCase {
 
     func testResolveOutputPathNextToSourceWithoutOutputDir() {
         let result = MigrateCommand.resolveOutputPath(
-            yamlPath: "/src/scenarios/apps/check-about.yaml",
+            yamlPath: "/src/skills/apps/check-about.yaml",
             outputDir: nil,
             sourceBaseDir: nil)
 
-        XCTAssertEqual(result, "/src/scenarios/apps/check-about.md")
+        XCTAssertEqual(result, "/src/skills/apps/check-about.md")
     }
 
     func testMigrateOutputDirPreservesDirectoryStructure() throws {

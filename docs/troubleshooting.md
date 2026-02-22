@@ -60,9 +60,9 @@ If not responding, restart: `sudo brew services restart mirroir-mcp` or `sudo ./
 
 **iOS autocorrect mangling typed text** — iOS applies autocorrect to typed text. Disable autocorrect in iPhone Settings > General > Keyboard, or type words followed by spaces to confirm them before autocorrect triggers.
 
-**Compiled scenario fails but you don't know why** — Use `--agent` to diagnose failures. Deterministic OCR analysis runs first (free, no API key), then optionally sends context to an AI for richer root-cause analysis:
+**Compiled skill fails but you don't know why** — Use `--agent` to diagnose failures. Deterministic OCR analysis runs first (free, no API key), then optionally sends context to an AI for richer root-cause analysis:
 ```bash
-mirroir test --agent scenario.yaml                    # deterministic OCR diagnosis (YAML or SKILL.md)
-mirroir test --agent claude-sonnet-4-6 scenario.yaml  # deterministic + AI diagnosis
+mirroir test --agent skill.yaml                    # deterministic OCR diagnosis (YAML or SKILL.md)
+mirroir test --agent claude-sonnet-4-6 skill.yaml  # deterministic + AI diagnosis
 ```
 See the [Agent Diagnosis](../README.md#agent-diagnosis) section for all supported providers and custom agent configuration.

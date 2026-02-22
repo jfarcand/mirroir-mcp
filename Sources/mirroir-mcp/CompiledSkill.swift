@@ -1,14 +1,14 @@
 // Copyright 2026 jfarcand@apache.org
 // Licensed under the Apache License, Version 2.0
 //
-// ABOUTME: Data model for compiled scenarios — pre-recorded coordinates, timing, and scroll sequences.
+// ABOUTME: Data model for compiled skills — pre-recorded coordinates, timing, and scroll sequences.
 // ABOUTME: Eliminates OCR during replay by storing all decision data from a learning run.
 
 import CommonCrypto
 import Foundation
 
-/// A compiled scenario ready for OCR-free replay.
-struct CompiledScenario: Codable, Equatable {
+/// A compiled skill ready for OCR-free replay.
+struct CompiledSkill: Codable, Equatable {
     /// Format version for forward compatibility.
     let version: Int
     /// Metadata about the source YAML file.
@@ -22,11 +22,11 @@ struct CompiledScenario: Codable, Equatable {
     static let currentVersion = 1
 }
 
-/// Metadata about the source scenario file used to detect staleness.
+/// Metadata about the source skill file used to detect staleness.
 struct SourceInfo: Codable, Equatable {
-    /// SHA-256 hash of the source scenario file content.
+    /// SHA-256 hash of the source skill file content.
     let sha256: String
-    /// ISO 8601 timestamp of when the scenario was compiled.
+    /// ISO 8601 timestamp of when the skill was compiled.
     let compiledAt: String
 }
 
@@ -37,9 +37,9 @@ struct DeviceInfo: Codable, Equatable {
     let orientation: String
 }
 
-/// A single step in a compiled scenario, combining the original step type with cached hints.
+/// A single step in a compiled skill, combining the original step type with cached hints.
 struct CompiledStep: Codable, Equatable {
-    /// Original step index in the scenario.
+    /// Original step index in the skill.
     let index: Int
     /// Step type key (e.g. "tap", "wait_for", "launch").
     let type: String
@@ -108,31 +108,31 @@ enum CompiledAction: String, Codable, Equatable {
     case passthrough
 }
 
-/// File I/O for compiled scenario JSON files.
-enum CompiledScenarioIO {
+/// File I/O for compiled skill JSON files.
+enum CompiledSkillIO {
 
-    /// Derive the compiled JSON path from a scenario file path.
+    /// Derive the compiled JSON path from a skill file path.
     /// Works for both `.yaml` and `.md` since `deletingPathExtension` handles either.
     /// `apps/settings/check-about.yaml` → `apps/settings/check-about.compiled.json`
     /// `apps/settings/check-about.md` → `apps/settings/check-about.compiled.json`
-    static func compiledPath(for scenarioPath: String) -> String {
-        let base = (scenarioPath as NSString).deletingPathExtension
+    static func compiledPath(for skillPath: String) -> String {
+        let base = (skillPath as NSString).deletingPathExtension
         return base + ".compiled.json"
     }
 
-    /// Load a compiled scenario from disk. Returns nil if file doesn't exist.
-    static func load(for scenarioPath: String) throws -> CompiledScenario? {
-        let path = compiledPath(for: scenarioPath)
+    /// Load a compiled skill from disk. Returns nil if file doesn't exist.
+    static func load(for skillPath: String) throws -> CompiledSkill? {
+        let path = compiledPath(for: skillPath)
         guard FileManager.default.fileExists(atPath: path) else { return nil }
 
         let data = try Data(contentsOf: URL(fileURLWithPath: path))
         let decoder = JSONDecoder()
-        return try decoder.decode(CompiledScenario.self, from: data)
+        return try decoder.decode(CompiledSkill.self, from: data)
     }
 
-    /// Save a compiled scenario to disk alongside its source file.
-    static func save(_ compiled: CompiledScenario, for scenarioPath: String) throws {
-        let path = compiledPath(for: scenarioPath)
+    /// Save a compiled skill to disk alongside its source file.
+    static func save(_ compiled: CompiledSkill, for skillPath: String) throws {
+        let path = compiledPath(for: skillPath)
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
         let data = try encoder.encode(compiled)
@@ -154,18 +154,18 @@ enum CompiledScenarioIO {
         return digest.map { String(format: "%02x", $0) }.joined()
     }
 
-    /// Check if a compiled scenario is stale relative to its source file.
-    static func checkStaleness(compiled: CompiledScenario,
-                                scenarioPath: String,
+    /// Check if a compiled skill is stale relative to its source file.
+    static func checkStaleness(compiled: CompiledSkill,
+                                skillPath: String,
                                 windowWidth: Double,
                                 windowHeight: Double) -> StalenessResult {
         // Version check
-        if compiled.version != CompiledScenario.currentVersion {
-            return .stale(reason: "compiled version \(compiled.version) != current \(CompiledScenario.currentVersion)")
+        if compiled.version != CompiledSkill.currentVersion {
+            return .stale(reason: "compiled version \(compiled.version) != current \(CompiledSkill.currentVersion)")
         }
 
         // Source hash check
-        if let currentHash = try? sha256(of: scenarioPath),
+        if let currentHash = try? sha256(of: skillPath),
            currentHash != compiled.source.sha256 {
             return .stale(reason: "source file has changed since compilation")
         }

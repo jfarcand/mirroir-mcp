@@ -39,7 +39,7 @@ final class CompiledStepExecutorTests: XCTestCase {
     // MARK: - Compiled Tap
 
     func testCompiledTapUsesCachedCoordinates() {
-        let step = ScenarioStep.tap(label: "General")
+        let step = SkillStep.tap(label: "General")
         let compiledStep = CompiledStep(
             index: 0, type: "tap", label: "General",
             hints: .tap(x: 205.0, y: 340.5, confidence: 0.98, strategy: "exact")
@@ -47,7 +47,7 @@ final class CompiledStepExecutorTests: XCTestCase {
 
         let result = compiledExecutor.execute(
             step: step, compiledStep: compiledStep,
-            stepIndex: 0, scenarioName: "test")
+            stepIndex: 0, skillName: "test")
 
         XCTAssertEqual(result.status, .passed)
         XCTAssertTrue(result.message?.contains("compiled tap") ?? false)
@@ -61,7 +61,7 @@ final class CompiledStepExecutorTests: XCTestCase {
         // Describer should NOT be called for a compiled tap
         describer.describeResult = nil  // Would fail if called
 
-        let step = ScenarioStep.tap(label: "General")
+        let step = SkillStep.tap(label: "General")
         let compiledStep = CompiledStep(
             index: 0, type: "tap", label: "General",
             hints: .tap(x: 100, y: 200, confidence: 0.95, strategy: "exact")
@@ -69,13 +69,13 @@ final class CompiledStepExecutorTests: XCTestCase {
 
         let result = compiledExecutor.execute(
             step: step, compiledStep: compiledStep,
-            stepIndex: 0, scenarioName: "test")
+            stepIndex: 0, skillName: "test")
 
         XCTAssertEqual(result.status, .passed)
     }
 
     func testCompiledTapMissingCoordinatesFails() {
-        let step = ScenarioStep.tap(label: "General")
+        let step = SkillStep.tap(label: "General")
         let hints = StepHints(
             compiledAction: .tap, tapX: nil, tapY: nil,
             confidence: nil, matchStrategy: nil,
@@ -86,7 +86,7 @@ final class CompiledStepExecutorTests: XCTestCase {
 
         let result = compiledExecutor.execute(
             step: step, compiledStep: compiledStep,
-            stepIndex: 0, scenarioName: "test")
+            stepIndex: 0, skillName: "test")
 
         XCTAssertEqual(result.status, .failed)
         XCTAssertTrue(result.message?.contains("missing coordinates") ?? false)
@@ -95,7 +95,7 @@ final class CompiledStepExecutorTests: XCTestCase {
     func testCompiledTapInputError() {
         input.tapResult = "Helper not available"
 
-        let step = ScenarioStep.tap(label: "General")
+        let step = SkillStep.tap(label: "General")
         let compiledStep = CompiledStep(
             index: 0, type: "tap", label: "General",
             hints: .tap(x: 100, y: 200, confidence: 0.95, strategy: "exact")
@@ -103,7 +103,7 @@ final class CompiledStepExecutorTests: XCTestCase {
 
         let result = compiledExecutor.execute(
             step: step, compiledStep: compiledStep,
-            stepIndex: 0, scenarioName: "test")
+            stepIndex: 0, skillName: "test")
 
         XCTAssertEqual(result.status, .failed)
         XCTAssertEqual(result.message, "Helper not available")
@@ -114,7 +114,7 @@ final class CompiledStepExecutorTests: XCTestCase {
     func testCompiledSleepDoesNotCallDescriber() {
         describer.describeResult = nil  // Would fail if called for OCR
 
-        let step = ScenarioStep.waitFor(label: "General", timeoutSeconds: nil)
+        let step = SkillStep.waitFor(label: "General", timeoutSeconds: nil)
         let compiledStep = CompiledStep(
             index: 0, type: "wait_for", label: "General",
             hints: .sleep(delayMs: 100)
@@ -122,14 +122,14 @@ final class CompiledStepExecutorTests: XCTestCase {
 
         let result = compiledExecutor.execute(
             step: step, compiledStep: compiledStep,
-            stepIndex: 0, scenarioName: "test")
+            stepIndex: 0, skillName: "test")
 
         XCTAssertEqual(result.status, .passed)
         XCTAssertTrue(result.message?.contains("compiled sleep") ?? false)
     }
 
     func testCompiledSleepWithZeroDelay() {
-        let step = ScenarioStep.assertVisible(label: "OK")
+        let step = SkillStep.assertVisible(label: "OK")
         let compiledStep = CompiledStep(
             index: 0, type: "assert_visible", label: "OK",
             hints: .sleep(delayMs: 0)
@@ -137,7 +137,7 @@ final class CompiledStepExecutorTests: XCTestCase {
 
         let result = compiledExecutor.execute(
             step: step, compiledStep: compiledStep,
-            stepIndex: 0, scenarioName: "test")
+            stepIndex: 0, skillName: "test")
 
         XCTAssertEqual(result.status, .passed)
     }
@@ -145,7 +145,7 @@ final class CompiledStepExecutorTests: XCTestCase {
     // MARK: - Compiled Scroll Sequence
 
     func testCompiledScrollSequencePerformsCorrectSwipes() {
-        let step = ScenarioStep.scrollTo(label: "About", direction: "up", maxScrolls: 10)
+        let step = SkillStep.scrollTo(label: "About", direction: "up", maxScrolls: 10)
         let compiledStep = CompiledStep(
             index: 0, type: "scroll_to", label: "About",
             hints: .scrollSequence(count: 3, direction: "up")
@@ -153,7 +153,7 @@ final class CompiledStepExecutorTests: XCTestCase {
 
         let result = compiledExecutor.execute(
             step: step, compiledStep: compiledStep,
-            stepIndex: 0, scenarioName: "test")
+            stepIndex: 0, skillName: "test")
 
         XCTAssertEqual(result.status, .passed)
         XCTAssertEqual(input.swipeCalls.count, 3)
@@ -161,7 +161,7 @@ final class CompiledStepExecutorTests: XCTestCase {
     }
 
     func testCompiledScrollSequenceZeroCount() {
-        let step = ScenarioStep.scrollTo(label: "About", direction: "up", maxScrolls: 10)
+        let step = SkillStep.scrollTo(label: "About", direction: "up", maxScrolls: 10)
         let compiledStep = CompiledStep(
             index: 0, type: "scroll_to", label: "About",
             hints: .scrollSequence(count: 0, direction: "up")
@@ -169,7 +169,7 @@ final class CompiledStepExecutorTests: XCTestCase {
 
         let result = compiledExecutor.execute(
             step: step, compiledStep: compiledStep,
-            stepIndex: 0, scenarioName: "test")
+            stepIndex: 0, skillName: "test")
 
         XCTAssertEqual(result.status, .passed)
         XCTAssertEqual(input.swipeCalls.count, 0)
@@ -179,7 +179,7 @@ final class CompiledStepExecutorTests: XCTestCase {
     func testCompiledScrollSequenceNoWindowInfo() {
         bridge.windowInfo = nil
 
-        let step = ScenarioStep.scrollTo(label: "About", direction: "up", maxScrolls: 10)
+        let step = SkillStep.scrollTo(label: "About", direction: "up", maxScrolls: 10)
         let compiledStep = CompiledStep(
             index: 0, type: "scroll_to", label: "About",
             hints: .scrollSequence(count: 2, direction: "up")
@@ -187,7 +187,7 @@ final class CompiledStepExecutorTests: XCTestCase {
 
         let result = compiledExecutor.execute(
             step: step, compiledStep: compiledStep,
-            stepIndex: 0, scenarioName: "test")
+            stepIndex: 0, skillName: "test")
 
         XCTAssertEqual(result.status, .failed)
         XCTAssertTrue(result.message?.contains("window info") ?? false)
@@ -196,7 +196,7 @@ final class CompiledStepExecutorTests: XCTestCase {
     func testCompiledScrollSequenceSwipeError() {
         input.swipeResult = "Swipe failed"
 
-        let step = ScenarioStep.scrollTo(label: "About", direction: "up", maxScrolls: 10)
+        let step = SkillStep.scrollTo(label: "About", direction: "up", maxScrolls: 10)
         let compiledStep = CompiledStep(
             index: 0, type: "scroll_to", label: "About",
             hints: .scrollSequence(count: 2, direction: "up")
@@ -204,7 +204,7 @@ final class CompiledStepExecutorTests: XCTestCase {
 
         let result = compiledExecutor.execute(
             step: step, compiledStep: compiledStep,
-            stepIndex: 0, scenarioName: "test")
+            stepIndex: 0, skillName: "test")
 
         XCTAssertEqual(result.status, .failed)
     }
@@ -214,7 +214,7 @@ final class CompiledStepExecutorTests: XCTestCase {
     func testPassthroughDelegatesToNormalExecutor() {
         input.launchAppResult = nil  // success
 
-        let step = ScenarioStep.launch(appName: "Settings")
+        let step = SkillStep.launch(appName: "Settings")
         let compiledStep = CompiledStep(
             index: 0, type: "launch", label: "Settings",
             hints: .passthrough()
@@ -222,7 +222,7 @@ final class CompiledStepExecutorTests: XCTestCase {
 
         let result = compiledExecutor.execute(
             step: step, compiledStep: compiledStep,
-            stepIndex: 0, scenarioName: "test")
+            stepIndex: 0, skillName: "test")
 
         XCTAssertEqual(result.status, .passed)
         XCTAssertEqual(input.launchAppCalls, ["Settings"])
@@ -231,7 +231,7 @@ final class CompiledStepExecutorTests: XCTestCase {
     func testPassthroughHomeStep() {
         bridge.menuActionResult = true
 
-        let step = ScenarioStep.home
+        let step = SkillStep.home
         let compiledStep = CompiledStep(
             index: 0, type: "home", label: nil,
             hints: .passthrough()
@@ -239,7 +239,7 @@ final class CompiledStepExecutorTests: XCTestCase {
 
         let result = compiledExecutor.execute(
             step: step, compiledStep: compiledStep,
-            stepIndex: 0, scenarioName: "test")
+            stepIndex: 0, skillName: "test")
 
         XCTAssertEqual(result.status, .passed)
     }
@@ -247,13 +247,13 @@ final class CompiledStepExecutorTests: XCTestCase {
     // MARK: - No Hints (AI-only)
 
     func testNoHintsSkipsStep() {
-        let step = ScenarioStep.skipped(stepType: "remember", reason: "AI-only")
+        let step = SkillStep.skipped(stepType: "remember", reason: "AI-only")
         let compiledStep = CompiledStep(
             index: 0, type: "remember", label: nil, hints: nil)
 
         let result = compiledExecutor.execute(
             step: step, compiledStep: compiledStep,
-            stepIndex: 0, scenarioName: "test")
+            stepIndex: 0, skillName: "test")
 
         XCTAssertEqual(result.status, .skipped)
         XCTAssertTrue(result.message?.contains("no compiled hints") ?? false)

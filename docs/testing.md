@@ -88,7 +88,7 @@ Run without any external dependencies. Three test targets:
 | `HelperLibTests` | HID key maps, layout mapper, permission policy, tap point calculator, grid overlay, MCP protocol types | Shared library logic |
 | `MCPServerTests` | JSON-RPC dispatch, tool registration, permission enforcement, protocol negotiation | MCP server behavior using protocol-based test doubles |
 | `HelperDaemonTests` | Command parsing, response formatting | Daemon command handling |
-| `TestRunnerTests` | Scenario parsing, step execution, element matching, YAML generation, event classification, JUnit/console reporters | Test runner (`mirroir test`) and recorder (`mirroir record`) |
+| `TestRunnerTests` | Skill parsing, step execution, element matching, YAML generation, event classification, JUnit/console reporters | Test runner (`mirroir test`) and recorder (`mirroir record`) |
 
 Unit tests use **protocol-based dependency injection** — five protocols (`MirroringBridging`, `InputProviding`, `ScreenCapturing`, `ScreenRecording`, `ScreenDescribing`) have stub implementations for test isolation. See `Tests/MCPServerTests/TestDoubles.swift`.
 

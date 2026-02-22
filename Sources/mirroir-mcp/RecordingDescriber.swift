@@ -2,7 +2,7 @@
 // Licensed under the Apache License, Version 2.0
 //
 // ABOUTME: Decorator around ScreenDescribing that caches the last OCR result.
-// ABOUTME: Used during scenario compilation to capture coordinates and timing for compiled replay.
+// ABOUTME: Used during skill compilation to capture coordinates and timing for compiled replay.
 
 import Foundation
 

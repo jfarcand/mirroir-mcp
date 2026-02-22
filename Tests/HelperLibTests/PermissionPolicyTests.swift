@@ -30,8 +30,8 @@ struct PermissionClassificationTests {
         let expected: Set<String> = [
             "screenshot", "describe_screen", "start_recording",
             "stop_recording", "get_orientation", "status",
-            "check_health", "list_targets", "list_scenarios",
-            "get_scenario",
+            "check_health", "list_targets", "list_skills",
+            "get_skill",
         ]
         #expect(PermissionPolicy.readonlyTools == expected)
     }
@@ -49,35 +49,35 @@ struct PermissionClassificationTests {
     }
 }
 
-// MARK: - Scenario Tool Classification
+// MARK: - Skill Tool Classification
 
-@Suite("PermissionPolicy - Scenario Tools")
-struct PermissionScenarioTests {
+@Suite("PermissionPolicy - Skill Tools")
+struct PermissionSkillTests {
 
-    @Test("list_scenarios is readonly")
-    func listScenariosReadonly() {
-        #expect(PermissionPolicy.readonlyTools.contains("list_scenarios"))
-        #expect(!PermissionPolicy.mutatingTools.contains("list_scenarios"))
+    @Test("list_skills is readonly")
+    func listSkillsReadonly() {
+        #expect(PermissionPolicy.readonlyTools.contains("list_skills"))
+        #expect(!PermissionPolicy.mutatingTools.contains("list_skills"))
     }
 
-    @Test("get_scenario is readonly")
-    func getScenarioReadonly() {
-        #expect(PermissionPolicy.readonlyTools.contains("get_scenario"))
-        #expect(!PermissionPolicy.mutatingTools.contains("get_scenario"))
+    @Test("get_skill is readonly")
+    func getSkillReadonly() {
+        #expect(PermissionPolicy.readonlyTools.contains("get_skill"))
+        #expect(!PermissionPolicy.mutatingTools.contains("get_skill"))
     }
 
-    @Test("scenario tools are always allowed without config")
-    func scenarioToolsAlwaysAllowed() {
+    @Test("skill tools are always allowed without config")
+    func skillToolsAlwaysAllowed() {
         let policy = PermissionPolicy(skipPermissions: false, config: nil)
-        #expect(policy.checkTool("list_scenarios") == .allowed)
-        #expect(policy.checkTool("get_scenario") == .allowed)
+        #expect(policy.checkTool("list_skills") == .allowed)
+        #expect(policy.checkTool("get_skill") == .allowed)
     }
 
-    @Test("scenario tools are always visible")
-    func scenarioToolsAlwaysVisible() {
+    @Test("skill tools are always visible")
+    func skillToolsAlwaysVisible() {
         let policy = PermissionPolicy(skipPermissions: false, config: nil)
-        #expect(policy.isToolVisible("list_scenarios") == true)
-        #expect(policy.isToolVisible("get_scenario") == true)
+        #expect(policy.isToolVisible("list_skills") == true)
+        #expect(policy.isToolVisible("get_skill") == true)
     }
 }
 

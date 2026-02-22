@@ -62,8 +62,8 @@ public struct PermissionPolicy: Sendable {
         "status",
         "check_health",
         "list_targets",
-        "list_scenarios",
-        "get_scenario",
+        "list_skills",
+        "get_skill",
     ]
 
     /// Tools that mutate iPhone state and require explicit permission.
@@ -194,9 +194,9 @@ public struct PermissionPolicy: Sendable {
         }
     }
 
-    /// Returns the scenario directories in resolution order (project-local first, then global).
-    public static var scenarioDirs: [String] {
-        [localConfigDir + "/scenarios", globalConfigDir + "/scenarios"]
+    /// Returns the skill directories in resolution order (project-local first, then global).
+    public static var skillDirs: [String] {
+        [localConfigDir + "/skills", globalConfigDir + "/skills"]
     }
 
     /// Returns the agent profile directories in resolution order (project-local first, then global).

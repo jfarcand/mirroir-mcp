@@ -30,10 +30,10 @@ All 28 tools exposed by the MCP server. Mutating tools require [permission](perm
 | `get_orientation` | — | Report portrait/landscape and window dimensions |
 | `status` | — | Connection state, window geometry, and device readiness |
 | `check_health` | — | Comprehensive setup diagnostic: mirroring, helper, DriverKit, screen capture |
-| `list_scenarios` | — | List available scenarios (SKILL.md and YAML) from project-local and global config dirs |
-| `get_scenario` | `name` | Read a scenario file (SKILL.md or YAML) with ${VAR} env substitution. Appends compilation status. |
-| `record_step` | `step_index`, `type`, `label`?, `tap_x`?, `tap_y`?, `confidence`?, `match_strategy`?, `elapsed_ms`?, `scroll_count`?, `scroll_direction`? | Record a compiled step during AI-driven scenario execution |
-| `save_compiled` | `scenario_name` | Save accumulated compiled steps as .compiled.json next to the source scenario |
+| `list_skills` | — | List available skills (SKILL.md and YAML) from project-local and global config dirs |
+| `get_skill` | `name` | Read a skill file (SKILL.md or YAML) with ${VAR} env substitution. Appends compilation status. |
+| `record_step` | `step_index`, `type`, `label`?, `tap_x`?, `tap_y`?, `confidence`?, `match_strategy`?, `elapsed_ms`?, `scroll_count`?, `scroll_direction`? | Record a compiled step during AI-driven skill execution |
+| `save_compiled` | `skill_name` | Save accumulated compiled steps as .compiled.json next to the source skill |
 
 ## Coordinates
 
@@ -87,22 +87,22 @@ Supported modes: `airplane_on`, `airplane_off`, `wifi_on`, `wifi_off`, `cellular
 
 This is the most environment-dependent tool — it relies on the Settings app UI layout, which varies by locale and iOS version. `ElementMatcher` substring matching provides some resilience across locales.
 
-## Scenarios
+## Skills
 
-Scenarios are files that describe multi-step test flows as intents, not scripts. They can be written in **SKILL.md** format (YAML front matter + markdown body — the recommended format) or **YAML** format (legacy). The server provides two readonly tools for scenario discovery and reading — the AI is the execution engine that interprets steps and calls existing MCP tools.
+Skills are files that describe multi-step test flows as intents, not scripts. They can be written in **SKILL.md** format (YAML front matter + markdown body — the recommended format) or **YAML** format (legacy). The server provides two readonly tools for skill discovery and reading — the AI is the execution engine that interprets steps and calls existing MCP tools.
 
 ### Why AI Execution?
 
-Steps like `tap: "Email"` don't specify coordinates — the AI calls `describe_screen`, finds the element by fuzzy matching, and taps it. This matters because real iOS apps change between versions, vary across screen sizes, and throw unexpected UI (permission prompts, keyboard suggestions, notification banners). A deterministic script runner would need exact strings and hardcoded timeouts. The AI adapts: it scrolls to find off-screen elements, dismisses unexpected dialogs, retries failed steps, and flags unresolved `${VAR}` placeholders. Scenarios declare *what* should happen; the AI figures out *how*.
+Steps like `tap: "Email"` don't specify coordinates — the AI calls `describe_screen`, finds the element by fuzzy matching, and taps it. This matters because real iOS apps change between versions, vary across screen sizes, and throw unexpected UI (permission prompts, keyboard suggestions, notification banners). A deterministic script runner would need exact strings and hardcoded timeouts. The AI adapts: it scrolls to find off-screen elements, dismisses unexpected dialogs, retries failed steps, and flags unresolved `${VAR}` placeholders. Skills declare *what* should happen; the AI figures out *how*.
 
 ### Directory Layout
 
 ```
-~/.mirroir-mcp/scenarios/          # global scenarios
-<cwd>/.mirroir-mcp/scenarios/      # project-local (overrides global)
+~/.mirroir-mcp/skills/          # global skills
+<cwd>/.mirroir-mcp/skills/      # project-local skills (overrides global)
 ```
 
-Both directories are scanned recursively, so you can organize scenarios into subdirectories (e.g. `apps/slack/send-message.md`). Project-local scenarios with the same relative path override global ones. When both a `.md` and `.yaml` file exist with the same stem name, the `.md` file takes precedence.
+Both directories are scanned recursively, so you can organize skills into subdirectories (e.g. `apps/slack/send-message.md`). Project-local skills with the same relative path override global ones. When both a `.md` and `.yaml` file exist with the same stem name, the `.md` file takes precedence.
 
 ### SKILL.md Format (Recommended)
 
@@ -129,13 +129,13 @@ Test the login screen with valid credentials.
 7. Screenshot: "final_state"
 ```
 
-Convert existing YAML scenarios with `mirroir migrate`:
+Convert existing YAML skills with `mirroir migrate`:
 
 ```bash
-mirroir migrate scenario.yaml                            # convert a single file
-mirroir migrate --dir path/to/scenarios/                 # convert all YAML files in a directory
-mirroir migrate --output-dir ./converted/ scenario.yaml  # write .md files to alternate directory
-mirroir migrate --dry-run scenario.yaml                  # preview without writing
+mirroir migrate skill.yaml                            # convert a single file
+mirroir migrate --dir path/to/skills/                 # convert all YAML files in a directory
+mirroir migrate --output-dir ./converted/ skill.yaml  # write .md files to alternate directory
+mirroir migrate --dry-run skill.yaml                  # preview without writing
 ```
 
 ### YAML Format (Legacy)
@@ -157,7 +157,7 @@ steps:
 
 ### Variable Substitution
 
-`${VAR}` placeholders are resolved from environment variables when `get_scenario` reads the file (both SKILL.md and YAML formats). Use `${VAR:-default}` to provide a fallback value when the variable is unset. Unresolved variables without defaults are left as-is so the AI can flag them.
+`${VAR}` placeholders are resolved from environment variables when `get_skill` reads the file (both SKILL.md and YAML formats). Use `${VAR:-default}` to provide a fallback value when the variable is unset. Unresolved variables without defaults are left as-is so the AI can flag them.
 
 ```yaml
 - type: "${RECIPIENT:-Phil Tremblay}"   # uses env var, falls back to "Phil Tremblay"
@@ -194,7 +194,7 @@ Steps are intents — the AI maps each to the appropriate MCP tool calls:
 
 ### Conditions
 
-Scenarios can branch using `condition` steps. The AI calls `describe_screen` to evaluate the condition, then executes the matching branch:
+Skills can branch using `condition` steps. The AI calls `describe_screen` to evaluate the condition, then executes the matching branch:
 
 ```yaml
 - condition:
@@ -210,7 +210,7 @@ If the condition is true, the `then` steps execute. If false and `else` is prese
 
 ### Repeats
 
-Scenarios can loop using `repeat` steps. The AI checks a screen condition before each iteration and stops when the condition fails or `max` is reached:
+Skills can loop using `repeat` steps. The AI checks a screen condition before each iteration and stops when the condition fails or `max` is reached:
 
 ```yaml
 - repeat:

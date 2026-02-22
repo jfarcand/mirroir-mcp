@@ -1,7 +1,7 @@
 // Copyright 2026 jfarcand@apache.org
 // Licensed under the Apache License, Version 2.0
 //
-// ABOUTME: Tests for TestRunner: CLI argument parsing, scenario resolution, and help flag.
+// ABOUTME: Tests for TestRunner: CLI argument parsing, skill resolution, and help flag.
 // ABOUTME: Tests pure logic functions without requiring system access.
 
 import XCTest
@@ -14,7 +14,7 @@ final class TestRunnerConfigTests: XCTestCase {
 
     func testParseEmptyArgs() {
         let config = TestRunner.parseArguments([])
-        XCTAssertTrue(config.scenarioArgs.isEmpty)
+        XCTAssertTrue(config.skillArgs.isEmpty)
         XCTAssertNil(config.junitPath)
         XCTAssertEqual(config.screenshotDir, "./mirroir-test-results")
         XCTAssertEqual(config.timeoutSeconds, 15)
@@ -64,26 +64,26 @@ final class TestRunnerConfigTests: XCTestCase {
         XCTAssertEqual(config.timeoutSeconds, 30)
     }
 
-    func testParseScenarioArgs() {
+    func testParseSkillArgs() {
         let config = TestRunner.parseArguments(["check-about", "send-message"])
-        XCTAssertEqual(config.scenarioArgs, ["check-about", "send-message"])
+        XCTAssertEqual(config.skillArgs, ["check-about", "send-message"])
     }
 
     func testParseMixedArgs() {
         let config = TestRunner.parseArguments([
             "--verbose", "--junit", "out.xml",
-            "--timeout", "20", "scenario1", "scenario2"
+            "--timeout", "20", "skill1", "skill2"
         ])
         XCTAssertTrue(config.verbose)
         XCTAssertEqual(config.junitPath, "out.xml")
         XCTAssertEqual(config.timeoutSeconds, 20)
-        XCTAssertEqual(config.scenarioArgs, ["scenario1", "scenario2"])
+        XCTAssertEqual(config.skillArgs, ["skill1", "skill2"])
     }
 
     func testParseIgnoresUnknownFlags() {
-        let config = TestRunner.parseArguments(["--unknown", "scenario1"])
-        // --unknown starts with - so it's treated as a flag, not a scenario
-        XCTAssertEqual(config.scenarioArgs, ["scenario1"])
+        let config = TestRunner.parseArguments(["--unknown", "skill1"])
+        // --unknown starts with - so it's treated as a flag, not a skill
+        XCTAssertEqual(config.skillArgs, ["skill1"])
     }
 
     // MARK: - Agent Flag Parsing
@@ -96,23 +96,23 @@ final class TestRunnerConfigTests: XCTestCase {
 
     func testParseAgentWithModelName() {
         // --agent claude-sonnet-4-6 → AI model name
-        let config = TestRunner.parseArguments(["--agent", "claude-sonnet-4-6", "scenario.yaml"])
+        let config = TestRunner.parseArguments(["--agent", "claude-sonnet-4-6", "skill.yaml"])
         XCTAssertEqual(config.agent, "claude-sonnet-4-6")
-        XCTAssertEqual(config.scenarioArgs, ["scenario.yaml"])
+        XCTAssertEqual(config.skillArgs, ["skill.yaml"])
     }
 
     func testParseAgentFollowedByYAML() {
-        // --agent scenario.yaml → bare agent, scenario.yaml is a scenario arg
-        let config = TestRunner.parseArguments(["--agent", "scenario.yaml"])
+        // --agent skill.yaml → bare agent, skill.yaml is a skill arg
+        let config = TestRunner.parseArguments(["--agent", "skill.yaml"])
         XCTAssertEqual(config.agent, "")
-        XCTAssertEqual(config.scenarioArgs, ["scenario.yaml"])
+        XCTAssertEqual(config.skillArgs, ["skill.yaml"])
     }
 
     func testParseAgentFollowedByYMLFile() {
-        // --agent test.yml → bare agent, test.yml is a scenario arg
+        // --agent test.yml → bare agent, test.yml is a skill arg
         let config = TestRunner.parseArguments(["--agent", "test.yml"])
         XCTAssertEqual(config.agent, "")
-        XCTAssertEqual(config.scenarioArgs, ["test.yml"])
+        XCTAssertEqual(config.skillArgs, ["test.yml"])
     }
 
     func testParseAgentFollowedByFlag() {
@@ -126,16 +126,16 @@ final class TestRunnerConfigTests: XCTestCase {
         // --agent ollama:llama3 → Ollama model
         let config = TestRunner.parseArguments(["--agent", "ollama:llama3", "test.yaml"])
         XCTAssertEqual(config.agent, "ollama:llama3")
-        XCTAssertEqual(config.scenarioArgs, ["test.yaml"])
+        XCTAssertEqual(config.skillArgs, ["test.yaml"])
     }
 
     func testParseNoAgentByDefault() {
         // No --agent flag → nil
-        let config = TestRunner.parseArguments(["scenario.yaml"])
+        let config = TestRunner.parseArguments(["skill.yaml"])
         XCTAssertNil(config.agent)
     }
 
-    // MARK: - Scenario Resolution
+    // MARK: - Skill Resolution
 
     func testResolveDirectFilePath() throws {
         let tmpDir = NSTemporaryDirectory() + "test-resolve-\(UUID().uuidString)"
@@ -147,14 +147,14 @@ final class TestRunnerConfigTests: XCTestCase {
         try "name: Test\nsteps:\n  - home".write(
             toFile: filePath, atomically: true, encoding: .utf8)
 
-        let files = try TestRunner.resolveScenarioFiles([filePath])
+        let files = try TestRunner.resolveSkillFiles([filePath])
         XCTAssertEqual(files.count, 1)
         XCTAssertEqual(files[0], filePath)
     }
 
     func testResolveNotFoundThrows() {
         XCTAssertThrowsError(
-            try TestRunner.resolveScenarioFiles(["nonexistent-scenario-xyz"])
+            try TestRunner.resolveSkillFiles(["nonexistent-skill-xyz"])
         ) { error in
             XCTAssertTrue(error.localizedDescription.contains("not found"))
         }
