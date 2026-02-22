@@ -313,32 +313,19 @@ final class StepExecutor {
                                    startTime: CFAbsoluteTime) -> StepResult {
         let step = SkillStep.screenshot(label: label)
 
-        guard let base64 = capture.captureBase64() else {
+        guard let data = captureScreenshotData() else {
             return StepResult(step: step, status: .failed,
                               message: "Failed to capture screenshot",
                               durationSeconds: elapsed(startTime))
         }
 
-        guard let data = Data(base64Encoded: base64) else {
-            return StepResult(step: step, status: .failed,
-                              message: "Failed to decode screenshot data",
-                              durationSeconds: elapsed(startTime))
-        }
-
-        let dir = config.screenshotDir
-        try? FileManager.default.createDirectory(
-            atPath: dir, withIntermediateDirectories: true)
-
         let safeName = skillName.replacingOccurrences(of: " ", with: "_")
         let safeLabel = label.replacingOccurrences(of: " ", with: "_")
         let filename = "\(safeName)_\(safeLabel).png"
-        let path = (dir as NSString).appendingPathComponent(filename)
 
-        do {
-            try data.write(to: URL(fileURLWithPath: path))
-        } catch {
+        guard let path = saveScreenshot(data, filename: filename) else {
             return StepResult(step: step, status: .failed,
-                              message: "Failed to save screenshot to \(path): \(error.localizedDescription)",
+                              message: "Failed to save screenshot",
                               durationSeconds: elapsed(startTime))
         }
 
@@ -697,18 +684,34 @@ final class StepExecutor {
         }
     }
 
-    /// Save a screenshot for debugging when a step fails.
-    private func captureFailureScreenshot(stepIndex: Int, skillName: String) {
+    /// Capture and decode a screenshot as raw PNG data.
+    /// Returns nil if capture or base64 decode fails.
+    private func captureScreenshotData() -> Data? {
         guard let base64 = capture.captureBase64(),
-              let data = Data(base64Encoded: base64) else { return }
+              let data = Data(base64Encoded: base64) else { return nil }
+        return data
+    }
 
+    /// Write PNG data to the screenshot directory, creating it if needed.
+    /// Returns the written file path, or nil on failure.
+    @discardableResult
+    private func saveScreenshot(_ data: Data, filename: String) -> String? {
         let dir = config.screenshotDir
         try? FileManager.default.createDirectory(
             atPath: dir, withIntermediateDirectories: true)
-
-        let safeName = skillName.replacingOccurrences(of: " ", with: "_")
-        let filename = "\(safeName)_failure_step\(stepIndex + 1).png"
         let path = (dir as NSString).appendingPathComponent(filename)
-        try? data.write(to: URL(fileURLWithPath: path))
+        do {
+            try data.write(to: URL(fileURLWithPath: path))
+            return path
+        } catch {
+            return nil
+        }
+    }
+
+    /// Save a screenshot for debugging when a step fails.
+    private func captureFailureScreenshot(stepIndex: Int, skillName: String) {
+        guard let data = captureScreenshotData() else { return }
+        let safeName = skillName.replacingOccurrences(of: " ", with: "_")
+        saveScreenshot(data, filename: "\(safeName)_failure_step\(stepIndex + 1).png")
     }
 }

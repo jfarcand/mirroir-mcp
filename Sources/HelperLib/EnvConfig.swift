@@ -234,7 +234,7 @@ public enum EnvConfig {
     }
 
     public static var scrollPixelScale: Double {
-        readDouble("scrollPixelScale", default: TimingConstants.scrollPixelScale)
+        read(ConfigKey("scrollPixelScale", default: TimingConstants.scrollPixelScale))
     }
 
     public static var hidTypingChunkSize: Int {
