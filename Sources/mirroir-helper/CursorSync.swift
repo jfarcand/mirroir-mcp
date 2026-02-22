@@ -82,4 +82,64 @@ enum CursorSync {
         karabiner.postPointingReport(up)
         usleep(EnvConfig.cursorSettleUs)
     }
+
+    /// Perform an interpolated button-down → movement → button-up gesture.
+    ///
+    /// Used by drag (click-drag with initial hold for iOS drag recognition).
+    /// Swipe uses scroll wheel events instead (see `handleSwipe`).
+    /// The `initialHoldUs` parameter controls the hold after button-down
+    /// before movement begins.
+    ///
+    /// - Parameters:
+    ///   - from: Start point (screen-absolute).
+    ///   - to: End point (screen-absolute).
+    ///   - steps: Number of interpolation steps.
+    ///   - moveDurationMs: Time in milliseconds for the movement phase.
+    ///   - initialHoldUs: Microseconds to hold after button-down before moving.
+    ///   - karabiner: Karabiner HID provider.
+    static func interpolatedGesture(
+        from: CGPoint,
+        to: CGPoint,
+        steps: Int,
+        moveDurationMs: Int,
+        initialHoldUs: UInt32,
+        karabiner: any KarabinerProviding
+    ) {
+        let totalDx = to.x - from.x
+        let totalDy = to.y - from.y
+        let stepDelayUs = UInt32(max(moveDurationMs, 1) * 1000 / steps)
+
+        // Button down
+        var down = PointingInput()
+        down.buttons = 0x01
+        karabiner.postPointingReport(down)
+
+        if initialHoldUs > 0 {
+            usleep(initialHoldUs)
+        }
+
+        // Interpolated movement
+        for i in 1...steps {
+            let progress = Double(i) / Double(steps)
+            let targetX = from.x + totalDx * progress
+            let targetY = from.y + totalDy * progress
+
+            CGWarpMouseCursorPosition(CGPoint(x: targetX, y: targetY))
+
+            let dx = Int8(clamping: Int(totalDx / Double(steps)))
+            let dy = Int8(clamping: Int(totalDy / Double(steps)))
+            var move = PointingInput()
+            move.buttons = 0x01
+            move.x = dx
+            move.y = dy
+            karabiner.postPointingReport(move)
+            usleep(stepDelayUs)
+        }
+
+        // Button up
+        var up = PointingInput()
+        up.buttons = 0x00
+        karabiner.postPointingReport(up)
+        usleep(EnvConfig.cursorSettleUs)
+    }
 }

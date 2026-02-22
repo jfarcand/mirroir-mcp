@@ -161,43 +161,19 @@ extension CommandServer {
             return makeErrorResponse("Karabiner pointing device not ready")
         }
 
-        CursorSync.withCursorSynced(at: CGPoint(x: fromX, y: fromY), karabiner: karabiner) {
-            // Button down with initial hold for iOS drag recognition
-            var down = PointingInput()
-            down.buttons = 0x01
-            karabiner.postPointingReport(down)
-            usleep(EnvConfig.dragModeHoldUs)
+        let from = CGPoint(x: fromX, y: fromY)
+        let to = CGPoint(x: toX, y: toY)
+        let dragModeHoldMs = Int(EnvConfig.dragModeHoldUs / 1000)
 
-            // Slow interpolated movement with fine steps
-            let steps = EnvConfig.dragInterpolationSteps
-            let totalDx = toX - fromX
-            let totalDy = toY - fromY
-            let dragModeHoldMs = Int(EnvConfig.dragModeHoldUs / 1000)
-            let moveDurationMs = durationMs - dragModeHoldMs
-            let stepDelayUs = UInt32(max(moveDurationMs, 1) * 1000 / steps)
-
-            for i in 1...steps {
-                let progress = Double(i) / Double(steps)
-                let targetX = fromX + totalDx * progress
-                let targetY = fromY + totalDy * progress
-
-                CGWarpMouseCursorPosition(CGPoint(x: targetX, y: targetY))
-
-                let dx = Int8(clamping: Int(totalDx / Double(steps)))
-                let dy = Int8(clamping: Int(totalDy / Double(steps)))
-                var move = PointingInput()
-                move.buttons = 0x01
-                move.x = dx
-                move.y = dy
-                karabiner.postPointingReport(move)
-                usleep(stepDelayUs)
-            }
-
-            // Button up
-            var up = PointingInput()
-            up.buttons = 0x00
-            karabiner.postPointingReport(up)
-            usleep(EnvConfig.cursorSettleUs)
+        CursorSync.withCursorSynced(at: from, karabiner: karabiner) {
+            CursorSync.interpolatedGesture(
+                from: from,
+                to: to,
+                steps: EnvConfig.dragInterpolationSteps,
+                moveDurationMs: durationMs - dragModeHoldMs,
+                initialHoldUs: EnvConfig.dragModeHoldUs,
+                karabiner: karabiner
+            )
         }
 
         return makeOkResponse()
