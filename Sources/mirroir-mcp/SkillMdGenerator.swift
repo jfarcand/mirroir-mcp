@@ -1,22 +1,15 @@
 // Copyright 2026 jfarcand@apache.org
 // Licensed under the Apache License, Version 2.0
 //
-// ABOUTME: Pure function that converts explored screens into a SKILL.md string.
-// ABOUTME: Produces YAML front matter and markdown step instructions from ExploredScreen data.
+// ABOUTME: Assembles SKILL.md documents from explored screens.
+// ABOUTME: Produces YAML front matter and numbered markdown steps using LandmarkPicker and ActionStepFormatter.
 
 import Foundation
 import HelperLib
 
 /// Generates SKILL.md content from app exploration data.
-/// Pure function with no side effects — easily testable.
+/// Delegates OCR filtering to `LandmarkPicker` and action formatting to `ActionStepFormatter`.
 enum SkillMdGenerator {
-
-    /// Minimum character length for a landmark candidate.
-    static let landmarkMinLength = 3
-    /// Maximum character length for a landmark candidate.
-    static let landmarkMaxLength = 40
-    /// Minimum OCR confidence for a landmark candidate.
-    static let landmarkMinConfidence: Float = 0.5
 
     /// Generate a SKILL.md string from exploration session data.
     ///
@@ -43,62 +36,64 @@ enum SkillMdGenerator {
         lines.append("---")
         lines.append("")
 
-        // Step 1: always launch the app
-        lines.append("Launch **\(appName)**")
+        // Description paragraph
+        if !goal.isEmpty {
+            let capitalizedGoal = goal.prefix(1).uppercased() + goal.dropFirst()
+            lines.append("\(capitalizedGoal) in the \(appName) app.")
+        } else {
+            lines.append("Explore the \(appName) app.")
+        }
         lines.append("")
+
+        // Steps heading
+        lines.append("## Steps")
+
+        // Step counter and landmark dedup tracker
+        var stepNum = 1
+        var lastLandmark: String?
+
+        // Step 1: always launch the app
+        lines.append("\(stepNum). Launch **\(appName)**")
+        stepNum += 1
 
         // Steps for each captured screen
         for screen in screens {
-            // Pick a landmark element for wait_for
-            if let landmark = pickLandmarkElement(from: screen.elements) {
-                lines.append("Wait for \"\(landmark)\"")
-                lines.append("")
+            // Pick a landmark element for wait_for, skipping consecutive duplicates
+            if let landmark = LandmarkPicker.pickLandmark(from: screen.elements) {
+                if landmark != lastLandmark {
+                    lines.append("\(stepNum). Wait for \"\(landmark)\" to appear")
+                    stepNum += 1
+                }
+                lastLandmark = landmark
             }
 
-            // If this screen was reached by tapping something, add a Tap step
-            if let arrivedVia = screen.arrivedVia, !arrivedVia.isEmpty {
-                lines.append("Tap \"\(arrivedVia)\"")
-                lines.append("")
+            // Generate action step based on actionType
+            if let step = ActionStepFormatter.format(actionType: screen.actionType, arrivedVia: screen.arrivedVia) {
+                lines.append("\(stepNum). \(step)")
+                stepNum += 1
             }
         }
 
+        lines.append("")
         return lines.joined(separator: "\n")
     }
 
-    /// Pick the most distinctive OCR element near the top of the screen as a landmark.
-    /// Prefers elements that are 3-40 characters long with confidence > 0.5.
-    /// Sorts candidates by Y position (topmost first) to pick a stable header/title.
-    static func pickLandmarkElement(from elements: [TapPoint]) -> String? {
-        let candidates = elements.filter { el in
-            el.text.count >= landmarkMinLength &&
-            el.text.count <= landmarkMaxLength &&
-            el.confidence >= landmarkMinConfidence
-        }
-        .sorted { $0.tapY < $1.tapY }
-
-        return candidates.first?.text
-    }
-
     /// Derive a skill name from the app name and optional goal.
-    /// Produces a lowercase-kebab-case identifier.
+    /// Produces a Title Case name suitable for display.
     static func deriveName(appName: String, goal: String) -> String {
         let source: String
         if goal.isEmpty {
-            source = "explore-\(appName)"
+            source = "Explore \(appName)"
         } else {
-            source = "\(appName)-\(goal)"
+            source = goal
         }
 
-        // Convert to lowercase kebab-case: replace non-alphanumeric with hyphens, collapse runs
-        let kebab = source.lowercased()
-            .map { $0.isLetter || $0.isNumber ? String($0) : "-" }
-            .joined()
-
-        // Collapse consecutive hyphens and trim leading/trailing hyphens
-        let collapsed = kebab.components(separatedBy: "-")
-            .filter { !$0.isEmpty }
-            .joined(separator: "-")
-
-        return collapsed
+        // Title-case each word
+        return source.split(separator: " ")
+            .map { word in
+                let lower = word.lowercased()
+                return lower.prefix(1).uppercased() + lower.dropFirst()
+            }
+            .joined(separator: " ")
     }
 }

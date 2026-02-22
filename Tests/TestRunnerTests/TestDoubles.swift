@@ -75,6 +75,7 @@ final class StubInput: InputProviding, @unchecked Sendable {
 
     var tapCalls: [(x: Double, y: Double)] = []
     var swipeCalls: [(fromX: Double, fromY: Double, toX: Double, toY: Double)] = []
+    var dragCalls: [(fromX: Double, fromY: Double, toX: Double, toY: Double)] = []
     var launchAppCalls: [String] = []
 
     func tap(x: Double, y: Double, cursorMode: CursorMode? = nil) -> String? {
@@ -87,7 +88,10 @@ final class StubInput: InputProviding, @unchecked Sendable {
         return swipeResult
     }
     func drag(fromX: Double, fromY: Double, toX: Double, toY: Double,
-              durationMs: Int, cursorMode: CursorMode? = nil) -> String? { dragResult }
+              durationMs: Int, cursorMode: CursorMode? = nil) -> String? {
+        dragCalls.append((fromX: fromX, fromY: fromY, toX: toX, toY: toY))
+        return dragResult
+    }
     func longPress(x: Double, y: Double, durationMs: Int, cursorMode: CursorMode? = nil) -> String? { longPressResult }
     func doubleTap(x: Double, y: Double, cursorMode: CursorMode? = nil) -> String? { doubleTapResult }
     func shake() -> TypeResult { shakeResult }

@@ -209,6 +209,10 @@ public enum TimingConstants {
     /// Swipe duration for dismissing app cards in the App Switcher (milliseconds).
     public static let appSwitcherSwipeDurationMs: Int = 200
 
+    /// Maximum horizontal swipes to search for an app card in the App Switcher carousel.
+    /// Covers ~15 apps (3 visible per view × 5 swipes).
+    public static let appSwitcherMaxSwipes: Int = 5
+
     /// UI settling delay after App Switcher or network toggle operations (microseconds).
     public static let toolSettlingDelayUs: UInt32 = 500_000
 

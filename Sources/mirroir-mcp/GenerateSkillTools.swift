@@ -52,6 +52,13 @@ extension MirroirMCP {
                         "description": .string(
                             "Element tapped to reach current screen, e.g. \"General\" (for capture action)."),
                     ]),
+                    "action_type": .object([
+                        "type": .string("string"),
+                        "description": .string(
+                            "Action performed to reach current screen: " +
+                            "\"tap\", \"swipe\", \"type\", \"press_key\", \"scroll_to\", " +
+                            "\"long_press\" (for capture action)."),
+                    ]),
                 ]),
                 "required": .array([.string("action")]),
             ],
@@ -113,10 +120,11 @@ extension MirroirMCP {
                 "Is the target window visible?")
         }
 
-        // Capture first screen (no arrivedVia since this is the initial screen)
+        // Capture first screen (no action since this is the initial screen)
         session.capture(
             elements: result.elements,
             hints: result.hints,
+            actionType: nil,
             arrivedVia: nil,
             screenshotBase64: result.screenshotBase64
         )
@@ -154,13 +162,21 @@ extension MirroirMCP {
         }
 
         let arrivedVia = args["arrived_via"]?.asString()
+        let actionType = args["action_type"]?.asString()
 
-        session.capture(
+        let accepted = session.capture(
             elements: result.elements,
             hints: result.hints,
+            actionType: actionType,
             arrivedVia: arrivedVia,
             screenshotBase64: result.screenshotBase64
         )
+
+        if !accepted {
+            return .text(
+                "Screen unchanged — capture skipped (duplicate of previous screen). " +
+                "Try a different action before capturing again.")
+        }
 
         let screenNum = session.screenCount
         let description = formatScreenDescription(

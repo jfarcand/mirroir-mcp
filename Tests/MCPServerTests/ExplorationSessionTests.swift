@@ -28,6 +28,7 @@ final class ExplorationSessionTests: XCTestCase {
         session.capture(
             elements: [TapPoint(text: "General", tapX: 205, tapY: 340, confidence: 0.95)],
             hints: ["Navigation bar detected"],
+            actionType: nil,
             arrivedVia: nil,
             screenshotBase64: "base64screenshot1"
         )
@@ -44,18 +45,21 @@ final class ExplorationSessionTests: XCTestCase {
         session.capture(
             elements: [TapPoint(text: "General", tapX: 205, tapY: 340, confidence: 0.95)],
             hints: [],
+            actionType: nil,
             arrivedVia: nil,
             screenshotBase64: "screen0"
         )
         session.capture(
             elements: [TapPoint(text: "About", tapX: 205, tapY: 400, confidence: 0.92)],
             hints: [],
+            actionType: "tap",
             arrivedVia: "General",
             screenshotBase64: "screen1"
         )
         session.capture(
             elements: [TapPoint(text: "iOS Version", tapX: 205, tapY: 300, confidence: 0.88)],
             hints: [],
+            actionType: "tap",
             arrivedVia: "About",
             screenshotBase64: "screen2"
         )
@@ -68,7 +72,9 @@ final class ExplorationSessionTests: XCTestCase {
         XCTAssertEqual(data?.screens[2].index, 2)
         XCTAssertEqual(data?.screens[0].screenshotBase64, "screen0")
         XCTAssertEqual(data?.screens[1].arrivedVia, "General")
+        XCTAssertEqual(data?.screens[1].actionType, "tap")
         XCTAssertEqual(data?.screens[2].arrivedVia, "About")
+        XCTAssertEqual(data?.screens[2].actionType, "tap")
         XCTAssertEqual(data?.appName, "Settings")
         XCTAssertEqual(data?.goal, "explore")
     }
@@ -80,8 +86,9 @@ final class ExplorationSessionTests: XCTestCase {
         session.start(appName: "Maps", goal: "search")
 
         session.capture(
-            elements: [TapPoint(text: "Search", tapX: 100, tapY: 50, confidence: 0.9)],
+            elements: [TapPoint(text: "Search", tapX: 100, tapY: 150, confidence: 0.9)],
             hints: [],
+            actionType: nil,
             arrivedVia: nil,
             screenshotBase64: "img"
         )
@@ -123,6 +130,7 @@ final class ExplorationSessionTests: XCTestCase {
         session.capture(
             elements: [TapPoint(text: "Old Screen", tapX: 100, tapY: 100, confidence: 0.9)],
             hints: [],
+            actionType: nil,
             arrivedVia: nil,
             screenshotBase64: "old"
         )
@@ -135,5 +143,66 @@ final class ExplorationSessionTests: XCTestCase {
         XCTAssertEqual(session.currentGoal, "new goal")
         XCTAssertEqual(session.screenCount, 0)
         XCTAssertTrue(session.active)
+    }
+
+    // MARK: - Duplicate Screen Rejection
+
+    func testCaptureDuplicateScreenIsRejected() {
+        let session = ExplorationSession()
+        session.start(appName: "Settings", goal: "test dedup")
+
+        let elements = [
+            TapPoint(text: "General", tapX: 205, tapY: 340, confidence: 0.95),
+            TapPoint(text: "Privacy", tapX: 205, tapY: 400, confidence: 0.93),
+        ]
+
+        let first = session.capture(
+            elements: elements, hints: [], actionType: nil,
+            arrivedVia: nil, screenshotBase64: "img1")
+        XCTAssertTrue(first, "First capture should be accepted")
+        XCTAssertEqual(session.screenCount, 1)
+
+        let second = session.capture(
+            elements: elements, hints: [], actionType: "tap",
+            arrivedVia: "General", screenshotBase64: "img2")
+        XCTAssertFalse(second, "Duplicate screen should be rejected")
+        XCTAssertEqual(session.screenCount, 1, "Count should not increase on duplicate")
+    }
+
+    func testCaptureDifferentScreenIsAccepted() {
+        let session = ExplorationSession()
+        session.start(appName: "Settings", goal: "test dedup")
+
+        let first = session.capture(
+            elements: [TapPoint(text: "General", tapX: 205, tapY: 340, confidence: 0.95)],
+            hints: [], actionType: nil, arrivedVia: nil, screenshotBase64: "img1")
+        XCTAssertTrue(first)
+
+        let second = session.capture(
+            elements: [TapPoint(text: "About", tapX: 205, tapY: 400, confidence: 0.92)],
+            hints: [], actionType: "tap", arrivedVia: "General", screenshotBase64: "img2")
+        XCTAssertTrue(second, "Different screen should be accepted")
+        XCTAssertEqual(session.screenCount, 2)
+    }
+
+    func testCaptureDuplicateAfterDifferentIsRejected() {
+        let session = ExplorationSession()
+        session.start(appName: "Settings", goal: "test dedup")
+
+        let elementsA = [TapPoint(text: "General", tapX: 205, tapY: 340, confidence: 0.95)]
+        let elementsB = [TapPoint(text: "About", tapX: 205, tapY: 400, confidence: 0.92)]
+
+        session.capture(
+            elements: elementsA, hints: [], actionType: nil,
+            arrivedVia: nil, screenshotBase64: "img1")
+        session.capture(
+            elements: elementsB, hints: [], actionType: "tap",
+            arrivedVia: "General", screenshotBase64: "img2")
+
+        let duplicate = session.capture(
+            elements: elementsB, hints: [], actionType: "tap",
+            arrivedVia: "About", screenshotBase64: "img3")
+        XCTAssertFalse(duplicate, "B after B should be rejected")
+        XCTAssertEqual(session.screenCount, 2, "Count should stay at 2")
     }
 }

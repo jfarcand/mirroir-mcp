@@ -352,11 +352,13 @@ final class StepExecutorTests: XCTestCase {
         // Verify App Switcher was opened and Home was pressed
         XCTAssertTrue(bridge.menuActionCalls.contains(where: { $0.item == "App Switcher" }))
         XCTAssertTrue(bridge.menuActionCalls.contains(where: { $0.item == "Home Screen" }))
-        // Verify swipe up was performed on app card
-        XCTAssertEqual(input.swipeCalls.count, 1)
+        // Verify drag up was performed on app card (drag, not swipe, for reliable dismiss)
+        XCTAssertEqual(input.swipeCalls.count, 0)
+        XCTAssertEqual(input.dragCalls.count, 1)
     }
 
     func testResetAppNotInSwitcher() {
+        // App not found — exhausts all horizontal search swipes before reporting "already quit"
         describer.describeResult = ScreenDescriber.DescribeResult(
             elements: [TapPoint(text: "Other App", tapX: 200, tapY: 400, confidence: 0.95)],
             screenshotBase64: ""
@@ -366,7 +368,45 @@ final class StepExecutorTests: XCTestCase {
             step: .resetApp(appName: "Settings"), stepIndex: 0, skillName: "test")
         XCTAssertEqual(result.status, .passed)
         XCTAssertTrue(result.message?.contains("already quit") ?? false)
-        XCTAssertEqual(input.swipeCalls.count, 0)
+        // Should have swiped left through the carousel before giving up
+        XCTAssertEqual(input.swipeCalls.count, EnvConfig.appSwitcherMaxSwipes)
+    }
+
+    func testResetAppFindsAppAfterSwipe() {
+        // First OCR: only "Other App" visible. After one horizontal swipe: "Settings" appears.
+        let noMatch = ScreenDescriber.DescribeResult(
+            elements: [TapPoint(text: "Other App", tapX: 200, tapY: 400, confidence: 0.95)],
+            screenshotBase64: ""
+        )
+        let found = ScreenDescriber.DescribeResult(
+            elements: [TapPoint(text: "Settings", tapX: 200, tapY: 400, confidence: 0.95)],
+            screenshotBase64: ""
+        )
+        describer.describeResults = [noMatch, found]
+
+        let result = executor.execute(
+            step: .resetApp(appName: "Settings"), stepIndex: 0, skillName: "test")
+        XCTAssertEqual(result.status, .passed)
+        XCTAssertTrue(result.message?.contains("Force-quit") ?? false)
+        // 1 horizontal search swipe + 1 dismiss drag = 1 swipe + 1 drag
+        XCTAssertEqual(input.swipeCalls.count, 1)
+        XCTAssertEqual(input.dragCalls.count, 1)
+    }
+
+    func testResetAppExhaustsSwipesReportsAlreadyQuit() {
+        // Target never appears across all carousel swipes
+        let noMatch = ScreenDescriber.DescribeResult(
+            elements: [TapPoint(text: "Other App", tapX: 200, tapY: 400, confidence: 0.95)],
+            screenshotBase64: ""
+        )
+        describer.describeResult = noMatch
+
+        let result = executor.execute(
+            step: .resetApp(appName: "Settings"), stepIndex: 0, skillName: "test")
+        XCTAssertEqual(result.status, .passed)
+        XCTAssertTrue(result.message?.contains("already quit") ?? false)
+        // All swipes are horizontal search swipes, no dismiss swipe
+        XCTAssertEqual(input.swipeCalls.count, EnvConfig.appSwitcherMaxSwipes)
     }
 
     func testResetAppSwitcherFailed() {

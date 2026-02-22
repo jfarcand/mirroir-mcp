@@ -291,6 +291,10 @@ public enum EnvConfig {
         readInt("appSwitcherSwipeDurationMs", default: TimingConstants.appSwitcherSwipeDurationMs)
     }
 
+    public static var appSwitcherMaxSwipes: Int {
+        readInt("appSwitcherMaxSwipes", default: TimingConstants.appSwitcherMaxSwipes)
+    }
+
     public static var toolSettlingDelayUs: UInt32 {
         readUInt32("toolSettlingDelayUs", default: TimingConstants.toolSettlingDelayUs)
     }

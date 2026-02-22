@@ -15,7 +15,9 @@ struct ExploredScreen: Sendable {
     let elements: [TapPoint]
     /// Contextual hints from the screen describer (e.g. navigation cues).
     let hints: [String]
-    /// The element label tapped to arrive at this screen (e.g. "General", "About").
+    /// The action performed to reach this screen (e.g. "tap", "swipe", "type", "press_key").
+    let actionType: String?
+    /// The element label or value associated with the action (e.g. "General", "up", "hello").
     let arrivedVia: String?
     /// Base64-encoded PNG screenshot of the screen.
     let screenshotBase64: String
@@ -41,22 +43,34 @@ final class ExplorationSession: @unchecked Sendable {
     }
 
     /// Append a captured screen to the session.
+    /// Returns `false` if the screen is a duplicate of the last captured screen (unchanged).
+    @discardableResult
     func capture(
         elements: [TapPoint],
         hints: [String],
+        actionType: String?,
         arrivedVia: String?,
         screenshotBase64: String
-    ) {
+    ) -> Bool {
         lock.lock()
         defer { lock.unlock() }
+
+        // Reject duplicate: compare against last captured screen
+        if let lastScreen = screens.last,
+           ScreenFingerprint.areEqual(lastScreen.elements, elements) {
+            return false
+        }
+
         let screen = ExploredScreen(
             index: screens.count,
             elements: elements,
             hints: hints,
+            actionType: actionType,
             arrivedVia: arrivedVia,
             screenshotBase64: screenshotBase64
         )
         screens.append(screen)
+        return true
     }
 
     /// Finalize the session: return all captured data and reset state.
