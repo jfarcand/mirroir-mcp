@@ -227,32 +227,14 @@ final class StepExecutor {
                               durationSeconds: elapsed(startTime))
         }
 
-        let centerX = Double(windowInfo.size.width) / 2.0
-        let centerY = Double(windowInfo.size.height) / 2.0
-        let swipeDistance = Double(windowInfo.size.height) * EnvConfig.swipeDistanceFraction
-
-        let fromX: Double, fromY: Double, toX: Double, toY: Double
-        switch direction.lowercased() {
-        case "up":
-            fromX = centerX; fromY = centerY + swipeDistance / 2
-            toX = centerX; toY = centerY - swipeDistance / 2
-        case "down":
-            fromX = centerX; fromY = centerY - swipeDistance / 2
-            toX = centerX; toY = centerY + swipeDistance / 2
-        case "left":
-            fromX = centerX + swipeDistance / 2; fromY = centerY
-            toX = centerX - swipeDistance / 2; toY = centerY
-        case "right":
-            fromX = centerX - swipeDistance / 2; fromY = centerY
-            toX = centerX + swipeDistance / 2; toY = centerY
-        default:
+        guard let ep = swipeEndpoints(direction: direction, windowInfo: windowInfo) else {
             return StepResult(step: step, status: .failed,
                               message: "Unknown swipe direction: \(direction). Use up/down/left/right.",
                               durationSeconds: elapsed(startTime))
         }
 
-        if let error = input.swipe(fromX: fromX, fromY: fromY,
-                                    toX: toX, toY: toY, durationMs: EnvConfig.defaultSwipeDurationMs) {
+        if let error = input.swipe(fromX: ep.fromX, fromY: ep.fromY,
+                                    toX: ep.toX, toY: ep.toY, durationMs: EnvConfig.defaultSwipeDurationMs) {
             return StepResult(step: step, status: .failed, message: error,
                               durationSeconds: elapsed(startTime))
         }
@@ -425,36 +407,17 @@ final class StepExecutor {
                               durationSeconds: elapsed(startTime))
         }
 
-        let centerX = Double(windowInfo.size.width) / 2.0
-        let centerY = Double(windowInfo.size.height) / 2.0
-        let swipeDistance = Double(windowInfo.size.height) * EnvConfig.swipeDistanceFraction
+        guard let ep = swipeEndpoints(direction: direction, windowInfo: windowInfo) else {
+            return StepResult(step: step, status: .failed,
+                              message: "Unknown direction: \(direction)",
+                              durationSeconds: elapsed(startTime))
+        }
 
         var previousTexts: [String] = []
 
         for attempt in 0..<maxScrolls {
-            // Perform swipe
-            let fromX: Double, fromY: Double, toX: Double, toY: Double
-            switch direction.lowercased() {
-            case "up":
-                fromX = centerX; fromY = centerY + swipeDistance / 2
-                toX = centerX; toY = centerY - swipeDistance / 2
-            case "down":
-                fromX = centerX; fromY = centerY - swipeDistance / 2
-                toX = centerX; toY = centerY + swipeDistance / 2
-            case "left":
-                fromX = centerX + swipeDistance / 2; fromY = centerY
-                toX = centerX - swipeDistance / 2; toY = centerY
-            case "right":
-                fromX = centerX - swipeDistance / 2; fromY = centerY
-                toX = centerX + swipeDistance / 2; toY = centerY
-            default:
-                return StepResult(step: step, status: .failed,
-                                  message: "Unknown direction: \(direction)",
-                                  durationSeconds: elapsed(startTime))
-            }
-
-            if let error = input.swipe(fromX: fromX, fromY: fromY,
-                                        toX: toX, toY: toY, durationMs: EnvConfig.defaultSwipeDurationMs) {
+            if let error = input.swipe(fromX: ep.fromX, fromY: ep.fromY,
+                                        toX: ep.toX, toY: ep.toY, durationMs: EnvConfig.defaultSwipeDurationMs) {
                 return StepResult(step: step, status: .failed,
                                   message: "Swipe failed: \(error)",
                                   durationSeconds: elapsed(startTime))
@@ -699,6 +662,39 @@ final class StepExecutor {
     /// Convenience cast to MenuActionCapable for steps that need menu actions.
     private var menuBridge: (any MenuActionCapable)? {
         bridge as? (any MenuActionCapable)
+    }
+
+    /// Swipe endpoints computed from a direction string and window dimensions.
+    struct SwipeEndpoints {
+        let fromX: Double, fromY: Double, toX: Double, toY: Double
+    }
+
+    /// Compute swipe start/end coordinates from a direction and window info.
+    /// Returns nil for unknown directions.
+    private func swipeEndpoints(
+        direction: String, windowInfo: WindowInfo
+    ) -> SwipeEndpoints? {
+        let centerX = Double(windowInfo.size.width) / 2.0
+        let centerY = Double(windowInfo.size.height) / 2.0
+        let dist = Double(windowInfo.size.height) * EnvConfig.swipeDistanceFraction
+        let half = dist / 2
+
+        switch direction.lowercased() {
+        case "up":
+            return SwipeEndpoints(fromX: centerX, fromY: centerY + half,
+                                  toX: centerX, toY: centerY - half)
+        case "down":
+            return SwipeEndpoints(fromX: centerX, fromY: centerY - half,
+                                  toX: centerX, toY: centerY + half)
+        case "left":
+            return SwipeEndpoints(fromX: centerX + half, fromY: centerY,
+                                  toX: centerX - half, toY: centerY)
+        case "right":
+            return SwipeEndpoints(fromX: centerX - half, fromY: centerY,
+                                  toX: centerX + half, toY: centerY)
+        default:
+            return nil
+        }
     }
 
     /// Save a screenshot for debugging when a step fails.
