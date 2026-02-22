@@ -9,59 +9,6 @@ import CoreText
 import Foundation
 import ImageIO
 
-/// A single grid line in the mirroring window's point coordinate space.
-struct GridLine {
-    /// Axis of the line: vertical lines have constant x, horizontal have constant y.
-    enum Axis {
-        case vertical
-        case horizontal
-    }
-
-    let axis: Axis
-    /// Position in points (x for vertical lines, y for horizontal lines).
-    let position: CGFloat
-    /// Label text if this line should be labeled (nil otherwise).
-    let label: String?
-}
-
-/// Computes grid line positions and labels without any drawing dependency.
-enum GridGeometry {
-    /// Compute all grid lines for the given window size and configuration.
-    ///
-    /// - Parameters:
-    ///   - windowSize: Size of the mirroring window in points.
-    ///   - spacing: Points between grid lines.
-    ///   - labelEveryN: Show coordinate labels every N grid lines.
-    /// - Returns: Array of grid lines sorted by axis then position.
-    static func computeLines(
-        windowSize: CGSize, spacing: CGFloat, labelEveryN: Int
-    ) -> [GridLine] {
-        var lines: [GridLine] = []
-
-        // Vertical lines (constant x)
-        var lineIndex = 1
-        var x = spacing
-        while x < windowSize.width {
-            let label = (lineIndex % labelEveryN == 0) ? "\(Int(x))" : nil
-            lines.append(GridLine(axis: .vertical, position: x, label: label))
-            x += spacing
-            lineIndex += 1
-        }
-
-        // Horizontal lines (constant y)
-        lineIndex = 1
-        var y = spacing
-        while y < windowSize.height {
-            let label = (lineIndex % labelEveryN == 0) ? "\(Int(y))" : nil
-            lines.append(GridLine(axis: .horizontal, position: y, label: label))
-            y += spacing
-            lineIndex += 1
-        }
-
-        return lines
-    }
-}
-
 /// Draws a labeled coordinate grid on a screenshot so the AI can map visual
 /// elements to precise tap coordinates.
 public enum GridOverlay {
@@ -104,15 +51,57 @@ public enum GridOverlay {
         // Draw original image
         ctx.draw(cgImage, in: CGRect(x: 0, y: 0, width: pixelWidth, height: pixelHeight))
 
-        // Compute grid geometry
-        let lines = GridGeometry.computeLines(
-            windowSize: windowSize, spacing: gridSpacing, labelEveryN: labelEveryN
-        )
+        // Grid line style: white at low alpha, 1px
+        guard let gridLineColor = CGColor(
+            colorSpace: colorSpace,
+            components: [1.0, 1.0, 1.0, gridLineAlpha]
+        ) else { return nil }
+        ctx.setStrokeColor(gridLineColor)
+        ctx.setLineWidth(1.0)
 
-        // Draw all grid lines and labels
+        let spacing = gridSpacing
         let fontSize = gridLabelFontSize * max(scaleX, scaleY)
-        drawLines(lines, in: ctx, pixelWidth: pixelWidth, pixelHeight: pixelHeight,
-                  scaleX: scaleX, scaleY: scaleY, colorSpace: colorSpace, fontSize: fontSize)
+
+        // Vertical lines (constant x)
+        var lineIndex = 1
+        var x = spacing
+        while x < windowSize.width {
+            let px = x * scaleX
+            ctx.move(to: CGPoint(x: px, y: 0))
+            ctx.addLine(to: CGPoint(x: px, y: CGFloat(pixelHeight)))
+            ctx.strokePath()
+            if lineIndex % labelEveryN == 0 {
+                drawLabel(
+                    "\(Int(x))",
+                    in: ctx,
+                    at: CGPoint(x: px + 2, y: CGFloat(pixelHeight) - fontSize - 4),
+                    fontSize: fontSize
+                )
+            }
+            x += spacing
+            lineIndex += 1
+        }
+
+        // Horizontal lines (constant y)
+        lineIndex = 1
+        var y = spacing
+        while y < windowSize.height {
+            // CG origin is bottom-left; mirroring window origin is top-left.
+            let py = CGFloat(pixelHeight) - y * scaleY
+            ctx.move(to: CGPoint(x: 0, y: py))
+            ctx.addLine(to: CGPoint(x: CGFloat(pixelWidth), y: py))
+            ctx.strokePath()
+            if lineIndex % labelEveryN == 0 {
+                drawLabel(
+                    "\(Int(y))",
+                    in: ctx,
+                    at: CGPoint(x: 4, y: py + 2),
+                    fontSize: fontSize
+                )
+            }
+            y += spacing
+            lineIndex += 1
+        }
 
         // Encode back to PNG
         guard let resultImage = ctx.makeImage() else { return nil }
@@ -126,48 +115,6 @@ public enum GridOverlay {
         CGImageDestinationAddImage(dest, resultImage, nil)
         guard CGImageDestinationFinalize(dest) else { return nil }
         return mutableData as Data
-    }
-
-    /// Draw all grid lines and their labels into a CG context.
-    private static func drawLines(
-        _ lines: [GridLine],
-        in ctx: CGContext,
-        pixelWidth: Int, pixelHeight: Int,
-        scaleX: CGFloat, scaleY: CGFloat,
-        colorSpace: CGColorSpace, fontSize: CGFloat
-    ) {
-        guard let gridLineColor = CGColor(
-            colorSpace: colorSpace,
-            components: [1.0, 1.0, 1.0, gridLineAlpha]
-        ) else { return }
-        ctx.setStrokeColor(gridLineColor)
-        ctx.setLineWidth(1.0)
-
-        for line in lines {
-            switch line.axis {
-            case .vertical:
-                let px = line.position * scaleX
-                ctx.move(to: CGPoint(x: px, y: 0))
-                ctx.addLine(to: CGPoint(x: px, y: CGFloat(pixelHeight)))
-                ctx.strokePath()
-                if let label = line.label {
-                    drawLabel(label, in: ctx,
-                              at: CGPoint(x: px + 2, y: CGFloat(pixelHeight) - fontSize - 4),
-                              fontSize: fontSize)
-                }
-            case .horizontal:
-                // CG origin is bottom-left; mirroring window origin is top-left.
-                let py = CGFloat(pixelHeight) - line.position * scaleY
-                ctx.move(to: CGPoint(x: 0, y: py))
-                ctx.addLine(to: CGPoint(x: CGFloat(pixelWidth), y: py))
-                ctx.strokePath()
-                if let label = line.label {
-                    drawLabel(label, in: ctx,
-                              at: CGPoint(x: 4, y: py + 2),
-                              fontSize: fontSize)
-                }
-            }
-        }
     }
 
     /// Draw a coordinate label at the given point with a semi-transparent
