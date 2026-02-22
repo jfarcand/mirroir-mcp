@@ -384,9 +384,14 @@ if (!skillsAvailable) {
       <div class="carousel-dots"></div>
     </div>
 
+    <h3 class="search-heading">Community skill library</h3>
     <p>
-      <code>$&#123;VAR&#125;</code> placeholders resolve from environment variables.
-      Install skills in Claude Code<sup>*</sup>:
+      The <a href="https://github.com/jfarcand/mirroir-skills" rel="noopener noreferrer">mirroir-skills</a> repository
+      is an open collection of ready-made SKILL.md files &mdash; login flows, cross-app workflows, settings automation, and more.
+      <code>$&#123;VAR&#125;</code> placeholders resolve from environment variables, so the same skill works across accounts and devices.
+    </p>
+    <p>
+      Install the full library as a Claude Code plugin<sup>*</sup>:
     </p>
     <div class="install-block install-block-alt">
       <code><span class="prompt">$</span> claude plugin add jfarcand/mirroir-skills</code>
@@ -395,8 +400,6 @@ if (!skillsAvailable) {
     <p class="install-hint">
       <sup>*</sup> Also supported by GitHub Copilot.
     </p>
-
-    <h3 class="search-heading">Search the community skill library</h3>
     <div class="skill-search-wrap">
       <input
         type="text"
