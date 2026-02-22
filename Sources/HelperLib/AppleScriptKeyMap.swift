@@ -8,28 +8,35 @@
 public enum AppleScriptKeyMap {
 
     /// macOS virtual key codes for special keys (same codes as CGEvent virtualKey).
-    private static let keyMap: [String: UInt16] = [
-        "return": 36,
-        "escape": 53,
-        "tab": 48,
-        "delete": 51,
-        "space": 49,
-        "up": 126,
-        "down": 125,
-        "left": 123,
-        "right": 124,
+    /// Uses `KeyName` as key type to ensure exhaustive coverage with `HIDSpecialKeyMap`.
+    private static let keyMap: [KeyName: UInt16] = [
+        .return: 36,
+        .escape: 53,
+        .tab: 48,
+        .delete: 51,
+        .space: 49,
+        .up: 126,
+        .down: 125,
+        .left: 123,
+        .right: 124,
     ]
 
-    /// Look up the macOS virtual key code for a key name.
+    /// Look up the macOS virtual key code for a key name string.
     /// Key names are case-sensitive and lowercase (e.g., "return", "escape").
     /// Returns nil for unknown key names.
     public static func keyCode(for name: String) -> UInt16? {
-        keyMap[name]
+        guard let key = KeyName(rawValue: name) else { return nil }
+        return keyMap[key]
+    }
+
+    /// Look up the macOS virtual key code for a typed key name.
+    public static func keyCode(for key: KeyName) -> UInt16? {
+        keyMap[key]
     }
 
     /// All supported key names, sorted alphabetically.
     public static var supportedKeys: [String] {
-        keyMap.keys.sorted()
+        KeyName.sortedNames
     }
 
     /// Build an AppleScript that activates iPhone Mirroring and sends a key press.
