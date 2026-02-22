@@ -85,4 +85,66 @@ struct NavigationHintDetectorTests {
         let hints = NavigationHintDetector.detect(elements: elements, windowHeight: windowHeight)
         #expect(hints.isEmpty, "\"< Back\" is not a bare chevron — OCR typically splits them")
     }
+
+    // MARK: - HintConfig tests
+
+    @Test("custom top zone fraction widens detection area")
+    func customTopZoneFraction() {
+        let config = NavigationHintDetector.HintConfig(topZoneFraction: 0.5)
+        let elements = [
+            makeTapPoint("<", x: 30, y: 400),
+        ]
+        let hints = NavigationHintDetector.detect(
+            elements: elements, windowHeight: windowHeight, config: config
+        )
+        #expect(hints.count == 1, "y=400 is within 50% top zone of 900px window")
+    }
+
+    @Test("custom bottom zone fraction widens detection area")
+    func customBottomZoneFraction() {
+        let config = NavigationHintDetector.HintConfig(bottomZoneFraction: 0.5)
+        let elements = [
+            makeTapPoint("<", x: 30, y: 500),
+        ]
+        let hints = NavigationHintDetector.detect(
+            elements: elements, windowHeight: windowHeight, config: config
+        )
+        #expect(hints.count == 1, "y=500 is within bottom zone starting at 50% of 900px")
+    }
+
+    @Test("custom chevron patterns detect non-default characters")
+    func customChevronPatterns() {
+        let config = NavigationHintDetector.HintConfig(
+            backChevronPatterns: ["←", "BACK"]
+        )
+        let elements = [
+            makeTapPoint("←", x: 30, y: 80),
+        ]
+        let hints = NavigationHintDetector.detect(
+            elements: elements, windowHeight: windowHeight, config: config
+        )
+        #expect(hints.count == 1, "Custom pattern ← should be detected")
+    }
+
+    @Test("custom patterns exclude default chevron")
+    func customPatternsExcludeDefault() {
+        let config = NavigationHintDetector.HintConfig(
+            backChevronPatterns: ["←"]
+        )
+        let elements = [
+            makeTapPoint("<", x: 30, y: 80),
+        ]
+        let hints = NavigationHintDetector.detect(
+            elements: elements, windowHeight: windowHeight, config: config
+        )
+        #expect(hints.isEmpty, "Default < should not match when custom patterns replace it")
+    }
+
+    @Test("default HintConfig matches original behavior")
+    func defaultConfigMatchesOriginal() {
+        let config = NavigationHintDetector.HintConfig()
+        #expect(config.topZoneFraction == 0.15)
+        #expect(config.bottomZoneFraction == 0.85)
+        #expect(config.backChevronPatterns == ["<", "‹", "〈"])
+    }
 }
