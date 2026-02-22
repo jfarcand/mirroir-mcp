@@ -14,7 +14,11 @@ The helper daemon listens on a **local Unix socket only** (`/var/run/mirroir-hel
 
 ## Root Daemon
 
-The helper daemon runs as root because Karabiner's HID sockets require root access. It accepts commands from any local user in the `staff` group (the default group for macOS user accounts).
+The helper daemon runs as root because Karabiner's HID sockets require root access.
+
+**Socket ownership:** The socket at `/var/run/mirroir-helper.sock` is owned by the console user (the person physically logged in at the Mac) with mode `0600`. Only that user and root can connect. When no console user is detected (e.g. at the loginwindow), the socket is set to mode `0000` (fail-closed — no access until someone logs in).
+
+**Peer authentication:** On each incoming connection, the daemon calls `getpeereid()` to verify the connecting process's UID. Only the console user and root (uid 0) are allowed. All other connections are rejected and closed. The console UID is re-resolved on each connection to handle fast user switching.
 
 ## Fail-Closed Permissions
 

@@ -18,10 +18,23 @@ extension MirroirMCP {
             + "Defaults to 'direct' for iPhone Mirroring, 'preserving' for generic windows."),
     ])
 
+    /// Result of parsing cursor_mode: a valid mode (or nil for default) vs an error message.
+    private enum CursorModeResult {
+        case ok(CursorMode?)
+        case invalid(String)
+    }
+
     /// Parse an optional cursor_mode string from tool args into a CursorMode.
-    private static func parseCursorMode(_ args: [String: JSONValue]) -> CursorMode? {
-        guard let value = args["cursor_mode"]?.asString() else { return nil }
-        return value == "direct" ? .direct : .preserving
+    /// Returns `.ok(nil)` when absent, `.ok(mode)` for valid values,
+    /// or `.invalid(message)` for unrecognized values.
+    private static func parseCursorMode(_ args: [String: JSONValue]) -> CursorModeResult {
+        guard let value = args["cursor_mode"]?.asString() else { return .ok(nil) }
+        switch value {
+        case "direct": return .ok(.direct)
+        case "preserving": return .ok(.preserving)
+        default:
+            return .invalid("Invalid cursor_mode '\(value)'. Must be 'direct' or 'preserving'.")
+        }
     }
 
     static func registerInputTools(
@@ -63,7 +76,13 @@ extension MirroirMCP {
                     return .error("Missing required parameters: x, y (numbers)")
                 }
 
-                if let error = input.tap(x: x, y: y, cursorMode: parseCursorMode(args)) {
+                let cursorMode: CursorMode?
+                switch parseCursorMode(args) {
+                case .ok(let mode): cursorMode = mode
+                case .invalid(let msg): return .error(msg)
+                }
+
+                if let error = input.tap(x: x, y: y, cursorMode: cursorMode) {
                     return .error(error)
                 }
                 return .text("Tapped at (\(Int(x)), \(Int(y)))")
@@ -126,11 +145,17 @@ extension MirroirMCP {
 
                 let duration = args["duration_ms"]?.asInt() ?? EnvConfig.defaultSwipeDurationMs
 
+                let cursorMode: CursorMode?
+                switch parseCursorMode(args) {
+                case .ok(let mode): cursorMode = mode
+                case .invalid(let msg): return .error(msg)
+                }
+
                 if let error = input.swipe(
                     fromX: fromX, fromY: fromY,
                     toX: toX, toY: toY,
                     durationMs: duration,
-                    cursorMode: parseCursorMode(args)
+                    cursorMode: cursorMode
                 ) {
                     return .error(error)
                 }
@@ -197,11 +222,17 @@ extension MirroirMCP {
 
                 let duration = args["duration_ms"]?.asInt() ?? EnvConfig.defaultDragDurationMs
 
+                let cursorMode: CursorMode?
+                switch parseCursorMode(args) {
+                case .ok(let mode): cursorMode = mode
+                case .invalid(let msg): return .error(msg)
+                }
+
                 if let error = input.drag(
                     fromX: fromX, fromY: fromY,
                     toX: toX, toY: toY,
                     durationMs: duration,
-                    cursorMode: parseCursorMode(args)
+                    cursorMode: cursorMode
                 ) {
                     return .error(error)
                 }
@@ -350,8 +381,14 @@ extension MirroirMCP {
 
                 let duration = args["duration_ms"]?.asInt() ?? EnvConfig.defaultLongPressDurationMs
 
+                let cursorMode: CursorMode?
+                switch parseCursorMode(args) {
+                case .ok(let mode): cursorMode = mode
+                case .invalid(let msg): return .error(msg)
+                }
+
                 if let error = input.longPress(x: x, y: y, durationMs: duration,
-                                               cursorMode: parseCursorMode(args)) {
+                                               cursorMode: cursorMode) {
                     return .error(error)
                 }
                 return .text("Long pressed at (\(Int(x)), \(Int(y))) for \(duration)ms")
@@ -393,7 +430,13 @@ extension MirroirMCP {
                     return .error("Missing required parameters: x, y (numbers)")
                 }
 
-                if let error = input.doubleTap(x: x, y: y, cursorMode: parseCursorMode(args)) {
+                let cursorMode: CursorMode?
+                switch parseCursorMode(args) {
+                case .ok(let mode): cursorMode = mode
+                case .invalid(let msg): return .error(msg)
+                }
+
+                if let error = input.doubleTap(x: x, y: y, cursorMode: cursorMode) {
                     return .error(error)
                 }
                 return .text("Double-tapped at (\(Int(x)), \(Int(y)))")

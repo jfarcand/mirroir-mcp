@@ -8,6 +8,7 @@ import CoreGraphics
 import Darwin
 import Foundation
 import HelperLib
+import SystemConfiguration
 
 /// Path where the helper listens for commands from the MCP server.
 let helperSocketPath = "/var/run/mirroir-helper.sock"
@@ -72,13 +73,17 @@ final class CommandServer {
             throw HelperError.bindFailed(errno: errno)
         }
 
-        // Allow local users (staff group) to connect. On macOS, all interactive
-        // users are in the staff group, so this restricts access to local users
-        // while preventing access from other system daemons.
-        chmod(helperSocketPath, 0o660)
-        // Set group to staff so the MCP server (running as a normal user) can connect
-        let staffGroupID = gid_t(EnvConfig.staffGroupID)
-        chown(helperSocketPath, 0, staffGroupID)
+        // Restrict socket access to the console user (the person sitting at the Mac).
+        // This prevents other system daemons and non-console users from sending commands.
+        if let (uid, gid) = Self.resolveConsoleUID() {
+            chmod(helperSocketPath, 0o600)
+            chown(helperSocketPath, uid, gid)
+            logHelper("Socket owned by console user uid=\(uid) gid=\(gid) mode=0600")
+        } else {
+            // No console user (e.g. loginwindow) — fail closed with no access
+            chmod(helperSocketPath, 0o000)
+            logHelper("No console user detected, socket mode=0000 (fail-closed)")
+        }
 
         guard listen(listenFd, 4) == 0 else {
             Darwin.close(listenFd)
@@ -97,6 +102,21 @@ final class CommandServer {
                 continue
             }
 
+            // Authenticate the connecting peer via getpeereid.
+            // Re-resolve console UID on each connection to handle fast user switching.
+            var peerUID: uid_t = 0
+            var peerGID: gid_t = 0
+            if getpeereid(clientFd, &peerUID, &peerGID) == 0 {
+                let consoleUID = Self.resolveConsoleUID()?.uid
+                let allowed = peerUID == 0 || (consoleUID != nil && peerUID == consoleUID)
+                if !allowed {
+                    logHelper("Rejected connection from uid=\(peerUID) (console uid=\(consoleUID.map { String($0) } ?? "none"))")
+                    Darwin.close(clientFd)
+                    continue
+                }
+                logHelper("Accepted connection from uid=\(peerUID)")
+            }
+
             // Set receive and send timeouts so the accept loop doesn't get stuck
             // when a client disconnects uncleanly or stops reading responses.
             var timeout = timeval(tv_sec: Int(EnvConfig.clientRecvTimeoutSec), tv_usec: 0)
@@ -110,6 +130,20 @@ final class CommandServer {
             defer { Darwin.close(clientFd) }
             handleClient(fd: clientFd)
         }
+    }
+
+    /// Resolve the UID and GID of the macOS console user (the person logged in at the physical
+    /// display) via `SCDynamicStoreCopyConsoleUser`. Returns `nil` when nobody is logged in
+    /// (loginwindow reports uid 0xFFFFFFFF).
+    static func resolveConsoleUID() -> (uid: uid_t, gid: gid_t)? {
+        var uid: uid_t = 0
+        var gid: gid_t = 0
+        guard let name = SCDynamicStoreCopyConsoleUser(nil, &uid, &gid) as String?,
+              !name.isEmpty,
+              uid != 0xFFFF_FFFF else {
+            return nil
+        }
+        return (uid, gid)
     }
 
     /// Stop the server.

@@ -241,17 +241,30 @@ final class HelperClient: Sendable {
         }
         guard sent == data.count else { return nil }
 
-        // Read response (expect single line)
-        var responseBuf = [UInt8](repeating: 0, count: 4096)
-        let bytesRead = recv(activeFd, &responseBuf, responseBuf.count, 0)
-        guard bytesRead > 0 else { return nil }
+        // Read response, looping until a newline delimiter arrives or EOF.
+        // Cap at 64KB to match the server's maxCommandSize limit.
+        let maxResponseSize = 65_536
+        var responseBuffer = Data()
+        var readBuf = [UInt8](repeating: 0, count: 4096)
 
-        // Find newline delimiter in response
+        while responseBuffer.count < maxResponseSize {
+            let bytesRead = recv(activeFd, &readBuf, readBuf.count, 0)
+            if bytesRead == 0 { break } // EOF
+            if bytesRead < 0 { return nil } // error or timeout
+
+            responseBuffer.append(contentsOf: readBuf[0..<bytesRead])
+
+            if responseBuffer.contains(0x0A) { break }
+        }
+
+        guard !responseBuffer.isEmpty else { return nil }
+
+        // Extract first complete line (up to newline delimiter)
         let responseData: Data
-        if let newlineIdx = responseBuf[0..<bytesRead].firstIndex(of: 0x0A) {
-            responseData = Data(responseBuf[0..<newlineIdx])
+        if let newlineIdx = responseBuffer.firstIndex(of: 0x0A) {
+            responseData = Data(responseBuffer[responseBuffer.startIndex..<newlineIdx])
         } else {
-            responseData = Data(responseBuf[0..<bytesRead])
+            responseData = responseBuffer
         }
 
         do {

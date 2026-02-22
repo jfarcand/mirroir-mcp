@@ -54,6 +54,7 @@ enum DoctorCommand {
         checks.append(checkKarabinerInstalled())
         checks.append(checkDriverKitExtension())
         checks.append(checkHelperDaemon())
+        checks.append(checkSocketSecurity())
         checks.append(checkVirtualHIDDevices())
         checks.append(checkKarabinerIgnoreRule())
         checks.append(checkMirroringRunning())
@@ -238,6 +239,69 @@ enum DoctorCommand {
             status: .warned,
             detail: "running but devices not ready",
             fixHint: "Helper is connected but Karabiner virtual HID devices are not ready yet. Try restarting Karabiner-Elements."
+        )
+    }
+
+    static func checkSocketSecurity() -> DoctorCheck {
+        let socketPath = "/var/run/mirroir-helper.sock"
+        let fm = FileManager.default
+
+        guard fm.fileExists(atPath: socketPath) else {
+            return DoctorCheck(
+                name: "Socket security",
+                status: .warned,
+                detail: "socket not found (checked by Helper daemon above)",
+                fixHint: nil
+            )
+        }
+
+        guard let attrs = try? fm.attributesOfItem(atPath: socketPath) else {
+            return DoctorCheck(
+                name: "Socket security",
+                status: .warned,
+                detail: "cannot read socket attributes",
+                fixHint: "Check permissions on \(socketPath)"
+            )
+        }
+
+        let posixPerms = (attrs[.posixPermissions] as? Int) ?? 0
+        let ownerUID = (attrs[.ownerAccountID] as? UInt) ?? 0
+        let currentUID = UInt(getuid())
+        let modeStr = String(posixPerms, radix: 8)
+
+        // Check for old group-accessible mode (0660)
+        if posixPerms == 0o660 {
+            return DoctorCheck(
+                name: "Socket security",
+                status: .warned,
+                detail: "mode=0\(modeStr) (group-accessible, expected 0600)",
+                fixHint: "Restart the helper daemon to apply console-user socket ownership: sudo launchctl kickstart -k system/com.jfarcand.mirroir-helper"
+            )
+        }
+
+        if posixPerms != 0o600 {
+            return DoctorCheck(
+                name: "Socket security",
+                status: .warned,
+                detail: "mode=0\(modeStr) (expected 0600)",
+                fixHint: "Restart the helper daemon to apply correct socket permissions: sudo launchctl kickstart -k system/com.jfarcand.mirroir-helper"
+            )
+        }
+
+        if ownerUID != currentUID {
+            return DoctorCheck(
+                name: "Socket security",
+                status: .warned,
+                detail: "owner uid=\(ownerUID) (expected \(currentUID))",
+                fixHint: "Socket is owned by a different user. Restart the helper daemon while logged in."
+            )
+        }
+
+        return DoctorCheck(
+            name: "Socket security",
+            status: .passed,
+            detail: "mode=0600, owner=uid \(ownerUID)",
+            fixHint: nil
         )
     }
 

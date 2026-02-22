@@ -446,4 +446,56 @@ final class ScenarioParserTests: XCTestCase {
         let step = ScenarioStep.switchTarget(name: "android")
         XCTAssertEqual(step.displayName, "target: \"android\"")
     }
+
+    // MARK: - press_key dict modifiers syntax
+
+    func testParsePressKeyWithDictModifiers() {
+        let steps = ScenarioParser.parseSteps(
+            from: "steps:\n  - press_key: \"l\" modifiers: [\"command\"]")
+        XCTAssertEqual(steps.count, 1)
+        if case .pressKey(let keyName, let modifiers) = steps[0] {
+            XCTAssertEqual(keyName, "l")
+            XCTAssertEqual(modifiers, ["command"])
+        } else {
+            XCTFail("Expected press_key step with dict modifiers")
+        }
+    }
+
+    func testParsePressKeyWithMultipleDictModifiers() {
+        let steps = ScenarioParser.parseSteps(
+            from: "steps:\n  - press_key: \"l\" modifiers: [\"command\", \"shift\"]")
+        XCTAssertEqual(steps.count, 1)
+        if case .pressKey(let keyName, let modifiers) = steps[0] {
+            XCTAssertEqual(keyName, "l")
+            XCTAssertEqual(modifiers, ["command", "shift"])
+        } else {
+            XCTFail("Expected press_key step with multiple dict modifiers")
+        }
+    }
+
+    // MARK: - wait_for timeout syntax
+
+    func testParseWaitForWithTimeout() {
+        let steps = ScenarioParser.parseSteps(
+            from: "steps:\n  - wait_for: \"General\" timeout: 30")
+        XCTAssertEqual(steps.count, 1)
+        if case .waitFor(let label, let timeout) = steps[0] {
+            XCTAssertEqual(label, "General")
+            XCTAssertEqual(timeout, 30)
+        } else {
+            XCTFail("Expected wait_for step with timeout")
+        }
+    }
+
+    func testParseWaitForWithoutTimeout() {
+        let steps = ScenarioParser.parseSteps(
+            from: "steps:\n  - wait_for: \"General\"")
+        XCTAssertEqual(steps.count, 1)
+        if case .waitFor(let label, let timeout) = steps[0] {
+            XCTAssertEqual(label, "General")
+            XCTAssertNil(timeout)
+        } else {
+            XCTFail("Expected wait_for step without timeout")
+        }
+    }
 }

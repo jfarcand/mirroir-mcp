@@ -281,6 +281,24 @@ enum ScenarioParser {
     /// Parse a press_key value which may include modifiers.
     /// Formats: `"return"`, `"l" modifiers: ["command"]`, `"l+command"`
     private static func parsePressKey(_ value: String) -> ScenarioStep {
+        // Check for dict-style modifiers: "key" modifiers: ["mod1", "mod2"]
+        if let modRange = value.range(of: #" modifiers: \["#, options: .regularExpression) {
+            let keyName = stripQuotes(
+                String(value[value.startIndex..<modRange.lowerBound])
+                    .trimmingCharacters(in: .whitespaces)
+            )
+            // Extract the bracket contents: everything between [ and ]
+            let afterBracket = value[modRange.upperBound...]
+            if let closeBracket = afterBracket.firstIndex(of: "]") {
+                let bracketContent = String(afterBracket[afterBracket.startIndex..<closeBracket])
+                let modifiers = bracketContent
+                    .split(separator: ",")
+                    .map { stripQuotes(String($0).trimmingCharacters(in: .whitespaces)) }
+                    .filter { !$0.isEmpty }
+                return .pressKey(keyName: keyName, modifiers: modifiers)
+            }
+        }
+
         // Check for inline modifiers: "key+mod1+mod2"
         if value.contains("+") {
             let parts = value.split(separator: "+").map {
@@ -297,7 +315,18 @@ enum ScenarioParser {
     /// Parse a wait_for value which may include a timeout.
     /// Formats: `"General"`, `"General" timeout: 30`
     private static func parseWaitFor(_ value: String) -> ScenarioStep {
-        // Simple case: just a label
+        // Check for timeout suffix: "label" timeout: 30
+        if let timeoutRange = value.range(of: #" timeout: "#, options: .regularExpression) {
+            let label = stripQuotes(
+                String(value[value.startIndex..<timeoutRange.lowerBound])
+                    .trimmingCharacters(in: .whitespaces)
+            )
+            let timeoutStr = String(value[timeoutRange.upperBound...])
+                .trimmingCharacters(in: .whitespaces)
+            let timeout = Int(timeoutStr)
+            return .waitFor(label: label, timeoutSeconds: timeout)
+        }
+
         return .waitFor(label: value, timeoutSeconds: nil)
     }
 

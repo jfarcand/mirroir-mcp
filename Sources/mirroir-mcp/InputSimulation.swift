@@ -437,7 +437,7 @@ final class InputSimulation: Sendable {
                               warning: nil, error: helperClient.unavailableMessage)
         }
 
-        DebugLog.log("typeText", "typing \(text.count) char(s): \(text.prefix(50))")
+        DebugLog.log("typeText", "typing \(text.count) char(s)")
         ensureTargetFrontmost()
 
         // Split text into segments: HID-typeable (substituted) vs paste-needed (original).
@@ -453,14 +453,14 @@ final class InputSimulation: Sendable {
             case .paste:
                 // No working paste mechanism — collect skipped characters for the warning
                 skippedChars += segment.text
-                fputs("InputSimulation: skipping \(segment.text.count) char(s) with no HID mapping: \(segment.text)\n", stderr)
+                fputs("InputSimulation: skipping \(segment.text.count) char(s) with no HID mapping\n", stderr)
             }
         }
 
         if !skippedChars.isEmpty {
             return TypeResult(
                 success: true,
-                warning: "Skipped \(skippedChars.count) character(s) with no HID mapping: \(skippedChars)",
+                warning: "Skipped \(skippedChars.count) character(s) with no HID mapping",
                 error: nil
             )
         }
