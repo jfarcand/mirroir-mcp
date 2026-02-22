@@ -11,25 +11,26 @@ import Testing
 @Suite("ProcessExtensions")
 struct ProcessExtensionTests {
 
-    @Test("waitWithTimeout returns true for a process that exits immediately")
+    @Test("waitWithTimeout returns .exited with status 0 for a successful process")
     func fastProcess() {
         let process = Process()
         process.executableURL = URL(fileURLWithPath: "/usr/bin/true")
         try! process.run()
-        let exited = process.waitWithTimeout(seconds: 5)
-        #expect(exited, "Process that exits immediately should return true")
-        #expect(process.terminationStatus == 0)
+        let result = process.waitWithTimeout(seconds: 5)
+        #expect(result == .exited(status: 0))
+        #expect(result.didExit)
     }
 
-    @Test("waitWithTimeout returns false when process exceeds timeout")
+    @Test("waitWithTimeout returns .timedOut when process exceeds timeout")
     func slowProcess() {
         let process = Process()
         process.executableURL = URL(fileURLWithPath: "/bin/sleep")
         process.arguments = ["10"]
         try! process.run()
 
-        let exited = process.waitWithTimeout(seconds: 1)
-        #expect(!exited, "Process sleeping 10s should not exit within 1s timeout")
+        let result = process.waitWithTimeout(seconds: 1)
+        #expect(result == .timedOut)
+        #expect(!result.didExit)
         #expect(process.isRunning)
 
         // Clean up
@@ -37,25 +38,25 @@ struct ProcessExtensionTests {
         process.waitUntilExit()
     }
 
-    @Test("waitWithTimeout returns true when process exits before timeout")
+    @Test("waitWithTimeout returns .exited when process exits before timeout")
     func processExitsWithinTimeout() {
         let process = Process()
         process.executableURL = URL(fileURLWithPath: "/bin/sleep")
         process.arguments = ["0.1"]
         try! process.run()
 
-        let exited = process.waitWithTimeout(seconds: 5)
-        #expect(exited, "Process sleeping 0.1s should exit within 5s timeout")
+        let result = process.waitWithTimeout(seconds: 5)
+        #expect(result.didExit, "Process sleeping 0.1s should exit within 5s timeout")
     }
 
-    @Test("waitWithTimeout returns true for process with non-zero exit code")
+    @Test("waitWithTimeout returns .exited with non-zero status for failing process")
     func failingProcess() {
         let process = Process()
         process.executableURL = URL(fileURLWithPath: "/usr/bin/false")
         try! process.run()
 
-        let exited = process.waitWithTimeout(seconds: 5)
-        #expect(exited, "Process should be detected as exited regardless of exit code")
-        #expect(process.terminationStatus != 0)
+        let result = process.waitWithTimeout(seconds: 5)
+        #expect(result == .exited(status: 1))
+        #expect(result.didExit)
     }
 }

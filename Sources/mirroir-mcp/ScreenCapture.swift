@@ -84,12 +84,12 @@ final class ScreenCapture: Sendable {
             return nil
         }
 
-        if !process.waitWithTimeout(seconds: 10) {
+        guard case .exited(let status) = process.waitWithTimeout(seconds: 10) else {
             process.terminate()
             return nil
         }
 
-        guard process.terminationStatus == 0 else { return nil }
+        guard status == 0 else { return nil }
 
         let fileURL = URL(fileURLWithPath: outputPath)
         defer { try? FileManager.default.removeItem(at: fileURL) }
