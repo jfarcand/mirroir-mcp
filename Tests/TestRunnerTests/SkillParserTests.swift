@@ -1,18 +1,18 @@
 // Copyright 2026 jfarcand@apache.org
 // Licensed under the Apache License, Version 2.0
 //
-// ABOUTME: Tests for ScenarioParser: YAML parsing, step type extraction, env var substitution.
+// ABOUTME: Tests for SkillParser: YAML parsing, step type extraction, env var substitution.
 // ABOUTME: Covers all step types, malformed input, AI-only steps, and edge cases.
 
 import XCTest
 import HelperLib
 @testable import mirroir_mcp
 
-final class ScenarioParserTests: XCTestCase {
+final class SkillParserTests: XCTestCase {
 
     // MARK: - Basic Parsing
 
-    func testParseSimpleScenario() {
+    func testParseSimpleSkill() {
         let yaml = """
         name: Check About
         description: Navigate to About screen
@@ -21,40 +21,40 @@ final class ScenarioParserTests: XCTestCase {
           - tap: "General"
           - assert_visible: "Model Name"
         """
-        let scenario = ScenarioParser.parse(content: yaml, filePath: "check-about.yaml")
-        XCTAssertEqual(scenario.name, "Check About")
-        XCTAssertEqual(scenario.description, "Navigate to About screen")
-        XCTAssertEqual(scenario.steps.count, 3)
+        let skill = SkillParser.parse(content: yaml, filePath: "check-about.yaml")
+        XCTAssertEqual(skill.name, "Check About")
+        XCTAssertEqual(skill.description, "Navigate to About screen")
+        XCTAssertEqual(skill.steps.count, 3)
     }
 
     func testParseExtractsFilePath() {
         let yaml = "name: Test\nsteps:\n  - home"
-        let scenario = ScenarioParser.parse(content: yaml, filePath: "/path/to/test.yaml")
-        XCTAssertEqual(scenario.filePath, "/path/to/test.yaml")
+        let skill = SkillParser.parse(content: yaml, filePath: "/path/to/test.yaml")
+        XCTAssertEqual(skill.filePath, "/path/to/test.yaml")
     }
 
     func testParseFallbackName() {
         let yaml = "steps:\n  - home"
-        let scenario = ScenarioParser.parse(content: yaml, filePath: "my-scenario.yaml")
-        XCTAssertEqual(scenario.name, "my-scenario")
+        let skill = SkillParser.parse(content: yaml, filePath: "my-skill.yaml")
+        XCTAssertEqual(skill.name, "my-skill")
     }
 
     func testParseEmptyContent() {
-        let scenario = ScenarioParser.parse(content: "", filePath: "empty.yaml")
-        XCTAssertEqual(scenario.steps.count, 0)
-        XCTAssertEqual(scenario.name, "empty")
+        let skill = SkillParser.parse(content: "", filePath: "empty.yaml")
+        XCTAssertEqual(skill.steps.count, 0)
+        XCTAssertEqual(skill.name, "empty")
     }
 
     func testParseNoStepsSection() {
         let yaml = "name: No Steps\ndescription: Missing steps block"
-        let scenario = ScenarioParser.parse(content: yaml)
-        XCTAssertEqual(scenario.steps.count, 0)
+        let skill = SkillParser.parse(content: yaml)
+        XCTAssertEqual(skill.steps.count, 0)
     }
 
     // MARK: - Step Type Parsing
 
     func testParseLaunchStep() {
-        let steps = ScenarioParser.parseSteps(from: "steps:\n  - launch: \"Settings\"")
+        let steps = SkillParser.parseSteps(from: "steps:\n  - launch: \"Settings\"")
         XCTAssertEqual(steps.count, 1)
         if case .launch(let appName) = steps[0] {
             XCTAssertEqual(appName, "Settings")
@@ -64,7 +64,7 @@ final class ScenarioParserTests: XCTestCase {
     }
 
     func testParseTapStep() {
-        let steps = ScenarioParser.parseSteps(from: "steps:\n  - tap: \"General\"")
+        let steps = SkillParser.parseSteps(from: "steps:\n  - tap: \"General\"")
         XCTAssertEqual(steps.count, 1)
         if case .tap(let label) = steps[0] {
             XCTAssertEqual(label, "General")
@@ -74,7 +74,7 @@ final class ScenarioParserTests: XCTestCase {
     }
 
     func testParseTypeStep() {
-        let steps = ScenarioParser.parseSteps(from: "steps:\n  - type: \"Hello World\"")
+        let steps = SkillParser.parseSteps(from: "steps:\n  - type: \"Hello World\"")
         XCTAssertEqual(steps.count, 1)
         if case .type(let text) = steps[0] {
             XCTAssertEqual(text, "Hello World")
@@ -84,7 +84,7 @@ final class ScenarioParserTests: XCTestCase {
     }
 
     func testParsePressKeyStep() {
-        let steps = ScenarioParser.parseSteps(from: "steps:\n  - press_key: \"return\"")
+        let steps = SkillParser.parseSteps(from: "steps:\n  - press_key: \"return\"")
         XCTAssertEqual(steps.count, 1)
         if case .pressKey(let keyName, let modifiers) = steps[0] {
             XCTAssertEqual(keyName, "return")
@@ -95,7 +95,7 @@ final class ScenarioParserTests: XCTestCase {
     }
 
     func testParsePressKeyWithModifiers() {
-        let steps = ScenarioParser.parseSteps(from: "steps:\n  - press_key: \"l+command\"")
+        let steps = SkillParser.parseSteps(from: "steps:\n  - press_key: \"l+command\"")
         XCTAssertEqual(steps.count, 1)
         if case .pressKey(let keyName, let modifiers) = steps[0] {
             XCTAssertEqual(keyName, "l")
@@ -106,7 +106,7 @@ final class ScenarioParserTests: XCTestCase {
     }
 
     func testParseSwipeStep() {
-        let steps = ScenarioParser.parseSteps(from: "steps:\n  - swipe: \"up\"")
+        let steps = SkillParser.parseSteps(from: "steps:\n  - swipe: \"up\"")
         XCTAssertEqual(steps.count, 1)
         if case .swipe(let direction) = steps[0] {
             XCTAssertEqual(direction, "up")
@@ -116,7 +116,7 @@ final class ScenarioParserTests: XCTestCase {
     }
 
     func testParseWaitForStep() {
-        let steps = ScenarioParser.parseSteps(from: "steps:\n  - wait_for: \"General\"")
+        let steps = SkillParser.parseSteps(from: "steps:\n  - wait_for: \"General\"")
         XCTAssertEqual(steps.count, 1)
         if case .waitFor(let label, _) = steps[0] {
             XCTAssertEqual(label, "General")
@@ -126,7 +126,7 @@ final class ScenarioParserTests: XCTestCase {
     }
 
     func testParseAssertVisibleStep() {
-        let steps = ScenarioParser.parseSteps(from: "steps:\n  - assert_visible: \"Model Name\"")
+        let steps = SkillParser.parseSteps(from: "steps:\n  - assert_visible: \"Model Name\"")
         XCTAssertEqual(steps.count, 1)
         if case .assertVisible(let label) = steps[0] {
             XCTAssertEqual(label, "Model Name")
@@ -136,7 +136,7 @@ final class ScenarioParserTests: XCTestCase {
     }
 
     func testParseAssertNotVisibleStep() {
-        let steps = ScenarioParser.parseSteps(
+        let steps = SkillParser.parseSteps(
             from: "steps:\n  - assert_not_visible: \"Error\"")
         XCTAssertEqual(steps.count, 1)
         if case .assertNotVisible(let label) = steps[0] {
@@ -147,7 +147,7 @@ final class ScenarioParserTests: XCTestCase {
     }
 
     func testParseScreenshotStep() {
-        let steps = ScenarioParser.parseSteps(from: "steps:\n  - screenshot: \"result\"")
+        let steps = SkillParser.parseSteps(from: "steps:\n  - screenshot: \"result\"")
         XCTAssertEqual(steps.count, 1)
         if case .screenshot(let label) = steps[0] {
             XCTAssertEqual(label, "result")
@@ -157,7 +157,7 @@ final class ScenarioParserTests: XCTestCase {
     }
 
     func testParseHomeStep() {
-        let steps = ScenarioParser.parseSteps(from: "steps:\n  - home")
+        let steps = SkillParser.parseSteps(from: "steps:\n  - home")
         XCTAssertEqual(steps.count, 1)
         if case .home = steps[0] {
             // pass
@@ -167,7 +167,7 @@ final class ScenarioParserTests: XCTestCase {
     }
 
     func testParsePressHomeStep() {
-        let steps = ScenarioParser.parseSteps(from: "steps:\n  - press_home")
+        let steps = SkillParser.parseSteps(from: "steps:\n  - press_home")
         XCTAssertEqual(steps.count, 1)
         if case .home = steps[0] {
             // pass
@@ -177,7 +177,7 @@ final class ScenarioParserTests: XCTestCase {
     }
 
     func testParseOpenURLStep() {
-        let steps = ScenarioParser.parseSteps(
+        let steps = SkillParser.parseSteps(
             from: "steps:\n  - open_url: \"https://example.com\"")
         XCTAssertEqual(steps.count, 1)
         if case .openURL(let url) = steps[0] {
@@ -188,7 +188,7 @@ final class ScenarioParserTests: XCTestCase {
     }
 
     func testParseShakeStep() {
-        let steps = ScenarioParser.parseSteps(from: "steps:\n  - shake")
+        let steps = SkillParser.parseSteps(from: "steps:\n  - shake")
         XCTAssertEqual(steps.count, 1)
         if case .shake = steps[0] {
             // pass
@@ -200,7 +200,7 @@ final class ScenarioParserTests: XCTestCase {
     // MARK: - AI-Only Steps
 
     func testParseRememberStep() {
-        let steps = ScenarioParser.parseSteps(from: "steps:\n  - remember: \"user name\"")
+        let steps = SkillParser.parseSteps(from: "steps:\n  - remember: \"user name\"")
         XCTAssertEqual(steps.count, 1)
         if case .skipped(let stepType, _) = steps[0] {
             XCTAssertEqual(stepType, "remember")
@@ -210,7 +210,7 @@ final class ScenarioParserTests: XCTestCase {
     }
 
     func testParseConditionStep() {
-        let steps = ScenarioParser.parseSteps(
+        let steps = SkillParser.parseSteps(
             from: "steps:\n  - condition: \"if logged in\"")
         XCTAssertEqual(steps.count, 1)
         if case .skipped(let stepType, _) = steps[0] {
@@ -221,7 +221,7 @@ final class ScenarioParserTests: XCTestCase {
     }
 
     func testParseUnknownStep() {
-        let steps = ScenarioParser.parseSteps(
+        let steps = SkillParser.parseSteps(
             from: "steps:\n  - custom_action: \"something\"")
         XCTAssertEqual(steps.count, 1)
         if case .skipped(let stepType, _) = steps[0] {
@@ -231,7 +231,7 @@ final class ScenarioParserTests: XCTestCase {
         }
     }
 
-    // MARK: - Multi-Step Scenarios
+    // MARK: - Multi-Step Skills
 
     func testParseMultipleSteps() {
         let yaml = """
@@ -245,32 +245,32 @@ final class ScenarioParserTests: XCTestCase {
           - assert_visible: "Model Name"
           - screenshot: "about_screen"
         """
-        let scenario = ScenarioParser.parse(content: yaml)
-        XCTAssertEqual(scenario.steps.count, 7)
+        let skill = SkillParser.parse(content: yaml)
+        XCTAssertEqual(skill.steps.count, 7)
     }
 
     // MARK: - Quote Handling
 
     func testStripDoubleQuotes() {
-        XCTAssertEqual(ScenarioParser.stripQuotes("\"hello\""), "hello")
+        XCTAssertEqual(SkillParser.stripQuotes("\"hello\""), "hello")
     }
 
     func testStripSingleQuotes() {
-        XCTAssertEqual(ScenarioParser.stripQuotes("'hello'"), "hello")
+        XCTAssertEqual(SkillParser.stripQuotes("'hello'"), "hello")
     }
 
     func testNoQuotesToStrip() {
-        XCTAssertEqual(ScenarioParser.stripQuotes("hello"), "hello")
+        XCTAssertEqual(SkillParser.stripQuotes("hello"), "hello")
     }
 
     func testMismatchedQuotesNotStripped() {
-        XCTAssertEqual(ScenarioParser.stripQuotes("\"hello'"), "\"hello'")
+        XCTAssertEqual(SkillParser.stripQuotes("\"hello'"), "\"hello'")
     }
 
     // MARK: - Unquoted Values
 
     func testParseUnquotedValues() {
-        let steps = ScenarioParser.parseSteps(from: "steps:\n  - tap: General")
+        let steps = SkillParser.parseSteps(from: "steps:\n  - tap: General")
         XCTAssertEqual(steps.count, 1)
         if case .tap(let label) = steps[0] {
             XCTAssertEqual(label, "General")
@@ -282,24 +282,24 @@ final class ScenarioParserTests: XCTestCase {
     // MARK: - DisplayName
 
     func testDisplayNameLaunch() {
-        let step = ScenarioStep.launch(appName: "Settings")
+        let step = SkillStep.launch(appName: "Settings")
         XCTAssertEqual(step.displayName, "launch: \"Settings\"")
     }
 
     func testDisplayNameSkipped() {
-        let step = ScenarioStep.skipped(stepType: "remember", reason: "AI-only")
+        let step = SkillStep.skipped(stepType: "remember", reason: "AI-only")
         XCTAssertEqual(step.displayName, "remember (skipped)")
     }
 
     func testDisplayNamePressKeyWithModifiers() {
-        let step = ScenarioStep.pressKey(keyName: "l", modifiers: ["command"])
+        let step = SkillStep.pressKey(keyName: "l", modifiers: ["command"])
         XCTAssertEqual(step.displayName, "press_key: \"l\" [command]")
     }
 
     // MARK: - scroll_to
 
     func testParseScrollToStep() {
-        let steps = ScenarioParser.parseSteps(from: "steps:\n  - scroll_to: \"About\"")
+        let steps = SkillParser.parseSteps(from: "steps:\n  - scroll_to: \"About\"")
         XCTAssertEqual(steps.count, 1)
         if case .scrollTo(let label, let direction, let maxScrolls) = steps[0] {
             XCTAssertEqual(label, "About")
@@ -311,14 +311,14 @@ final class ScenarioParserTests: XCTestCase {
     }
 
     func testDisplayNameScrollTo() {
-        let step = ScenarioStep.scrollTo(label: "About", direction: "up", maxScrolls: 10)
+        let step = SkillStep.scrollTo(label: "About", direction: "up", maxScrolls: 10)
         XCTAssertEqual(step.displayName, "scroll_to: \"About\"")
     }
 
     // MARK: - reset_app
 
     func testParseResetAppStep() {
-        let steps = ScenarioParser.parseSteps(from: "steps:\n  - reset_app: \"Settings\"")
+        let steps = SkillParser.parseSteps(from: "steps:\n  - reset_app: \"Settings\"")
         XCTAssertEqual(steps.count, 1)
         if case .resetApp(let appName) = steps[0] {
             XCTAssertEqual(appName, "Settings")
@@ -328,14 +328,14 @@ final class ScenarioParserTests: XCTestCase {
     }
 
     func testDisplayNameResetApp() {
-        let step = ScenarioStep.resetApp(appName: "Settings")
+        let step = SkillStep.resetApp(appName: "Settings")
         XCTAssertEqual(step.displayName, "reset_app: \"Settings\"")
     }
 
     // MARK: - set_network
 
     func testParseSetNetworkStep() {
-        let steps = ScenarioParser.parseSteps(from: "steps:\n  - set_network: \"airplane_on\"")
+        let steps = SkillParser.parseSteps(from: "steps:\n  - set_network: \"airplane_on\"")
         XCTAssertEqual(steps.count, 1)
         if case .setNetwork(let mode) = steps[0] {
             XCTAssertEqual(mode, "airplane_on")
@@ -345,14 +345,14 @@ final class ScenarioParserTests: XCTestCase {
     }
 
     func testDisplayNameSetNetwork() {
-        let step = ScenarioStep.setNetwork(mode: "wifi_off")
+        let step = SkillStep.setNetwork(mode: "wifi_off")
         XCTAssertEqual(step.displayName, "set_network: \"wifi_off\"")
     }
 
     // MARK: - measure
 
     func testParseMeasureInlineStep() {
-        let steps = ScenarioParser.parseSteps(
+        let steps = SkillParser.parseSteps(
             from: "steps:\n  - measure: { tap: \"Login\", until: \"Dashboard\", max: 5, name: \"login_time\" }")
         XCTAssertEqual(steps.count, 1)
         if case .measure(let name, let action, let until, let maxSeconds) = steps[0] {
@@ -370,7 +370,7 @@ final class ScenarioParserTests: XCTestCase {
     }
 
     func testParseMeasureWithoutName() {
-        let steps = ScenarioParser.parseSteps(
+        let steps = SkillParser.parseSteps(
             from: "steps:\n  - measure: { tap: \"Go\", until: \"Done\" }")
         XCTAssertEqual(steps.count, 1)
         if case .measure(let name, _, let until, let maxSeconds) = steps[0] {
@@ -383,15 +383,15 @@ final class ScenarioParserTests: XCTestCase {
     }
 
     func testDisplayNameMeasure() {
-        let step = ScenarioStep.measure(
+        let step = SkillStep.measure(
             name: "login", action: .tap(label: "Go"),
             until: "Done", maxSeconds: 5.0)
         XCTAssertEqual(step.displayName, "measure: \"login\"")
     }
 
-    // MARK: - Scenario with new step types
+    // MARK: - Skill with new step types
 
-    func testParseScenarioWithNewSteps() {
+    func testParseSkillWithNewSteps() {
         let yaml = """
         name: Full Flow
         steps:
@@ -401,14 +401,14 @@ final class ScenarioParserTests: XCTestCase {
           - set_network: "wifi_off"
           - measure: { tap: "General", until: "About", max: 3 }
         """
-        let scenario = ScenarioParser.parse(content: yaml)
-        XCTAssertEqual(scenario.steps.count, 5)
+        let skill = SkillParser.parse(content: yaml)
+        XCTAssertEqual(skill.steps.count, 5)
     }
 
     // MARK: - Target Switching
 
     func testParseSwitchTargetStep() {
-        let steps = ScenarioParser.parseSteps(from: "steps:\n  - target: \"android\"")
+        let steps = SkillParser.parseSteps(from: "steps:\n  - target: \"android\"")
         XCTAssertEqual(steps.count, 1)
         if case .switchTarget(let name) = steps[0] {
             XCTAssertEqual(name, "android")
@@ -427,30 +427,30 @@ final class ScenarioParserTests: XCTestCase {
           - target: "iphone"
           - tap: "Settings"
         """
-        let scenario = ScenarioParser.parse(content: yaml)
-        XCTAssertEqual(scenario.targets, ["iphone", "android"])
+        let skill = SkillParser.parse(content: yaml)
+        XCTAssertEqual(skill.targets, ["iphone", "android"])
     }
 
     func testParseNoTargetsHeaderReturnsEmpty() {
         let yaml = "name: Single\nsteps:\n  - home"
-        let scenario = ScenarioParser.parse(content: yaml)
-        XCTAssertTrue(scenario.targets.isEmpty)
+        let skill = SkillParser.parse(content: yaml)
+        XCTAssertTrue(skill.targets.isEmpty)
     }
 
     func testSwitchTargetTypeKey() {
-        let step = ScenarioStep.switchTarget(name: "android")
+        let step = SkillStep.switchTarget(name: "android")
         XCTAssertEqual(step.typeKey, "target")
     }
 
     func testSwitchTargetDisplayName() {
-        let step = ScenarioStep.switchTarget(name: "android")
+        let step = SkillStep.switchTarget(name: "android")
         XCTAssertEqual(step.displayName, "target: \"android\"")
     }
 
     // MARK: - press_key dict modifiers syntax
 
     func testParsePressKeyWithDictModifiers() {
-        let steps = ScenarioParser.parseSteps(
+        let steps = SkillParser.parseSteps(
             from: "steps:\n  - press_key: \"l\" modifiers: [\"command\"]")
         XCTAssertEqual(steps.count, 1)
         if case .pressKey(let keyName, let modifiers) = steps[0] {
@@ -462,7 +462,7 @@ final class ScenarioParserTests: XCTestCase {
     }
 
     func testParsePressKeyWithMultipleDictModifiers() {
-        let steps = ScenarioParser.parseSteps(
+        let steps = SkillParser.parseSteps(
             from: "steps:\n  - press_key: \"l\" modifiers: [\"command\", \"shift\"]")
         XCTAssertEqual(steps.count, 1)
         if case .pressKey(let keyName, let modifiers) = steps[0] {
@@ -476,7 +476,7 @@ final class ScenarioParserTests: XCTestCase {
     // MARK: - wait_for timeout syntax
 
     func testParseWaitForWithTimeout() {
-        let steps = ScenarioParser.parseSteps(
+        let steps = SkillParser.parseSteps(
             from: "steps:\n  - wait_for: \"General\" timeout: 30")
         XCTAssertEqual(steps.count, 1)
         if case .waitFor(let label, let timeout) = steps[0] {
@@ -488,7 +488,7 @@ final class ScenarioParserTests: XCTestCase {
     }
 
     func testParseWaitForWithoutTimeout() {
-        let steps = ScenarioParser.parseSteps(
+        let steps = SkillParser.parseSteps(
             from: "steps:\n  - wait_for: \"General\"")
         XCTAssertEqual(steps.count, 1)
         if case .waitFor(let label, let timeout) = steps[0] {

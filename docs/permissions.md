@@ -4,7 +4,7 @@ The server is **fail-closed by default**. Without a config file, only read-only 
 
 | Always allowed | Requires permission |
 |---------------|-------------------|
-| `screenshot`, `describe_screen`, `start_recording`, `stop_recording`, `get_orientation`, `status`, `check_health`, `list_scenarios`, `get_scenario` | `tap`, `swipe`, `drag`, `type_text`, `press_key`, `long_press`, `double_tap`, `shake`, `launch_app`, `open_url`, `press_home`, `press_app_switcher`, `spotlight`, `scroll_to`, `reset_app`, `measure`, `set_network` |
+| `screenshot`, `describe_screen`, `start_recording`, `stop_recording`, `get_orientation`, `status`, `check_health`, `list_skills`, `get_skill` | `tap`, `swipe`, `drag`, `type_text`, `press_key`, `long_press`, `double_tap`, `shake`, `launch_app`, `open_url`, `press_home`, `press_app_switcher`, `spotlight`, `scroll_to`, `reset_app`, `measure`, `set_network` |
 
 Mutating tools are hidden from `tools/list` entirely — the MCP client never sees them unless you allow them.
 

@@ -1,57 +1,57 @@
-# Scenarios & Marketplace
+# Skills & Marketplace
 
-Scenarios are files that describe multi-step iPhone automation flows as intents, not scripts. They can be written in **SKILL.md** format (recommended) or **YAML** format (legacy). The MCP server provides the tools; scenarios teach the AI what to do with them.
+Skills are files that describe multi-step iPhone automation flows as intents, not scripts. They can be written in **SKILL.md** format (recommended) or **YAML** format (legacy). The MCP server provides the tools; skills teach the AI what to do with them.
 
 ## Overview
 
 The system has two layers:
 
 1. **This repository** (`mirroir-mcp`) — provides 28 MCP tools for iPhone interaction
-2. **Scenario repositories** (e.g., [jfarcand/mirroir-scenarios](https://github.com/jfarcand/mirroir-scenarios)) — provide reusable scenario files (SKILL.md or YAML) + plugin discovery
+2. **Skill repositories** (e.g., [jfarcand/mirroir-skills](https://github.com/jfarcand/mirroir-skills)) — provide reusable skill files (SKILL.md or YAML) + plugin discovery
 
-Scenarios are intentionally simple. Steps like `tap: "Email"` don't specify pixel coordinates — the AI uses `describe_screen` for fuzzy OCR matching and adapts to unexpected dialogs, layout changes, and timing differences.
+Skills are intentionally simple. Steps like `tap: "Email"` don't specify pixel coordinates — the AI uses `describe_screen` for fuzzy OCR matching and adapts to unexpected dialogs, layout changes, and timing differences.
 
 ## Plugin Discovery
 
-Scenarios can be installed via AI coding assistant plugin systems or manually.
+Skills can be installed via AI coding assistant plugin systems or manually.
 
 ### Claude Code
 
 ```bash
-claude plugin marketplace add jfarcand/mirroir-scenarios
-claude plugin install scenarios@mirroir-scenarios
+claude plugin marketplace add jfarcand/mirroir-skills
+claude plugin install skills@mirroir-skills
 ```
 
-Plugin metadata lives in `.claude-plugin/marketplace.json` in the scenario repository. The `SKILL.md` file in the scenario repo teaches Claude how to interpret scenario steps.
+Plugin metadata lives in `.claude-plugin/marketplace.json` in the skill repository. The `SKILL.md` file in the skill repo teaches Claude how to interpret skill steps.
 
 ### GitHub Copilot CLI
 
 ```bash
-copilot plugin marketplace add jfarcand/mirroir-scenarios
-copilot plugin install scenarios@mirroir-scenarios
+copilot plugin marketplace add jfarcand/mirroir-skills
+copilot plugin install skills@mirroir-skills
 ```
 
-Plugin metadata lives in `.github/plugin/marketplace.json` in the scenario repository.
+Plugin metadata lives in `.github/plugin/marketplace.json` in the skill repository.
 
 ### Manual Installation
 
-Clone or copy scenario files (`.md` or `.yaml`) into one of the scan directories:
+Clone or copy skill files (`.md` or `.yaml`) into one of the scan directories:
 
 ```bash
 # Global — available in all projects
-git clone https://github.com/jfarcand/mirroir-scenarios.git \
-    ~/.mirroir-mcp/scenarios/
+git clone https://github.com/jfarcand/mirroir-skills.git \
+    ~/.mirroir-mcp/skills/
 
 # Project-local — available only in current project
-mkdir -p .mirroir-mcp/scenarios/
-cp my-scenario.md .mirroir-mcp/scenarios/
+mkdir -p .mirroir-mcp/skills/
+cp my-skill.md .mirroir-mcp/skills/
 ```
 
-Project-local scenarios with the same filename override global ones. When both a `.md` and `.yaml` file exist with the same stem name, the `.md` file takes precedence.
+Project-local skills with the same filename override global ones. When both a `.md` and `.yaml` file exist with the same stem name, the `.md` file takes precedence.
 
-## Scenario Format
+## Skill Format
 
-Scenarios can be written in SKILL.md (recommended) or YAML (legacy). Both formats support the same fields and step types.
+Skills can be written in SKILL.md (recommended) or YAML (legacy). Both formats support the same fields and step types.
 
 ### SKILL.md Format (Recommended)
 
@@ -81,13 +81,13 @@ Send a direct message to a contact in Slack.
 10. Screenshot: "message_sent"
 ```
 
-Convert existing YAML scenarios with `mirroir migrate`:
+Convert existing YAML skills with `mirroir migrate`:
 
 ```bash
-mirroir migrate scenario.yaml                            # convert a single file
-mirroir migrate --dir path/to/scenarios/                 # convert all YAML files in a directory
-mirroir migrate --output-dir ./converted/ scenario.yaml  # write .md files to alternate directory
-mirroir migrate --dry-run scenario.yaml                  # preview without writing
+mirroir migrate skill.yaml                            # convert a single file
+mirroir migrate --dir path/to/skills/                 # convert all YAML files in a directory
+mirroir migrate --output-dir ./converted/ skill.yaml  # write .md files to alternate directory
+mirroir migrate --dry-run skill.yaml                  # preview without writing
 ```
 
 ### YAML Format (Legacy)
@@ -96,16 +96,16 @@ mirroir migrate --dry-run scenario.yaml                  # preview without writi
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `name` | string | Human-readable scenario name |
+| `name` | string | Human-readable skill name |
 | `app` | string | Target app(s), comma-separated for cross-app flows |
-| `description` | string | What the scenario does |
+| `description` | string | What the skill does |
 | `steps` | list | Ordered list of step objects |
 
 ### Optional Metadata
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `version` | integer | Scenario format version (default: 1). Used for future format evolution. |
+| `version` | integer | Skill format version (default: 1). Used for future format evolution. |
 | `ios_min` | string | Minimum iOS version (e.g., `"17.0"`) |
 | `locale` | string | Expected device locale (e.g., `"fr-CA"`) |
 | `tags` | list | Categorization tags (e.g., `["productivity", "messaging"]`) |
@@ -142,8 +142,8 @@ Each step is a single key-value pair in the `steps` list. The AI interprets each
 | `press_key` | Key name (string) | `press_key` | Press a special key (return, escape, tab, etc.) with optional modifiers |
 | `swipe` | Direction (string) | `swipe` | Swipe in a direction (up, down, left, right) |
 | `wait_for` | Element text (string) | `describe_screen` (poll) | Wait until text appears on screen (retry with describe_screen) |
-| `assert_visible` | Element text (string) | `describe_screen` | Verify text is visible; fail the scenario if not found |
-| `assert_not_visible` | Element text (string) | `describe_screen` | Verify text is NOT visible; fail the scenario if found |
+| `assert_visible` | Element text (string) | `describe_screen` | Verify text is visible; fail the skill if not found |
+| `assert_not_visible` | Element text (string) | `describe_screen` | Verify text is NOT visible; fail the skill if found |
 | `screenshot` | Label (string) | `screenshot` | Capture a screenshot with a descriptive label |
 | `shake` | `true` | `shake` | Trigger a shake gesture (debug menus, undo) |
 | `press_home` | `true` | `press_home` | Return to the home screen |
@@ -161,7 +161,7 @@ Each step is a single key-value pair in the `steps` list. The AI interprets each
 
 ### Conditions
 
-Scenarios can branch using `condition` steps. The AI calls `describe_screen` to evaluate the condition, then executes the matching branch:
+Skills can branch using `condition` steps. The AI calls `describe_screen` to evaluate the condition, then executes the matching branch:
 
 ```yaml
 - condition:
@@ -177,7 +177,7 @@ If the condition is true, the `then` steps execute. If false and `else` is prese
 
 ### Repeats
 
-Scenarios can loop using `repeat` steps. The AI checks a screen condition before each iteration and stops when the condition fails or `max` is reached:
+Skills can loop using `repeat` steps. The AI checks a screen condition before each iteration and stops when the condition fails or `max` is reached:
 
 ```yaml
 - repeat:
@@ -195,7 +195,7 @@ Loop modes: `while_visible: "Label"` (continue while present), `until_visible: "
 
 ### Environment Variables: `${VAR}`
 
-Variables wrapped in `${...}` are resolved from environment variables at `get_scenario` time (before the AI sees the scenario content). This works for both SKILL.md and YAML formats.
+Variables wrapped in `${...}` are resolved from environment variables at `get_skill` time (before the AI sees the skill content). This works for both SKILL.md and YAML formats.
 
 ```yaml
 - type: "${TEST_EMAIL}"           # Required — left as ${TEST_EMAIL} if unset
@@ -209,7 +209,7 @@ Variables wrapped in `${...}` are resolved from environment variables at `get_sc
 
 ### AI-Remembered Data: `{var}`
 
-Single-brace variables are placeholders for data the AI extracts during scenario execution via `remember:` steps:
+Single-brace variables are placeholders for data the AI extracts during skill execution via `remember:` steps:
 
 ```yaml
 - remember: "Read the commute time and ETA from the navigation screen."
@@ -223,7 +223,7 @@ These are never resolved by the server — they exist in the YAML for the AI to 
 
 ## AI Execution Model
 
-Scenarios are executed by AI, not by a deterministic runner. This is by design:
+Skills are executed by AI, not by a deterministic runner. This is by design:
 
 **Why AI instead of a script runner:**
 - **Fuzzy matching:** `tap: "Email"` works even if the actual text is "Email Address" or "E-mail"
@@ -240,26 +240,26 @@ Scenarios are executed by AI, not by a deterministic runner. This is by design:
 
 This enables cross-app data flows — read data from one app, switch apps, then use that data in another.
 
-## Scenario Validation
+## Skill Validation
 
-Scenario files should be validated for:
+Skill files should be validated for:
 
 - **Required fields:** `name`, `app`, `description`, `steps` must all be present
 - **Step types:** Each step key must be a recognized step type
 - **Variable syntax:** `${VAR}` patterns must have valid identifier names
 - **Non-empty steps:** The `steps` list must contain at least one step
 
-## Available Scenarios
+## Available Skills
 
-Scenarios are maintained in the [mirroir-scenarios](https://github.com/jfarcand/mirroir-scenarios) repository. Install them via the plugin system (see [Plugin Discovery](#plugin-discovery) above) or clone manually into `~/.mirroir-mcp/scenarios/`.
+Skills are maintained in the [mirroir-skills](https://github.com/jfarcand/mirroir-skills) repository. Install them via the plugin system (see [Plugin Discovery](#plugin-discovery) above) or clone manually into `~/.mirroir-mcp/skills/`.
 
-## Contributing a Scenario
+## Contributing a Skill
 
-Checklist for adding a new scenario:
+Checklist for adding a new skill:
 
-1. **Create the scenario file** (`.md` for SKILL.md format, or `.yaml` for legacy) in the appropriate directory under `scenarios/`
-   - `apps/<app-name>/` for app-specific scenarios
-   - `testing/<framework>/` for test automation scenarios
+1. **Create the skill file** (`.md` for SKILL.md format, or `.yaml` for legacy) in the appropriate directory under `skills/`
+   - `apps/<app-name>/` for app-specific skills
+   - `testing/<framework>/` for test automation skills
 
 2. **Include all required fields:** `name`, `app`, `description`, `steps`
 
@@ -272,6 +272,6 @@ Checklist for adding a new scenario:
    - `assert_visible:` to verify the action succeeded
    - `screenshot:` at key points for visual confirmation
 
-6. **Test the scenario** end-to-end on a real device with `get_scenario` + manual execution
+6. **Test the skill** end-to-end on a real device with `get_skill` + manual execution
 
 7. **Keep steps intent-based** — describe *what* to do, not *how* to do it. Let the AI handle coordinates, scrolling, and timing.

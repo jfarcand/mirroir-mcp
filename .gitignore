@@ -15,10 +15,11 @@ update-helper.sh
 npm/bin/mirroir-mcp-native
 npm/bin/mirroir-helper
 npm/bin/com.jfarcand.mirroir-helper.plist
-.mirroir-mcp/scenarios/
+.mirroir-mcp/skills/
 mirroir-test-results/
 integrations/
 .vscode/launch.json
 website/node_modules/
 website/dist/
 website/.astro/
+website/src/data/skills-index.json

@@ -2,7 +2,7 @@
 // Licensed under the Apache License, Version 2.0
 //
 // ABOUTME: Tests for ElementMatcher: exact, case-insensitive, and substring matching.
-// ABOUTME: Covers match priorities, empty input, no-match scenarios, and visibility checks.
+// ABOUTME: Covers match priorities, empty input, no-match cases, and visibility checks.
 
 import XCTest
 @testable import HelperLib

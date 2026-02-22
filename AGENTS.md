@@ -4,9 +4,9 @@ This project has companion repos on the same machine. Reference them when needed
 
 | Repo | Local Path | Purpose |
 |------|-----------|---------|
-| [mirroir-scenarios](https://github.com/jfarcand/mirroir-scenarios) | `../mirroir-scenarios` | Community scenario YAML files (apps/, workflows/, testing/) |
+| [mirroir-skills](https://github.com/jfarcand/mirroir-skills) | `../mirroir-skills` | Community skill YAML files (apps/, workflows/, testing/) |
 
-Compiled `.compiled.json` files live alongside their source `.yaml` in the scenarios repo.
+Compiled `.compiled.json` files live alongside their source `.yaml` in the skills repo.
 
 ## Package Manager: Swift Package Manager
 
@@ -66,7 +66,7 @@ This project uses **Swift Package Manager** (SPM) exclusively. The `Package.swif
 - **Commit messages MUST use conventional commit format:** `type(scope): description`
   - Types: `feat`, `fix`, `chore`, `docs`, `test`, `refactor`, `ci`, `style`, `perf`, `build`, `revert`
   - Scope is optional. Multi-scope with `|` is permitted: `fix(module|context): description`
-  - Examples: `feat: add check_health tool`, `fix(scenarios): handle YAML block scalars`, `docs: update architecture guide`
+  - Examples: `feat: add check_health tool`, `fix(skills): handle YAML block scalars`, `docs: update architecture guide`
   - The pre-commit hook enforces this — non-conventional commits are rejected.
 - Always create a branch when adding new features. Bug fixes go directly to main branch.
 - Always run validation after making changes: `swift build` then `swift test`

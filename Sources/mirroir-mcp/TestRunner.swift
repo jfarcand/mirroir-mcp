@@ -2,7 +2,7 @@
 // Licensed under the Apache License, Version 2.0
 //
 // ABOUTME: Top-level orchestrator for the `mirroir test` CLI subcommand.
-// ABOUTME: Parses CLI args, discovers scenarios, executes them, and reports results.
+// ABOUTME: Parses CLI args, discovers skills, executes them, and reports results.
 
 import Darwin
 import Foundation
@@ -10,7 +10,7 @@ import HelperLib
 
 /// Configuration parsed from CLI arguments.
 struct TestRunConfig {
-    let scenarioArgs: [String]
+    let skillArgs: [String]
     let junitPath: String?
     let screenshotDir: String
     let timeoutSeconds: Int
@@ -22,7 +22,7 @@ struct TestRunConfig {
     let showHelp: Bool
 }
 
-/// Orchestrates scenario test execution from the CLI.
+/// Orchestrates skill test execution from the CLI.
 enum TestRunner {
 
     /// Parse CLI arguments and run tests. Returns exit code (0 = all pass, 1 = any fail).
@@ -34,29 +34,29 @@ enum TestRunner {
             return 0
         }
 
-        // Resolve scenario files
-        let scenarioFiles: [String]
+        // Resolve skill files
+        let skillFiles: [String]
         do {
-            scenarioFiles = try resolveScenarioFiles(config.scenarioArgs)
+            skillFiles = try resolveSkillFiles(config.skillArgs)
         } catch {
             fputs("Error: \(error.localizedDescription)\n", stderr)
             return 1
         }
 
-        if scenarioFiles.isEmpty {
-            fputs("No scenarios found.\n", stderr)
-            fputs("Place .yaml files in .mirroir-mcp/scenarios/ or specify paths.\n", stderr)
+        if skillFiles.isEmpty {
+            fputs("No skills found.\n", stderr)
+            fputs("Place .yaml files in .mirroir-mcp/skills/ or specify paths.\n", stderr)
             return 1
         }
 
-        fputs("mirroir test: \(scenarioFiles.count) scenario(s) to run\n", stderr)
+        fputs("mirroir test: \(skillFiles.count) skill(s) to run\n", stderr)
 
-        // Parse all scenarios upfront to catch errors early
-        var scenarios: [ScenarioDefinition] = []
-        for filePath in scenarioFiles {
+        // Parse all skills upfront to catch errors early
+        var skills: [SkillDefinition] = []
+        for filePath in skillFiles {
             do {
-                let scenario = try ScenarioParser.parse(filePath: filePath)
-                scenarios.append(scenario)
+                let skill = try SkillParser.parse(filePath: filePath)
+                skills.append(skill)
             } catch {
                 fputs("Error parsing \(filePath): \(error.localizedDescription)\n", stderr)
                 return 1
@@ -92,42 +92,42 @@ enum TestRunner {
             config: executorConfig
         )
 
-        // Load compiled scenarios if available
+        // Load compiled skills if available
         let windowInfo = bridge.getWindowInfo()
-        var compiledMap: [String: CompiledScenario] = [:]
+        var compiledMap: [String: CompiledSkill] = [:]
         if !config.noCompiled {
             let windowWidth = windowInfo.map { Double($0.size.width) } ?? 0
             let windowHeight = windowInfo.map { Double($0.size.height) } ?? 0
-            for scenario in scenarios {
-                if let compiled = try? CompiledScenarioIO.load(for: scenario.filePath) {
-                    let staleness = CompiledScenarioIO.checkStaleness(
-                        compiled: compiled, scenarioPath: scenario.filePath,
+            for skill in skills {
+                if let compiled = try? CompiledSkillIO.load(for: skill.filePath) {
+                    let staleness = CompiledSkillIO.checkStaleness(
+                        compiled: compiled, skillPath: skill.filePath,
                         windowWidth: windowWidth, windowHeight: windowHeight)
                     switch staleness {
                     case .fresh:
-                        compiledMap[scenario.filePath] = compiled
+                        compiledMap[skill.filePath] = compiled
                     case .stale(let reason):
-                        fputs("Warning: compiled scenario stale for \(scenario.name): \(reason)\n", stderr)
+                        fputs("Warning: compiled skill stale for \(skill.name): \(reason)\n", stderr)
                     }
                 }
             }
         }
 
-        // Execute scenarios
-        var allResults: [ConsoleReporter.ScenarioResult] = []
+        // Execute skills
+        var allResults: [ConsoleReporter.SkillResult] = []
         var totalCompiledSteps = 0
         var totalNormalSteps = 0
 
-        for scenario in scenarios {
-            let result: ConsoleReporter.ScenarioResult
-            if let compiled = compiledMap[scenario.filePath] {
+        for skill in skills {
+            let result: ConsoleReporter.SkillResult
+            if let compiled = compiledMap[skill.filePath] {
                 let compiledExecutor = CompiledStepExecutor(
                     bridge: bridge, input: input,
                     describer: describer, capture: capture,
                     config: executorConfig
                 )
-                result = executeCompiledScenario(
-                    scenario: scenario, compiled: compiled,
+                result = executeCompiledSkill(
+                    skill: skill, compiled: compiled,
                     compiledExecutor: compiledExecutor,
                     normalExecutor: executor,
                     describer: describer, agent: config.agent,
@@ -139,9 +139,9 @@ enum TestRunner {
                     $0.hints?.compiledAction == .passthrough || $0.hints == nil
                 }.count
             } else {
-                result = executeScenario(scenario: scenario, executor: executor,
-                                         verbose: config.verbose)
-                totalNormalSteps += scenario.steps.count
+                result = executeSkill(skill: skill, executor: executor,
+                                      verbose: config.verbose)
+                totalNormalSteps += skill.steps.count
             }
             allResults.append(result)
         }
@@ -170,19 +170,19 @@ enum TestRunner {
         return anyFailed ? 1 : 0
     }
 
-    /// Execute a single scenario and return results.
-    static func executeScenario(scenario: ScenarioDefinition,
-                                executor: StepExecutor,
-                                verbose: Bool) -> ConsoleReporter.ScenarioResult {
-        let stepCount = scenario.steps.count
-        ConsoleReporter.reportScenarioStart(
-            name: scenario.name, filePath: scenario.filePath, stepCount: stepCount)
+    /// Execute a single skill and return results.
+    static func executeSkill(skill: SkillDefinition,
+                             executor: StepExecutor,
+                             verbose: Bool) -> ConsoleReporter.SkillResult {
+        let stepCount = skill.steps.count
+        ConsoleReporter.reportSkillStart(
+            name: skill.name, filePath: skill.filePath, stepCount: stepCount)
 
         let startTime = CFAbsoluteTimeGetCurrent()
         var stepResults: [StepResult] = []
         var stopOnFailure = false
 
-        for (index, step) in scenario.steps.enumerated() {
+        for (index, step) in skill.steps.enumerated() {
             if stopOnFailure {
                 // Skip remaining steps after a failure
                 let skippedResult = StepResult(
@@ -196,7 +196,7 @@ enum TestRunner {
             }
 
             let result = executor.execute(step: step, stepIndex: index,
-                                          scenarioName: scenario.name)
+                                          skillName: skill.name)
             stepResults.append(result)
             ConsoleReporter.reportStep(index: index, total: stepCount,
                                        result: result, verbose: verbose)
@@ -207,30 +207,30 @@ enum TestRunner {
         }
 
         let totalDuration = CFAbsoluteTimeGetCurrent() - startTime
-        let scenarioResult = ConsoleReporter.ScenarioResult(
-            name: scenario.name,
-            filePath: scenario.filePath,
+        let skillResult = ConsoleReporter.SkillResult(
+            name: skill.name,
+            filePath: skill.filePath,
             stepResults: stepResults,
             durationSeconds: totalDuration
         )
-        ConsoleReporter.reportScenarioEnd(result: scenarioResult)
-        return scenarioResult
+        ConsoleReporter.reportSkillEnd(result: skillResult)
+        return skillResult
     }
 
-    /// Execute a scenario using compiled hints for OCR-free replay.
+    /// Execute a skill using compiled hints for OCR-free replay.
     /// When `agent` is non-nil, failed steps trigger a diagnostic OCR call.
     /// When `agent` is a non-empty model name, AI diagnosis runs after deterministic analysis.
-    static func executeCompiledScenario(
-        scenario: ScenarioDefinition,
-        compiled: CompiledScenario,
+    static func executeCompiledSkill(
+        skill: SkillDefinition,
+        compiled: CompiledSkill,
         compiledExecutor: CompiledStepExecutor,
         normalExecutor: StepExecutor,
         describer: ScreenDescribing,
         agent: String?,
         verbose: Bool
-    ) -> ConsoleReporter.ScenarioResult {
+    ) -> ConsoleReporter.SkillResult {
         let agentEnabled = agent != nil
-        let stepCount = scenario.steps.count
+        let stepCount = skill.steps.count
         let tag: String
         if let modelName = agent, !modelName.isEmpty {
             tag = " [compiled+agent:\(modelName)]"
@@ -239,16 +239,16 @@ enum TestRunner {
         } else {
             tag = " [compiled]"
         }
-        ConsoleReporter.reportScenarioStart(
-            name: scenario.name + tag,
-            filePath: scenario.filePath, stepCount: stepCount)
+        ConsoleReporter.reportSkillStart(
+            name: skill.name + tag,
+            filePath: skill.filePath, stepCount: stepCount)
 
         let startTime = CFAbsoluteTimeGetCurrent()
         var stepResults: [StepResult] = []
         var stopOnFailure = false
         var recommendations: [AgentDiagnostic.Recommendation] = []
 
-        for (index, step) in scenario.steps.enumerated() {
+        for (index, step) in skill.steps.enumerated() {
             if stopOnFailure {
                 let skippedResult = StepResult(
                     step: step, status: .skipped,
@@ -265,7 +265,7 @@ enum TestRunner {
                 let compiledStep = compiled.steps[index]
                 result = compiledExecutor.execute(
                     step: step, compiledStep: compiledStep,
-                    stepIndex: index, scenarioName: scenario.name)
+                    stepIndex: index, skillName: skill.name)
 
                 // Agent diagnostic on failure
                 if agentEnabled && result.status == .failed {
@@ -277,9 +277,9 @@ enum TestRunner {
                 }
             } else {
                 result = normalExecutor.execute(
-                    step: step, stepIndex: index, scenarioName: scenario.name)
+                    step: step, stepIndex: index, skillName: skill.name)
 
-                // Agent diagnostic on normal step failure within a compiled scenario
+                // Agent diagnostic on normal step failure within a compiled skill
                 if agentEnabled && result.status == .failed {
                     let synthStep = CompiledStep(
                         index: index, type: step.typeKey,
@@ -305,7 +305,7 @@ enum TestRunner {
         // Print deterministic diagnostic report
         if agentEnabled && !recommendations.isEmpty {
             AgentDiagnostic.printReport(recommendations: recommendations,
-                                         scenarioName: scenario.name)
+                                         skillName: skill.name)
         }
 
         // Run AI diagnosis if a model name was specified
@@ -313,27 +313,27 @@ enum TestRunner {
             runAIDiagnosis(
                 modelName: modelName,
                 recommendations: recommendations,
-                scenarioName: scenario.name,
-                scenarioFilePath: scenario.filePath)
+                skillName: skill.name,
+                skillFilePath: skill.filePath)
         }
 
         let totalDuration = CFAbsoluteTimeGetCurrent() - startTime
-        let scenarioResult = ConsoleReporter.ScenarioResult(
-            name: scenario.name,
-            filePath: scenario.filePath,
+        let skillResult = ConsoleReporter.SkillResult(
+            name: skill.name,
+            filePath: skill.filePath,
             stepResults: stepResults,
             durationSeconds: totalDuration
         )
-        ConsoleReporter.reportScenarioEnd(result: scenarioResult)
-        return scenarioResult
+        ConsoleReporter.reportSkillEnd(result: skillResult)
+        return skillResult
     }
 
     /// Resolve and invoke the AI agent for diagnosis. Errors are non-fatal warnings.
     private static func runAIDiagnosis(
         modelName: String,
         recommendations: [AgentDiagnostic.Recommendation],
-        scenarioName: String,
-        scenarioFilePath: String
+        skillName: String,
+        skillFilePath: String
     ) {
         guard let agentConfig = AIAgentRegistry.resolve(name: modelName) else {
             let available = AIAgentRegistry.availableAgents().joined(separator: ", ")
@@ -348,11 +348,11 @@ enum TestRunner {
 
         let payload = AgentDiagnostic.buildPayload(
             recommendations: recommendations,
-            scenarioName: scenarioName,
-            scenarioFilePath: scenarioFilePath)
+            skillName: skillName,
+            skillFilePath: skillFilePath)
 
         if let diagnosis = provider.diagnose(payload: payload) {
-            AgentDiagnostic.printAIReport(diagnosis: diagnosis, scenarioName: scenarioName)
+            AgentDiagnostic.printAIReport(diagnosis: diagnosis, skillName: skillName)
         }
     }
 
@@ -360,7 +360,7 @@ enum TestRunner {
 
     /// Parse CLI arguments into TestRunConfig.
     static func parseArguments(_ args: [String]) -> TestRunConfig {
-        var scenarioArgs: [String] = []
+        var skillArgs: [String] = []
         var junitPath: String?
         var screenshotDir = "./mirroir-test-results"
         var timeoutSeconds = EnvConfig.waitForTimeoutSeconds
@@ -407,14 +407,14 @@ enum TestRunner {
                 }
             default:
                 if !arg.hasPrefix("-") {
-                    scenarioArgs.append(arg)
+                    skillArgs.append(arg)
                 }
             }
             i += 1
         }
 
         return TestRunConfig(
-            scenarioArgs: scenarioArgs,
+            skillArgs: skillArgs,
             junitPath: junitPath,
             screenshotDir: screenshotDir,
             timeoutSeconds: timeoutSeconds,
@@ -426,16 +426,16 @@ enum TestRunner {
         )
     }
 
-    /// Resolve scenario arguments to file paths.
-    /// If no args given, discovers all scenarios from default directories.
-    static func resolveScenarioFiles(_ args: [String]) throws -> [String] {
+    /// Resolve skill arguments to file paths.
+    /// If no args given, discovers all skills from default directories.
+    static func resolveSkillFiles(_ args: [String]) throws -> [String] {
         if args.isEmpty {
-            // Discover all scenarios from scenario directories
-            return discoverAllScenarioFiles()
+            // Discover all skills from skill directories
+            return discoverAllSkillFiles()
         }
 
         var files: [String] = []
-        let dirs = PermissionPolicy.scenarioDirs
+        let dirs = PermissionPolicy.skillDirs
 
         for arg in args {
             // Check if it's a direct file path
@@ -448,31 +448,31 @@ enum TestRunner {
             if arg.contains("*") {
                 let expanded = expandGlob(arg)
                 if expanded.isEmpty {
-                    throw TestRunnerError.noScenariosFound(pattern: arg)
+                    throw TestRunnerError.noSkillsFound(pattern: arg)
                 }
                 files.append(contentsOf: expanded)
                 continue
             }
 
-            // Try to resolve as scenario name (yamlOnly: deterministic runner needs YAML)
-            let (path, ambiguous) = MirroirMCP.resolveScenario(
+            // Try to resolve as skill name (yamlOnly: deterministic runner needs YAML)
+            let (path, ambiguous) = MirroirMCP.resolveSkill(
                 name: arg, dirs: dirs, yamlOnly: true)
             if let path = path {
                 files.append(path)
             } else if !ambiguous.isEmpty {
                 let matches = ambiguous.joined(separator: ", ")
-                throw TestRunnerError.ambiguousScenario(name: arg, matches: matches)
+                throw TestRunnerError.ambiguousSkill(name: arg, matches: matches)
             } else {
-                throw TestRunnerError.scenarioNotFound(name: arg)
+                throw TestRunnerError.skillNotFound(name: arg)
             }
         }
 
         return files
     }
 
-    /// Discover all scenario YAML files from default directories.
-    private static func discoverAllScenarioFiles() -> [String] {
-        let dirs = PermissionPolicy.scenarioDirs
+    /// Discover all skill YAML files from default directories.
+    private static func discoverAllSkillFiles() -> [String] {
+        let dirs = PermissionPolicy.skillDirs
         var files: [String] = []
         var seenRelPaths = Set<String>()
 
@@ -507,13 +507,13 @@ enum TestRunner {
     /// Print usage information.
     static func printUsage() {
         let usage = """
-        Usage: mirroir-mcp test [options] [scenario...]
+        Usage: mirroir-mcp test [options] [skill...]
 
-        Run scenario YAML files deterministically against iPhone Mirroring.
+        Run skill YAML files deterministically against iPhone Mirroring.
 
         Arguments:
-          <scenario>          Scenario name or .yaml file path (multiple allowed)
-                              If none specified, discovers all from scenario dirs
+          <skill>             Skill name or .yaml file path (multiple allowed)
+                              If none specified, discovers all from skill dirs
 
         Options:
           --junit <path>      Write JUnit XML report to <path>
@@ -521,7 +521,7 @@ enum TestRunner {
           --timeout <sec>     wait_for timeout in seconds (default: 15)
           --verbose, -v       Show detailed output
           --dry-run           Parse and validate without executing
-          --no-compiled       Skip compiled scenarios (force full OCR)
+          --no-compiled       Skip compiled skills (force full OCR)
           --agent [model]     Diagnose compiled failures. Without model: deterministic OCR only.
                               With model: deterministic + AI diagnosis.
                               Built-in: claude-sonnet-4-6, claude-haiku-4-5, gpt-4o
@@ -532,9 +532,9 @@ enum TestRunner {
           mirroir-mcp test check-about
           mirroir-mcp test apps/settings/check-about.yaml
           mirroir-mcp test --junit results.xml apps/settings/*.yaml
-          mirroir-mcp test --agent scenario.yaml           # deterministic diagnosis
-          mirroir-mcp test --agent claude-sonnet-4-6 scenario.yaml  # AI diagnosis
-          mirroir-mcp test                    # run all discovered scenarios
+          mirroir-mcp test --agent skill.yaml           # deterministic diagnosis
+          mirroir-mcp test --agent claude-sonnet-4-6 skill.yaml  # AI diagnosis
+          mirroir-mcp test                    # run all discovered skills
         """
         fputs(usage + "\n", stderr)
     }
@@ -542,18 +542,18 @@ enum TestRunner {
 
 /// Errors during test run resolution.
 enum TestRunnerError: LocalizedError {
-    case noScenariosFound(pattern: String)
-    case ambiguousScenario(name: String, matches: String)
-    case scenarioNotFound(name: String)
+    case noSkillsFound(pattern: String)
+    case ambiguousSkill(name: String, matches: String)
+    case skillNotFound(name: String)
 
     var errorDescription: String? {
         switch self {
-        case .noScenariosFound(let pattern):
-            return "No scenarios found matching pattern: \(pattern)"
-        case .ambiguousScenario(let name, let matches):
-            return "Ambiguous scenario '\(name)'. Multiple matches: \(matches)"
-        case .scenarioNotFound(let name):
-            return "Scenario '\(name)' not found"
+        case .noSkillsFound(let pattern):
+            return "No skills found matching pattern: \(pattern)"
+        case .ambiguousSkill(let name, let matches):
+            return "Ambiguous skill '\(name)'. Multiple matches: \(matches)"
+        case .skillNotFound(let name):
+            return "Skill '\(name)' not found"
         }
     }
 }

@@ -2,15 +2,15 @@
 // Licensed under the Apache License, Version 2.0
 //
 // ABOUTME: Terminal output formatting for test runner results.
-// ABOUTME: Prints per-step results, per-scenario summaries, and a final summary line.
+// ABOUTME: Prints per-step results, per-skill summaries, and a final summary line.
 
 import Foundation
 
 /// Formats and prints test results to the terminal.
 enum ConsoleReporter {
 
-    /// Result of running a single scenario.
-    struct ScenarioResult {
+    /// Result of running a single skill.
+    struct SkillResult {
         let name: String
         let filePath: String
         let stepResults: [StepResult]
@@ -32,14 +32,14 @@ enum ConsoleReporter {
         fputs(line + "\n", stderr)
     }
 
-    /// Print a scenario header before execution starts.
-    static func reportScenarioStart(name: String, filePath: String, stepCount: Int) {
-        fputs("\nScenario: \(name) (\(stepCount) steps)\n", stderr)
+    /// Print a skill header before execution starts.
+    static func reportSkillStart(name: String, filePath: String, stepCount: Int) {
+        fputs("\nSkill: \(name) (\(stepCount) steps)\n", stderr)
         fputs("  File: \(filePath)\n", stderr)
     }
 
-    /// Print a scenario summary after execution.
-    static func reportScenarioEnd(result: ScenarioResult) {
+    /// Print a skill summary after execution.
+    static func reportSkillEnd(result: SkillResult) {
         let passed = result.stepResults.filter { $0.status == .passed }.count
         let failed = result.stepResults.filter { $0.status == .failed }.count
         let skipped = result.stepResults.filter { $0.status == .skipped }.count
@@ -55,13 +55,13 @@ enum ConsoleReporter {
         fputs("  Result: \(overallStatus) (\(duration)) — \(passed) passed, \(failed) failed, \(skipped) skipped\n", stderr)
     }
 
-    /// Print a final summary across all scenarios.
-    static func reportSummary(results: [ScenarioResult]) {
-        let totalScenarios = results.count
-        let passedScenarios = results.filter { scenarioResult in
-            !scenarioResult.stepResults.contains { $0.status == .failed }
+    /// Print a final summary across all skills.
+    static func reportSummary(results: [SkillResult]) {
+        let totalSkills = results.count
+        let passedSkills = results.filter { skillResult in
+            !skillResult.stepResults.contains { $0.status == .failed }
         }.count
-        let failedScenarios = totalScenarios - passedScenarios
+        let failedSkills = totalSkills - passedSkills
 
         let totalSteps = results.flatMap { $0.stepResults }.count
         let passedSteps = results.flatMap { $0.stepResults }.filter { $0.status == .passed }.count
@@ -69,12 +69,12 @@ enum ConsoleReporter {
         let skippedSteps = results.flatMap { $0.stepResults }.filter { $0.status == .skipped }.count
 
         fputs("\n", stderr)
-        fputs("Summary: \(totalScenarios) scenario(s), \(totalSteps) step(s)\n", stderr)
-        fputs("  Scenarios — PASSED: \(passedScenarios), FAILED: \(failedScenarios)\n", stderr)
+        fputs("Summary: \(totalSkills) skill(s), \(totalSteps) step(s)\n", stderr)
+        fputs("  Skills — PASSED: \(passedSkills), FAILED: \(failedSkills)\n", stderr)
         fputs("  Steps — PASSED: \(passedSteps), FAILED: \(failedSteps), SKIPPED: \(skippedSteps)\n", stderr)
 
-        if failedScenarios > 0 {
-            fputs("\nFailed scenarios:\n", stderr)
+        if failedSkills > 0 {
+            fputs("\nFailed skills:\n", stderr)
             for result in results where result.stepResults.contains(where: { $0.status == .failed }) {
                 fputs("  - \(result.name)\n", stderr)
                 for stepResult in result.stepResults where stepResult.status == .failed {

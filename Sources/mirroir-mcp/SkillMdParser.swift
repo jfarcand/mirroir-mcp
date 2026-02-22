@@ -1,7 +1,7 @@
 // Copyright 2026 jfarcand@apache.org
 // Licensed under the Apache License, Version 2.0
 //
-// ABOUTME: Parses SKILL.md scenario files (YAML front matter + markdown body).
+// ABOUTME: Parses SKILL.md files (YAML front matter + markdown body).
 // ABOUTME: Extracts structured header metadata and the freeform markdown body for AI execution.
 
 import Foundation

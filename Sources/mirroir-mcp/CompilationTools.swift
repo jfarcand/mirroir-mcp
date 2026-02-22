@@ -1,13 +1,13 @@
 // Copyright 2026 jfarcand@apache.org
 // Licensed under the Apache License, Version 2.0
 //
-// ABOUTME: Registers MCP tools for AI-driven scenario compilation (record_step, save_compiled).
-// ABOUTME: Accumulates step data reported by the AI during scenario execution and writes .compiled.json.
+// ABOUTME: Registers MCP tools for AI-driven skill compilation (record_step, save_compiled).
+// ABOUTME: Accumulates step data reported by the AI during skill execution and writes .compiled.json.
 
 import Foundation
 import HelperLib
 
-/// Accumulates compiled steps reported by the AI during scenario execution.
+/// Accumulates compiled steps reported by the AI during skill execution.
 /// Thread-safe via NSLock. Session persists across MCP calls (survives context compaction).
 final class CompilationSession: @unchecked Sendable {
     private var steps: [CompiledStep] = []
@@ -57,8 +57,8 @@ extension MirroirMCP {
         server.registerTool(MCPToolDefinition(
             name: "record_step",
             description: """
-                Record a compiled step during AI-driven scenario execution. \
-                Call this after each scenario step with the step index, type, label, \
+                Record a compiled step during AI-driven skill execution. \
+                Call this after each skill step with the step index, type, label, \
                 and any observed data (coordinates, timing, scroll count). \
                 The server accumulates steps for later saving via save_compiled.
                 """,
@@ -67,7 +67,7 @@ extension MirroirMCP {
                 "properties": .object([
                     "step_index": .object([
                         "type": .string("integer"),
-                        "description": .string("Step index in the scenario (0-based)"),
+                        "description": .string("Step index in the skill (0-based)"),
                     ]),
                     "type": .object([
                         "type": .string("string"),
@@ -161,23 +161,23 @@ extension MirroirMCP {
             name: "save_compiled",
             description: """
                 Save the accumulated compiled steps as a .compiled.json file next to \
-                the source scenario file. Call this after all record_step calls are done. \
+                the source skill file. Call this after all record_step calls are done. \
                 Clears the compilation session afterward.
                 """,
             inputSchema: [
                 "type": .string("object"),
                 "properties": .object([
-                    "scenario_name": .object([
+                    "skill_name": .object([
                         "type": .string("string"),
                         "description": .string(
-                            "Scenario name or path to resolve (e.g. 'check-about' or 'apps/settings/check-about')"),
+                            "Skill name or path to resolve (e.g. 'check-about' or 'apps/settings/check-about')"),
                     ]),
                 ]),
-                "required": .array([.string("scenario_name")]),
+                "required": .array([.string("skill_name")]),
             ],
             handler: { args in
-                guard let scenarioName = args["scenario_name"]?.asString() else {
-                    return .error("Missing required parameter: scenario_name (string)")
+                guard let skillName = args["skill_name"]?.asString() else {
+                    return .error("Missing required parameter: skill_name (string)")
                 }
 
                 let stepCount = session.stepCount
@@ -185,25 +185,25 @@ extension MirroirMCP {
                     return .error("No steps recorded. Call record_step before save_compiled.")
                 }
 
-                // Resolve scenario path
-                let dirs = PermissionPolicy.scenarioDirs
-                let (resolvedPath, ambiguous) = resolveScenario(name: scenarioName, dirs: dirs)
+                // Resolve skill path
+                let dirs = PermissionPolicy.skillDirs
+                let (resolvedPath, ambiguous) = resolveSkill(name: skillName, dirs: dirs)
 
-                guard let scenarioPath = resolvedPath else {
+                guard let skillPath = resolvedPath else {
                     if !ambiguous.isEmpty {
                         let matches = ambiguous.map { "  - \($0)" }.joined(separator: "\n")
                         return .error(
-                            "Ambiguous scenario name '\(scenarioName)':\n\(matches)")
+                            "Ambiguous skill name '\(skillName)':\n\(matches)")
                     }
-                    return .error("Scenario '\(scenarioName)' not found")
+                    return .error("Skill '\(skillName)' not found")
                 }
 
                 // Compute source hash
                 let sourceHash: String
                 do {
-                    sourceHash = try CompiledScenarioIO.sha256(of: scenarioPath)
+                    sourceHash = try CompiledSkillIO.sha256(of: skillPath)
                 } catch {
-                    return .error("Failed to hash scenario file: \(error.localizedDescription)")
+                    return .error("Failed to hash skill file: \(error.localizedDescription)")
                 }
 
                 // Get window dimensions from active target
@@ -213,10 +213,10 @@ extension MirroirMCP {
                 let windowHeight = windowInfo.map { Double($0.size.height) } ?? 0
                 let orientation = target.bridge.getOrientation()?.rawValue ?? "unknown"
 
-                // Build compiled scenario
+                // Build compiled skill
                 let steps = session.finalizeAndClear()
-                let compiled = CompiledScenario(
-                    version: CompiledScenario.currentVersion,
+                let compiled = CompiledSkill(
+                    version: CompiledSkill.currentVersion,
                     source: SourceInfo(
                         sha256: sourceHash,
                         compiledAt: ISO8601DateFormatter().string(from: Date())
@@ -230,12 +230,12 @@ extension MirroirMCP {
                 )
 
                 // Check if compiled file already exists
-                let compiledPath = CompiledScenarioIO.compiledPath(for: scenarioPath)
+                let compiledPath = CompiledSkillIO.compiledPath(for: skillPath)
                 let alreadyExists = FileManager.default.fileExists(atPath: compiledPath)
 
                 // Write the compiled file
                 do {
-                    try CompiledScenarioIO.save(compiled, for: scenarioPath)
+                    try CompiledSkillIO.save(compiled, for: skillPath)
                 } catch {
                     return .error("Failed to write compiled file: \(error.localizedDescription)")
                 }

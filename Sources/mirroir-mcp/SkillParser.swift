@@ -1,24 +1,24 @@
 // Copyright 2026 jfarcand@apache.org
 // Licensed under the Apache License, Version 2.0
 //
-// ABOUTME: Parses scenario YAML files into structured ScenarioDefinition with typed steps.
-// ABOUTME: Uses regex-based parsing (no Yams dependency) reusing helpers from ScenarioTools.
+// ABOUTME: Parses skill YAML files into structured SkillDefinition with typed steps.
+// ABOUTME: Uses regex-based parsing (no Yams dependency) reusing helpers from SkillTools.
 
 import Foundation
 import HelperLib
 
-/// A parsed scenario ready for execution.
-struct ScenarioDefinition {
+/// A parsed skill ready for execution.
+struct SkillDefinition {
     let name: String
     let description: String
     let filePath: String
-    let steps: [ScenarioStep]
-    /// Target names declared in the scenario header (for multi-target scenarios).
+    let steps: [SkillStep]
+    /// Target names declared in the skill header (for multi-target skills).
     let targets: [String]
 }
 
-/// A single executable step within a scenario.
-enum ScenarioStep {
+/// A single executable step within a skill.
+enum SkillStep {
     case launch(appName: String)
     case tap(label: String)
     case type(text: String)
@@ -34,7 +34,7 @@ enum ScenarioStep {
     case scrollTo(label: String, direction: String, maxScrolls: Int)
     case resetApp(appName: String)
     case setNetwork(mode: String)
-    indirect case measure(name: String, action: ScenarioStep, until: String, maxSeconds: Double?)
+    indirect case measure(name: String, action: SkillStep, until: String, maxSeconds: Double?)
     case switchTarget(name: String)
     case skipped(stepType: String, reason: String)
 
@@ -113,28 +113,28 @@ enum ScenarioStep {
     }
 }
 
-/// Parses scenario YAML content into structured definitions.
-enum ScenarioParser {
+/// Parses skill YAML content into structured definitions.
+enum SkillParser {
 
-    /// Parse a scenario file at the given path.
+    /// Parse a skill file at the given path.
     /// Returns the parsed definition or throws on file read / parse errors.
-    static func parse(filePath: String) throws -> ScenarioDefinition {
+    static func parse(filePath: String) throws -> SkillDefinition {
         let content = try String(contentsOfFile: filePath, encoding: .utf8)
         let substituted = MirroirMCP.substituteEnvVars(in: content)
         return parse(content: substituted, filePath: filePath)
     }
 
-    /// Parse scenario YAML content string.
-    static func parse(content: String, filePath: String = "<inline>") -> ScenarioDefinition {
+    /// Parse skill YAML content string.
+    static func parse(content: String, filePath: String = "<inline>") -> SkillDefinition {
         let fallbackName = (filePath as NSString).lastPathComponent
             .replacingOccurrences(of: ".yaml", with: "")
-        let header = MirroirMCP.extractScenarioHeader(
+        let header = MirroirMCP.extractSkillHeader(
             from: content, fallbackName: fallbackName, source: "")
 
         let steps = parseSteps(from: content)
         let targets = parseTargets(from: content)
 
-        return ScenarioDefinition(
+        return SkillDefinition(
             name: header.name,
             description: header.description,
             filePath: filePath,
@@ -179,10 +179,10 @@ enum ScenarioParser {
 
     /// Extract steps from the YAML content.
     /// Steps appear after a `steps:` line, each prefixed with `- key: "value"` or `- key`.
-    static func parseSteps(from content: String) -> [ScenarioStep] {
+    static func parseSteps(from content: String) -> [SkillStep] {
         let lines = content.components(separatedBy: .newlines)
         var inSteps = false
-        var steps: [ScenarioStep] = []
+        var steps: [SkillStep] = []
 
         for line in lines {
             let trimmed = line.trimmingCharacters(in: .whitespaces)
@@ -213,7 +213,7 @@ enum ScenarioParser {
     }
 
     /// Parse a single step string like `tap: "General"` or `home`.
-    static func parseStep(_ raw: String) -> ScenarioStep? {
+    static func parseStep(_ raw: String) -> SkillStep? {
         let trimmed = raw.trimmingCharacters(in: .whitespaces)
         guard !trimmed.isEmpty else { return nil }
 
@@ -280,7 +280,7 @@ enum ScenarioParser {
 
     /// Parse a press_key value which may include modifiers.
     /// Formats: `"return"`, `"l" modifiers: ["command"]`, `"l+command"`
-    private static func parsePressKey(_ value: String) -> ScenarioStep {
+    private static func parsePressKey(_ value: String) -> SkillStep {
         // Check for dict-style modifiers: "key" modifiers: ["mod1", "mod2"]
         if let modRange = value.range(of: #" modifiers: \["#, options: .regularExpression) {
             let keyName = stripQuotes(
@@ -314,7 +314,7 @@ enum ScenarioParser {
 
     /// Parse a wait_for value which may include a timeout.
     /// Formats: `"General"`, `"General" timeout: 30`
-    private static func parseWaitFor(_ value: String) -> ScenarioStep {
+    private static func parseWaitFor(_ value: String) -> SkillStep {
         // Check for timeout suffix: "label" timeout: 30
         if let timeoutRange = value.range(of: #" timeout: "#, options: .regularExpression) {
             let label = stripQuotes(
@@ -332,7 +332,7 @@ enum ScenarioParser {
 
     /// Parse a measure step value.
     /// Format: `{ tap: "Login", until: "Dashboard", max: 5, name: "login_time" }`
-    private static func parseMeasure(_ value: String) -> ScenarioStep {
+    private static func parseMeasure(_ value: String) -> SkillStep {
         var inner = value
         // Strip surrounding braces if present
         if inner.hasPrefix("{") && inner.hasSuffix("}") {
@@ -344,7 +344,7 @@ enum ScenarioParser {
             $0.trimmingCharacters(in: .whitespaces)
         }
 
-        var actionStep: ScenarioStep?
+        var actionStep: SkillStep?
         var until = ""
         var maxSeconds: Double?
         var name = "measure"

@@ -1,13 +1,13 @@
 // Copyright 2026 jfarcand@apache.org
 // Licensed under the Apache License, Version 2.0
 //
-// ABOUTME: Replays compiled scenario steps with zero OCR by using cached coordinates and timing.
+// ABOUTME: Replays compiled skill steps with zero OCR by using cached coordinates and timing.
 // ABOUTME: Falls through to the normal StepExecutor for passthrough steps that are already OCR-free.
 
 import Foundation
 import HelperLib
 
-/// Replays compiled scenario steps using cached hints instead of live OCR.
+/// Replays compiled skill steps using cached hints instead of live OCR.
 /// Tap steps use recorded coordinates, wait_for/assert steps use recorded delays,
 /// and scroll_to steps replay exact swipe sequences.
 final class CompiledStepExecutor {
@@ -37,8 +37,8 @@ final class CompiledStepExecutor {
     }
 
     /// Execute a compiled step using cached hints.
-    func execute(step: ScenarioStep, compiledStep: CompiledStep,
-                 stepIndex: Int, scenarioName: String) -> StepResult {
+    func execute(step: SkillStep, compiledStep: CompiledStep,
+                 stepIndex: Int, skillName: String) -> StepResult {
         let startTime = CFAbsoluteTimeGetCurrent()
 
         guard let hints = compiledStep.hints else {
@@ -57,13 +57,13 @@ final class CompiledStepExecutor {
             return executeScrollSequence(step: step, hints: hints, startTime: startTime)
         case .passthrough:
             return normalExecutor.execute(step: step, stepIndex: stepIndex,
-                                           scenarioName: scenarioName)
+                                           skillName: skillName)
         }
     }
 
     // MARK: - Compiled Actions
 
-    private func executeTap(step: ScenarioStep, hints: StepHints,
+    private func executeTap(step: SkillStep, hints: StepHints,
                             startTime: CFAbsoluteTime) -> StepResult {
         guard let x = hints.tapX, let y = hints.tapY else {
             return StepResult(step: step, status: .failed,
@@ -87,7 +87,7 @@ final class CompiledStepExecutor {
         return result
     }
 
-    private func executeSleep(step: ScenarioStep, hints: StepHints,
+    private func executeSleep(step: SkillStep, hints: StepHints,
                               startTime: CFAbsoluteTime) -> StepResult {
         let delayMs = (hints.observedDelayMs ?? 0) + Self.sleepBufferMs
         if delayMs > 0 {
@@ -99,7 +99,7 @@ final class CompiledStepExecutor {
                           durationSeconds: elapsed(startTime))
     }
 
-    private func executeScrollSequence(step: ScenarioStep, hints: StepHints,
+    private func executeScrollSequence(step: SkillStep, hints: StepHints,
                                         startTime: CFAbsoluteTime) -> StepResult {
         let count = hints.scrollCount ?? 0
         let direction = hints.scrollDirection ?? "up"

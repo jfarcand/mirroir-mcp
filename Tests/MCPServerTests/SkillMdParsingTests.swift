@@ -41,7 +41,7 @@ final class SkillMdParsingTests: XCTestCase {
     func testParseMissingFields() {
         let content = """
         ---
-        name: Minimal Scenario
+        name: Minimal Skill
         ---
 
         Just a description paragraph.
@@ -49,7 +49,7 @@ final class SkillMdParsingTests: XCTestCase {
 
         let header = SkillMdParser.parseHeader(content: content, fallbackName: "fallback")
         XCTAssertEqual(header.version, SkillMdParser.currentVersion)
-        XCTAssertEqual(header.name, "Minimal Scenario")
+        XCTAssertEqual(header.name, "Minimal Skill")
         XCTAssertEqual(header.app, "")
         XCTAssertEqual(header.iosMin, "")
         XCTAssertEqual(header.locale, "")
@@ -112,9 +112,9 @@ final class SkillMdParsingTests: XCTestCase {
         1. Do something
         """
 
-        let header = SkillMdParser.parseHeader(content: content, fallbackName: "plain-scenario")
+        let header = SkillMdParser.parseHeader(content: content, fallbackName: "plain-skill")
         XCTAssertEqual(header.version, SkillMdParser.currentVersion)
-        XCTAssertEqual(header.name, "plain-scenario")
+        XCTAssertEqual(header.name, "plain-skill")
         XCTAssertEqual(header.description, "This is plain markdown with no front matter.")
     }
 

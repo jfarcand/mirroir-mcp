@@ -2,7 +2,7 @@
 // Licensed under the Apache License, Version 2.0
 //
 // ABOUTME: Records user interactions with the iPhone Mirroring window via CGEvent tap.
-// ABOUTME: Captures taps, swipes, and keyboard input for scenario YAML generation.
+// ABOUTME: Captures taps, swipes, and keyboard input for skill YAML generation.
 
 import AppKit
 import CoreGraphics
@@ -374,7 +374,7 @@ enum EventClassifier {
         return .tap
     }
 
-    /// Map macOS virtual key codes to scenario key names.
+    /// Map macOS virtual key codes to skill key names.
     /// Returns nil for regular printable keys.
     static func specialKeyName(for keyCode: UInt16) -> String? {
         specialKeyMap[keyCode]

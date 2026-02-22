@@ -14,9 +14,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Clone scenarios repo
+      - name: Clone skills repo
         run: |
-          git clone https://github.com/jfarcand/mirroir-scenarios.git .mirroir-mcp/scenarios
+          git clone https://github.com/jfarcand/mirroir-skills.git .mirroir-mcp/skills
 
       - name: Build (debug)
         run: swift build
@@ -48,7 +48,7 @@ jobs:
           MIRROIR_BUNDLE_ID: com.jfarcand.FakeMirroring
           MIRROIR_PROCESS_NAME: FakeMirroring
         run: |
-          .build/release/mirroir-mcp test --junit test-results.xml --verbose Tests/Fixtures/scenarios/fake-mirroring-check.yaml
+          .build/release/mirroir-mcp test --junit test-results.xml --verbose Tests/Fixtures/skills/fake-mirroring-check.yaml
 
       - name: Upload test results
         if: always()
@@ -86,7 +86,7 @@ jobs:
           lines = sys.stdin.readlines()
           obj = json.loads(lines[1])
           tools = [t['name'] for t in obj['result']['tools']]
-          expected = {'screenshot','start_recording','stop_recording','tap','swipe','drag','type_text','press_key','long_press','double_tap','shake','launch_app','open_url','press_home','press_app_switcher','spotlight','get_orientation','status','check_health','describe_screen','list_scenarios','get_scenario','scroll_to','reset_app','measure','set_network','list_targets','switch_target','record_step','save_compiled'}
+          expected = {'screenshot','start_recording','stop_recording','tap','swipe','drag','type_text','press_key','long_press','double_tap','shake','launch_app','open_url','press_home','press_app_switcher','spotlight','get_orientation','status','check_health','describe_screen','list_skills','get_skill','scroll_to','reset_app','measure','set_network','list_targets','switch_target','record_step','save_compiled'}
           assert set(tools) == expected, f'Expected: {expected}\nGot: {set(tools)}\nMissing: {expected - set(tools)}\nExtra: {set(tools) - expected}'
           print(f'tools/list: {len(tools)} tools registered')
           "
@@ -131,7 +131,7 @@ jobs:
           lines = sys.stdin.readlines()
           obj = json.loads(lines[1])
           tools = [t['name'] for t in obj['result']['tools']]
-          expected_readonly = {'screenshot','start_recording','stop_recording','get_orientation','status','check_health','describe_screen','list_scenarios','get_scenario','list_targets'}
+          expected_readonly = {'screenshot','start_recording','stop_recording','get_orientation','status','check_health','describe_screen','list_skills','get_skill','list_targets'}
           assert set(tools) == expected_readonly, f'Fail-closed should show only readonly tools.\nExpected: {expected_readonly}\nGot: {set(tools)}\nExtra: {set(tools) - expected_readonly}\nMissing: {expected_readonly - set(tools)}'
           print(f'Fail-closed default: {len(tools)} readonly tools (OK)')
           "

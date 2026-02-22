@@ -13,7 +13,7 @@
     Menlo, Consolas, monospace;
   --color-bg: #2e1f0f;
   --color-text: #f5f0eb;
-  --color-muted: #bba98f;
+  --color-muted: #c8b8a0;
   --color-border: #4a3828;
   --color-code-bg: #241a0d;
   --color-accent: #4da3ff;
@@ -26,6 +26,11 @@ html {
   background: linear-gradient(180deg, #1a1008 0%, #2e1f0f 40%, #3d2a16 100%);
   line-height: 1.6;
   -webkit-font-smoothing: antialiased;
+}
+
+/* Prevent background scroll while lightbox is open */
+html.scroll-lock {
+  overflow: hidden;
 }
 
 body {
@@ -174,6 +179,49 @@ pre code {
   max-width: 640px;
   margin: 0.5rem auto 0;
   line-height: 1.5;
+}
+
+/* Hero CTAs */
+.hero-cta {
+  display: flex;
+  justify-content: center;
+  gap: 0.75rem;
+  margin-top: 1.25rem;
+}
+
+.btn-primary {
+  display: inline-block;
+  padding: 0.6rem 1.5rem;
+  background: var(--color-accent);
+  color: #fff;
+  border-radius: 6px;
+  font-weight: 600;
+  font-size: 0.95rem;
+  transition: background 0.15s;
+  text-decoration: none;
+}
+
+.btn-primary:hover {
+  background: #3a8fe6;
+  text-decoration: none;
+}
+
+.btn-secondary {
+  display: inline-block;
+  padding: 0.6rem 1.5rem;
+  border: 1px solid var(--color-border);
+  color: var(--color-muted);
+  border-radius: 6px;
+  font-weight: 500;
+  font-size: 0.95rem;
+  transition: border-color 0.15s, color 0.15s;
+  text-decoration: none;
+}
+
+.btn-secondary:hover {
+  border-color: var(--color-accent);
+  color: var(--color-accent);
+  text-decoration: none;
 }
 
 /* Section styling */
@@ -421,8 +469,8 @@ section > p {
   background: var(--color-accent);
 }
 
-/* Scenario carousel slides */
-.scenario-slide h3 {
+/* Skill carousel slides */
+.skill-slide h3 {
   font-size: 0.85rem;
   font-weight: 600;
   margin-bottom: 0.5rem;
@@ -430,7 +478,7 @@ section > p {
   text-align: center;
 }
 
-.scenario-slide pre {
+.skill-slide pre {
   font-size: 0.78rem;
   margin-bottom: 0;
 }
@@ -444,8 +492,8 @@ section > p {
   margin-bottom: 0;
 }
 
-/* Scenario search */
-.scenario-search-wrap {
+/* Skill search */
+.skill-search-wrap {
   margin-top: 1rem;
   max-width: 480px;
   margin-left: auto;
@@ -453,7 +501,7 @@ section > p {
   position: relative;
 }
 
-.scenario-search-wrap::before {
+.skill-search-wrap::before {
   content: "\1F50D";
   position: absolute;
   left: 0.75rem;
@@ -463,7 +511,7 @@ section > p {
   opacity: 0.5;
 }
 
-.scenario-search-wrap input {
+.skill-search-wrap input {
   width: 100%;
   font-family: var(--font-mono);
   font-size: 0.85rem;
@@ -476,24 +524,24 @@ section > p {
   transition: border-color 0.15s;
 }
 
-.scenario-search-wrap input:focus {
+.skill-search-wrap input:focus {
   border-color: var(--color-accent);
 }
 
-.scenario-search-wrap input::placeholder {
+.skill-search-wrap input::placeholder {
   color: var(--color-muted);
 }
 
-#scenario-results {
+#skill-results {
   list-style: none;
   margin-top: 0.5rem;
 }
 
-#scenario-results:empty {
+#skill-results:empty {
   display: none;
 }
 
-#scenario-results li {
+#skill-results li {
   padding: 0.5rem 0.75rem;
   border: 1px solid var(--color-border);
   border-radius: 6px;
@@ -501,19 +549,27 @@ section > p {
   margin-bottom: 0.4rem;
 }
 
-.scenario-row {
+/* Search status messages */
+.skill-status {
+  text-align: center;
+  font-size: 0.85rem;
+  color: var(--color-muted);
+  padding: 0.75rem;
+}
+
+.skill-row {
   display: flex;
   align-items: center;
   gap: 0.5rem;
 }
 
-.scenario-row a:first-child {
+.skill-row a:first-child {
   font-size: 0.9rem;
   font-weight: 500;
   flex: 1;
 }
 
-.scenario-app {
+.skill-app {
   font-size: 0.75rem;
   color: var(--color-muted);
   background: var(--color-border);
@@ -521,7 +577,7 @@ section > p {
   border-radius: 4px;
 }
 
-.scenario-dl {
+.skill-dl {
   font-size: 0.85rem;
   color: var(--color-muted);
   text-decoration: none;
@@ -530,12 +586,12 @@ section > p {
   transition: color 0.15s;
 }
 
-.scenario-dl:hover {
+.skill-dl:hover {
   color: var(--color-accent);
   text-decoration: none;
 }
 
-.scenario-desc {
+.skill-desc {
   display: block;
   font-size: 0.8rem;
   color: var(--color-muted);
@@ -706,6 +762,7 @@ section > p {
   display: block;
 }
 
+/* Lightbox */
 .demo-lightbox {
   display: none;
   position: fixed;
@@ -724,6 +781,29 @@ section > p {
   max-width: 90vw;
   max-height: 90vh;
   border-radius: 12px;
+}
+
+.lightbox-close {
+  position: absolute;
+  top: 1rem;
+  right: 1rem;
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.15);
+  color: #fff;
+  border: none;
+  font-size: 1.5rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s;
+  z-index: 1001;
+}
+
+.lightbox-close:hover {
+  background: rgba(255, 255, 255, 0.3);
 }
 
 /* Footer */
@@ -750,6 +830,24 @@ footer .trademark {
   margin-top: 1rem;
 }
 
+/* Reduced motion: pause autoplay videos and disable smooth transitions */
+@media (prefers-reduced-motion: reduce) {
+  .demo-slide video {
+    /* Browsers that respect reduced-motion will not autoplay.
+       The JS also disables autoplay for these users. */
+  }
+
+  .carousel-track {
+    scroll-behavior: auto;
+  }
+
+  *,
+  *::before,
+  *::after {
+    transition-duration: 0.01ms !important;
+  }
+}
+
 /* Responsive */
 @media (max-width: 500px) {
   body {
@@ -773,9 +871,13 @@ footer .trademark {
     padding: 0 2rem;
   }
 
-  .scenario-slide pre {
+  .skill-slide pre {
     max-height: 300px;
     overflow-y: auto;
   }
 
+  .hero-cta {
+    flex-direction: column;
+    align-items: center;
+  }
 }

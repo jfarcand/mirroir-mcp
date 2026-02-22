@@ -1,7 +1,7 @@
 // Copyright 2026 jfarcand@apache.org
 // Licensed under the Apache License, Version 2.0
 //
-// ABOUTME: Tests for AI-driven compilation tools: record_step, save_compiled, and get_scenario status.
+// ABOUTME: Tests for AI-driven compilation tools: record_step, save_compiled, and get_skill status.
 // ABOUTME: Verifies session accumulation, hint derivation, file output, and compilation status reporting.
 
 import XCTest
@@ -205,12 +205,12 @@ final class CompilationToolsTests: XCTestCase {
     // MARK: - save_compiled file I/O
 
     func testSaveCompiledWritesFile() throws {
-        let scenarioPath = createScenarioFile("test.md", content: "# Test\nSteps here")
+        let skillPath = createSkillFile("test.md", content: "# Test\nSteps here")
 
-        // Build and save a compiled scenario
-        let hash = try CompiledScenarioIO.sha256(of: scenarioPath)
-        let compiled = CompiledScenario(
-            version: CompiledScenario.currentVersion,
+        // Build and save a compiled skill
+        let hash = try CompiledSkillIO.sha256(of: skillPath)
+        let compiled = CompiledSkill(
+            version: CompiledSkill.currentVersion,
             source: SourceInfo(sha256: hash, compiledAt: "2026-02-21T10:00:00Z"),
             device: DeviceInfo(windowWidth: 410, windowHeight: 898, orientation: "portrait"),
             steps: [
@@ -221,13 +221,13 @@ final class CompilationToolsTests: XCTestCase {
             ]
         )
 
-        try CompiledScenarioIO.save(compiled, for: scenarioPath)
+        try CompiledSkillIO.save(compiled, for: skillPath)
 
-        let compiledPath = CompiledScenarioIO.compiledPath(for: scenarioPath)
+        let compiledPath = CompiledSkillIO.compiledPath(for: skillPath)
         XCTAssertTrue(FileManager.default.fileExists(atPath: compiledPath))
 
         // Verify it can be loaded back
-        let loaded = try CompiledScenarioIO.load(for: scenarioPath)
+        let loaded = try CompiledSkillIO.load(for: skillPath)
         XCTAssertEqual(loaded, compiled)
     }
 
@@ -248,20 +248,20 @@ final class CompilationToolsTests: XCTestCase {
 
     // MARK: - compilationStatus
 
-    func testGetScenarioReportsNotCompiled() {
-        let scenarioPath = createScenarioFile("test.md", content: "# Test\nBody")
+    func testGetSkillReportsNotCompiled() {
+        let skillPath = createSkillFile("test.md", content: "# Test\nBody")
 
-        let status = MirroirMCP.compilationStatus(for: scenarioPath)
+        let status = MirroirMCP.compilationStatus(for: skillPath)
         XCTAssertTrue(status.contains("[Not compiled"),
             "Expected [Not compiled], got: \(status)")
     }
 
-    func testGetScenarioReportsFresh() throws {
-        let scenarioPath = createScenarioFile("fresh.md", content: "# Fresh\nBody")
+    func testGetSkillReportsFresh() throws {
+        let skillPath = createSkillFile("fresh.md", content: "# Fresh\nBody")
 
-        let hash = try CompiledScenarioIO.sha256(of: scenarioPath)
-        let compiled = CompiledScenario(
-            version: CompiledScenario.currentVersion,
+        let hash = try CompiledSkillIO.sha256(of: skillPath)
+        let compiled = CompiledSkill(
+            version: CompiledSkill.currentVersion,
             source: SourceInfo(sha256: hash, compiledAt: "2026-02-21T10:00:00Z"),
             device: DeviceInfo(windowWidth: 410, windowHeight: 898, orientation: "portrait"),
             steps: [
@@ -269,30 +269,30 @@ final class CompilationToolsTests: XCTestCase {
                              hints: .passthrough()),
             ]
         )
-        try CompiledScenarioIO.save(compiled, for: scenarioPath)
+        try CompiledSkillIO.save(compiled, for: skillPath)
 
-        let status = MirroirMCP.compilationStatus(for: scenarioPath)
+        let status = MirroirMCP.compilationStatus(for: skillPath)
         XCTAssertEqual(status, "[Compiled: fresh]")
     }
 
-    func testGetScenarioReportsStale() throws {
-        let scenarioPath = createScenarioFile("stale.md", content: "# Original\nBody")
+    func testGetSkillReportsStale() throws {
+        let skillPath = createSkillFile("stale.md", content: "# Original\nBody")
 
         // Compile with the original content
-        let hash = try CompiledScenarioIO.sha256(of: scenarioPath)
-        let compiled = CompiledScenario(
-            version: CompiledScenario.currentVersion,
+        let hash = try CompiledSkillIO.sha256(of: skillPath)
+        let compiled = CompiledSkill(
+            version: CompiledSkill.currentVersion,
             source: SourceInfo(sha256: hash, compiledAt: "2026-02-21T10:00:00Z"),
             device: DeviceInfo(windowWidth: 410, windowHeight: 898, orientation: "portrait"),
             steps: []
         )
-        try CompiledScenarioIO.save(compiled, for: scenarioPath)
+        try CompiledSkillIO.save(compiled, for: skillPath)
 
         // Modify the source file
         try "# Modified\nDifferent body".write(
-            toFile: scenarioPath, atomically: true, encoding: .utf8)
+            toFile: skillPath, atomically: true, encoding: .utf8)
 
-        let status = MirroirMCP.compilationStatus(for: scenarioPath)
+        let status = MirroirMCP.compilationStatus(for: skillPath)
         XCTAssertTrue(status.contains("[Compiled: stale"),
             "Expected [Compiled: stale], got: \(status)")
         XCTAssertTrue(status.contains("changed"),
@@ -303,11 +303,11 @@ final class CompilationToolsTests: XCTestCase {
         // compilationStatus should only check version + hash, not dimensions.
         // This validates the fix for the circular dimension comparison bug where
         // compiled.device dimensions were used as "current" dimensions.
-        let scenarioPath = createScenarioFile("dimensions.md", content: "# Dimensions\nBody")
+        let skillPath = createSkillFile("dimensions.md", content: "# Dimensions\nBody")
 
-        let hash = try CompiledScenarioIO.sha256(of: scenarioPath)
-        let compiled = CompiledScenario(
-            version: CompiledScenario.currentVersion,
+        let hash = try CompiledSkillIO.sha256(of: skillPath)
+        let compiled = CompiledSkill(
+            version: CompiledSkill.currentVersion,
             source: SourceInfo(sha256: hash, compiledAt: "2026-02-21T10:00:00Z"),
             device: DeviceInfo(windowWidth: 999, windowHeight: 1, orientation: "landscape"),
             steps: [
@@ -315,28 +315,28 @@ final class CompilationToolsTests: XCTestCase {
                              hints: .passthrough()),
             ]
         )
-        try CompiledScenarioIO.save(compiled, for: scenarioPath)
+        try CompiledSkillIO.save(compiled, for: skillPath)
 
         // compilationStatus should report fresh because hash matches,
         // even though dimensions are unusual — dimension check is deferred to the test runner
-        let status = MirroirMCP.compilationStatus(for: scenarioPath)
+        let status = MirroirMCP.compilationStatus(for: skillPath)
         XCTAssertEqual(status, "[Compiled: fresh]",
             "compilationStatus should not check dimensions; got: \(status)")
     }
 
     func testCompilationStatusDetectsVersionMismatch() throws {
-        let scenarioPath = createScenarioFile("version.md", content: "# Version\nBody")
+        let skillPath = createSkillFile("version.md", content: "# Version\nBody")
 
-        let hash = try CompiledScenarioIO.sha256(of: scenarioPath)
-        let compiled = CompiledScenario(
+        let hash = try CompiledSkillIO.sha256(of: skillPath)
+        let compiled = CompiledSkill(
             version: 999,
             source: SourceInfo(sha256: hash, compiledAt: "2026-02-21T10:00:00Z"),
             device: DeviceInfo(windowWidth: 410, windowHeight: 898, orientation: "portrait"),
             steps: []
         )
-        try CompiledScenarioIO.save(compiled, for: scenarioPath)
+        try CompiledSkillIO.save(compiled, for: skillPath)
 
-        let status = MirroirMCP.compilationStatus(for: scenarioPath)
+        let status = MirroirMCP.compilationStatus(for: skillPath)
         XCTAssertTrue(status.contains("[Compiled: stale"),
             "Expected stale for version mismatch, got: \(status)")
         XCTAssertTrue(status.contains("version"),
@@ -345,8 +345,8 @@ final class CompilationToolsTests: XCTestCase {
 
     func testCompiledPathForMdMatchesYamlPattern() {
         // Verify that .md files get .compiled.json just like .yaml files
-        let mdPath = CompiledScenarioIO.compiledPath(for: "apps/test.md")
-        let yamlPath = CompiledScenarioIO.compiledPath(for: "apps/test.yaml")
+        let mdPath = CompiledSkillIO.compiledPath(for: "apps/test.md")
+        let yamlPath = CompiledSkillIO.compiledPath(for: "apps/test.yaml")
         XCTAssertEqual(mdPath, "apps/test.compiled.json")
         XCTAssertEqual(yamlPath, "apps/test.compiled.json")
     }
@@ -354,7 +354,7 @@ final class CompilationToolsTests: XCTestCase {
     // MARK: - Helpers
 
     @discardableResult
-    private func createScenarioFile(
+    private func createSkillFile(
         _ relativePath: String,
         content: String
     ) -> String {

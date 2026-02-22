@@ -6,11 +6,11 @@
 
 import Foundation
 
-/// Generates JUnit XML from scenario test results.
+/// Generates JUnit XML from skill test results.
 enum JUnitReporter {
 
-    /// Generate JUnit XML string from scenario results.
-    static func generateXML(results: [ConsoleReporter.ScenarioResult]) -> String {
+    /// Generate JUnit XML string from skill results.
+    static func generateXML(results: [ConsoleReporter.SkillResult]) -> String {
         var xml = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
 
         let totalTests = results.flatMap { $0.stepResults }.count
@@ -32,8 +32,8 @@ enum JUnitReporter {
         return xml
     }
 
-    /// Generate a single testsuite element for a scenario.
-    private static func generateTestSuite(result: ConsoleReporter.ScenarioResult) -> String {
+    /// Generate a single testsuite element for a skill.
+    private static func generateTestSuite(result: ConsoleReporter.SkillResult) -> String {
         let testCount = result.stepResults.count
         let failureCount = result.stepResults.filter { $0.status == .failed }.count
         let skippedCount = result.stepResults.filter { $0.status == .skipped }.count
@@ -81,7 +81,7 @@ enum JUnitReporter {
     }
 
     /// Write JUnit XML to a file at the given path.
-    static func writeXML(results: [ConsoleReporter.ScenarioResult], to path: String) throws {
+    static func writeXML(results: [ConsoleReporter.SkillResult], to path: String) throws {
         let xml = generateXML(results: results)
         let dir = (path as NSString).deletingLastPathComponent
         if !dir.isEmpty {

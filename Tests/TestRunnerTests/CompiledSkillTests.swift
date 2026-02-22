@@ -1,18 +1,18 @@
 // Copyright 2026 jfarcand@apache.org
 // Licensed under the Apache License, Version 2.0
 //
-// ABOUTME: Tests for CompiledScenario data model, JSON serialization, staleness detection.
+// ABOUTME: Tests for CompiledSkill data model, JSON serialization, staleness detection.
 // ABOUTME: Validates path derivation, SHA-256 hashing, and version/dimension mismatch handling.
 
 import XCTest
 @testable import mirroir_mcp
 
-final class CompiledScenarioTests: XCTestCase {
+final class CompiledSkillTests: XCTestCase {
 
     // MARK: - JSON Round-Trip
 
     func testJSONRoundTrip() throws {
-        let compiled = CompiledScenario(
+        let compiled = CompiledSkill(
             version: 1,
             source: SourceInfo(sha256: "abc123", compiledAt: "2026-02-19T14:30:00Z"),
             device: DeviceInfo(windowWidth: 410.0, windowHeight: 898.0, orientation: "portrait"),
@@ -31,13 +31,13 @@ final class CompiledScenarioTests: XCTestCase {
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
         let data = try encoder.encode(compiled)
-        let decoded = try JSONDecoder().decode(CompiledScenario.self, from: data)
+        let decoded = try JSONDecoder().decode(CompiledSkill.self, from: data)
 
         XCTAssertEqual(compiled, decoded)
     }
 
     func testJSONContainsExpectedKeys() throws {
-        let compiled = CompiledScenario(
+        let compiled = CompiledSkill(
             version: 1,
             source: SourceInfo(sha256: "hash", compiledAt: "2026-01-01T00:00:00Z"),
             device: DeviceInfo(windowWidth: 410, windowHeight: 898, orientation: "portrait"),
@@ -60,17 +60,17 @@ final class CompiledScenarioTests: XCTestCase {
     // MARK: - Path Derivation
 
     func testCompiledPathFromYAML() {
-        let result = CompiledScenarioIO.compiledPath(for: "apps/settings/check-about.yaml")
+        let result = CompiledSkillIO.compiledPath(for: "apps/settings/check-about.yaml")
         XCTAssertEqual(result, "apps/settings/check-about.compiled.json")
     }
 
     func testCompiledPathFromYAMLWithPath() {
-        let result = CompiledScenarioIO.compiledPath(for: "/home/user/scenarios/login.yaml")
-        XCTAssertEqual(result, "/home/user/scenarios/login.compiled.json")
+        let result = CompiledSkillIO.compiledPath(for: "/home/user/skills/login.yaml")
+        XCTAssertEqual(result, "/home/user/skills/login.compiled.json")
     }
 
     func testCompiledPathFromMd() {
-        let result = CompiledScenarioIO.compiledPath(for: "apps/settings/check-about.md")
+        let result = CompiledSkillIO.compiledPath(for: "apps/settings/check-about.md")
         XCTAssertEqual(result, "apps/settings/check-about.compiled.json")
     }
 
@@ -79,18 +79,18 @@ final class CompiledScenarioTests: XCTestCase {
     func testSHA256Consistency() {
         let data1 = Data("hello world".utf8)
         let data2 = Data("hello world".utf8)
-        XCTAssertEqual(CompiledScenarioIO.sha256(data: data1),
-                       CompiledScenarioIO.sha256(data: data2))
+        XCTAssertEqual(CompiledSkillIO.sha256(data: data1),
+                       CompiledSkillIO.sha256(data: data2))
     }
 
     func testSHA256DifferentInputs() {
-        let hash1 = CompiledScenarioIO.sha256(data: Data("hello".utf8))
-        let hash2 = CompiledScenarioIO.sha256(data: Data("world".utf8))
+        let hash1 = CompiledSkillIO.sha256(data: Data("hello".utf8))
+        let hash2 = CompiledSkillIO.sha256(data: Data("world".utf8))
         XCTAssertNotEqual(hash1, hash2)
     }
 
     func testSHA256Length() {
-        let hash = CompiledScenarioIO.sha256(data: Data("test".utf8))
+        let hash = CompiledSkillIO.sha256(data: Data("test".utf8))
         XCTAssertEqual(hash.count, 64) // SHA-256 = 32 bytes = 64 hex chars
     }
 
@@ -105,17 +105,17 @@ final class CompiledScenarioTests: XCTestCase {
         let yamlContent = "name: test\nsteps:\n  - tap: \"OK\"\n"
         try yamlContent.write(toFile: yamlPath, atomically: true, encoding: .utf8)
 
-        let hash = try CompiledScenarioIO.sha256(of: yamlPath)
+        let hash = try CompiledSkillIO.sha256(of: yamlPath)
 
-        let compiled = CompiledScenario(
-            version: CompiledScenario.currentVersion,
+        let compiled = CompiledSkill(
+            version: CompiledSkill.currentVersion,
             source: SourceInfo(sha256: hash, compiledAt: "2026-02-19T14:30:00Z"),
             device: DeviceInfo(windowWidth: 410, windowHeight: 898, orientation: "portrait"),
             steps: []
         )
 
-        let result = CompiledScenarioIO.checkStaleness(
-            compiled: compiled, scenarioPath: yamlPath,
+        let result = CompiledSkillIO.checkStaleness(
+            compiled: compiled, skillPath: yamlPath,
             windowWidth: 410, windowHeight: 898)
         XCTAssertEqual(result, .fresh)
     }
@@ -128,15 +128,15 @@ final class CompiledScenarioTests: XCTestCase {
         let yamlPath = tempDir + "/test.yaml"
         try "original content".write(toFile: yamlPath, atomically: true, encoding: .utf8)
 
-        let compiled = CompiledScenario(
-            version: CompiledScenario.currentVersion,
+        let compiled = CompiledSkill(
+            version: CompiledSkill.currentVersion,
             source: SourceInfo(sha256: "stale-hash", compiledAt: "2026-02-19T14:30:00Z"),
             device: DeviceInfo(windowWidth: 410, windowHeight: 898, orientation: "portrait"),
             steps: []
         )
 
-        let result = CompiledScenarioIO.checkStaleness(
-            compiled: compiled, scenarioPath: yamlPath,
+        let result = CompiledSkillIO.checkStaleness(
+            compiled: compiled, skillPath: yamlPath,
             windowWidth: 410, windowHeight: 898)
         if case .stale(let reason) = result {
             XCTAssertTrue(reason.contains("changed"))
@@ -153,18 +153,18 @@ final class CompiledScenarioTests: XCTestCase {
         let yamlPath = tempDir + "/test.yaml"
         let content = "test content"
         try content.write(toFile: yamlPath, atomically: true, encoding: .utf8)
-        let hash = try CompiledScenarioIO.sha256(of: yamlPath)
+        let hash = try CompiledSkillIO.sha256(of: yamlPath)
 
-        let compiled = CompiledScenario(
-            version: CompiledScenario.currentVersion,
+        let compiled = CompiledSkill(
+            version: CompiledSkill.currentVersion,
             source: SourceInfo(sha256: hash, compiledAt: "2026-02-19T14:30:00Z"),
             device: DeviceInfo(windowWidth: 410, windowHeight: 898, orientation: "portrait"),
             steps: []
         )
 
         // Different window dimensions
-        let result = CompiledScenarioIO.checkStaleness(
-            compiled: compiled, scenarioPath: yamlPath,
+        let result = CompiledSkillIO.checkStaleness(
+            compiled: compiled, skillPath: yamlPath,
             windowWidth: 390, windowHeight: 844)
         if case .stale(let reason) = result {
             XCTAssertTrue(reason.contains("dimensions"))
@@ -174,15 +174,15 @@ final class CompiledScenarioTests: XCTestCase {
     }
 
     func testStaleWhenVersionMismatch() throws {
-        let compiled = CompiledScenario(
+        let compiled = CompiledSkill(
             version: 999,
             source: SourceInfo(sha256: "anything", compiledAt: "2026-02-19T14:30:00Z"),
             device: DeviceInfo(windowWidth: 410, windowHeight: 898, orientation: "portrait"),
             steps: []
         )
 
-        let result = CompiledScenarioIO.checkStaleness(
-            compiled: compiled, scenarioPath: "/nonexistent.yaml",
+        let result = CompiledSkillIO.checkStaleness(
+            compiled: compiled, skillPath: "/nonexistent.yaml",
             windowWidth: 410, windowHeight: 898)
         if case .stale(let reason) = result {
             XCTAssertTrue(reason.contains("version"))
@@ -201,7 +201,7 @@ final class CompiledScenarioTests: XCTestCase {
         let yamlPath = tempDir + "/test.yaml"
         try "content".write(toFile: yamlPath, atomically: true, encoding: .utf8)
 
-        let compiled = CompiledScenario(
+        let compiled = CompiledSkill(
             version: 1,
             source: SourceInfo(sha256: "abc", compiledAt: "2026-02-19T14:30:00Z"),
             device: DeviceInfo(windowWidth: 410, windowHeight: 898, orientation: "portrait"),
@@ -211,14 +211,14 @@ final class CompiledScenarioTests: XCTestCase {
             ]
         )
 
-        try CompiledScenarioIO.save(compiled, for: yamlPath)
-        let loaded = try CompiledScenarioIO.load(for: yamlPath)
+        try CompiledSkillIO.save(compiled, for: yamlPath)
+        let loaded = try CompiledSkillIO.load(for: yamlPath)
 
         XCTAssertEqual(loaded, compiled)
     }
 
     func testLoadReturnsNilForMissingFile() throws {
-        let result = try CompiledScenarioIO.load(for: "/nonexistent/test.yaml")
+        let result = try CompiledSkillIO.load(for: "/nonexistent/test.yaml")
         XCTAssertNil(result)
     }
 
@@ -256,32 +256,32 @@ final class CompiledScenarioTests: XCTestCase {
         XCTAssertNil(hints.scrollCount)
     }
 
-    // MARK: - ScenarioStep Accessors
+    // MARK: - SkillStep Accessors
 
     func testTypeKey() {
-        XCTAssertEqual(ScenarioStep.launch(appName: "Settings").typeKey, "launch")
-        XCTAssertEqual(ScenarioStep.tap(label: "OK").typeKey, "tap")
-        XCTAssertEqual(ScenarioStep.type(text: "hello").typeKey, "type")
-        XCTAssertEqual(ScenarioStep.pressKey(keyName: "return", modifiers: []).typeKey, "press_key")
-        XCTAssertEqual(ScenarioStep.swipe(direction: "up").typeKey, "swipe")
-        XCTAssertEqual(ScenarioStep.waitFor(label: "X", timeoutSeconds: nil).typeKey, "wait_for")
-        XCTAssertEqual(ScenarioStep.assertVisible(label: "X").typeKey, "assert_visible")
-        XCTAssertEqual(ScenarioStep.assertNotVisible(label: "X").typeKey, "assert_not_visible")
-        XCTAssertEqual(ScenarioStep.screenshot(label: "X").typeKey, "screenshot")
-        XCTAssertEqual(ScenarioStep.home.typeKey, "home")
-        XCTAssertEqual(ScenarioStep.openURL(url: "https://x").typeKey, "open_url")
-        XCTAssertEqual(ScenarioStep.shake.typeKey, "shake")
-        XCTAssertEqual(ScenarioStep.scrollTo(label: "X", direction: "up", maxScrolls: 10).typeKey, "scroll_to")
-        XCTAssertEqual(ScenarioStep.resetApp(appName: "X").typeKey, "reset_app")
-        XCTAssertEqual(ScenarioStep.setNetwork(mode: "wifi_on").typeKey, "set_network")
-        XCTAssertEqual(ScenarioStep.skipped(stepType: "remember", reason: "AI").typeKey, "remember")
+        XCTAssertEqual(SkillStep.launch(appName: "Settings").typeKey, "launch")
+        XCTAssertEqual(SkillStep.tap(label: "OK").typeKey, "tap")
+        XCTAssertEqual(SkillStep.type(text: "hello").typeKey, "type")
+        XCTAssertEqual(SkillStep.pressKey(keyName: "return", modifiers: []).typeKey, "press_key")
+        XCTAssertEqual(SkillStep.swipe(direction: "up").typeKey, "swipe")
+        XCTAssertEqual(SkillStep.waitFor(label: "X", timeoutSeconds: nil).typeKey, "wait_for")
+        XCTAssertEqual(SkillStep.assertVisible(label: "X").typeKey, "assert_visible")
+        XCTAssertEqual(SkillStep.assertNotVisible(label: "X").typeKey, "assert_not_visible")
+        XCTAssertEqual(SkillStep.screenshot(label: "X").typeKey, "screenshot")
+        XCTAssertEqual(SkillStep.home.typeKey, "home")
+        XCTAssertEqual(SkillStep.openURL(url: "https://x").typeKey, "open_url")
+        XCTAssertEqual(SkillStep.shake.typeKey, "shake")
+        XCTAssertEqual(SkillStep.scrollTo(label: "X", direction: "up", maxScrolls: 10).typeKey, "scroll_to")
+        XCTAssertEqual(SkillStep.resetApp(appName: "X").typeKey, "reset_app")
+        XCTAssertEqual(SkillStep.setNetwork(mode: "wifi_on").typeKey, "set_network")
+        XCTAssertEqual(SkillStep.skipped(stepType: "remember", reason: "AI").typeKey, "remember")
     }
 
     func testLabelValue() {
-        XCTAssertEqual(ScenarioStep.launch(appName: "Settings").labelValue, "Settings")
-        XCTAssertEqual(ScenarioStep.tap(label: "OK").labelValue, "OK")
-        XCTAssertNil(ScenarioStep.home.labelValue)
-        XCTAssertNil(ScenarioStep.shake.labelValue)
-        XCTAssertNil(ScenarioStep.skipped(stepType: "remember", reason: "AI").labelValue)
+        XCTAssertEqual(SkillStep.launch(appName: "Settings").labelValue, "Settings")
+        XCTAssertEqual(SkillStep.tap(label: "OK").labelValue, "OK")
+        XCTAssertNil(SkillStep.home.labelValue)
+        XCTAssertNil(SkillStep.shake.labelValue)
+        XCTAssertNil(SkillStep.skipped(stepType: "remember", reason: "AI").labelValue)
     }
 }

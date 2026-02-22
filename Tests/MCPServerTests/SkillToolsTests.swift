@@ -1,20 +1,20 @@
 // Copyright 2026 jfarcand@apache.org
 // Licensed under the Apache License, Version 2.0
 //
-// ABOUTME: Tests for scenario helper functions: YAML discovery, header parsing, env var substitution.
-// ABOUTME: Uses temporary directories to simulate project-local and global scenario layouts.
+// ABOUTME: Tests for skill helper functions: YAML discovery, header parsing, env var substitution.
+// ABOUTME: Uses temporary directories to simulate project-local and global skill layouts.
 
 import XCTest
 import HelperLib
 @testable import mirroir_mcp
 
-final class ScenarioToolsTests: XCTestCase {
+final class SkillToolsTests: XCTestCase {
 
     private var tmpDir: String!
 
     override func setUp() {
         super.setUp()
-        tmpDir = NSTemporaryDirectory() + "scenario-tests-\(UUID().uuidString)"
+        tmpDir = NSTemporaryDirectory() + "skill-tests-\(UUID().uuidString)"
         try? FileManager.default.createDirectory(
             atPath: tmpDir, withIntermediateDirectories: true)
     }
@@ -61,8 +61,8 @@ final class ScenarioToolsTests: XCTestCase {
     // MARK: - extractYAMLValue
 
     func testExtractSimpleValue() {
-        let result = MirroirMCP.extractYAMLValue(from: "name: My Scenario", key: "name")
-        XCTAssertEqual(result, "My Scenario")
+        let result = MirroirMCP.extractYAMLValue(from: "name: My Skill", key: "name")
+        XCTAssertEqual(result, "My Skill")
     }
 
     func testExtractDoubleQuotedValue() {
@@ -85,7 +85,7 @@ final class ScenarioToolsTests: XCTestCase {
         XCTAssertEqual(result, "spaced  out")
     }
 
-    // MARK: - extractScenarioHeader (inline YAML)
+    // MARK: - extractSkillHeader (inline YAML)
 
     func testHeaderSimpleInline() {
         let yaml = """
@@ -95,7 +95,7 @@ final class ScenarioToolsTests: XCTestCase {
         steps:
           - launch: "Slack"
         """
-        let info = MirroirMCP.extractScenarioHeader(
+        let info = MirroirMCP.extractSkillHeader(
             from: yaml, fallbackName: "fallback", source: "test")
         XCTAssertEqual(info.name, "Send Message")
         XCTAssertEqual(info.description, "Send a DM to someone")
@@ -109,9 +109,9 @@ final class ScenarioToolsTests: XCTestCase {
         steps:
           - launch: "Weather"
         """
-        let info = MirroirMCP.extractScenarioHeader(
-            from: yaml, fallbackName: "my-scenario", source: "global")
-        XCTAssertEqual(info.name, "my-scenario")
+        let info = MirroirMCP.extractSkillHeader(
+            from: yaml, fallbackName: "my-skill", source: "global")
+        XCTAssertEqual(info.name, "my-skill")
         XCTAssertEqual(info.description, "Check the forecast")
     }
 
@@ -122,7 +122,7 @@ final class ScenarioToolsTests: XCTestCase {
         steps:
           - launch: "Settings"
         """
-        let info = MirroirMCP.extractScenarioHeader(
+        let info = MirroirMCP.extractSkillHeader(
             from: yaml, fallbackName: "fallback", source: "local")
         XCTAssertEqual(info.name, "Quick Test")
         XCTAssertEqual(info.description, "")
@@ -139,7 +139,7 @@ final class ScenarioToolsTests: XCTestCase {
         steps:
           - launch: "Notes"
         """
-        let info = MirroirMCP.extractScenarioHeader(
+        let info = MirroirMCP.extractSkillHeader(
             from: yaml, fallbackName: "fallback", source: "test")
         XCTAssertEqual(info.name, "Multi Line")
         XCTAssertEqual(info.description,
@@ -155,7 +155,7 @@ final class ScenarioToolsTests: XCTestCase {
         steps:
           - launch: "App"
         """
-        let info = MirroirMCP.extractScenarioHeader(
+        let info = MirroirMCP.extractSkillHeader(
             from: yaml, fallbackName: "fallback", source: "test")
         XCTAssertEqual(info.name, "Literal Block")
         XCTAssertEqual(info.description, "Line one Line two")
@@ -169,14 +169,14 @@ final class ScenarioToolsTests: XCTestCase {
         steps:
           - launch: "App"
         """
-        let info = MirroirMCP.extractScenarioHeader(
+        let info = MirroirMCP.extractSkillHeader(
             from: yaml, fallbackName: "fallback", source: "test")
         XCTAssertEqual(info.name, "Strip Block")
         XCTAssertEqual(info.description, "Stripped trailing newline")
     }
 
     func testHeaderEmptyContent() {
-        let info = MirroirMCP.extractScenarioHeader(
+        let info = MirroirMCP.extractSkillHeader(
             from: "", fallbackName: "empty", source: "test")
         XCTAssertEqual(info.name, "empty")
         XCTAssertEqual(info.description, "")
@@ -191,12 +191,12 @@ final class ScenarioToolsTests: XCTestCase {
         steps:
           - launch: "Calendar"
         """
-        let info = MirroirMCP.extractScenarioHeader(
+        let info = MirroirMCP.extractSkillHeader(
             from: yaml, fallbackName: "fallback", source: "test")
         XCTAssertEqual(info.description, "Description content here")
     }
 
-    // MARK: - extractScenarioHeader (from file)
+    // MARK: - extractSkillHeader (from file)
 
     func testHeaderFromFile() {
         let path = createFile("test.yaml", content: """
@@ -205,14 +205,14 @@ final class ScenarioToolsTests: XCTestCase {
         steps:
           - launch: "App"
         """)
-        let info = MirroirMCP.extractScenarioHeader(
+        let info = MirroirMCP.extractSkillHeader(
             from: path, source: "local")
         XCTAssertEqual(info.name, "File Test")
         XCTAssertEqual(info.description, "Read from disk")
     }
 
     func testHeaderFromMissingFile() {
-        let info = MirroirMCP.extractScenarioHeader(
+        let info = MirroirMCP.extractSkillHeader(
             from: tmpDir + "/nonexistent.yaml", source: "local")
         XCTAssertEqual(info.name, "nonexistent")
         XCTAssertEqual(info.description, "")
@@ -221,41 +221,41 @@ final class ScenarioToolsTests: XCTestCase {
     // MARK: - substituteEnvVars
 
     func testSubstituteWithEnvVar() {
-        setenv("SCENARIO_TEST_VAR", "hello", 1)
-        defer { unsetenv("SCENARIO_TEST_VAR") }
+        setenv("SKILL_TEST_VAR", "hello", 1)
+        defer { unsetenv("SKILL_TEST_VAR") }
 
-        let result = MirroirMCP.substituteEnvVars(in: "say ${SCENARIO_TEST_VAR}")
+        let result = MirroirMCP.substituteEnvVars(in: "say ${SKILL_TEST_VAR}")
         XCTAssertEqual(result, "say hello")
     }
 
     func testSubstituteWithDefault() {
-        unsetenv("SCENARIO_UNSET_VAR")
+        unsetenv("SKILL_UNSET_VAR")
 
-        let result = MirroirMCP.substituteEnvVars(in: "city: ${SCENARIO_UNSET_VAR:-Montreal}")
+        let result = MirroirMCP.substituteEnvVars(in: "city: ${SKILL_UNSET_VAR:-Montreal}")
         XCTAssertEqual(result, "city: Montreal")
     }
 
     func testSubstituteUnsetNoDefault() {
-        unsetenv("SCENARIO_MISSING_VAR")
+        unsetenv("SKILL_MISSING_VAR")
 
-        let result = MirroirMCP.substituteEnvVars(in: "value: ${SCENARIO_MISSING_VAR}")
-        XCTAssertEqual(result, "value: ${SCENARIO_MISSING_VAR}")
+        let result = MirroirMCP.substituteEnvVars(in: "value: ${SKILL_MISSING_VAR}")
+        XCTAssertEqual(result, "value: ${SKILL_MISSING_VAR}")
     }
 
     func testSubstituteEnvOverridesDefault() {
-        setenv("SCENARIO_SET_VAR", "actual", 1)
-        defer { unsetenv("SCENARIO_SET_VAR") }
+        setenv("SKILL_SET_VAR", "actual", 1)
+        defer { unsetenv("SKILL_SET_VAR") }
 
-        let result = MirroirMCP.substituteEnvVars(in: "${SCENARIO_SET_VAR:-fallback}")
+        let result = MirroirMCP.substituteEnvVars(in: "${SKILL_SET_VAR:-fallback}")
         XCTAssertEqual(result, "actual")
     }
 
     func testSubstituteMultipleVars() {
-        setenv("SCENARIO_A", "alpha", 1)
-        setenv("SCENARIO_B", "beta", 1)
-        defer { unsetenv("SCENARIO_A"); unsetenv("SCENARIO_B") }
+        setenv("SKILL_A", "alpha", 1)
+        setenv("SKILL_B", "beta", 1)
+        defer { unsetenv("SKILL_A"); unsetenv("SKILL_B") }
 
-        let result = MirroirMCP.substituteEnvVars(in: "${SCENARIO_A} and ${SCENARIO_B}")
+        let result = MirroirMCP.substituteEnvVars(in: "${SKILL_A} and ${SKILL_B}")
         XCTAssertEqual(result, "alpha and beta")
     }
 
@@ -272,17 +272,17 @@ final class ScenarioToolsTests: XCTestCase {
     }
 
     func testSubstituteEmptyDefault() {
-        unsetenv("SCENARIO_EMPTY_DEFAULT")
+        unsetenv("SKILL_EMPTY_DEFAULT")
 
-        let result = MirroirMCP.substituteEnvVars(in: "val=${SCENARIO_EMPTY_DEFAULT:-}")
+        let result = MirroirMCP.substituteEnvVars(in: "val=${SKILL_EMPTY_DEFAULT:-}")
         XCTAssertEqual(result, "val=")
     }
 
-    // MARK: - resolveScenario
+    // MARK: - resolveSkill
 
     func testResolveExactPath() {
         createFile("apps/slack/send-message.yaml", content: "name: Send")
-        let (path, ambiguous) = MirroirMCP.resolveScenario(
+        let (path, ambiguous) = MirroirMCP.resolveSkill(
             name: "apps/slack/send-message", dirs: [tmpDir])
         XCTAssertNotNil(path)
         XCTAssertTrue(path!.hasSuffix("apps/slack/send-message.yaml"))
@@ -291,7 +291,7 @@ final class ScenarioToolsTests: XCTestCase {
 
     func testResolveBasenameUnique() {
         createFile("apps/slack/send-message.yaml", content: "name: Send")
-        let (path, ambiguous) = MirroirMCP.resolveScenario(
+        let (path, ambiguous) = MirroirMCP.resolveSkill(
             name: "send-message", dirs: [tmpDir])
         XCTAssertNotNil(path)
         XCTAssertTrue(path!.hasSuffix("send-message.yaml"))
@@ -301,14 +301,14 @@ final class ScenarioToolsTests: XCTestCase {
     func testResolveBasenameAmbiguous() {
         createFile("apps/slack/send-message.yaml", content: "name: Slack Send")
         createFile("apps/teams/send-message.yaml", content: "name: Teams Send")
-        let (path, ambiguous) = MirroirMCP.resolveScenario(
+        let (path, ambiguous) = MirroirMCP.resolveSkill(
             name: "send-message", dirs: [tmpDir])
         XCTAssertNil(path)
         XCTAssertEqual(ambiguous.count, 2)
     }
 
     func testResolveNotFound() {
-        let (path, ambiguous) = MirroirMCP.resolveScenario(
+        let (path, ambiguous) = MirroirMCP.resolveSkill(
             name: "nonexistent", dirs: [tmpDir])
         XCTAssertNil(path)
         XCTAssertTrue(ambiguous.isEmpty)
@@ -324,7 +324,7 @@ final class ScenarioToolsTests: XCTestCase {
         createFile("local/test.yaml", content: "name: Local", baseDir: tmpDir)
         createFile("global/test.yaml", content: "name: Global", baseDir: tmpDir)
 
-        let (path, _) = MirroirMCP.resolveScenario(
+        let (path, _) = MirroirMCP.resolveSkill(
             name: "test", dirs: [localDir, globalDir])
         XCTAssertNotNil(path)
         XCTAssertTrue(path!.contains("/local/"))
@@ -343,7 +343,7 @@ final class ScenarioToolsTests: XCTestCase {
         createFile("global/apps/settings/list-apps.yaml",
             content: "name: Global List", baseDir: tmpDir)
 
-        let (path, ambiguous) = MirroirMCP.resolveScenario(
+        let (path, ambiguous) = MirroirMCP.resolveSkill(
             name: "list-apps", dirs: [localDir, globalDir])
         XCTAssertNotNil(path, "Same rel path in both dirs should resolve, not be ambiguous")
         XCTAssertTrue(ambiguous.isEmpty)
@@ -352,29 +352,29 @@ final class ScenarioToolsTests: XCTestCase {
 
     func testResolveWithYamlExtension() {
         createFile("test.yaml", content: "name: Test")
-        let (path, _) = MirroirMCP.resolveScenario(
+        let (path, _) = MirroirMCP.resolveSkill(
             name: "test.yaml", dirs: [tmpDir])
         XCTAssertNotNil(path)
     }
 
-    // MARK: - findScenarioFiles (.md + .yaml)
+    // MARK: - findSkillFiles (.md + .yaml)
 
-    func testFindScenarioFilesIncludesMd() {
+    func testFindSkillFilesIncludesMd() {
         createFile("a.yaml", content: "name: A")
         createFile("b.md", content: "---\nname: B\n---\n\nBody")
-        createFile("c.txt", content: "not a scenario")
+        createFile("c.txt", content: "not a skill")
 
-        let results = MirroirMCP.findScenarioFiles(in: tmpDir)
+        let results = MirroirMCP.findSkillFiles(in: tmpDir)
         XCTAssertTrue(results.contains("a.yaml"))
         XCTAssertTrue(results.contains("b.md"))
         XCTAssertFalse(results.contains("c.txt"))
     }
 
-    func testFindScenarioFilesMdBeforeYamlForSameStem() {
+    func testFindSkillFilesMdBeforeYamlForSameStem() {
         createFile("test.yaml", content: "name: YAML")
         createFile("test.md", content: "---\nname: MD\n---\n\nBody")
 
-        let results = MirroirMCP.findScenarioFiles(in: tmpDir)
+        let results = MirroirMCP.findSkillFiles(in: tmpDir)
         // .md should come before .yaml for the same stem
         let mdIndex = results.firstIndex(of: "test.md")
         let yamlIndex = results.firstIndex(of: "test.yaml")
@@ -383,48 +383,48 @@ final class ScenarioToolsTests: XCTestCase {
         XCTAssertTrue(mdIndex! < yamlIndex!)
     }
 
-    // MARK: - discoverScenarios with .md
+    // MARK: - discoverSkills with .md
 
     func testDiscoverMdFiles() {
-        // Create a scenario dir structure that mimics what discoverScenarios expects
-        let scenarioDir = tmpDir + "/scenarios"
-        createFile("scenarios/test.md",
-                    content: "---\nname: MD Scenario\n---\n\nDescription here.",
+        // Create a skill dir structure that mimics what discoverSkills expects
+        let skillDir = tmpDir + "/skills"
+        createFile("skills/test.md",
+                    content: "---\nname: MD Skill\n---\n\nDescription here.",
                     baseDir: tmpDir)
 
-        // Directly test findScenarioFiles and extractScenarioHeader on the dir
-        let files = MirroirMCP.findScenarioFiles(in: scenarioDir)
+        // Directly test findSkillFiles and extractSkillHeader on the dir
+        let files = MirroirMCP.findSkillFiles(in: skillDir)
         XCTAssertEqual(files, ["test.md"])
 
-        let filePath = scenarioDir + "/" + files[0]
-        let info = MirroirMCP.extractScenarioHeader(from: filePath, source: "local")
-        XCTAssertEqual(info.name, "MD Scenario")
+        let filePath = skillDir + "/" + files[0]
+        let info = MirroirMCP.extractSkillHeader(from: filePath, source: "local")
+        XCTAssertEqual(info.name, "MD Skill")
         XCTAssertEqual(info.description, "Description here.")
     }
 
     func testMdOverridesYamlInDiscovery() {
         // When both .md and .yaml exist with the same stem, .md wins
-        let scenarioDir = tmpDir + "/scenarios"
-        createFile("scenarios/test.yaml", content: "name: YAML Version\ndescription: from yaml",
+        let skillDir = tmpDir + "/skills"
+        createFile("skills/test.yaml", content: "name: YAML Version\ndescription: from yaml",
                     baseDir: tmpDir)
-        createFile("scenarios/test.md",
+        createFile("skills/test.md",
                     content: "---\nname: MD Version\n---\n\nFrom markdown.",
                     baseDir: tmpDir)
 
-        let files = MirroirMCP.findScenarioFiles(in: scenarioDir)
+        let files = MirroirMCP.findSkillFiles(in: skillDir)
         // Both files should be found
         XCTAssertTrue(files.contains("test.md"))
         XCTAssertTrue(files.contains("test.yaml"))
 
-        // Simulate discoverScenarios dedup: first seen stem wins
+        // Simulate discoverSkills dedup: first seen stem wins
         var seenStems = Set<String>()
-        var results: [MirroirMCP.ScenarioInfo] = []
+        var results: [MirroirMCP.SkillInfo] = []
         for relPath in files {
-            let stem = MirroirMCP.scenarioStem(relPath)
+            let stem = MirroirMCP.skillStem(relPath)
             if seenStems.contains(stem) { continue }
             seenStems.insert(stem)
-            let filePath = scenarioDir + "/" + relPath
-            let info = MirroirMCP.extractScenarioHeader(from: filePath, source: "local")
+            let filePath = skillDir + "/" + relPath
+            let info = MirroirMCP.extractSkillHeader(from: filePath, source: "local")
             results.append(info)
         }
 
@@ -432,11 +432,11 @@ final class ScenarioToolsTests: XCTestCase {
         XCTAssertEqual(results[0].name, "MD Version")
     }
 
-    // MARK: - resolveScenario with .md
+    // MARK: - resolveSkill with .md
 
     func testResolveMdFile() {
         createFile("test.md", content: "---\nname: MD Test\n---\n\nBody")
-        let (path, ambiguous) = MirroirMCP.resolveScenario(
+        let (path, ambiguous) = MirroirMCP.resolveSkill(
             name: "test", dirs: [tmpDir])
         XCTAssertNotNil(path)
         XCTAssertTrue(path!.hasSuffix("test.md"))
@@ -447,7 +447,7 @@ final class ScenarioToolsTests: XCTestCase {
         createFile("test.yaml", content: "name: YAML")
         createFile("test.md", content: "---\nname: MD\n---\n\nBody")
 
-        let (path, ambiguous) = MirroirMCP.resolveScenario(
+        let (path, ambiguous) = MirroirMCP.resolveSkill(
             name: "test", dirs: [tmpDir])
         XCTAssertNotNil(path)
         XCTAssertTrue(path!.hasSuffix("test.md"), "Expected .md to be preferred over .yaml")
@@ -456,7 +456,7 @@ final class ScenarioToolsTests: XCTestCase {
 
     func testResolveMdWithExplicitExtension() {
         createFile("test.md", content: "---\nname: MD\n---\n\nBody")
-        let (path, _) = MirroirMCP.resolveScenario(
+        let (path, _) = MirroirMCP.resolveSkill(
             name: "test.md", dirs: [tmpDir])
         XCTAssertNotNil(path)
         XCTAssertTrue(path!.hasSuffix("test.md"))
@@ -464,7 +464,7 @@ final class ScenarioToolsTests: XCTestCase {
 
     func testResolveYamlStillWorksWhenNoMd() {
         createFile("test.yaml", content: "name: YAML Only")
-        let (path, _) = MirroirMCP.resolveScenario(
+        let (path, _) = MirroirMCP.resolveSkill(
             name: "test", dirs: [tmpDir])
         XCTAssertNotNil(path)
         XCTAssertTrue(path!.hasSuffix("test.yaml"))
@@ -473,21 +473,21 @@ final class ScenarioToolsTests: XCTestCase {
     func testResolveMdInSubdirectory() {
         createFile("apps/slack/send.md",
                     content: "---\nname: Send\n---\n\nBody")
-        let (path, ambiguous) = MirroirMCP.resolveScenario(
+        let (path, ambiguous) = MirroirMCP.resolveSkill(
             name: "apps/slack/send", dirs: [tmpDir])
         XCTAssertNotNil(path)
         XCTAssertTrue(path!.hasSuffix("send.md"))
         XCTAssertTrue(ambiguous.isEmpty)
     }
 
-    // MARK: - resolveScenario with yamlOnly
+    // MARK: - resolveSkill with yamlOnly
 
     func testResolveYamlOnlySkipsMd() {
         // When both .md and .yaml exist, yamlOnly: true returns the .yaml
         createFile("test.yaml", content: "name: YAML Version")
         createFile("test.md", content: "---\nname: MD Version\n---\n\nBody")
 
-        let (path, ambiguous) = MirroirMCP.resolveScenario(
+        let (path, ambiguous) = MirroirMCP.resolveSkill(
             name: "test", dirs: [tmpDir], yamlOnly: true)
         XCTAssertNotNil(path)
         XCTAssertTrue(path!.hasSuffix("test.yaml"),
@@ -500,7 +500,7 @@ final class ScenarioToolsTests: XCTestCase {
         createFile("apps/slack/send.yaml", content: "name: Slack Send")
         createFile("apps/slack/send.md", content: "---\nname: Slack Send MD\n---\n\nBody")
 
-        let (path, ambiguous) = MirroirMCP.resolveScenario(
+        let (path, ambiguous) = MirroirMCP.resolveSkill(
             name: "send", dirs: [tmpDir], yamlOnly: true)
         XCTAssertNotNil(path)
         XCTAssertTrue(path!.hasSuffix("send.yaml"),
@@ -512,9 +512,9 @@ final class ScenarioToolsTests: XCTestCase {
         // When only .md exists, yamlOnly: true should not find it
         createFile("test.md", content: "---\nname: MD Only\n---\n\nBody")
 
-        let (path, ambiguous) = MirroirMCP.resolveScenario(
+        let (path, ambiguous) = MirroirMCP.resolveSkill(
             name: "test", dirs: [tmpDir], yamlOnly: true)
-        XCTAssertNil(path, "yamlOnly should not resolve .md-only scenarios")
+        XCTAssertNil(path, "yamlOnly should not resolve .md-only skills")
         XCTAssertTrue(ambiguous.isEmpty)
     }
 
@@ -523,25 +523,25 @@ final class ScenarioToolsTests: XCTestCase {
         createFile("test.yaml", content: "name: YAML")
         createFile("test.md", content: "---\nname: MD\n---\n\nBody")
 
-        let (path, _) = MirroirMCP.resolveScenario(
+        let (path, _) = MirroirMCP.resolveSkill(
             name: "test", dirs: [tmpDir])
         XCTAssertNotNil(path)
         XCTAssertTrue(path!.hasSuffix("test.md"),
             "Default behavior should prefer .md")
     }
 
-    // MARK: - scenarioStem
+    // MARK: - skillStem
 
-    func testScenarioStemYaml() {
-        XCTAssertEqual(MirroirMCP.scenarioStem("apps/slack/send.yaml"), "apps/slack/send")
+    func testSkillStemYaml() {
+        XCTAssertEqual(MirroirMCP.skillStem("apps/slack/send.yaml"), "apps/slack/send")
     }
 
-    func testScenarioStemMd() {
-        XCTAssertEqual(MirroirMCP.scenarioStem("apps/slack/send.md"), "apps/slack/send")
+    func testSkillStemMd() {
+        XCTAssertEqual(MirroirMCP.skillStem("apps/slack/send.md"), "apps/slack/send")
     }
 
-    func testScenarioStemNoExtension() {
-        XCTAssertEqual(MirroirMCP.scenarioStem("apps/slack/send"), "apps/slack/send")
+    func testSkillStemNoExtension() {
+        XCTAssertEqual(MirroirMCP.skillStem("apps/slack/send"), "apps/slack/send")
     }
 
     // MARK: - Helpers

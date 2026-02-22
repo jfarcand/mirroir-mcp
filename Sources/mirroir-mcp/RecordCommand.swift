@@ -2,7 +2,7 @@
 // Licensed under the Apache License, Version 2.0
 //
 // ABOUTME: CLI orchestration for the `record` subcommand.
-// ABOUTME: Captures user interactions with iPhone Mirroring and outputs scenario YAML.
+// ABOUTME: Captures user interactions with iPhone Mirroring and outputs skill YAML.
 
 import CoreGraphics
 import Darwin
@@ -15,7 +15,7 @@ nonisolated(unsafe) var recordingRunLoop: CFRunLoop?
 /// Configuration parsed from `record` subcommand arguments.
 struct RecordConfig {
     let outputPath: String
-    let scenarioName: String
+    let skillName: String
     let description: String
     let appName: String?
     let noOCR: Bool
@@ -23,7 +23,7 @@ struct RecordConfig {
 }
 
 /// Orchestrates the `record` subcommand: installs a CGEvent tap, captures user
-/// interactions with the iPhone Mirroring window, and writes scenario YAML on exit.
+/// interactions with the iPhone Mirroring window, and writes skill YAML on exit.
 ///
 /// Usage: `mirroir-mcp record [options]`
 enum RecordCommand {
@@ -98,7 +98,7 @@ enum RecordCommand {
 
         let yaml = YAMLGenerator.generate(
             events: events,
-            name: config.scenarioName,
+            name: config.skillName,
             description: config.description,
             appName: config.appName
         )
@@ -109,7 +109,7 @@ enum RecordCommand {
         } else {
             do {
                 try yaml.write(toFile: config.outputPath, atomically: true, encoding: .utf8)
-                fputs("Scenario written to: \(config.outputPath)\n", stderr)
+                fputs("Skill written to: \(config.outputPath)\n", stderr)
             } catch {
                 fputs("Error writing file: \(error.localizedDescription)\n", stderr)
                 return 1
@@ -122,8 +122,8 @@ enum RecordCommand {
     // MARK: - Argument Parsing
 
     static func parseArguments(_ args: [String]) -> RecordConfig {
-        var outputPath = "recorded-scenario.yaml"
-        var scenarioName = "Recorded Scenario"
+        var outputPath = "recorded-skill.yaml"
+        var skillName = "Recorded Skill"
         var description = "Recorded from live interaction"
         var appName: String?
         var noOCR = false
@@ -140,7 +140,7 @@ enum RecordCommand {
                 if i < args.count { outputPath = args[i] }
             case "--name", "-n":
                 i += 1
-                if i < args.count { scenarioName = args[i] }
+                if i < args.count { skillName = args[i] }
             case "--description":
                 i += 1
                 if i < args.count { description = args[i] }
@@ -157,7 +157,7 @@ enum RecordCommand {
 
         return RecordConfig(
             outputPath: outputPath,
-            scenarioName: scenarioName,
+            skillName: skillName,
             description: description,
             appName: appName,
             noOCR: noOCR,
@@ -169,14 +169,14 @@ enum RecordCommand {
         let usage = """
         Usage: mirroir-mcp record [options]
 
-        Record user interactions with iPhone Mirroring as a scenario YAML file.
+        Record user interactions with iPhone Mirroring as a skill YAML file.
         Captures taps, swipes, and keyboard input. Press Ctrl+C to stop.
 
         Options:
-          --output, -o <path>    Output file path (default: recorded-scenario.yaml)
+          --output, -o <path>    Output file path (default: recorded-skill.yaml)
                                  Use "-" to write to stdout
-          --name, -n <name>      Scenario name (default: "Recorded Scenario")
-          --description <text>   Scenario description
+          --name, -n <name>      Skill name (default: "Recorded Skill")
+          --description <text>   Skill description
           --app <name>           App name for the YAML header
           --no-ocr               Skip OCR label detection (faster, coordinates only)
           --help, -h             Show this help
@@ -184,7 +184,7 @@ enum RecordCommand {
         Examples:
           mirroir-mcp record -o login-flow.yaml -n "Login Flow" --app "MyApp"
           mirroir-mcp record --no-ocr -o quick-capture.yaml
-          mirroir-mcp record -o - | tee scenario.yaml
+          mirroir-mcp record -o - | tee skill.yaml
         """
         fputs(usage + "\n", stderr)
     }

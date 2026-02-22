@@ -1,12 +1,12 @@
 // Copyright 2026 jfarcand@apache.org
 // Licensed under the Apache License, Version 2.0
 //
-// ABOUTME: CLI command `mirroir migrate` that converts YAML scenarios to SKILL.md format.
+// ABOUTME: CLI command `mirroir migrate` that converts YAML skills to SKILL.md format.
 // ABOUTME: Transforms structured YAML steps into natural-language markdown for AI execution.
 
 import Foundation
 
-/// Converts YAML scenario files to SKILL.md format (YAML front matter + markdown body).
+/// Converts YAML skill files to SKILL.md format (YAML front matter + markdown body).
 ///
 /// Usage: `mirroir-mcp migrate [options] <file.yaml> [file2.yaml ...]`
 ///        `mirroir-mcp migrate --dir <path>`
@@ -100,7 +100,7 @@ enum MigrateCommand {
         }
     }
 
-    /// Convert YAML scenario content to SKILL.md format.
+    /// Convert YAML skill content to SKILL.md format.
     static func convertYAMLToSkillMd(content: String, filePath: String) -> String {
         let lines = content.components(separatedBy: .newlines)
         let header = extractHeaderFields(from: lines)
@@ -156,7 +156,7 @@ enum MigrateCommand {
 
     // MARK: - Header Extraction
 
-    /// Raw header fields from a YAML scenario file.
+    /// Raw header fields from a YAML skill file.
     struct HeaderFields {
         var name: String = ""
         var app: String = ""
@@ -226,7 +226,7 @@ enum MigrateCommand {
         return value.components(separatedBy: ",").compactMap { item in
             let trimmed = item.trimmingCharacters(in: .whitespaces)
             guard !trimmed.isEmpty else { return nil }
-            return ScenarioParser.stripQuotes(trimmed)
+            return SkillParser.stripQuotes(trimmed)
         }
     }
 
@@ -368,7 +368,7 @@ enum MigrateCommand {
             .trimmingCharacters(in: .whitespaces)
         let rawValue = String(trimmed[trimmed.index(after: colonIndex)...])
             .trimmingCharacters(in: .whitespaces)
-        let value = ScenarioParser.stripQuotes(rawValue)
+        let value = SkillParser.stripQuotes(rawValue)
 
         // Handle press_home: true as a bare home step
         if key == "press_home" {
@@ -415,7 +415,7 @@ enum MigrateCommand {
             let isAtKeywordLevel = (keywordIndent != nil && indent == keywordIndent)
 
             if isAtKeywordLevel && trimmed.hasPrefix("if_visible:") {
-                ifVisible = ScenarioParser.stripQuotes(
+                ifVisible = SkillParser.stripQuotes(
                     MirroirMCP.extractYAMLValue(from: trimmed, key: "if_visible"))
             } else if isAtKeywordLevel && trimmed == "then:" {
                 inThen = true
@@ -468,7 +468,7 @@ enum MigrateCommand {
             let isAtKeywordLevel = (keywordIndent != nil && indent == keywordIndent)
 
             if isAtKeywordLevel && trimmed.hasPrefix("while_visible:") {
-                whileVisible = ScenarioParser.stripQuotes(
+                whileVisible = SkillParser.stripQuotes(
                     MirroirMCP.extractYAMLValue(from: trimmed, key: "while_visible"))
             } else if isAtKeywordLevel && trimmed.hasPrefix("max:") {
                 let maxStr = MirroirMCP.extractYAMLValue(from: trimmed, key: "max")
@@ -625,7 +625,7 @@ enum MigrateCommand {
             guard let colonIdx = part.firstIndex(of: ":") else { continue }
             let key = String(part[part.startIndex..<colonIdx])
                 .trimmingCharacters(in: .whitespaces)
-            let val = ScenarioParser.stripQuotes(
+            let val = SkillParser.stripQuotes(
                 String(part[part.index(after: colonIdx)...])
                     .trimmingCharacters(in: .whitespaces))
 
@@ -731,7 +731,7 @@ enum MigrateCommand {
         let usage = """
         Usage: mirroir-mcp migrate [options] <file.yaml> [file2.yaml ...]
 
-        Convert YAML scenario files to SKILL.md format (YAML front matter + markdown).
+        Convert YAML skill files to SKILL.md format (YAML front matter + markdown).
 
         Arguments:
           <file.yaml>             One or more YAML files to convert
@@ -744,7 +744,7 @@ enum MigrateCommand {
 
         Examples:
           mirroir-mcp migrate apps/settings/check-about.yaml
-          mirroir-mcp migrate --dir ../iphone-mirroir-scenarios
+          mirroir-mcp migrate --dir ../iphone-mirroir-skills
           mirroir-mcp migrate --dry-run apps/mail/email-triage.yaml
         """
         fputs(usage + "\n", stderr)

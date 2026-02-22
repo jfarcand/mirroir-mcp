@@ -41,14 +41,14 @@ final class StepExecutorTests: XCTestCase {
     func testLaunchSuccess() {
         input.launchAppResult = nil  // nil = success
         let result = executor.execute(
-            step: .launch(appName: "Settings"), stepIndex: 0, scenarioName: "test")
+            step: .launch(appName: "Settings"), stepIndex: 0, skillName: "test")
         XCTAssertEqual(result.status, .passed)
     }
 
     func testLaunchFailure() {
         input.launchAppResult = "App not found"
         let result = executor.execute(
-            step: .launch(appName: "NonExistent"), stepIndex: 0, scenarioName: "test")
+            step: .launch(appName: "NonExistent"), stepIndex: 0, skillName: "test")
         XCTAssertEqual(result.status, .failed)
         XCTAssertEqual(result.message, "App not found")
     }
@@ -63,7 +63,7 @@ final class StepExecutorTests: XCTestCase {
         input.tapResult = nil  // nil = success
 
         let result = executor.execute(
-            step: .tap(label: "General"), stepIndex: 0, scenarioName: "test")
+            step: .tap(label: "General"), stepIndex: 0, skillName: "test")
         XCTAssertEqual(result.status, .passed)
     }
 
@@ -74,7 +74,7 @@ final class StepExecutorTests: XCTestCase {
         )
 
         let result = executor.execute(
-            step: .tap(label: "General"), stepIndex: 0, scenarioName: "test")
+            step: .tap(label: "General"), stepIndex: 0, skillName: "test")
         XCTAssertEqual(result.status, .failed)
         XCTAssertTrue(result.message?.contains("not found") ?? false)
     }
@@ -83,7 +83,7 @@ final class StepExecutorTests: XCTestCase {
         describer.describeResult = nil
 
         let result = executor.execute(
-            step: .tap(label: "General"), stepIndex: 0, scenarioName: "test")
+            step: .tap(label: "General"), stepIndex: 0, skillName: "test")
         XCTAssertEqual(result.status, .failed)
         XCTAssertTrue(result.message?.contains("OCR") ?? false)
     }
@@ -93,14 +93,14 @@ final class StepExecutorTests: XCTestCase {
     func testTypeSuccess() {
         input.typeTextResult = TypeResult(success: true, warning: nil, error: nil)
         let result = executor.execute(
-            step: .type(text: "Hello"), stepIndex: 0, scenarioName: "test")
+            step: .type(text: "Hello"), stepIndex: 0, skillName: "test")
         XCTAssertEqual(result.status, .passed)
     }
 
     func testTypeFailure() {
         input.typeTextResult = TypeResult(success: false, warning: nil, error: "Helper unavailable")
         let result = executor.execute(
-            step: .type(text: "Hello"), stepIndex: 0, scenarioName: "test")
+            step: .type(text: "Hello"), stepIndex: 0, skillName: "test")
         XCTAssertEqual(result.status, .failed)
     }
 
@@ -110,7 +110,7 @@ final class StepExecutorTests: XCTestCase {
         input.pressKeyResult = TypeResult(success: true, warning: nil, error: nil)
         let result = executor.execute(
             step: .pressKey(keyName: "return", modifiers: []),
-            stepIndex: 0, scenarioName: "test")
+            stepIndex: 0, skillName: "test")
         XCTAssertEqual(result.status, .passed)
     }
 
@@ -123,7 +123,7 @@ final class StepExecutorTests: XCTestCase {
         )
 
         let result = executor.execute(
-            step: .assertVisible(label: "Model Name"), stepIndex: 0, scenarioName: "test")
+            step: .assertVisible(label: "Model Name"), stepIndex: 0, skillName: "test")
         XCTAssertEqual(result.status, .passed)
     }
 
@@ -134,7 +134,7 @@ final class StepExecutorTests: XCTestCase {
         )
 
         let result = executor.execute(
-            step: .assertVisible(label: "Model Name"), stepIndex: 0, scenarioName: "test")
+            step: .assertVisible(label: "Model Name"), stepIndex: 0, skillName: "test")
         XCTAssertEqual(result.status, .failed)
     }
 
@@ -147,7 +147,7 @@ final class StepExecutorTests: XCTestCase {
         )
 
         let result = executor.execute(
-            step: .assertNotVisible(label: "Error"), stepIndex: 0, scenarioName: "test")
+            step: .assertNotVisible(label: "Error"), stepIndex: 0, skillName: "test")
         XCTAssertEqual(result.status, .passed)
     }
 
@@ -158,7 +158,7 @@ final class StepExecutorTests: XCTestCase {
         )
 
         let result = executor.execute(
-            step: .assertNotVisible(label: "Error"), stepIndex: 0, scenarioName: "test")
+            step: .assertNotVisible(label: "Error"), stepIndex: 0, skillName: "test")
         XCTAssertEqual(result.status, .failed)
     }
 
@@ -167,14 +167,14 @@ final class StepExecutorTests: XCTestCase {
     func testHomeSuccess() {
         bridge.menuActionResult = true
         let result = executor.execute(
-            step: .home, stepIndex: 0, scenarioName: "test")
+            step: .home, stepIndex: 0, skillName: "test")
         XCTAssertEqual(result.status, .passed)
     }
 
     func testHomeFailure() {
         bridge.menuActionResult = false
         let result = executor.execute(
-            step: .home, stepIndex: 0, scenarioName: "test")
+            step: .home, stepIndex: 0, skillName: "test")
         XCTAssertEqual(result.status, .failed)
     }
 
@@ -183,7 +183,7 @@ final class StepExecutorTests: XCTestCase {
     func testShakeSuccess() {
         input.shakeResult = TypeResult(success: true, warning: nil, error: nil)
         let result = executor.execute(
-            step: .shake, stepIndex: 0, scenarioName: "test")
+            step: .shake, stepIndex: 0, skillName: "test")
         XCTAssertEqual(result.status, .passed)
     }
 
@@ -192,7 +192,7 @@ final class StepExecutorTests: XCTestCase {
     func testOpenURLSuccess() {
         input.openURLResult = nil  // nil = success
         let result = executor.execute(
-            step: .openURL(url: "https://example.com"), stepIndex: 0, scenarioName: "test")
+            step: .openURL(url: "https://example.com"), stepIndex: 0, skillName: "test")
         XCTAssertEqual(result.status, .passed)
     }
 
@@ -201,13 +201,13 @@ final class StepExecutorTests: XCTestCase {
     func testSwipeSuccess() {
         input.swipeResult = nil  // nil = success
         let result = executor.execute(
-            step: .swipe(direction: "up"), stepIndex: 0, scenarioName: "test")
+            step: .swipe(direction: "up"), stepIndex: 0, skillName: "test")
         XCTAssertEqual(result.status, .passed)
     }
 
     func testSwipeInvalidDirection() {
         let result = executor.execute(
-            step: .swipe(direction: "diagonal"), stepIndex: 0, scenarioName: "test")
+            step: .swipe(direction: "diagonal"), stepIndex: 0, skillName: "test")
         XCTAssertEqual(result.status, .failed)
         XCTAssertTrue(result.message?.contains("Unknown swipe direction") ?? false)
     }
@@ -217,7 +217,7 @@ final class StepExecutorTests: XCTestCase {
     func testSkippedStep() {
         let result = executor.execute(
             step: .skipped(stepType: "remember", reason: "AI-only"),
-            stepIndex: 0, scenarioName: "test")
+            stepIndex: 0, skillName: "test")
         XCTAssertEqual(result.status, .skipped)
     }
 
@@ -240,7 +240,7 @@ final class StepExecutorTests: XCTestCase {
         // but dry run should pass.
         describer.describeResult = nil
         let result = dryExecutor.execute(
-            step: .tap(label: "General"), stepIndex: 0, scenarioName: "test")
+            step: .tap(label: "General"), stepIndex: 0, skillName: "test")
         XCTAssertEqual(result.status, .passed)
         XCTAssertEqual(result.message, "dry run")
     }
@@ -255,7 +255,7 @@ final class StepExecutorTests: XCTestCase {
 
         let result = executor.execute(
             step: .scrollTo(label: "About", direction: "up", maxScrolls: 10),
-            stepIndex: 0, scenarioName: "test")
+            stepIndex: 0, skillName: "test")
         XCTAssertEqual(result.status, .passed)
         XCTAssertEqual(result.message, "already visible")
         XCTAssertEqual(input.swipeCalls.count, 0)
@@ -279,7 +279,7 @@ final class StepExecutorTests: XCTestCase {
 
         let result = executor.execute(
             step: .scrollTo(label: "About", direction: "up", maxScrolls: 10),
-            stepIndex: 0, scenarioName: "test")
+            stepIndex: 0, skillName: "test")
         XCTAssertEqual(result.status, .passed)
         XCTAssertTrue(result.message?.contains("scroll(s)") ?? false)
         XCTAssertTrue(input.swipeCalls.count > 0)
@@ -295,7 +295,7 @@ final class StepExecutorTests: XCTestCase {
 
         let result = executor.execute(
             step: .scrollTo(label: "About", direction: "up", maxScrolls: 5),
-            stepIndex: 0, scenarioName: "test")
+            stepIndex: 0, skillName: "test")
         XCTAssertEqual(result.status, .failed)
         XCTAssertTrue(result.message?.contains("exhausted") ?? false)
     }
@@ -319,7 +319,7 @@ final class StepExecutorTests: XCTestCase {
 
         let result = executor.execute(
             step: .scrollTo(label: "Target", direction: "up", maxScrolls: 2),
-            stepIndex: 0, scenarioName: "test")
+            stepIndex: 0, skillName: "test")
         XCTAssertEqual(result.status, .failed)
         XCTAssertTrue(result.message?.contains("Not found after") ?? false)
     }
@@ -332,7 +332,7 @@ final class StepExecutorTests: XCTestCase {
 
         let result = executor.execute(
             step: .scrollTo(label: "About", direction: "up", maxScrolls: 5),
-            stepIndex: 0, scenarioName: "test")
+            stepIndex: 0, skillName: "test")
         XCTAssertEqual(result.status, .failed)
         XCTAssertTrue(result.message?.contains("window info") ?? false)
     }
@@ -346,7 +346,7 @@ final class StepExecutorTests: XCTestCase {
         )
 
         let result = executor.execute(
-            step: .resetApp(appName: "Settings"), stepIndex: 0, scenarioName: "test")
+            step: .resetApp(appName: "Settings"), stepIndex: 0, skillName: "test")
         XCTAssertEqual(result.status, .passed)
         XCTAssertTrue(result.message?.contains("Force-quit") ?? false)
         // Verify App Switcher was opened and Home was pressed
@@ -363,7 +363,7 @@ final class StepExecutorTests: XCTestCase {
         )
 
         let result = executor.execute(
-            step: .resetApp(appName: "Settings"), stepIndex: 0, scenarioName: "test")
+            step: .resetApp(appName: "Settings"), stepIndex: 0, skillName: "test")
         XCTAssertEqual(result.status, .passed)
         XCTAssertTrue(result.message?.contains("already quit") ?? false)
         XCTAssertEqual(input.swipeCalls.count, 0)
@@ -373,7 +373,7 @@ final class StepExecutorTests: XCTestCase {
         bridge.menuActionResult = false
 
         let result = executor.execute(
-            step: .resetApp(appName: "Settings"), stepIndex: 0, scenarioName: "test")
+            step: .resetApp(appName: "Settings"), stepIndex: 0, skillName: "test")
         XCTAssertEqual(result.status, .failed)
         XCTAssertTrue(result.message?.contains("App Switcher") ?? false)
     }
@@ -387,7 +387,7 @@ final class StepExecutorTests: XCTestCase {
         )
 
         let result = executor.execute(
-            step: .setNetwork(mode: "airplane_on"), stepIndex: 0, scenarioName: "test")
+            step: .setNetwork(mode: "airplane_on"), stepIndex: 0, skillName: "test")
         XCTAssertEqual(result.status, .passed)
         XCTAssertTrue(result.message?.contains("airplane_on") ?? false)
         XCTAssertEqual(input.launchAppCalls, ["Settings"])
@@ -396,7 +396,7 @@ final class StepExecutorTests: XCTestCase {
 
     func testSetNetworkInvalidMode() {
         let result = executor.execute(
-            step: .setNetwork(mode: "bluetooth_on"), stepIndex: 0, scenarioName: "test")
+            step: .setNetwork(mode: "bluetooth_on"), stepIndex: 0, skillName: "test")
         XCTAssertEqual(result.status, .failed)
         XCTAssertTrue(result.message?.contains("Unknown mode") ?? false)
     }
@@ -405,7 +405,7 @@ final class StepExecutorTests: XCTestCase {
         input.launchAppResult = "Spotlight failed"
 
         let result = executor.execute(
-            step: .setNetwork(mode: "wifi_off"), stepIndex: 0, scenarioName: "test")
+            step: .setNetwork(mode: "wifi_off"), stepIndex: 0, skillName: "test")
         XCTAssertEqual(result.status, .failed)
         XCTAssertTrue(result.message?.contains("Settings") ?? false)
     }
@@ -417,7 +417,7 @@ final class StepExecutorTests: XCTestCase {
         )
 
         let result = executor.execute(
-            step: .setNetwork(mode: "cellular_off"), stepIndex: 0, scenarioName: "test")
+            step: .setNetwork(mode: "cellular_off"), stepIndex: 0, skillName: "test")
         XCTAssertEqual(result.status, .failed)
         XCTAssertTrue(result.message?.contains("not found") ?? false)
     }
@@ -439,7 +439,7 @@ final class StepExecutorTests: XCTestCase {
         let result = executor.execute(
             step: .measure(name: "login_time", action: .tap(label: "Login"),
                            until: "Dashboard", maxSeconds: 5.0),
-            stepIndex: 0, scenarioName: "test")
+            stepIndex: 0, skillName: "test")
         XCTAssertEqual(result.status, .passed)
         XCTAssertTrue(result.message?.contains("login_time") ?? false)
     }
@@ -450,7 +450,7 @@ final class StepExecutorTests: XCTestCase {
         let result = executor.execute(
             step: .measure(name: "test", action: .tap(label: "Login"),
                            until: "Dashboard", maxSeconds: 5.0),
-            stepIndex: 0, scenarioName: "test")
+            stepIndex: 0, skillName: "test")
         XCTAssertEqual(result.status, .failed)
         XCTAssertTrue(result.message?.contains("Action failed") ?? false)
     }
@@ -483,7 +483,7 @@ final class StepExecutorTests: XCTestCase {
         let result = shortExecutor.execute(
             step: .measure(name: "test", action: .tap(label: "Login"),
                            until: "Dashboard", maxSeconds: 0.5),
-            stepIndex: 0, scenarioName: "test")
+            stepIndex: 0, skillName: "test")
         XCTAssertEqual(result.status, .failed)
         XCTAssertTrue(result.message?.contains("timed out") ?? false)
     }
@@ -493,7 +493,7 @@ final class StepExecutorTests: XCTestCase {
     func testSwitchTargetWithoutRegistryFails() {
         // The default executor has no registry
         let result = executor.execute(
-            step: .switchTarget(name: "android"), stepIndex: 0, scenarioName: "test")
+            step: .switchTarget(name: "android"), stepIndex: 0, skillName: "test")
         XCTAssertEqual(result.status, .failed)
         XCTAssertTrue(result.message?.contains("No target registry") ?? false)
     }
@@ -527,7 +527,7 @@ final class StepExecutorTests: XCTestCase {
             config: config, registry: registry)
 
         let result = registryExecutor.execute(
-            step: .switchTarget(name: "android"), stepIndex: 0, scenarioName: "test")
+            step: .switchTarget(name: "android"), stepIndex: 0, skillName: "test")
         XCTAssertEqual(result.status, .passed)
         XCTAssertTrue(result.message?.contains("android") ?? false)
     }
@@ -549,7 +549,7 @@ final class StepExecutorTests: XCTestCase {
             config: config, registry: registry)
 
         let result = registryExecutor.execute(
-            step: .switchTarget(name: "nonexistent"), stepIndex: 0, scenarioName: "test")
+            step: .switchTarget(name: "nonexistent"), stepIndex: 0, skillName: "test")
         XCTAssertEqual(result.status, .failed)
         XCTAssertTrue(result.message?.contains("Unknown target") ?? false)
     }

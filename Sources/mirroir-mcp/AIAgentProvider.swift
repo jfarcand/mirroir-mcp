@@ -1,7 +1,7 @@
 // Copyright 2026 jfarcand@apache.org
 // Licensed under the Apache License, Version 2.0
 //
-// ABOUTME: Core infrastructure for AI-powered agent diagnosis of compiled scenario failures.
+// ABOUTME: Core infrastructure for AI-powered agent diagnosis of compiled skill failures.
 // ABOUTME: Defines the protocol, config model, built-in registry, resolver, and shared HTTP helper.
 
 import Foundation
@@ -55,18 +55,18 @@ struct AISuggestedFix: Codable {
     }
 }
 
-/// Protocol for AI agent providers that can diagnose scenario failures.
+/// Protocol for AI agent providers that can diagnose skill failures.
 protocol AIAgentProviding {
     func diagnose(payload: DiagnosticPayload) -> AIDiagnosis?
 }
 
 /// Default system prompt for AI diagnosis, used when no prompt file is found.
 let aiDiagnosisDefaultPrompt = """
-    You are an expert iOS UI automation debugger analyzing a failed test scenario.
+    You are an expert iOS UI automation debugger analyzing a failed test skill.
 
     Given the diagnostic context below, provide:
     1. ROOT CAUSE: What specifically went wrong and why
-    2. FIX: Concrete actionable fix (coordinate changes, timing adjustments, or scenario edits)
+    2. FIX: Concrete actionable fix (coordinate changes, timing adjustments, or skill edits)
     3. CONFIDENCE: high, medium, or low
 
     Respond in JSON: {"analysis": "...", "suggested_fixes": [\

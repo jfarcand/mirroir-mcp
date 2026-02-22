@@ -1,14 +1,14 @@
 // Copyright 2026 jfarcand@apache.org
 // Licensed under the Apache License, Version 2.0
 //
-// ABOUTME: Integration tests that load all real scenario files and validate parsing.
-// ABOUTME: Ensures every shipped scenario (YAML or SKILL.md) parses without errors and uses only recognized step types.
+// ABOUTME: Integration tests that load all real skill files and validate parsing.
+// ABOUTME: Ensures every shipped skill (YAML or SKILL.md) parses without errors and uses only recognized step types.
 
 import XCTest
 import HelperLib
 @testable import mirroir_mcp
 
-final class ScenarioFileTests: XCTestCase {
+final class SkillFileTests: XCTestCase {
 
     private static var projectRoot: String {
         URL(fileURLWithPath: #filePath)
@@ -18,31 +18,31 @@ final class ScenarioFileTests: XCTestCase {
             .path
     }
 
-    private static var scenariosDir: String {
-        projectRoot + "/.mirroir-mcp/scenarios"
+    private static var skillsDir: String {
+        projectRoot + "/.mirroir-mcp/skills"
     }
 
     // MARK: - Global validation
 
-    func testAllScenarioFilesParse() throws {
-        let stems = scenarioStems()
-        XCTAssertFalse(stems.isEmpty, "No scenario files found in \(Self.scenariosDir)")
+    func testAllSkillFilesParse() throws {
+        let stems = skillStems()
+        XCTAssertFalse(stems.isEmpty, "No skill files found in \(Self.skillsDir)")
 
         for stem in stems {
-            let scenario = try parseScenario(stem)
-            XCTAssertFalse(scenario.name.isEmpty, "\(stem): empty name")
+            let skill = try parseSkill(stem)
+            XCTAssertFalse(skill.name.isEmpty, "\(stem): empty name")
             // YAML files have parsed steps; .md files have empty steps (natural language)
-            if scenario.filePath.hasSuffix(".yaml") {
-                XCTAssertFalse(scenario.steps.isEmpty, "\(stem): no steps")
+            if skill.filePath.hasSuffix(".yaml") {
+                XCTAssertFalse(skill.steps.isEmpty, "\(stem): no steps")
             } else {
-                XCTAssertFalse(scenario.description.isEmpty, "\(stem): empty description")
+                XCTAssertFalse(skill.description.isEmpty, "\(stem): empty description")
             }
         }
     }
 
-    func testScenarioCount() {
-        let stems = scenarioStems()
-        XCTAssertEqual(stems.count, 24, "Expected 24 scenarios, got \(stems.count): \(stems)")
+    func testSkillCount() {
+        let stems = skillStems()
+        XCTAssertEqual(stems.count, 24, "Expected 24 skills, got \(stems.count): \(stems)")
     }
 
     func testNoUnexpectedUnknownSteps() throws {
@@ -54,10 +54,10 @@ final class ScenarioFileTests: XCTestCase {
 
         let files = yamlFilesSkippingLegacy()
         for file in files {
-            let fullPath = Self.scenariosDir + "/" + file
+            let fullPath = Self.skillsDir + "/" + file
             let content = try String(contentsOfFile: fullPath, encoding: .utf8)
-            let scenario = ScenarioParser.parse(content: content, filePath: fullPath)
-            for step in scenario.steps {
+            let skill = SkillParser.parse(content: content, filePath: fullPath)
+            for step in skill.steps {
                 if case .skipped(let stepType, let reason) = step {
                     let allowed = knownAIOnlyTypes.contains(stepType)
                         || expectedUnknownTypes.contains(stepType)
@@ -68,10 +68,10 @@ final class ScenarioFileTests: XCTestCase {
         }
     }
 
-    // MARK: - Individual scenario validation: apps/
+    // MARK: - Individual skill validation: apps/
 
     func testCheckAbout() throws {
-        let s = try parseScenario("apps/settings/check-about")
+        let s = try parseSkill("apps/settings/check-about")
         XCTAssertEqual(s.name, "Read Device Info")
         XCTAssertFalse(s.description.isEmpty)
         if !s.steps.isEmpty {
@@ -85,7 +85,7 @@ final class ScenarioFileTests: XCTestCase {
     }
 
     func testCheckAboutFr() throws {
-        let s = try parseScenario("apps/settings/check-about-fr")
+        let s = try parseSkill("apps/settings/check-about-fr")
         XCTAssertEqual(s.name, "Vérifier l'écran À propos")
         if !s.steps.isEmpty {
             XCTAssertEqual(s.steps.count, 7)
@@ -93,7 +93,7 @@ final class ScenarioFileTests: XCTestCase {
     }
 
     func testSetTimer() throws {
-        let s = try parseScenario("apps/clock/set-timer")
+        let s = try parseSkill("apps/clock/set-timer")
         XCTAssertEqual(s.name, "Set Timer")
         if !s.steps.isEmpty {
             XCTAssertEqual(s.steps.count, 8)
@@ -102,7 +102,7 @@ final class ScenarioFileTests: XCTestCase {
     }
 
     func testSetAlarm() throws {
-        let s = try parseScenario("apps/clock/set-alarm")
+        let s = try parseSkill("apps/clock/set-alarm")
         XCTAssertEqual(s.name, "Set Alarm")
         if !s.steps.isEmpty {
             XCTAssertEqual(s.steps.count, 10)
@@ -111,7 +111,7 @@ final class ScenarioFileTests: XCTestCase {
     }
 
     func testCheckToday() throws {
-        let s = try parseScenario("apps/calendar/check-today")
+        let s = try parseSkill("apps/calendar/check-today")
         XCTAssertEqual(s.name, "Read Today's Schedule")
         if !s.steps.isEmpty {
             XCTAssertEqual(s.steps.count, 6)
@@ -120,7 +120,7 @@ final class ScenarioFileTests: XCTestCase {
     }
 
     func testCreateEvent() throws {
-        let s = try parseScenario("apps/calendar/create-event")
+        let s = try parseSkill("apps/calendar/create-event")
         XCTAssertEqual(s.name, "Create Calendar Event")
         if !s.steps.isEmpty {
             XCTAssertEqual(s.steps.count, 11)
@@ -128,7 +128,7 @@ final class ScenarioFileTests: XCTestCase {
     }
 
     func testCheckForecast() throws {
-        let s = try parseScenario("apps/weather/check-forecast")
+        let s = try parseSkill("apps/weather/check-forecast")
         XCTAssertEqual(s.name, "Read Weather Forecast")
         if !s.steps.isEmpty {
             XCTAssertEqual(s.steps.count, 8)
@@ -138,7 +138,7 @@ final class ScenarioFileTests: XCTestCase {
     }
 
     func testAddCity() throws {
-        let s = try parseScenario("apps/weather/add-city")
+        let s = try parseSkill("apps/weather/add-city")
         XCTAssertEqual(s.name, "Add City to Weather")
         if !s.steps.isEmpty {
             XCTAssertEqual(s.steps.count, 12)
@@ -146,7 +146,7 @@ final class ScenarioFileTests: XCTestCase {
     }
 
     func testSendMessage() throws {
-        let s = try parseScenario("apps/slack/send-message")
+        let s = try parseSkill("apps/slack/send-message")
         XCTAssertEqual(s.name, "Send Slack Message")
         if !s.steps.isEmpty {
             XCTAssertEqual(s.steps.count, 11)
@@ -155,7 +155,7 @@ final class ScenarioFileTests: XCTestCase {
     }
 
     func testCheckUnread() throws {
-        let s = try parseScenario("apps/slack/check-unread")
+        let s = try parseSkill("apps/slack/check-unread")
         XCTAssertEqual(s.name, "Read Unread Slack Messages")
         if !s.steps.isEmpty {
             XCTAssertEqual(s.steps.count, 6)
@@ -163,7 +163,7 @@ final class ScenarioFileTests: XCTestCase {
     }
 
     func testSaveDirections() throws {
-        let s = try parseScenario("apps/maps/save-directions")
+        let s = try parseSkill("apps/maps/save-directions")
         XCTAssertEqual(s.name, "Get Directions and Travel Time")
         if !s.steps.isEmpty {
             XCTAssertEqual(s.steps.count, 11)
@@ -171,7 +171,7 @@ final class ScenarioFileTests: XCTestCase {
     }
 
     func testShareRecent() throws {
-        let s = try parseScenario("apps/photos/share-recent")
+        let s = try parseSkill("apps/photos/share-recent")
         XCTAssertEqual(s.name, "Share Recent Photo")
         if !s.steps.isEmpty {
             XCTAssertEqual(s.steps.count, 16)
@@ -186,7 +186,7 @@ final class ScenarioFileTests: XCTestCase {
     }
 
     func testListApps() throws {
-        let s = try parseScenario("apps/settings/list-apps")
+        let s = try parseSkill("apps/settings/list-apps")
         XCTAssertEqual(s.name, "List Installed Apps")
         XCTAssertTrue(s.description.contains("iPhone Storage"))
         if !s.steps.isEmpty {
@@ -197,7 +197,7 @@ final class ScenarioFileTests: XCTestCase {
     }
 
     func testInstallApp() throws {
-        let s = try parseScenario("apps/appstore/install-app")
+        let s = try parseSkill("apps/appstore/install-app")
         XCTAssertEqual(s.name, "Install App from App Store")
         if !s.steps.isEmpty {
             XCTAssertEqual(s.steps.count, 17)
@@ -207,7 +207,7 @@ final class ScenarioFileTests: XCTestCase {
     }
 
     func testUninstallApp() throws {
-        let s = try parseScenario("apps/settings/uninstall-app")
+        let s = try parseSkill("apps/settings/uninstall-app")
         XCTAssertEqual(s.name, "Uninstall App")
         if !s.steps.isEmpty {
             XCTAssertEqual(s.steps.count, 13)
@@ -215,10 +215,10 @@ final class ScenarioFileTests: XCTestCase {
         }
     }
 
-    // MARK: - Individual scenario validation: apps/mail
+    // MARK: - Individual skill validation: apps/mail
 
     func testEmailTriage() throws {
-        let s = try parseScenario("apps/mail/email-triage")
+        let s = try parseSkill("apps/mail/email-triage")
         XCTAssertEqual(s.name, "Email Triage")
         if !s.steps.isEmpty {
             XCTAssertEqual(s.steps.count, 13)
@@ -232,7 +232,7 @@ final class ScenarioFileTests: XCTestCase {
     }
 
     func testBatchArchive() throws {
-        let s = try parseScenario("apps/mail/batch-archive")
+        let s = try parseSkill("apps/mail/batch-archive")
         XCTAssertEqual(s.name, "Batch Archive Inbox")
         if !s.steps.isEmpty {
             XCTAssertEqual(s.steps.count, 12)
@@ -241,10 +241,10 @@ final class ScenarioFileTests: XCTestCase {
         }
     }
 
-    // MARK: - Individual scenario validation: testing/
+    // MARK: - Individual skill validation: testing/
 
     func testLoginFlow() throws {
-        let s = try parseScenario("testing/expo-go/login-flow")
+        let s = try parseSkill("testing/expo-go/login-flow")
         XCTAssertEqual(s.name, "Expo Go Login Flow")
         if !s.steps.isEmpty {
             XCTAssertEqual(s.steps.count, 20)
@@ -253,7 +253,7 @@ final class ScenarioFileTests: XCTestCase {
     }
 
     func testShakeDebugMenu() throws {
-        let s = try parseScenario("testing/expo-go/shake-debug-menu")
+        let s = try parseSkill("testing/expo-go/shake-debug-menu")
         XCTAssertEqual(s.name, "Expo Go Debug Menu")
         if !s.steps.isEmpty {
             XCTAssertEqual(s.steps.count, 7)
@@ -262,7 +262,7 @@ final class ScenarioFileTests: XCTestCase {
     }
 
     func testQASmokePack() throws {
-        let s = try parseScenario("testing/expo-go/qa-smoke-pack")
+        let s = try parseSkill("testing/expo-go/qa-smoke-pack")
         XCTAssertEqual(s.name, "Visual Regression Test")
         if !s.steps.isEmpty {
             XCTAssertEqual(s.steps.count, 15)
@@ -270,10 +270,10 @@ final class ScenarioFileTests: XCTestCase {
         }
     }
 
-    // MARK: - Individual scenario validation: workflows/
+    // MARK: - Individual skill validation: workflows/
 
     func testCommuteETA() throws {
-        let s = try parseScenario("workflows/commute-eta-notify")
+        let s = try parseSkill("workflows/commute-eta-notify")
         XCTAssertEqual(s.name, "Commute ETA Notification")
         if !s.steps.isEmpty {
             XCTAssertEqual(s.steps.count, 26)
@@ -284,7 +284,7 @@ final class ScenarioFileTests: XCTestCase {
     }
 
     func testMorningBriefing() throws {
-        let s = try parseScenario("workflows/morning-briefing")
+        let s = try parseSkill("workflows/morning-briefing")
         XCTAssertEqual(s.name, "Morning Briefing")
         if !s.steps.isEmpty {
             XCTAssertEqual(s.steps.count, 25)
@@ -294,7 +294,7 @@ final class ScenarioFileTests: XCTestCase {
     }
 
     func testStandupAutoposter() throws {
-        let s = try parseScenario("workflows/standup-autoposter")
+        let s = try parseSkill("workflows/standup-autoposter")
         XCTAssertEqual(s.name, "Standup Autoposter")
         if !s.steps.isEmpty {
             XCTAssertEqual(s.steps.count, 20)
@@ -303,10 +303,10 @@ final class ScenarioFileTests: XCTestCase {
         }
     }
 
-    // MARK: - Individual scenario validation: ci/
+    // MARK: - Individual skill validation: ci/
 
     func testFakeMirroringCheck() throws {
-        let s = try parseScenario("ci/fake-mirroring-check")
+        let s = try parseSkill("ci/fake-mirroring-check")
         XCTAssertEqual(s.name, "FakeMirroring smoke test")
         if !s.steps.isEmpty {
             XCTAssertEqual(s.steps.count, 10)
@@ -315,17 +315,17 @@ final class ScenarioFileTests: XCTestCase {
         }
     }
 
-    // MARK: - Step type coverage across all scenarios
+    // MARK: - Step type coverage across all skills
 
     func testAllExecutableStepTypesCovered() throws {
         let files = yamlFilesSkippingLegacy()
         var seenTypes: Set<String> = []
 
         for file in files {
-            let fullPath = Self.scenariosDir + "/" + file
+            let fullPath = Self.skillsDir + "/" + file
             let content = try String(contentsOfFile: fullPath, encoding: .utf8)
-            let scenario = ScenarioParser.parse(content: content, filePath: fullPath)
-            for step in scenario.steps {
+            let skill = SkillParser.parse(content: content, filePath: fullPath)
+            for step in skill.steps {
                 seenTypes.insert(stepKind(step))
             }
         }
@@ -333,42 +333,42 @@ final class ScenarioFileTests: XCTestCase {
         // When no YAML files exist (CI with .md-only), skip step-type coverage
         guard !files.isEmpty else { return }
 
-        // Step types that appear in at least one real scenario
-        let expectedInScenarios: Set<String> = [
+        // Step types that appear in at least one real skill
+        let expectedInSkills: Set<String> = [
             "launch", "tap", "type", "press_key", "swipe",
             "wait_for", "assert_visible", "assert_not_visible",
             "screenshot", "home", "shake", "scroll_to",
             "remember", "condition", "repeat", "long_press",
         ]
-        for expected in expectedInScenarios {
+        for expected in expectedInSkills {
             XCTAssertTrue(seenTypes.contains(expected),
-                "Step type '\(expected)' not found in any scenario")
+                "Step type '\(expected)' not found in any skill")
         }
 
-        // These types are only tested synthetically (ScenarioParserTests),
-        // not used in any shipped scenario yet:
+        // These types are only tested synthetically (SkillParserTests),
+        // not used in any shipped skill yet:
         // open_url, scroll_to, reset_app, set_network, measure
     }
 
     // MARK: - Header extraction from real files
 
     func testAllFilesHaveValidHeaders() throws {
-        let stems = scenarioStems()
+        let stems = skillStems()
 
         for stem in stems {
-            let path = try resolveScenarioPath(stem)
-            let info = MirroirMCP.extractScenarioHeader(
+            let path = try resolveSkillPath(stem)
+            let info = MirroirMCP.extractSkillHeader(
                 from: path, source: "local")
             XCTAssertFalse(info.name.isEmpty, "\(stem): empty header name")
         }
     }
 
-    func testAllScenariosHaveDescriptions() throws {
-        let stems = scenarioStems()
+    func testAllSkillsHaveDescriptions() throws {
+        let stems = skillStems()
 
         for stem in stems {
-            let path = try resolveScenarioPath(stem)
-            let info = MirroirMCP.extractScenarioHeader(
+            let path = try resolveSkillPath(stem)
+            let info = MirroirMCP.extractSkillHeader(
                 from: path, source: "local")
             XCTAssertFalse(info.description.isEmpty,
                 "\(stem): description parsed as empty")
@@ -381,10 +381,10 @@ final class ScenarioFileTests: XCTestCase {
 
     func testEnvVarPatternsAreWellFormed() throws {
         let envVarPattern = try NSRegularExpression(pattern: "\\$\\{([^}]+)\\}")
-        let stems = scenarioStems()
+        let stems = skillStems()
 
         for stem in stems {
-            let path = try resolveScenarioPath(stem)
+            let path = try resolveSkillPath(stem)
             let content = try String(contentsOfFile: path, encoding: .utf8)
             let range = NSRange(content.startIndex..., in: content)
             let matches = envVarPattern.matches(in: content, range: range)
@@ -406,7 +406,7 @@ final class ScenarioFileTests: XCTestCase {
     }
 
     func testEnvVarSubstitutionOnRealContent() throws {
-        let path = try resolveScenarioPath("apps/slack/send-message")
+        let path = try resolveSkillPath("apps/slack/send-message")
         let content = try String(contentsOfFile: path, encoding: .utf8)
 
         // Set env vars and verify substitution
@@ -427,7 +427,7 @@ final class ScenarioFileTests: XCTestCase {
     }
 
     func testEnvVarDefaultsApplied() throws {
-        let path = try resolveScenarioPath("apps/clock/set-alarm")
+        let path = try resolveSkillPath("apps/clock/set-alarm")
         let content = try String(contentsOfFile: path, encoding: .utf8)
 
         // Do NOT set ALARM_LABEL — should fall back to default
@@ -440,19 +440,19 @@ final class ScenarioFileTests: XCTestCase {
 
     // MARK: - Helpers
 
-    /// Parse a scenario by stem (no extension). Tries .yaml first for full parsing
+    /// Parse a skill by stem (no extension). Tries .yaml first for full parsing
     /// with steps, then falls back to .md for header-only parsing.
-    private func parseScenario(_ stem: String) throws -> ScenarioDefinition {
-        let yamlPath = Self.scenariosDir + "/" + stem + ".yaml"
+    private func parseSkill(_ stem: String) throws -> SkillDefinition {
+        let yamlPath = Self.skillsDir + "/" + stem + ".yaml"
         if FileManager.default.fileExists(atPath: yamlPath) {
             let content = try String(contentsOfFile: yamlPath, encoding: .utf8)
-            return ScenarioParser.parse(content: content, filePath: yamlPath)
+            return SkillParser.parse(content: content, filePath: yamlPath)
         }
-        let mdPath = Self.scenariosDir + "/" + stem + ".md"
+        let mdPath = Self.skillsDir + "/" + stem + ".md"
         let content = try String(contentsOfFile: mdPath, encoding: .utf8)
         let fallbackName = (stem as NSString).lastPathComponent
         let header = SkillMdParser.parseHeader(content: content, fallbackName: fallbackName)
-        return ScenarioDefinition(
+        return SkillDefinition(
             name: header.name,
             description: header.description,
             filePath: mdPath,
@@ -461,22 +461,22 @@ final class ScenarioFileTests: XCTestCase {
         )
     }
 
-    /// Resolve a scenario stem to its actual file path (.yaml preferred, then .md).
-    private func resolveScenarioPath(_ stem: String) throws -> String {
-        let yamlPath = Self.scenariosDir + "/" + stem + ".yaml"
+    /// Resolve a skill stem to its actual file path (.yaml preferred, then .md).
+    private func resolveSkillPath(_ stem: String) throws -> String {
+        let yamlPath = Self.skillsDir + "/" + stem + ".yaml"
         if FileManager.default.fileExists(atPath: yamlPath) { return yamlPath }
-        let mdPath = Self.scenariosDir + "/" + stem + ".md"
+        let mdPath = Self.skillsDir + "/" + stem + ".md"
         if FileManager.default.fileExists(atPath: mdPath) { return mdPath }
         throw NSError(
-            domain: "ScenarioFileTests", code: 1,
+            domain: "SkillFileTests", code: 1,
             userInfo: [NSLocalizedDescriptionKey: "No .yaml or .md file found for '\(stem)'"])
     }
 
-    /// Return unique scenario stems from the scenarios directory, filtering out legacy/,
-    /// dotfile directories (.claude/, .github/), and root-level non-scenario .md files.
+    /// Return unique skill stems from the skills directory, filtering out legacy/,
+    /// dotfile directories (.claude/, .github/), and root-level non-skill .md files.
     /// When both .yaml and .md exist for the same stem, only one entry is returned.
-    private func scenarioStems() -> [String] {
-        let allFiles = MirroirMCP.findScenarioFiles(in: Self.scenariosDir)
+    private func skillStems() -> [String] {
+        let allFiles = MirroirMCP.findSkillFiles(in: Self.skillsDir)
         var seenStems = Set<String>()
         var stems: [String] = []
 
@@ -489,7 +489,7 @@ final class ScenarioFileTests: XCTestCase {
             // Skip root-level .md files (README.md, CLA.md, etc.)
             if pathComponents.count == 1 && relPath.hasSuffix(".md") { continue }
 
-            let stem = MirroirMCP.scenarioStem(relPath)
+            let stem = MirroirMCP.skillStem(relPath)
             if seenStems.contains(stem) { continue }
             seenStems.insert(stem)
             stems.append(stem)
@@ -500,13 +500,13 @@ final class ScenarioFileTests: XCTestCase {
 
     /// Return non-legacy .yaml files for tests that require parsed steps.
     private func yamlFilesSkippingLegacy() -> [String] {
-        MirroirMCP.findYAMLFiles(in: Self.scenariosDir).filter {
+        MirroirMCP.findYAMLFiles(in: Self.skillsDir).filter {
             !$0.hasPrefix("legacy/")
         }
     }
 
-    /// Map a ScenarioStep to its string kind for easy comparison.
-    private func stepKind(_ step: ScenarioStep) -> String {
+    /// Map a SkillStep to its string kind for comparison.
+    private func stepKind(_ step: SkillStep) -> String {
         switch step {
         case .launch: return "launch"
         case .tap: return "tap"
@@ -530,17 +530,17 @@ final class ScenarioFileTests: XCTestCase {
     }
 
     private func assertContains(
-        _ scenario: ScenarioDefinition, _ kind: String,
+        _ skill: SkillDefinition, _ kind: String,
         file: StaticString = #filePath, line: UInt = #line
     ) {
-        let found = scenario.steps.contains { stepKind($0) == kind }
+        let found = skill.steps.contains { stepKind($0) == kind }
         XCTAssertTrue(found,
-            "'\(scenario.name)' missing expected step type '\(kind)'",
+            "'\(skill.name)' missing expected step type '\(kind)'",
             file: file, line: line)
     }
 
     private func assertStepKinds(
-        _ steps: [ScenarioStep], _ expected: [String],
+        _ steps: [SkillStep], _ expected: [String],
         file: String, testFile: StaticString = #filePath, testLine: UInt = #line
     ) {
         XCTAssertEqual(steps.count, expected.count,

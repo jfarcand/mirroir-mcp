@@ -26,7 +26,7 @@ mirroir-mcp/
 │   │   ├── MeasureTools.swift        # measure — time screen transitions
 │   │   ├── NetworkTools.swift        # set_network — toggle airplane/wifi/cellular
 │   │   ├── InfoTools.swift           # status, get_orientation, check_health
-│   │   ├── ScenarioTools.swift       # list_scenarios, get_scenario (SKILL.md + YAML)
+│   │   ├── SkillTools.swift          # list_skills, get_skill (SKILL.md + YAML)
 │   │   ├── SkillMdParser.swift      # SKILL.md front matter parser
 │   │   ├── MigrateCommand.swift     # mirroir migrate — YAML → SKILL.md conversion
 │   │   ├── Protocols.swift           # DI protocol abstractions
@@ -38,13 +38,13 @@ mirroir-mcp/
 │   │   ├── HelperClient.swift        # Unix socket client to helper daemon
 │   │   ├── DebugLog.swift            # Debug logging to stderr + file
 │   │   ├── TestRunner.swift          # `mirroir test` orchestrator
-│   │   ├── ScenarioParser.swift      # YAML → structured ScenarioStep list (used by test runner)
+│   │   ├── SkillParser.swift         # YAML → structured SkillStep list (used by test runner)
 │   │   ├── StepExecutor.swift        # Runs steps against real subsystems
 │   │   ├── ElementMatcher.swift      # Fuzzy OCR text matching (exact/case/substring)
 │   │   ├── ConsoleReporter.swift     # Terminal output formatting for test runner
 │   │   ├── JUnitReporter.swift       # JUnit XML generation for CI
 │   │   ├── EventRecorder.swift       # `mirroir record` — CGEvent tap monitoring
-│   │   ├── YAMLGenerator.swift       # Recorded events → scenario YAML
+│   │   ├── YAMLGenerator.swift       # Recorded events → skill YAML
 │   │   └── RecordCommand.swift       # `mirroir record` CLI entry point
 │   │
 │   ├── mirroir-helper/  # Root LaunchDaemon
@@ -74,9 +74,9 @@ mirroir-mcp/
 │   ├── MCPServerTests/         # XCTest — server routing + tool handlers
 │   ├── HelperDaemonTests/      # XCTest — command dispatch + Karabiner wire
 │   ├── HelperLibTests/         # Swift Testing — shared library utilities
-│   ├── TestRunnerTests/        # Swift Testing — test runner, recorder, scenario parser
+│   ├── TestRunnerTests/        # Swift Testing — test runner, recorder, skill parser
 │   ├── IntegrationTests/       # XCTest — FakeMirroring integration (requires running app)
-│   └── Fixtures/               # Test scenario files (YAML + SKILL.md)
+│   └── Fixtures/               # Test skill files (YAML + SKILL.md)
 │
 ├── scripts/                    # Install/uninstall helper scripts
 ├── Resources/                  # LaunchDaemon plist
