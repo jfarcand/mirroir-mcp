@@ -48,6 +48,11 @@ public struct TapPoint: Sendable {
 /// Converts raw OCR bounding box data into smart tap coordinates.
 /// Short labels (e.g. app icon names) are offset upward toward the icon above them,
 /// since Vision only detects the text label, not the icon itself.
+///
+/// The calculation runs as a three-stage pipeline:
+/// 1. ``groupIntoRows`` — cluster sorted elements within ``rowTolerance``
+/// 2. ``classifyRows`` — tag each row as icon/regular, compute gap from above
+/// 3. ``applyOffsets`` — produce final ``TapPoint`` array from classified rows
 public enum TapPointCalculator {
     /// Max label length for "short label" classification.
     static var maxLabelLength: Int { EnvConfig.tapMaxLabelLength }
@@ -70,24 +75,36 @@ public enum TapPointCalculator {
     /// Ensures all labels in an icon row get the same gap calculation.
     static var rowTolerance: Double { EnvConfig.tapRowTolerance }
 
-    /// Compute tap points from raw OCR elements, applying upward offsets
-    /// to short labels that have significant gaps above them (indicating
-    /// an icon or button is above the text).
-    ///
-    /// Elements at the same vertical position (within `rowTolerance`) are
-    /// processed as a batch so they all share the same gap from the row above.
-    public static func computeTapPoints(
-        elements: [RawTextElement], windowWidth: Double
-    ) -> [TapPoint] {
-        let sorted = elements.sorted { $0.textTopY < $1.textTopY }
+    // MARK: - Pipeline stage types
 
-        var results: [TapPoint] = []
-        var previousRowBottomY: Double = 0.0
-        var previousMultiRowBottomY: Double = 0.0
+    /// A horizontal row of elements at approximately the same vertical position.
+    public struct Row: Sendable {
+        /// Elements in this row, sorted left-to-right by original order.
+        public let elements: [RawTextElement]
+        /// Maximum textBottomY across all elements in the row.
+        public let bottomY: Double
+    }
+
+    /// A row annotated with classification and gap data from the row above.
+    public struct ClassifiedRow: Sendable {
+        /// The underlying row.
+        public let row: Row
+        /// Whether this row qualifies as an icon grid row (3+ short labels).
+        public let isIconRow: Bool
+        /// Vertical gap from the bottom of the reference row above.
+        public let gap: Double
+    }
+
+    // MARK: - Stage 1: Group into rows
+
+    /// Groups sorted elements into rows where all elements share approximately
+    /// the same textTopY (within ``rowTolerance``).
+    public static func groupIntoRows(_ sorted: [RawTextElement]) -> [Row] {
+        guard !sorted.isEmpty else { return [] }
+        var rows: [Row] = []
         var idx = 0
 
         while idx < sorted.count {
-            // Collect all elements in the same row (textTopY within tolerance)
             let rowTopY = sorted[idx].textTopY
             var rowEnd = idx + 1
             while rowEnd < sorted.count
@@ -95,20 +112,37 @@ public enum TapPointCalculator {
                 rowEnd += 1
             }
 
-            // The offset is a row-level decision: only icon grid rows (3+ short
-            // labels) get the upward offset. Single short labels (e.g. Settings
-            // list items like "Général") use text center to avoid false offsets
-            // into section separator gaps.
-            let rowSize = rowEnd - idx
-            let shortLabelsInRow = (idx..<rowEnd).filter { j in
-                sorted[j].text.count <= maxLabelLength
-                    && sorted[j].bboxWidth < windowWidth * maxLabelWidthFraction
+            let rowElements = Array(sorted[idx..<rowEnd])
+            let bottomY = rowElements.map(\.textBottomY).max() ?? rowTopY
+            rows.append(Row(elements: rowElements, bottomY: bottomY))
+            idx = rowEnd
+        }
+
+        return rows
+    }
+
+    // MARK: - Stage 2: Classify rows
+
+    /// Annotates each row with icon-row classification and gap from the row above.
+    ///
+    /// Icon rows measure their gap from the previous multi-element row,
+    /// bypassing single-element OCR fragments inside icons (e.g. Calendar date).
+    public static func classifyRows(
+        _ rows: [Row], windowWidth: Double
+    ) -> [ClassifiedRow] {
+        var classified: [ClassifiedRow] = []
+        var previousRowBottomY: Double = 0.0
+        var previousMultiRowBottomY: Double = 0.0
+
+        for row in rows {
+            let rowTopY = row.elements[0].textTopY
+            let shortLabelsInRow = row.elements.filter {
+                $0.text.count <= maxLabelLength
+                    && $0.bboxWidth < windowWidth * maxLabelWidthFraction
             }.count
-            let allShortLabels = shortLabelsInRow == rowSize
+            let allShortLabels = shortLabelsInRow == row.elements.count
             let isIconRow = allShortLabels && shortLabelsInRow >= iconRowMinLabels
 
-            // Icon rows measure gap from the previous multi-element row,
-            // bypassing single-element OCR fragments inside icons.
             let gap: Double
             if isIconRow {
                 gap = rowTopY - previousMultiRowBottomY
@@ -116,12 +150,29 @@ public enum TapPointCalculator {
                 gap = rowTopY - previousRowBottomY
             }
 
-            for j in idx..<rowEnd {
-                let element = sorted[j]
+            classified.append(ClassifiedRow(row: row, isIconRow: isIconRow, gap: gap))
 
+            previousRowBottomY = max(previousRowBottomY, row.bottomY)
+            if row.elements.count >= 2 {
+                previousMultiRowBottomY = max(previousMultiRowBottomY, row.bottomY)
+            }
+        }
+
+        return classified
+    }
+
+    // MARK: - Stage 3: Apply offsets
+
+    /// Converts classified rows into final tap points by applying the upward
+    /// offset to icon rows with a sufficient gap above.
+    public static func applyOffsets(_ classifiedRows: [ClassifiedRow]) -> [TapPoint] {
+        var results: [TapPoint] = []
+
+        for classified in classifiedRows {
+            for element in classified.row.elements {
                 let tapY: Double
                 let textCenterY = (element.textTopY + element.textBottomY) / 2.0
-                if isIconRow && gap > minGapForOffset {
+                if classified.isIconRow && classified.gap > minGapForOffset {
                     tapY = max(element.textTopY - iconOffset, 0.0)
                 } else {
                     tapY = textCenterY
@@ -134,22 +185,25 @@ public enum TapPointCalculator {
                     confidence: element.confidence
                 ))
             }
-
-            // Advance previousRowBottomY to the max textBottomY in this row
-            for j in idx..<rowEnd {
-                previousRowBottomY = max(previousRowBottomY, sorted[j].textBottomY)
-            }
-
-            // Advance previousMultiRowBottomY only for rows with 2+ elements
-            if (rowEnd - idx) >= 2 {
-                for j in idx..<rowEnd {
-                    previousMultiRowBottomY = max(previousMultiRowBottomY, sorted[j].textBottomY)
-                }
-            }
-
-            idx = rowEnd
         }
 
         return results
+    }
+
+    // MARK: - Public entry point
+
+    /// Compute tap points from raw OCR elements, applying upward offsets
+    /// to short labels that have significant gaps above them (indicating
+    /// an icon or button is above the text).
+    ///
+    /// Elements at the same vertical position (within `rowTolerance`) are
+    /// processed as a batch so they all share the same gap from the row above.
+    public static func computeTapPoints(
+        elements: [RawTextElement], windowWidth: Double
+    ) -> [TapPoint] {
+        let sorted = elements.sorted { $0.textTopY < $1.textTopY }
+        let rows = groupIntoRows(sorted)
+        let classified = classifyRows(rows, windowWidth: windowWidth)
+        return applyOffsets(classified)
     }
 }

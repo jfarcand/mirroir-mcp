@@ -421,6 +421,80 @@ struct TapPointCalculatorTests {
         #expect(results[1].tapY == 31.0, "Gap above threshold should trigger icon row offset")
     }
 
+    // MARK: - Pipeline stage tests
+
+    @Test("groupIntoRows clusters elements within row tolerance")
+    func groupIntoRowsClustering() {
+        let sorted = [
+            element(text: "A", tapX: 50, textTopY: 100, textBottomY: 115),
+            element(text: "B", tapX: 150, textTopY: 102, textBottomY: 117),
+            element(text: "C", tapX: 100, textTopY: 200, textBottomY: 215),
+        ]
+        let rows = TapPointCalculator.groupIntoRows(sorted)
+        #expect(rows.count == 2, "A and B should be in same row, C in a separate row")
+        #expect(rows[0].elements.count == 2)
+        #expect(rows[1].elements.count == 1)
+        #expect(rows[0].bottomY == 117.0)
+        #expect(rows[1].bottomY == 215.0)
+    }
+
+    @Test("groupIntoRows returns empty for empty input")
+    func groupIntoRowsEmpty() {
+        let rows = TapPointCalculator.groupIntoRows([])
+        #expect(rows.isEmpty)
+    }
+
+    @Test("classifyRows identifies icon rows vs regular rows")
+    func classifyRowsIconDetection() {
+        let iconElements = [
+            element(text: "App1", tapX: 54, textTopY: 150, textBottomY: 165),
+            element(text: "App2", tapX: 124, textTopY: 150, textBottomY: 165),
+            element(text: "App3", tapX: 194, textTopY: 150, textBottomY: 165),
+        ]
+        let regularElements = [
+            element(text: "Settings header text", tapX: 200, textTopY: 50, textBottomY: 65, bboxWidth: 300),
+        ]
+        let rows = [
+            TapPointCalculator.Row(elements: regularElements, bottomY: 65),
+            TapPointCalculator.Row(elements: iconElements, bottomY: 165),
+        ]
+        let classified = TapPointCalculator.classifyRows(rows, windowWidth: windowWidth)
+        #expect(classified.count == 2)
+        #expect(!classified[0].isIconRow, "Wide text row should not be icon row")
+        #expect(classified[1].isIconRow, "3 short labels should be icon row")
+        // Icon rows measure gap from previousMultiRowBottomY, which stays at 0
+        // because the header is a single-element row (doesn't advance multi-row tracker).
+        #expect(classified[1].gap == 150.0, "Icon row gap from y=0 (no prior multi-element row)")
+    }
+
+    @Test("applyOffsets uses text center for non-icon rows")
+    func applyOffsetsRegularRow() {
+        let elements = [
+            element(text: "Label", tapX: 100, textTopY: 200, textBottomY: 220),
+        ]
+        let row = TapPointCalculator.Row(elements: elements, bottomY: 220)
+        let classified = [TapPointCalculator.ClassifiedRow(row: row, isIconRow: false, gap: 100)]
+        let points = TapPointCalculator.applyOffsets(classified)
+        #expect(points.count == 1)
+        #expect(points[0].tapY == 210.0, "Non-icon row should use text center")
+    }
+
+    @Test("applyOffsets applies icon offset when gap exceeds threshold")
+    func applyOffsetsIconRow() {
+        let elements = [
+            element(text: "App1", tapX: 54, textTopY: 150, textBottomY: 165),
+            element(text: "App2", tapX: 124, textTopY: 150, textBottomY: 165),
+            element(text: "App3", tapX: 194, textTopY: 150, textBottomY: 165),
+        ]
+        let row = TapPointCalculator.Row(elements: elements, bottomY: 165)
+        let classified = [TapPointCalculator.ClassifiedRow(row: row, isIconRow: true, gap: 80)]
+        let points = TapPointCalculator.applyOffsets(classified)
+        #expect(points.count == 3)
+        for point in points {
+            #expect(point.tapY == 120.0, "\(point.text) should get 30pt upward offset")
+        }
+    }
+
     // MARK: - Settings-style list items (regression test)
 
     @Test("Settings list items use text center despite section separator gaps")
