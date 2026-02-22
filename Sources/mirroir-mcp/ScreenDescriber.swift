@@ -20,14 +20,18 @@ final class ScreenDescriber: Sendable {
         self.capture = capture
     }
 
-    /// Result of a describe operation: detected elements, navigation hints, plus the screenshot.
+    /// Result of a describe operation: detected elements, unlabeled icons, navigation hints,
+    /// plus the screenshot.
     struct DescribeResult: Sendable {
         let elements: [TapPoint]
+        let icons: [IconDetector.DetectedIcon]
         let hints: [String]
         let screenshotBase64: String
 
-        init(elements: [TapPoint], hints: [String] = [], screenshotBase64: String) {
+        init(elements: [TapPoint], icons: [IconDetector.DetectedIcon] = [],
+             hints: [String] = [], screenshotBase64: String) {
             self.elements = elements
+            self.icons = icons
             self.hints = hints
             self.screenshotBase64 = screenshotBase64
         }
@@ -113,6 +117,11 @@ final class ScreenDescriber: Sendable {
             elements: rawElements, windowWidth: windowWidth
         )
 
+        // Detect unlabeled icons in OCR-empty zones (tab bars, toolbars)
+        let icons = IconDetector.detect(
+            image: cgImage, ocrElements: elements, windowSize: info.size
+        )
+
         // Detect navigation patterns and generate keyboard shortcut hints
         let hints = NavigationHintDetector.detect(
             elements: elements, windowHeight: windowHeight
@@ -121,7 +130,7 @@ final class ScreenDescriber: Sendable {
         let griddedData = GridOverlay.addOverlay(to: data, windowSize: info.size) ?? data
         let base64 = griddedData.base64EncodedString()
 
-        return DescribeResult(elements: elements, hints: hints, screenshotBase64: base64)
+        return DescribeResult(elements: elements, icons: icons, hints: hints, screenshotBase64: base64)
     }
 
 }

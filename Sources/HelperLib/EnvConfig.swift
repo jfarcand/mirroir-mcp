@@ -335,6 +335,90 @@ public enum EnvConfig {
         readInt("defaultAIMaxTokens", default: TimingConstants.defaultAIMaxTokens)
     }
 
+    // MARK: - Icon Detection
+
+    public static var iconOcrProximityFilter: Double {
+        readDouble("iconOcrProximityFilter", default: TimingConstants.iconOcrProximityFilter)
+    }
+
+    public static var iconMinZoneHeight: Double {
+        readDouble("iconMinZoneHeight", default: TimingConstants.iconMinZoneHeight)
+    }
+
+    public static var iconSaliencyMinZone: Double {
+        readDouble("iconSaliencyMinZone", default: TimingConstants.iconSaliencyMinZone)
+    }
+
+    public static var iconBottomZoneFraction: Double {
+        readDouble("iconBottomZoneFraction", default: TimingConstants.iconBottomZoneFraction)
+    }
+
+    public static var iconTopZoneFraction: Double {
+        readDouble("iconTopZoneFraction", default: TimingConstants.iconTopZoneFraction)
+    }
+
+    public static var iconMaxZoneElements: Int {
+        readInt("iconMaxZoneElements", default: TimingConstants.iconMaxZoneElements)
+    }
+
+    public static var iconNoiseMaxLength: Int {
+        readInt("iconNoiseMaxLength", default: TimingConstants.iconNoiseMaxLength)
+    }
+
+    public static var iconMaxSaliencySize: Double {
+        readDouble("iconMaxSaliencySize", default: TimingConstants.iconMaxSaliencySize)
+    }
+
+    public static var iconMinForInterpolation: Int {
+        readInt("iconMinForInterpolation", default: TimingConstants.iconMinForInterpolation)
+    }
+
+    public static var iconSpacingTolerance: Double {
+        readDouble("iconSpacingTolerance", default: TimingConstants.iconSpacingTolerance)
+    }
+
+    public static var iconDeduplicationRadius: Double {
+        readDouble("iconDeduplicationRadius", default: TimingConstants.iconDeduplicationRadius)
+    }
+
+    // MARK: - Icon Cluster Detection
+
+    public static var iconColorThreshold: UInt8 {
+        if let value = settings["iconColorThreshold"],
+           let num = value as? Int, num >= 0, num <= 255 {
+            return UInt8(num)
+        }
+        if let str = env[envVarName("iconColorThreshold")],
+           let num = Int(str), num >= 0, num <= 255 {
+            return UInt8(num)
+        }
+        return TimingConstants.iconColorThreshold
+    }
+
+    public static var iconMinColumnDensity: Int {
+        readInt("iconMinColumnDensity", default: TimingConstants.iconMinColumnDensity)
+    }
+
+    public static var iconMinClusterWidth: Int {
+        readInt("iconMinClusterWidth", default: TimingConstants.iconMinClusterWidth)
+    }
+
+    public static var iconMaxClusterWidth: Int {
+        readInt("iconMaxClusterWidth", default: TimingConstants.iconMaxClusterWidth)
+    }
+
+    public static var iconSmoothingWindow: Int {
+        readInt("iconSmoothingWindow", default: TimingConstants.iconSmoothingWindow)
+    }
+
+    public static var iconCornerInsetPixels: Int {
+        readInt("iconCornerInsetPixels", default: TimingConstants.iconCornerInsetPixels)
+    }
+
+    public static var iconBarRowBgFraction: Double {
+        readDouble("iconBarRowBgFraction", default: TimingConstants.iconBarRowBgFraction)
+    }
+
     // MARK: - Input Tool Defaults
 
     public static var defaultDragDurationMs: Int {

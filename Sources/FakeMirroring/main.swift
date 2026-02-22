@@ -22,11 +22,18 @@ final class FakeScreenView: NSView {
 
     override var isFlipped: Bool { true }
 
+    /// Tab bar icon positions (x-center) and sizes — 5 evenly spaced icons
+    /// on a white bar at the bottom, simulating an iOS tab bar for icon detection testing.
+    private let tabBarHeight: CGFloat = 50
+    private let iconSize: CGFloat = 24
+    private let tabBarIconXPositions: [CGFloat] = [50, 130, 210, 290, 370]
+
     override func draw(_ dirtyRect: NSRect) {
         // Dark background for high OCR contrast
         NSColor(red: 0.1, green: 0.1, blue: 0.15, alpha: 1.0).setFill()
         dirtyRect.fill()
 
+        // Draw text labels
         let font = NSFont.systemFont(ofSize: 18, weight: .medium)
         let attributes: [NSAttributedString.Key: Any] = [
             .font: font,
@@ -37,6 +44,24 @@ final class FakeScreenView: NSView {
             let size = (text as NSString).size(withAttributes: attributes)
             let centeredX = origin.x - size.width / 2
             (text as NSString).draw(at: NSPoint(x: centeredX, y: origin.y), withAttributes: attributes)
+        }
+
+        // Draw white tab bar background at the bottom
+        let barY = bounds.height - tabBarHeight
+        NSColor.white.setFill()
+        NSRect(x: 0, y: barY, width: bounds.width, height: tabBarHeight).fill()
+
+        // Draw dark icon shapes (simple filled rectangles) on the tab bar
+        NSColor(red: 0.15, green: 0.15, blue: 0.15, alpha: 1.0).setFill()
+        let iconY = barY + (tabBarHeight - iconSize) / 2
+        for iconX in tabBarIconXPositions {
+            let rect = NSRect(
+                x: iconX - iconSize / 2,
+                y: iconY,
+                width: iconSize,
+                height: iconSize
+            )
+            NSBezierPath(roundedRect: rect, xRadius: 4, yRadius: 4).fill()
         }
     }
 }

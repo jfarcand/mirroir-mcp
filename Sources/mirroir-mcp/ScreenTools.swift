@@ -116,6 +116,13 @@ extension MirroirMCP {
                 if result.elements.isEmpty {
                     lines.append("(no text detected)")
                 }
+                if !result.icons.isEmpty {
+                    lines.append("")
+                    lines.append("Unlabeled icons (estimated positions — use describe_screen with skip_ocr=true to identify):")
+                    for icon in result.icons.sorted(by: { $0.tapX < $1.tapX }) {
+                        lines.append("- Icon at (\(Int(icon.tapX)), \(Int(icon.tapY))), ~\(Int(icon.estimatedSize))x\(Int(icon.estimatedSize))pt")
+                    }
+                }
                 if !result.hints.isEmpty {
                     lines.append("")
                     lines.append("Hints:")

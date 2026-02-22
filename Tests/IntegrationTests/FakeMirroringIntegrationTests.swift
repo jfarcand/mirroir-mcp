@@ -114,6 +114,34 @@ final class FakeMirroringIntegrationTests: XCTestCase {
         XCTAssertFalse(result.screenshotBase64.isEmpty, "Should include screenshot in describe result")
     }
 
+    func testIconDetectionInTabBar() {
+        let describer = ScreenDescriber(bridge: bridge, capture: ScreenCapture(bridge: bridge))
+        guard let result = describer.describe() else {
+            XCTFail("describe() returned nil")
+            return
+        }
+
+        // FakeMirroring renders 5 dark icon rectangles on a white bar at the bottom.
+        // The icon detector should find them (possibly via clustering, saliency, or
+        // spacing interpolation). We verify at least 3 are detected with correct positions.
+        XCTAssertGreaterThanOrEqual(
+            result.icons.count, 3,
+            "Should detect at least 3 tab bar icons, got \(result.icons.count)"
+        )
+
+        // All detected icons should be in the bottom 10% of the window
+        let info = bridge.getWindowInfo()
+        guard let info = info else { return }
+        let windowHeight = Double(info.size.height)
+
+        for icon in result.icons {
+            XCTAssertGreaterThan(
+                icon.tapY, windowHeight * 0.85,
+                "Tab bar icon should be near bottom, got tapY=\(icon.tapY)"
+            )
+        }
+    }
+
     func testOCRCoordinateAccuracy() {
         let describer = ScreenDescriber(bridge: bridge, capture: ScreenCapture(bridge: bridge))
         guard let result = describer.describe() else {
