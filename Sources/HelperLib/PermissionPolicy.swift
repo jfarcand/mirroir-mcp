@@ -88,6 +88,7 @@ public struct PermissionPolicy: Sendable {
         "switch_target",
         "record_step",
         "save_compiled",
+        "generate_skill",
     ]
 
     public init(skipPermissions: Bool, config: PermissionConfig?) {
