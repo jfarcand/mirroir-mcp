@@ -658,7 +658,8 @@ section > p {
 
 .pipeline-cmd code {
   font-size: 0.75rem;
-  white-space: nowrap;
+  white-space: normal;
+  word-break: break-word;
 }
 
 @media (max-width: 700px) {
