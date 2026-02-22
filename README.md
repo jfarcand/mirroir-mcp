@@ -16,7 +16,8 @@ An MCP server that controls iPhones through macOS iPhone Mirroring — and any m
 
 ## What's Changed
 
-- **"Scenario" renamed to "skill"** — MCP tools are now `list_skills` / `get_skill`, directories are `.mirroir-mcp/skills/`. The old `list_scenarios` / `get_scenario` tools no longer exist.
+- **`generate_skill` tool** — AI agents can now explore an app and produce a ready-to-run SKILL.md autonomously. Session-based: `start` → navigate with tap/swipe → `capture` each screen → `finish` to emit the skill file.
+- **`reset_app` carousel search** — `reset_app` now swipes through the App Switcher carousel to find off-screen app cards instead of giving up after one OCR scan.
 
 ## Requirements
 
@@ -279,6 +280,20 @@ mirroir record --no-ocr -o quick-capture.yaml      # skip OCR (faster)
 
 Press Ctrl+C to stop and save. Review the output and add `wait_for` steps where needed.
 
+## Generate Skill
+
+Let an AI agent explore an app and write the skill for you. The `generate_skill` MCP tool uses a three-phase session:
+
+1. **Start** — launches the app, OCRs the first screen
+2. **Navigate + Capture** — the agent taps, swipes, types to explore; calls `capture` after each navigation to record the screen
+3. **Finish** — assembles all captured screens into a SKILL.md with steps, landmarks, and metadata
+
+```
+Explore the Settings app and generate a skill that checks the iOS version.
+```
+
+The agent drives the exploration autonomously — duplicate screens are automatically skipped, and the generated skill uses OCR-based landmarks (no hardcoded coordinates).
+
 ## Doctor
 
 Verify your setup:
@@ -335,7 +350,7 @@ Environment variables also work: `MIRROIR_KEYSTROKE_DELAY_US`. See [`TimingConst
 
 | | |
 |---|---|
-| [Tools Reference](docs/tools.md) | All 28 tools, parameters, and input workflows |
+| [Tools Reference](docs/tools.md) | All 31 tools, parameters, and input workflows |
 | [FAQ](docs/faq.md) | Security, focus stealing, DriverKit, keyboard layouts |
 | [Security](docs/security.md) | Threat model, kill switch, and recommendations |
 | [Permissions](docs/permissions.md) | Fail-closed permission model and config file |

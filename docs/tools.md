@@ -1,6 +1,6 @@
 # Tools Reference
 
-All 28 tools exposed by the MCP server. Mutating tools require [permission](permissions.md) to appear in `tools/list`.
+All 31 tools exposed by the MCP server. Mutating tools require [permission](permissions.md) to appear in `tools/list`.
 
 ## Tool List
 
@@ -32,6 +32,7 @@ All 28 tools exposed by the MCP server. Mutating tools require [permission](perm
 | `check_health` | — | Comprehensive setup diagnostic: mirroring, helper, DriverKit, screen capture |
 | `list_skills` | — | List available skills (SKILL.md and YAML) from project-local and global config dirs |
 | `get_skill` | `name` | Read a skill file (SKILL.md or YAML) with ${VAR} env substitution. Appends compilation status. |
+| `generate_skill` | `action`, `app_name`?, `goal`?, `arrived_via`?, `action_type`? | Generate a SKILL.md by exploring an app. Session-based: start → capture → finish |
 | `record_step` | `step_index`, `type`, `label`?, `tap_x`?, `tap_y`?, `confidence`?, `match_strategy`?, `elapsed_ms`?, `scroll_count`?, `scroll_direction`? | Record a compiled step during AI-driven skill execution |
 | `save_compiled` | `skill_name` | Save accumulated compiled steps as .compiled.json next to the source skill |
 
