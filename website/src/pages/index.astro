@@ -5,6 +5,10 @@ import "../styles/global.css";
 import { readFileSync, existsSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 
+const serverJsonPath = fileURLToPath(new URL("../../../server.json", import.meta.url));
+const serverJson = JSON.parse(readFileSync(serverJsonPath, "utf-8"));
+const version = serverJson.version;
+
 const curlCmd = '/bin/bash -c "$(curl -fsSL https://mirroir.dev/get-mirroir.sh)"';
 const npxCmd = "npx -y mirroir-mcp install";
 const brewCmd = "brew tap jfarcand/tap && brew install mirroir-mcp";
@@ -217,7 +221,7 @@ if (!skillsAvailable) {
       Give your AI an iPhone.
     </p>
     <p class="subtitle">
-      An MCP server that controls a real iPhone via macOS iPhone Mirroring &mdash; and any macOS window too.
+      We built an MCP server to control iPhones through macOS iPhone Mirroring. Then we realized the same tools &mdash; screenshot, tap, swipe, type &mdash; work on any macOS window. Same security model. Same skills. Same AI.
     </p>
     <div class="hero-cta">
       <a href="#install" class="btn-primary">Install</a>
@@ -333,14 +337,11 @@ if (!skillsAvailable) {
 
   <!-- Install -->
   <section id="install">
-    <h2>Install mirroir-mcp</h2>
+    <h2>Install mirroir-mcp <span class="version-badge">v{version}</span></h2>
     <div class="install-block">
       <code><span class="prompt">$</span> {curlCmd}</code>
       <button class="copy-btn" data-copy={curlCmd}>Copy</button>
     </div>
-    <p class="install-hint">
-      Paste that in a macOS Terminal. Clones the repo, builds from source, installs the DriverKit virtual HID, and starts the helper daemon.
-    </p>
     <p class="alt-install">
       or via <a href="https://www.npmjs.com/package/mirroir-mcp" rel="noopener noreferrer">npx</a>:
     </p>
