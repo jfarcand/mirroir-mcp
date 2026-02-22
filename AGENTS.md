@@ -46,6 +46,48 @@ This project uses **Swift Package Manager** (SPM) exclusively. The `Package.swif
 - Bug fixes go directly to `main` branch (no feature branch needed)
 - Commit and push directly: `git push origin main`
 
+## Architecture
+
+This project follows established decomposition patterns. When adding new functionality, match these patterns — do not invent new structural idioms.
+
+### File Size Limit
+
+No file should exceed **500 lines**. If a type is growing past this threshold, extract a focused helper type or enum. Reference: `LandmarkPicker` and `ActionStepFormatter` were extracted from `SkillMdGenerator` for this reason.
+
+### Pattern Catalog
+
+Apply the pattern whose trigger condition matches your situation:
+
+| Trigger | Pattern | Example |
+|---------|---------|---------|
+| New MCP tool category | **Extension-Based Tool Registration**: create `XxxTools.swift` with `registerXxxTools()`, wire from `ToolHandlers.registerTools()` | `InputTools.swift`, `ScreenTools.swift` |
+| Tool handler needs business logic | **Thin Registration → Delegate**: tool file owns schema + arg parsing only; separate type owns logic | `InputTools.swift` → `InputSimulation.swift` |
+| New system boundary (hardware, OS API, network) | **Protocol Abstraction**: define protocol in `Protocols.swift`, implement in concrete type | `WindowBridging`/`MirroringBridge`, `InputProviding`/`InputSimulation` |
+| Pure transformation (filter, format, match, compute) | **Enum Namespace**: stateless enum, all `static func`, no stored properties | `LandmarkPicker`, `ActionStepFormatter`, `ElementMatcher` |
+| Multi-step stateful workflow (start/accumulate/finalize) | **Session Accumulator**: `final class` with `NSLock`, explicit lifecycle methods | `ExplorationSession` |
+| Wrapping a protocol to add observation/caching | **Decorator**: new type conforming to same protocol, forwarding + adding behavior | `RecordingDescriber` wraps `ScreenDescribing` |
+| Two input formats producing same output type | **Separate Parsers, Shared Model**: one parser per format, both emit same type | `SkillParser` (YAML) + `SkillMdParser` (Markdown) → `SkillStep` |
+| Generator building structured output from data | **Pipeline with Composable Stages**: generator delegates filtering/formatting to enum-namespace helpers | `SkillMdGenerator` uses `LandmarkPicker` + `ActionStepFormatter` |
+| CLI subcommand | **Command Enum**: `enum XxxCommand` with `static func run(arguments:) -> Int32` | `DoctorCommand`, `MigrateCommand`, `CompileCommand` |
+| Types shared by both `mirroir-mcp` and `mirroir-helper` | **HelperLib target**: value types, enums, utilities in `Sources/HelperLib/` | `TapPoint`, `EnvConfig`, `MCPProtocol` |
+
+### Decision Sequence for New Code
+
+When creating a new type or file, walk this checklist in order:
+
+1. **Does it cross a system boundary?** → Protocol in `Protocols.swift` + concrete implementation file.
+2. **Is it an MCP tool?** → `XxxTools.swift` with `registerXxxTools()`, wired from `ToolHandlers`. Business logic in a separate type.
+3. **Is it a pure transformation?** → Enum with `static` methods. No init, no stored properties.
+4. **Is it a stateful workflow?** → Session accumulator with explicit lifecycle and `NSLock`.
+5. **Is it growing past 400 lines?** → Stop and extract. Identify the secondary concern and move it to its own enum-namespace helper.
+
+### Prohibited Structural Choices
+
+- NEVER put business logic directly inside a tool registration handler. The handler parses args and delegates.
+- NEVER define a new protocol outside `Protocols.swift` unless it is internal to a single file.
+- NEVER add a new SPM target without discussing with ChefFamille first.
+- NEVER put types used only by `mirroir-mcp` into `HelperLib`. HelperLib is for cross-target shared types only.
+
 # Writing code
 
 - CRITICAL: NEVER USE --no-verify WHEN COMMITTING CODE
@@ -213,6 +255,10 @@ Mocks are permitted ONLY in test code for:
    - Error handling follows proper patterns throughout
    - No code paths that bypass real implementations
    - No force unwraps in production code (unless justified)
+   - Every new file follows a pattern from the Architecture Pattern Catalog
+   - No file exceeds 500 lines
+   - Tool registration files contain zero business logic
+   - New system boundaries have a protocol in `Protocols.swift`
 
 ### Failure Criteria
 If ANY of the above checks fail, the task is NOT complete regardless of test passing status.
