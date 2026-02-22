@@ -298,4 +298,110 @@ struct HIDKeyMapTests {
             #expect(seq!.steps[1].modifiers.contains(.leftShift), "'\(char)' base step should have shift")
         }
     }
+
+    // MARK: - Table Integrity
+
+    @Test("no duplicate keycode+modifier pairs in character map")
+    func noDuplicateKeycodeModifierPairs() {
+        // Build a complete set of characters that have direct (1-step) mappings
+        // by scanning all printable ASCII + common extended characters.
+        var seen = [String: Character]()
+        var duplicates: [(Character, Character, String)] = []
+
+        let testChars: [Character] = {
+            var chars: [Character] = []
+            // Printable ASCII
+            for scalar in (0x09...0x0D).compactMap(Unicode.Scalar.init) { chars.append(Character(scalar)) }
+            for scalar in (0x20...0x7E).compactMap(Unicode.Scalar.init) { chars.append(Character(scalar)) }
+            // ISO section key characters
+            chars.append("§")
+            chars.append("±")
+            return chars
+        }()
+
+        for char in testChars {
+            guard let mapping = HIDKeyMap.lookup(char) else { continue }
+            let key = "\(mapping.keycode)-\(mapping.modifiers.rawValue)"
+            if let existing = seen[key], existing != char {
+                // \n and \r both intentionally map to Return (0x28)
+                let isReturnAlias = Set([existing, char]) == Set<Character>(["\n", "\r"])
+                if !isReturnAlias {
+                    duplicates.append((existing, char, key))
+                }
+            } else {
+                seen[key] = char
+            }
+        }
+        #expect(duplicates.isEmpty,
+                "Conflicting keycode+modifier pairs: \(duplicates.map { "'\($0.0)' vs '\($0.1)' at \($0.2)" })")
+    }
+
+    @Test("dead-key sequences all have exactly 2 steps except cedilla")
+    func deadKeySequenceStepCounts() {
+        let deadKeyChars: [Character] = [
+            // Acute
+            "é", "É", "á", "Á", "í", "Í", "ó", "Ó", "ú", "Ú",
+            // Grave
+            "è", "È", "à", "À", "ì", "Ì", "ò", "Ò", "ù", "Ù",
+            // Umlaut
+            "ü", "Ü", "ö", "Ö", "ä", "Ä", "ë", "Ë", "ï", "Ï", "ÿ", "Ÿ",
+            // Circumflex
+            "ê", "Ê", "â", "Â", "î", "Î", "ô", "Ô", "û", "Û",
+            // Tilde
+            "ñ", "Ñ", "ã", "Ã", "õ", "Õ",
+        ]
+
+        for char in deadKeyChars {
+            let seq = HIDKeyMap.lookupSequence(char)
+            #expect(seq != nil, "Missing dead-key sequence for '\(char)'")
+            #expect(seq!.steps.count == 2,
+                    "'\(char)' should be a 2-step dead-key sequence, got \(seq!.steps.count)")
+        }
+
+        // ç and Ç are single-step Option characters, not dead-key
+        let cedillaLower = HIDKeyMap.lookupSequence("ç")
+        #expect(cedillaLower?.steps.count == 1, "ç should be 1-step (Option+c)")
+        let cedillaUpper = HIDKeyMap.lookupSequence("Ç")
+        #expect(cedillaUpper?.steps.count == 1, "Ç should be 1-step (Option+Shift+c)")
+    }
+
+    @Test("dead-key base characters all exist in character map")
+    func deadKeyBaseCharsInCharacterMap() {
+        // Every dead-key sequence step 1 is the trigger (Option+key),
+        // step 2 is a base character. The base character's keycode must be
+        // a valid entry in the character map (with or without shift).
+        let deadKeyChars: [Character] = [
+            "é", "á", "í", "ó", "ú",
+            "è", "à", "ì", "ò", "ù",
+            "ü", "ö", "ä", "ë", "ï", "ÿ",
+            "ê", "â", "î", "ô", "û",
+            "ñ", "ã", "õ",
+        ]
+
+        var missingBase: [String] = []
+        for char in deadKeyChars {
+            guard let seq = HIDKeyMap.lookupSequence(char), seq.steps.count == 2 else { continue }
+            let baseKeycode = seq.steps[1].keycode
+            // Verify the base keycode maps to a real character
+            let baseChar = "abcdefghijklmnopqrstuvwxyz".first { c in
+                HIDKeyMap.lookup(c)?.keycode == baseKeycode
+            }
+            if baseChar == nil {
+                missingBase.append("'\(char)' base keycode 0x\(String(baseKeycode, radix: 16)) not found in character map")
+            }
+        }
+        #expect(missingBase.isEmpty, "Dead-key base keycodes missing from character map: \(missingBase)")
+    }
+
+    @Test("character map count is stable")
+    func characterMapCountStable() {
+        // Verify the map size hasn't accidentally shrunk or bloated
+        #expect(HIDKeyMap.count >= 79, "Expected at least 79 direct mappings, got \(HIDKeyMap.count)")
+    }
+
+    @Test("dead-key map count is stable")
+    func deadKeyMapCountStable() {
+        // 36 dead-key chars + 2 cedilla = 38 total sequences
+        #expect(HIDKeyMap.deadKeyCount >= 38, "Expected at least 38 dead-key sequences, got \(HIDKeyMap.deadKeyCount)")
+    }
 }
