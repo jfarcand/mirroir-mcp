@@ -12,6 +12,12 @@
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue)](LICENSE)
 [![macOS 15+](https://img.shields.io/badge/macOS-15%2B-black?logo=apple)](https://support.apple.com/en-us/105071)
 
+## What's Changed
+
+"Scenario" is now "skill" everywhere: MCP tools (`list_skills`, `get_skill`), parameters (`skill_name`), directories (`.mirroir-mcp/skills/`), and the community repo ([mirroir-skills](https://github.com/jfarcand/mirroir-skills)). The old `list_scenarios` / `get_scenario` tools no longer exist — update your client config and any scripts that reference them.
+
+---
+
 We built an MCP server to control iPhones through macOS iPhone Mirroring — then realized the same tools work on any macOS window. [Screenshot, tap, swipe, type, scroll_to, measure](docs/tools.md) — from any MCP client. Same security model. Same skills. Same AI. No source code required.
 
 When automation breaks — a button moves, a label changes, timing drifts — [Agent Diagnosis](#agent-diagnosis) tells you *why* and how to fix it. Self-diagnosing automation, not just self-running.
