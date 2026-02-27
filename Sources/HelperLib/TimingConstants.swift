@@ -279,6 +279,18 @@ public enum TimingConstants {
     /// Minimum fraction of pixels in a row that must match background to qualify as a "bar row".
     public static let iconBarRowBgFraction: Double = 0.60
 
+    // MARK: - Scroll Deduplication
+
+    /// Default dedup strategy for scroll-collected OCR elements.
+    /// Options: "exact", "levenshtein", "proximity".
+    public static let scrollDedupStrategy: String = "exact"
+
+    /// Maximum Levenshtein edit distance for fuzzy text dedup.
+    public static let scrollDedupLevenshteinMax: Int = 3
+
+    /// Maximum Euclidean distance in points for coordinate proximity dedup.
+    public static let scrollDedupProximityPt: Double = 15.0
+
     // MARK: - Input Tool Defaults
 
     /// Default drag duration in milliseconds.

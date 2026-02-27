@@ -98,8 +98,14 @@ enum CalibrationScroller {
             previousTexts.formUnion(currentTexts)
         }
 
+        // Apply configurable dedup strategy to the final collected set
+        let strategy = ScrollDedupStrategy(rawValue: EnvConfig.scrollDedupStrategy) ?? .exact
+        let beforeCount = allElements.count
+        let deduped = ScrollDeduplicator.deduplicate(allElements, strategy: strategy)
+        DebugLog.persist("ScrollDedup", "strategy=\(strategy.rawValue) before=\(beforeCount) after=\(deduped.count) removed=\(beforeCount - deduped.count)")
+
         return ScrollResult(
-            elements: allElements,
+            elements: deduped,
             scrollCount: scrollCount,
             screenshotBase64: lastScreenshot
         )

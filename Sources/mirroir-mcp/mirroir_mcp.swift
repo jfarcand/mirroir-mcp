@@ -100,6 +100,7 @@ struct MirroirMCP {
         // Log active targets
         let targetNames = registry.allTargetNames
         DebugLog.persist("startup", "Targets: \(targetNames) (active: \(registry.activeTargetName))")
+        DebugLog.persist("startup", "ScrollDedup: strategy=\(EnvConfig.scrollDedupStrategy)")
 
         registerTools(server: server, registry: registry, policy: policy)
 

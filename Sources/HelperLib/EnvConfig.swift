@@ -389,6 +389,25 @@ public enum EnvConfig {
         readDouble("defaultMeasureTimeoutSeconds", default: TimingConstants.defaultMeasureTimeoutSeconds)
     }
 
+    // MARK: - Scroll Deduplication
+
+    /// Dedup strategy for scroll-collected OCR elements.
+    /// Options: "exact" (default), "levenshtein", "proximity".
+    public static var scrollDedupStrategy: String {
+        readString("scrollDedupStrategy", envVar: "MIRROIR_SCROLL_DEDUP_STRATEGY",
+                   default: TimingConstants.scrollDedupStrategy)
+    }
+
+    /// Maximum Levenshtein edit distance for fuzzy text dedup.
+    public static var scrollDedupLevenshteinMax: Int {
+        readInt("scrollDedupLevenshteinMax", default: TimingConstants.scrollDedupLevenshteinMax)
+    }
+
+    /// Maximum Euclidean distance in points for coordinate proximity dedup.
+    public static var scrollDedupProximityPt: Double {
+        readDouble("scrollDedupProximityPt", default: TimingConstants.scrollDedupProximityPt)
+    }
+
     // MARK: - Keyboard Layout
 
     /// iPhone keyboard layout name for character substitution.
