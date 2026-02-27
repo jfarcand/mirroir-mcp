@@ -83,6 +83,25 @@ protocol ScreenRecording: Sendable {
     func stopRecording() -> (filePath: String?, error: String?)
 }
 
+/// Abstracts raw text recognition from a screenshot image.
+/// Implementations produce `[RawTextElement]` in window-point space,
+/// decoupling the OCR engine from the rest of the describe pipeline.
+protocol TextRecognizing: Sendable {
+    /// Recognize text elements in a screenshot.
+    ///
+    /// - Parameters:
+    ///   - image: The raw screenshot as a `CGImage`.
+    ///   - windowSize: Size of the target window in points (for coordinate scaling).
+    ///   - contentBounds: Pixel-space rect from `ContentBoundsDetector`
+    ///     (caller computes this before invoking).
+    /// - Returns: Text elements with coordinates in window-point space.
+    func recognizeText(
+        in image: CGImage,
+        windowSize: CGSize,
+        contentBounds: CGRect
+    ) -> [RawTextElement]
+}
+
 /// Abstracts OCR-based screen element detection.
 protocol ScreenDescribing: Sendable {
     func describe(skipOCR: Bool) -> ScreenDescriber.DescribeResult?
@@ -154,5 +173,7 @@ extension InputSimulation: InputProviding {}
 extension ScreenCapture: ScreenCapturing {}
 
 extension ScreenRecorder: ScreenRecording {}
+
+extension AppleVisionTextRecognizer: TextRecognizing {}
 
 extension ScreenDescriber: ScreenDescribing {}

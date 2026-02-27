@@ -110,6 +110,22 @@ final class StubRecorder: ScreenRecording, @unchecked Sendable {
     }
 }
 
+// MARK: - StubTextRecognizer
+
+/// Stub for TextRecognizing that returns configurable elements without
+/// running real Vision OCR, enabling deterministic unit tests.
+final class StubTextRecognizer: TextRecognizing, @unchecked Sendable {
+    var elements: [RawTextElement] = []
+
+    func recognizeText(
+        in image: CGImage,
+        windowSize: CGSize,
+        contentBounds: CGRect
+    ) -> [RawTextElement] {
+        return elements
+    }
+}
+
 // MARK: - StubDescriber
 
 final class StubDescriber: ScreenDescribing, @unchecked Sendable {
