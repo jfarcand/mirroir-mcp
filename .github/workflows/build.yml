@@ -32,7 +32,7 @@ jobs:
 
       - name: Unit tests (Swift Testing)
         timeout-minutes: 5
-        run: swift test --skip IntegrationTests --disable-xctest
+        run: swift test --skip IntegrationTests --disable-xctest --no-parallel
 
       - name: Build and package FakeMirroring
         run: |

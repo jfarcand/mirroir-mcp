@@ -77,4 +77,4 @@ jobs:
 
       - name: Run unit tests (Swift Testing)
         timeout-minutes: 5
-        run: swift test --skip IntegrationTests --disable-xctest
+        run: swift test --skip IntegrationTests --disable-xctest --no-parallel
