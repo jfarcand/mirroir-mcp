@@ -18,14 +18,7 @@ Give your AI eyes, hands, and a real iPhone. An MCP server that lets any AI agen
 
 - **Icon detection (YOLO CoreML)** — `describe_screen` can now detect non-text UI elements (icons, buttons, toggles, activity rings) alongside Vision OCR text. Drop a CoreML `.mlmodelc` in `~/.mirroir-mcp/models/` and the server auto-detects it at startup. See [Icon Detection](#icon-detection) for details.
 - **Startup config dump** — All effective configuration values are logged at startup in a grouped two-column format. Check `~/.mirroir-mcp/mirroir.log` to see exactly what settings are active.
-- **Component calibration report** — All 18 iOS component definitions [tested against Apple Health (Santé)](https://gist.github.com/jfarcand/bb11f9c55814d134f47c814d0a5060d4). Scoring system correctly resolves conflicts between permissive and specific definitions. Zone-boundary absorption prevents cross-zone component merging.
-- **Trackpad-style scroll** — Swipe gestures use continuous trackpad attributes (gesture phases, pixel deltas) for reliable scrolling in iPhone Mirroring.
-- **Crash recovery** — `--restart-on-crash` flag re-execs the binary via `execv()` on SIGSEGV/SIGABRT/SIGBUS/SIGILL, preserving the MCP client connection.
-- **Debug log preservation** — When `--debug` is active, logs survive server restarts instead of being truncated.
 - **Component-driven exploration** — The explorer matches screen regions against [component definitions](docs/components.md) (`.md` files describing UI patterns like table rows, toggles, tab bars) instead of guessing from raw OCR. Multi-row elements (Health app summary cards) are absorbed into single tappable components. Calibrate definitions against live screens with `calibrate_component`.
-- **Hot reload** — During development, the server detects when its binary is rebuilt and reloads via `execv()`, preserving the MCP client connection. No manual reconnect needed after `swift build`.
-- **Autonomous app explorer** — `generate_skill` with `action: "explore"` does BFS graph traversal of any app, producing SKILL.md files automatically. Supports mobile, social, and desktop exploration strategies.
-- **CGEvent-only input** — All input (tap, swipe, type, press_key, shake) uses macOS CGEvent API directly. No kernel extensions, no root privileges, no helper daemons.
 
 ## Requirements
 
@@ -208,7 +201,6 @@ mirroir test --dry-run apps/settings/check-about    # validate without executing
 | `--verbose` | Step-by-step detail |
 | `--dry-run` | Parse and validate without executing |
 | `--no-compiled` | Skip compiled skills, force full OCR |
-| `--agent [model]` | Diagnose failures (see [Agent Diagnosis](#agent-diagnosis)) |
 
 Exit code `0` = all pass, `1` = any failure.
 
@@ -223,19 +215,6 @@ mirroir test --no-compiled check-about            # force full OCR
 ```
 
 AI agents auto-compile skills as a side-effect of the first MCP run. See [Compiled Skills](docs/compiled-skills.md) for details.
-
-### Agent Diagnosis
-
-When a compiled skill fails, `--agent` diagnoses *why* and suggests fixes.
-
-```bash
-mirroir test --agent skill                          # deterministic OCR diagnosis
-mirroir test --agent claude-sonnet-4-6 skill        # + AI via Anthropic
-mirroir test --agent gpt-4o skill                   # + AI via OpenAI
-mirroir test --agent ollama:llama3 skill             # + AI via local Ollama
-```
-
-Set `ANTHROPIC_API_KEY` or `OPENAI_API_KEY` for cloud models. Custom agent profiles go in `~/.mirroir-mcp/agents/`. All AI errors are non-fatal.
 
 ## Recorder
 
@@ -254,6 +233,20 @@ Explore the Settings app and generate a skill that checks the iOS version.
 ```
 
 Uses DFS graph traversal — tapping unvisited elements, backtracking when branches are exhausted. Duplicate screens are automatically skipped.
+
+## Component Detection
+
+Raw OCR returns a flat list of text elements with no structure. Component definitions teach the explorer what UI patterns look like — a `.md` file per pattern (table rows, toggles, tab bars, summary cards). The explorer matches screen regions against these definitions to decide what to tap, what to skip, and when to backtrack.
+
+18 iOS component definitions are included. Place custom definitions in `~/.mirroir-mcp/components/` or `<cwd>/.mirroir-mcp/components/`.
+
+Test a definition against the current live screen:
+
+```
+Use calibrate_component with my-component.md to check how it matches.
+```
+
+See [Component Detection](docs/components.md) for the definition format, match rules, and the detection pipeline.
 
 ## Doctor
 
