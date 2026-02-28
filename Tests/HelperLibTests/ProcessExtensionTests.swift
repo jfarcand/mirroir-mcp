@@ -8,7 +8,7 @@ import Foundation
 import Testing
 @testable import HelperLib
 
-@Suite("ProcessExtensions")
+@Suite("ProcessExtensions", .serialized)
 struct ProcessExtensionTests {
 
     @Test("waitWithTimeout returns .exited with status 0 for a successful process")

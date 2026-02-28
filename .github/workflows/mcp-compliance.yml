@@ -71,6 +71,10 @@ jobs:
       - name: Run MCP compliance validation
         run: ./scripts/ci/ensure-mcp-compliance.sh
 
-      - name: Run unit tests
+      - name: Run unit tests (XCTest)
         timeout-minutes: 15
         run: swift test --skip IntegrationTests --disable-swift-testing
+
+      - name: Run unit tests (Swift Testing)
+        timeout-minutes: 5
+        run: swift test --skip IntegrationTests --disable-xctest
