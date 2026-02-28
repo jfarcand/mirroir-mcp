@@ -72,4 +72,5 @@ jobs:
         run: ./scripts/ci/ensure-mcp-compliance.sh
 
       - name: Run unit tests
+        timeout-minutes: 15
         run: swift test --skip IntegrationTests
