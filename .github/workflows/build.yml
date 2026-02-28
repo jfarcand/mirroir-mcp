@@ -28,7 +28,7 @@ jobs:
 
       - name: Unit tests
         timeout-minutes: 15
-        run: swift test --skip IntegrationTests
+        run: swift test --skip IntegrationTests --disable-swift-testing
 
       - name: Build and package FakeMirroring
         run: |
