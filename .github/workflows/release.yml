@@ -77,8 +77,13 @@ jobs:
       - name: Build release
         run: swift build -c release
 
-      - name: Run tests
-        run: swift test --skip IntegrationTests
+      - name: Run tests (XCTest)
+        timeout-minutes: 15
+        run: swift test --skip IntegrationTests --disable-swift-testing
+
+      - name: Run tests (Swift Testing)
+        timeout-minutes: 5
+        run: swift test --skip IntegrationTests --disable-xctest --no-parallel
 
       - name: Commit version bump
         env:
