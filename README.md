@@ -16,6 +16,8 @@ Give your AI eyes, hands, and a real iPhone. An MCP server that lets any AI agen
 
 ## What's Changed
 
+- **Icon detection (YOLO CoreML)** — `describe_screen` can now detect non-text UI elements (icons, buttons, toggles, activity rings) alongside Vision OCR text. Drop a CoreML `.mlmodelc` in `~/.mirroir-mcp/models/` and the server auto-detects it at startup. See [Icon Detection](#icon-detection) for details.
+- **Startup config dump** — All effective configuration values are logged at startup in a grouped two-column format. Check `~/.mirroir-mcp/mirroir.log` to see exactly what settings are active.
 - **Component calibration report** — All 18 iOS component definitions [tested against Apple Health (Santé)](https://gist.github.com/jfarcand/bb11f9c55814d134f47c814d0a5060d4). Scoring system correctly resolves conflicts between permissive and specific definitions. Zone-boundary absorption prevents cross-zone component merging.
 - **Trackpad-style scroll** — Swipe gestures use continuous trackpad attributes (gesture phases, pixel deltas) for reliable scrolling in iPhone Mirroring.
 - **Crash recovery** — `--restart-on-crash` flag re-execs the binary via `execv()` on SIGSEGV/SIGABRT/SIGBUS/SIGILL, preserving the MCP client connection.
@@ -295,6 +297,23 @@ brew uninstall mirroir-mcp
 # From source
 ./uninstall-mirroir.sh
 ```
+
+## Icon Detection
+
+By default, `describe_screen` uses Apple Vision OCR to detect text on screen. If a YOLO CoreML model (`.mlmodelc`) is present in `~/.mirroir-mcp/models/`, the server auto-detects it and merges icon detection results with OCR text — giving the AI tap targets for non-text elements like buttons, toggles, and tab bar icons that text-only OCR misses.
+
+| Mode | `ocrBackend` setting | Behavior |
+|------|---------------------|----------|
+| Auto-detect (default) | `"auto"` | Uses Vision + YOLO if a model is installed, Vision only otherwise |
+| Vision only | `"vision"` | Apple Vision OCR text only |
+| YOLO only | `"yolo"` | CoreML element detection only |
+| Both | `"both"` | Always merge both backends (fails gracefully to Vision if no model) |
+
+### Installing a model
+
+Place a compiled CoreML model (`.mlmodelc`) in `~/.mirroir-mcp/models/`. The server will find and load it automatically. You can also point to a specific path via the `yoloModelPath` setting or `MIRROIR_YOLO_MODEL_PATH` environment variable.
+
+The `yoloConfidenceThreshold` setting (default: `0.3`) controls the minimum detection confidence — lower values detect more elements but may introduce noise.
 
 ## Configuration
 

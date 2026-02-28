@@ -279,6 +279,30 @@ public enum TimingConstants {
     /// Minimum fraction of pixels in a row that must match background to qualify as a "bar row".
     public static let iconBarRowBgFraction: Double = 0.60
 
+    // MARK: - OCR Configuration
+
+    /// OCR recognition level: "accurate" (higher quality, slower) or "fast" (lower quality, faster).
+    public static let ocrRecognitionLevel: String = "accurate"
+
+    /// Whether to enable language correction during OCR text recognition.
+    public static let ocrLanguageCorrection: Bool = true
+
+    // MARK: - YOLO Element Detection
+
+    /// OCR backend selection: "auto" (use both if a YOLO model is installed, vision otherwise),
+    /// "vision" (Apple Vision text only), "yolo" (CoreML element detection only),
+    /// or "both" (merge results from both backends).
+    public static let ocrBackend: String = "auto"
+
+    /// URL to download a YOLO .mlmodel or .mlmodelc from on first use.
+    public static let yoloModelURL: String = ""
+
+    /// Local filesystem path to a pre-compiled .mlmodelc directory. Overrides download.
+    public static let yoloModelPath: String = ""
+
+    /// Minimum confidence threshold for YOLO element detections (0.0–1.0).
+    public static let yoloConfidenceThreshold: Double = 0.3
+
     // MARK: - Scroll Deduplication
 
     /// Default dedup strategy for scroll-collected OCR elements.

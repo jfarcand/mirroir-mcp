@@ -9,6 +9,7 @@ import CoreText
 import Foundation
 import HelperLib
 import Testing
+import Vision
 @testable import mirroir_mcp
 
 @Suite("AppleVisionTextRecognizer")
@@ -123,6 +124,37 @@ struct AppleVisionTextRecognizerTests {
         #expect(element.textTopY < element.textBottomY, "Top should be above bottom in window coordinates")
         #expect(element.bboxWidth > 0)
         #expect(element.confidence > 0)
+    }
+
+    @Test("Accurate is the default recognition level")
+    func testAccurateIsDefault() {
+        #expect(TimingConstants.ocrRecognitionLevel == "accurate")
+    }
+
+    @Test("Language correction is enabled by default")
+    func testLanguageCorrectionIsDefault() {
+        #expect(TimingConstants.ocrLanguageCorrection == true)
+    }
+
+    @Test("Fast recognition level returns results")
+    func testFastRecognitionLevelReturnsResults() {
+        // Use Vision's .fast recognition level directly to verify it
+        // still detects large text — just possibly with fewer elements.
+        let image = makeImageWithText("Settings", fontSize: 96)
+
+        let request = VNRecognizeTextRequest()
+        request.recognitionLevel = .fast
+        request.usesLanguageCorrection = false
+
+        let handler = VNImageRequestHandler(cgImage: image, options: [:])
+        try! handler.perform([request])
+
+        let results = request.results ?? []
+        #expect(!results.isEmpty, "Fast recognition should still detect large text")
+        let found = results.contains { obs in
+            obs.topCandidates(1).first?.string == "Settings"
+        }
+        #expect(found, "Expected to find 'Settings' with fast recognition")
     }
 
     @Test("Content bounds scaling adjusts coordinates")

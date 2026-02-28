@@ -389,6 +389,45 @@ public enum EnvConfig {
         readDouble("defaultMeasureTimeoutSeconds", default: TimingConstants.defaultMeasureTimeoutSeconds)
     }
 
+    // MARK: - OCR Configuration
+
+    /// OCR recognition level: "accurate" or "fast".
+    public static var ocrRecognitionLevel: String {
+        readString("ocrRecognitionLevel", envVar: "MIRROIR_OCR_RECOGNITION_LEVEL",
+                   default: TimingConstants.ocrRecognitionLevel)
+    }
+
+    /// Whether to enable language correction during OCR text recognition.
+    public static var ocrLanguageCorrection: Bool {
+        readBool("ocrLanguageCorrection", envVar: "MIRROIR_OCR_LANGUAGE_CORRECTION",
+                 default: TimingConstants.ocrLanguageCorrection)
+    }
+
+    // MARK: - YOLO Element Detection
+
+    /// OCR backend selection: "auto", "vision", "yolo", or "both".
+    public static var ocrBackend: String {
+        readString("ocrBackend", envVar: "MIRROIR_OCR_BACKEND",
+                   default: TimingConstants.ocrBackend)
+    }
+
+    /// URL to download a YOLO .mlmodel or .mlmodelc from on first use.
+    public static var yoloModelURL: String {
+        readString("yoloModelURL", envVar: "MIRROIR_YOLO_MODEL_URL",
+                   default: TimingConstants.yoloModelURL)
+    }
+
+    /// Local filesystem path to a pre-compiled .mlmodelc directory.
+    public static var yoloModelPath: String {
+        readString("yoloModelPath", envVar: "MIRROIR_YOLO_MODEL_PATH",
+                   default: TimingConstants.yoloModelPath)
+    }
+
+    /// Minimum confidence threshold for YOLO element detections.
+    public static var yoloConfidenceThreshold: Double {
+        readDouble("yoloConfidenceThreshold", default: TimingConstants.yoloConfidenceThreshold)
+    }
+
     // MARK: - Scroll Deduplication
 
     /// Dedup strategy for scroll-collected OCR elements.
@@ -442,6 +481,175 @@ public enum EnvConfig {
     public static var mirroringProcessName: String {
         readString("mirroringProcessName", envVar: "MIRROIR_PROCESS_NAME",
                    default: "iPhone Mirroring")
+    }
+
+    // MARK: - Config Dump
+
+    /// Returns a formatted two-column dump of all effective configuration values,
+    /// grouped by section. Suitable for startup logging.
+    public static func formattedConfigDump() -> String {
+        let sections: [(String, [(String, String)])] = [
+            ("Cursor & Input", [
+                ("cursorSettleUs", "\(cursorSettleUs)"),
+                ("clickHoldUs", "\(clickHoldUs)"),
+                ("doubleTapHoldUs", "\(doubleTapHoldUs)"),
+                ("doubleTapGapUs", "\(doubleTapGapUs)"),
+                ("dragModeHoldUs", "\(dragModeHoldUs)"),
+                ("focusSettleUs", "\(focusSettleUs)"),
+                ("keystrokeDelayUs", "\(keystrokeDelayUs)"),
+            ]),
+            ("App Switching", [
+                ("spaceSwitchSettleUs", "\(spaceSwitchSettleUs)"),
+                ("spotlightAppearanceUs", "\(spotlightAppearanceUs)"),
+                ("searchResultsPopulateUs", "\(searchResultsPopulateUs)"),
+                ("safariLoadUs", "\(safariLoadUs)"),
+                ("addressBarActivateUs", "\(addressBarActivateUs)"),
+                ("preReturnUs", "\(preReturnUs)"),
+            ]),
+            ("Process & Polling", [
+                ("processPollUs", "\(processPollUs)"),
+                ("earlyFailureDetectUs", "\(earlyFailureDetectUs)"),
+                ("resumeFromPausedUs", "\(resumeFromPausedUs)"),
+                ("postHeartbeatSettleUs", "\(postHeartbeatSettleUs)"),
+            ]),
+            ("Keyboard", [
+                ("deadKeyDelayUs", "\(deadKeyDelayUs)"),
+                ("keyboardLayout", "\(keyboardLayout.isEmpty ? "(none)" : keyboardLayout)"),
+            ]),
+            ("Drag & Swipe", [
+                ("dragInterpolationSteps", "\(dragInterpolationSteps)"),
+                ("swipeInterpolationSteps", "\(swipeInterpolationSteps)"),
+                ("scrollPixelScale", "\(scrollPixelScale)"),
+                ("swipeDistanceFraction", "\(swipeDistanceFraction)"),
+                ("defaultSwipeDurationMs", "\(defaultSwipeDurationMs)"),
+                ("defaultDragDurationMs", "\(defaultDragDurationMs)"),
+                ("defaultLongPressDurationMs", "\(defaultLongPressDurationMs)"),
+                ("defaultScrollMaxAttempts", "\(defaultScrollMaxAttempts)"),
+            ]),
+            ("OCR", [
+                ("ocrBackend", ocrBackend),
+                ("ocrRecognitionLevel", ocrRecognitionLevel),
+                ("ocrLanguageCorrection", "\(ocrLanguageCorrection)"),
+            ]),
+            ("YOLO", [
+                ("yoloModelURL", yoloModelURL.isEmpty ? "(none)" : yoloModelURL),
+                ("yoloModelPath", yoloModelPath.isEmpty ? "(none)" : yoloModelPath),
+                ("yoloConfidenceThreshold", "\(yoloConfidenceThreshold)"),
+            ]),
+            ("Scroll Dedup", [
+                ("scrollDedupStrategy", scrollDedupStrategy),
+                ("scrollDedupLevenshteinMax", "\(scrollDedupLevenshteinMax)"),
+                ("scrollDedupProximityPt", "\(scrollDedupProximityPt)"),
+            ]),
+            ("Content Bounds", [
+                ("brightnessThreshold", "\(brightnessThreshold)"),
+            ]),
+            ("Tap Point", [
+                ("tapMaxLabelLength", "\(tapMaxLabelLength)"),
+                ("tapMaxLabelWidthFraction", "\(tapMaxLabelWidthFraction)"),
+                ("tapMinGapForOffset", "\(tapMinGapForOffset)"),
+                ("tapIconRowMinLabels", "\(tapIconRowMinLabels)"),
+                ("tapIconOffset", "\(tapIconOffset)"),
+                ("tapRowTolerance", "\(tapRowTolerance)"),
+                ("tapBottomZoneFraction", "\(tapBottomZoneFraction)"),
+            ]),
+            ("Safe Area", [
+                ("safeBottomMarginPt", "\(TimingConstants.safeBottomMarginPt)"),
+            ]),
+            ("Grid Overlay", [
+                ("gridSpacing", "\(gridSpacing)"),
+                ("gridLineAlpha", "\(gridLineAlpha)"),
+                ("gridLabelFontSize", "\(gridLabelFontSize)"),
+                ("gridLabelEveryN", "\(gridLabelEveryN)"),
+            ]),
+            ("Event Classification", [
+                ("eventTapDistanceThreshold", "\(eventTapDistanceThreshold)"),
+                ("eventSwipeDistanceThreshold", "\(eventSwipeDistanceThreshold)"),
+                ("eventLongPressThreshold", "\(eventLongPressThreshold)"),
+                ("eventLabelMaxDistance", "\(eventLabelMaxDistance)"),
+            ]),
+            ("Step Execution", [
+                ("waitForTimeoutSeconds", "\(waitForTimeoutSeconds)"),
+                ("stepSettlingDelayMs", "\(stepSettlingDelayMs)"),
+                ("compiledSleepBufferMs", "\(compiledSleepBufferMs)"),
+                ("waitForPollIntervalUs", "\(waitForPollIntervalUs)"),
+                ("measurePollIntervalUs", "\(measurePollIntervalUs)"),
+                ("defaultMeasureTimeoutSeconds", "\(defaultMeasureTimeoutSeconds)"),
+                ("settingsLoadUs", "\(settingsLoadUs)"),
+            ]),
+            ("App Switcher", [
+                ("appSwitcherCardOffset", "\(appSwitcherCardOffset)"),
+                ("appSwitcherCardXFraction", "\(appSwitcherCardXFraction)"),
+                ("appSwitcherCardYFraction", "\(appSwitcherCardYFraction)"),
+                ("appSwitcherSwipeDistance", "\(appSwitcherSwipeDistance)"),
+                ("appSwitcherSwipeDurationMs", "\(appSwitcherSwipeDurationMs)"),
+                ("appSwitcherMaxSwipes", "\(appSwitcherMaxSwipes)"),
+                ("toolSettlingDelayUs", "\(toolSettlingDelayUs)"),
+            ]),
+            ("Icon Detection", [
+                ("iconOcrProximityFilter", "\(iconOcrProximityFilter)"),
+                ("iconMinZoneHeight", "\(iconMinZoneHeight)"),
+                ("iconSaliencyMinZone", "\(iconSaliencyMinZone)"),
+                ("iconBottomZoneFraction", "\(iconBottomZoneFraction)"),
+                ("iconTopZoneFraction", "\(iconTopZoneFraction)"),
+                ("iconMaxZoneElements", "\(iconMaxZoneElements)"),
+                ("iconNoiseMaxLength", "\(iconNoiseMaxLength)"),
+                ("iconMaxSaliencySize", "\(iconMaxSaliencySize)"),
+                ("iconMinForInterpolation", "\(iconMinForInterpolation)"),
+                ("iconSpacingTolerance", "\(iconSpacingTolerance)"),
+                ("iconDeduplicationRadius", "\(iconDeduplicationRadius)"),
+            ]),
+            ("Icon Clusters", [
+                ("iconColorThreshold", "\(iconColorThreshold)"),
+                ("iconMinColumnDensity", "\(iconMinColumnDensity)"),
+                ("iconMinClusterWidth", "\(iconMinClusterWidth)"),
+                ("iconMaxClusterWidth", "\(iconMaxClusterWidth)"),
+                ("iconSmoothingWindow", "\(iconSmoothingWindow)"),
+                ("iconCornerInsetPixels", "\(iconCornerInsetPixels)"),
+                ("iconBarRowBgFraction", "\(iconBarRowBgFraction)"),
+            ]),
+            ("AI Provider", [
+                ("openAITimeoutSeconds", "\(openAITimeoutSeconds)"),
+                ("ollamaTimeoutSeconds", "\(ollamaTimeoutSeconds)"),
+                ("anthropicTimeoutSeconds", "\(anthropicTimeoutSeconds)"),
+                ("commandTimeoutSeconds", "\(commandTimeoutSeconds)"),
+                ("defaultAIMaxTokens", "\(defaultAIMaxTokens)"),
+            ]),
+            ("Component Detection", [
+                ("componentDetection", componentDetection),
+            ]),
+            ("App Identity", [
+                ("mirroringBundleID", mirroringBundleID),
+                ("mirroringProcessName", mirroringProcessName),
+            ]),
+        ]
+
+        var lines = [String]()
+        let keyWidth = 30
+        let columnWidth = 60
+
+        for (section, entries) in sections {
+            lines.append("  [\(section)]")
+            // Lay out entries in two columns
+            var i = 0
+            while i < entries.count {
+                let (k1, v1) = entries[i]
+                let left = "    \(k1.padding(toLength: keyWidth, withPad: " ", startingAt: 0)) \(v1)"
+                if i + 1 < entries.count {
+                    let (k2, v2) = entries[i + 1]
+                    // Pad with spaces; never truncate long values
+                    let gap = max(columnWidth - left.count, 2)
+                    let padding = String(repeating: " ", count: gap)
+                    lines.append("\(left)\(padding)\(k2.padding(toLength: keyWidth, withPad: " ", startingAt: 0)) \(v2)")
+                    i += 2
+                } else {
+                    lines.append(left)
+                    i += 1
+                }
+            }
+        }
+
+        return lines.joined(separator: "\n")
     }
 
     // MARK: - Settings File Loading
@@ -515,6 +723,17 @@ public enum EnvConfig {
             if let doubleVal = value as? Double { return Int(doubleVal) }
         }
         if let str = env[envVarName(key)], let parsed = Int(str) { return parsed }
+        return fallback
+    }
+
+    private static func readBool(_ key: String, envVar: String? = nil,
+                                   default fallback: Bool) -> Bool {
+        if let value = settings[key] as? Bool { return value }
+        // JSON numbers: 0 = false, non-zero = true
+        if let value = settings[key] as? Int { return value != 0 }
+        if let str = env[envVar ?? envVarName(key)] {
+            return ["true", "1", "yes"].contains(str.lowercased())
+        }
         return fallback
     }
 

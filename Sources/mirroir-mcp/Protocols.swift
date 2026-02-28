@@ -176,4 +176,8 @@ extension ScreenRecorder: ScreenRecording {}
 
 extension AppleVisionTextRecognizer: TextRecognizing {}
 
+extension CoreMLElementDetector: TextRecognizing {}
+
+extension CompositeTextRecognizer: TextRecognizing {}
+
 extension ScreenDescriber: ScreenDescribing {}

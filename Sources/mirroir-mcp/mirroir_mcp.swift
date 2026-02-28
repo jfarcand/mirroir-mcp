@@ -94,13 +94,15 @@ struct MirroirMCP {
             DebugLog.persist("startup", "WARNING: hidden from tools/list: \(hiddenTools)")
         }
 
+        // Log full effective configuration
+        DebugLog.persist("config", "Effective configuration:\n\(EnvConfig.formattedConfigDump())")
+
         let registry = buildTargetRegistry()
         let server = MCPServer(policy: policy)
 
         // Log active targets
         let targetNames = registry.allTargetNames
         DebugLog.persist("startup", "Targets: \(targetNames) (active: \(registry.activeTargetName))")
-        DebugLog.persist("startup", "ScrollDedup: strategy=\(EnvConfig.scrollDedupStrategy)")
 
         registerTools(server: server, registry: registry, policy: policy)
 
@@ -118,6 +120,7 @@ struct MirroirMCP {
         // Single-target mode: identical behavior to pre-multi-target code
         let bridge = MirroringBridge()
         let capture = ScreenCapture(bridge: bridge)
+        let textRecognizer = buildTextRecognizer()
         let ctx = TargetContext(
             name: "iphone",
             targetType: "iphone-mirroring",
@@ -125,7 +128,8 @@ struct MirroirMCP {
             bridge: bridge,
             input: InputSimulation(bridge: bridge),
             capture: capture,
-            describer: ScreenDescriber(bridge: bridge, capture: capture),
+            describer: ScreenDescriber(bridge: bridge, capture: capture,
+                                       textRecognizer: textRecognizer),
             recorder: ScreenRecorder(bridge: bridge),
             capabilities: iphoneMirroringCapabilities
         )
@@ -162,6 +166,7 @@ struct MirroirMCP {
             let cursorMode: CursorMode = config.type == "iphone-mirroring"
                 ? .direct : .preserving
             let capture = ScreenCapture(bridge: bridge)
+            let textRecognizer = buildTextRecognizer()
             targets[name] = TargetContext(
                 name: name,
                 targetType: config.type,
@@ -169,7 +174,8 @@ struct MirroirMCP {
                 bridge: bridge,
                 input: InputSimulation(bridge: bridge, cursorMode: cursorMode),
                 capture: capture,
-                describer: ScreenDescriber(bridge: bridge, capture: capture),
+                describer: ScreenDescriber(bridge: bridge, capture: capture,
+                                           textRecognizer: textRecognizer),
                 recorder: ScreenRecorder(bridge: bridge),
                 capabilities: capabilities
             )
@@ -189,6 +195,64 @@ struct MirroirMCP {
             resolvedDefault = sortedNames.first!  // Safe: configs was checked !isEmpty above
         }
         return TargetRegistry(targets: targets, defaultName: resolvedDefault)
+    }
+
+    /// Build the appropriate TextRecognizing backend based on configuration.
+    ///
+    /// - `"auto"` (default): Use both backends if a YOLO model is installed, vision only otherwise
+    /// - `"vision"`: Apple Vision OCR only
+    /// - `"yolo"`: YOLO CoreML element detection only (falls back to Vision if model unavailable)
+    /// - `"both"`: Merge results from both backends
+    private static func buildTextRecognizer() -> any TextRecognizing {
+        let backend = EnvConfig.ocrBackend
+
+        switch backend {
+        case "auto":
+            if let modelURL = ModelDownloadManager.resolveModelURL() {
+                DebugLog.persist("startup",
+                    "OCR: auto-detected YOLO model, using Vision + YOLO")
+                return CompositeTextRecognizer(backends: [
+                    AppleVisionTextRecognizer(),
+                    CoreMLElementDetector(
+                        modelURL: modelURL,
+                        confidenceThreshold: EnvConfig.yoloConfidenceThreshold
+                    ),
+                ])
+            }
+            DebugLog.persist("startup",
+                "OCR: no YOLO model found, using Vision OCR only. "
+                + "Install a .mlmodelc in \(ModelDownloadManager.modelsDirectory) "
+                + "or set yoloModelPath to enable element detection.")
+            return AppleVisionTextRecognizer()
+
+        case "yolo":
+            guard let modelURL = ModelDownloadManager.resolveModelURL() else {
+                DebugLog.persist("startup", "YOLO model unavailable, falling back to Vision OCR")
+                return AppleVisionTextRecognizer()
+            }
+            return CoreMLElementDetector(
+                modelURL: modelURL,
+                confidenceThreshold: EnvConfig.yoloConfidenceThreshold
+            )
+
+        case "both":
+            var backends: [any TextRecognizing] = [AppleVisionTextRecognizer()]
+            if let modelURL = ModelDownloadManager.resolveModelURL() {
+                backends.append(CoreMLElementDetector(
+                    modelURL: modelURL,
+                    confidenceThreshold: EnvConfig.yoloConfidenceThreshold
+                ))
+            } else {
+                DebugLog.persist("startup", "YOLO model unavailable, using Vision OCR only")
+            }
+            if backends.count == 1 {
+                return backends[0]
+            }
+            return CompositeTextRecognizer(backends: backends)
+
+        default:
+            return AppleVisionTextRecognizer()
+        }
     }
 }
 

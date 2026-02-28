@@ -27,19 +27,22 @@ final class ScreenDescriber: Sendable {
     }
 
     /// Result of a describe operation: detected elements, unlabeled icons, navigation hints,
-    /// plus the screenshot.
+    /// plus the screenshot and OCR timing.
     struct DescribeResult: Sendable {
         let elements: [TapPoint]
         let icons: [IconDetector.DetectedIcon]
         let hints: [String]
         let screenshotBase64: String
+        /// Time spent in OCR text recognition, in milliseconds.
+        let ocrTimeMs: Int
 
         init(elements: [TapPoint], icons: [IconDetector.DetectedIcon] = [],
-             hints: [String] = [], screenshotBase64: String) {
+             hints: [String] = [], screenshotBase64: String, ocrTimeMs: Int = 0) {
             self.elements = elements
             self.icons = icons
             self.hints = hints
             self.screenshotBase64 = screenshotBase64
+            self.ocrTimeMs = ocrTimeMs
         }
     }
 
@@ -70,9 +73,12 @@ final class ScreenDescriber: Sendable {
         // Detect the iOS content area and delegate text recognition to the
         // pluggable backend. The recognizer returns elements in window-point space.
         let contentBounds = ContentBoundsDetector.detect(image: cgImage)
+        let ocrStart = CFAbsoluteTimeGetCurrent()
         let rawElements = textRecognizer.recognizeText(
             in: cgImage, windowSize: info.size, contentBounds: contentBounds
         )
+        let ocrMs = Int((CFAbsoluteTimeGetCurrent() - ocrStart) * 1000)
+        DebugLog.log("OCR", "level=\(EnvConfig.ocrRecognitionLevel) elements=\(rawElements.count) time=\(ocrMs)ms")
 
         // Apply smart tap-point offsets: short labels are shifted upward
         // toward the icon/button above them.
@@ -93,7 +99,8 @@ final class ScreenDescriber: Sendable {
         let griddedData = GridOverlay.addOverlay(to: data, windowSize: info.size) ?? data
         let base64 = griddedData.base64EncodedString()
 
-        return DescribeResult(elements: elements, icons: icons, hints: hints, screenshotBase64: base64)
+        return DescribeResult(elements: elements, icons: icons, hints: hints,
+                              screenshotBase64: base64, ocrTimeMs: ocrMs)
     }
 
 }

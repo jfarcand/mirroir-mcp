@@ -41,13 +41,13 @@ All 32 tools exposed by the MCP server. Mutating tools require [permission](perm
 
 ## Coordinates
 
-Coordinates are in points relative to the mirroring window's top-left corner. Use `describe_screen` to get exact tap coordinates via OCR — its grid overlay also helps target unlabeled icons (back arrows, stars, gears) that OCR can't detect. For raw screenshots, coordinates are Retina 2x — divide pixel coordinates by 2 to get tap coordinates.
+Coordinates are in points relative to the mirroring window's top-left corner. Use `describe_screen` to get exact tap coordinates — it detects both text (via Vision OCR) and icons (via YOLO CoreML, if a model is installed). The grid overlay helps target any remaining unlabeled elements. For raw screenshots, coordinates are Retina 2x — divide pixel coordinates by 2 to get tap coordinates.
 
 ## Describe Screen
 
-`describe_screen` runs Apple Vision OCR on the mirroring window and returns detected text elements with their tap coordinates, plus a grid-overlaid screenshot for visual context.
+`describe_screen` returns detected elements with their tap coordinates, plus a grid-overlaid screenshot for visual context. By default it runs Apple Vision OCR for text recognition. If a YOLO CoreML model is installed in `~/.mirroir-mcp/models/`, the server auto-detects it and merges icon detections — giving the AI tap targets for non-text elements (buttons, toggles, icons) that text-only OCR misses. See [Icon Detection](../README.md#icon-detection) for setup.
 
-Set `skip_ocr: true` to skip Vision OCR and return only the grid-overlaid screenshot. This lets MCP clients use their own vision model to analyze the screen instead of relying on the built-in OCR (costs more tokens but can identify icons, images, and UI elements that text-only OCR misses).
+Set `skip_ocr: true` to skip all built-in recognition and return only the grid-overlaid screenshot. This lets MCP clients use their own vision model to analyze the screen instead.
 
 ## Typing Workflow
 

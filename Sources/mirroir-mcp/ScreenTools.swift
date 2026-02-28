@@ -130,6 +130,8 @@ extension MirroirMCP {
                         lines.append("- \(hint)")
                     }
                 }
+                lines.append("")
+                lines.append("_meta: ocr_time_ms=\(result.ocrTimeMs) recognition_level=\(EnvConfig.ocrRecognitionLevel) element_count=\(result.elements.count)")
                 let description = lines.joined(separator: "\n")
 
                 return MCPToolResult(

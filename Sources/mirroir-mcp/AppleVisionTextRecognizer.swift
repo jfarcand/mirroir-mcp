@@ -20,8 +20,8 @@ struct AppleVisionTextRecognizer: Sendable {
         contentBounds: CGRect
     ) -> [RawTextElement] {
         let request = VNRecognizeTextRequest()
-        request.recognitionLevel = .accurate
-        request.usesLanguageCorrection = true
+        request.recognitionLevel = EnvConfig.ocrRecognitionLevel == "fast" ? .fast : .accurate
+        request.usesLanguageCorrection = EnvConfig.ocrLanguageCorrection
 
         let handler = VNImageRequestHandler(cgImage: image, options: [:])
         do {
