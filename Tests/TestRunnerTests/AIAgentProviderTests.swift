@@ -291,6 +291,29 @@ struct AIAgentProviderTests {
         #expect(result!.suggestedFixes.isEmpty)
     }
 
+    // MARK: - Embacle Response Extraction
+
+    @Test("Parses embacle OpenAI-format response via diagnosis pipeline")
+    func embacleResponseExtraction() {
+        // Embacle-server returns OpenAI-format; the diagnosis JSON is inside choices[0].message.content
+        let diagnosisJSON = """
+            {"analysis": "Button label changed after iOS update",\
+            "suggested_fixes": [{"field": "label", "was": "Settings", "should_be": "Réglages"}],\
+            "confidence": "high"}
+            """
+        let result = parseAIDiagnosisResponse(
+            data: Data(diagnosisJSON.utf8), modelUsed: "embacle:copilot")
+
+        #expect(result != nil)
+        #expect(result!.analysis == "Button label changed after iOS update")
+        #expect(result!.suggestedFixes.count == 1)
+        #expect(result!.suggestedFixes[0].field == "label")
+        #expect(result!.suggestedFixes[0].was == "Settings")
+        #expect(result!.suggestedFixes[0].shouldBe == "Réglages")
+        #expect(result!.confidence == "high")
+        #expect(result!.modelUsed == "embacle:copilot")
+    }
+
     // MARK: - StubAIProvider
 
     @Test("StubAIProvider returns configured diagnosis")
@@ -352,6 +375,30 @@ struct AIAgentProviderTests {
         #expect(payload.failedSteps[0].patches[0].field == "tapX")
     }
 
+    // MARK: - Embacle Resolution
+
+    @Test("Resolves embacle from built-in registry")
+    func resolveEmbacle() {
+        let config = AIAgentRegistry.resolve(name: "embacle")
+        #expect(config != nil)
+        #expect(config!.name == "embacle")
+        #expect(config!.mode == .api)
+        #expect(config!.provider == .embacle)
+        #expect(config!.model == "copilot")
+        #expect(config!.apiKeyEnvVar == nil)
+        #expect(config!.baseURL == "http://localhost:3000")
+    }
+
+    @Test("Resolves embacle:claude from built-in registry")
+    func resolveEmbacleClaude() {
+        let config = AIAgentRegistry.resolve(name: "embacle:claude")
+        #expect(config != nil)
+        #expect(config!.name == "embacle:claude")
+        #expect(config!.provider == .embacle)
+        #expect(config!.model == "claude")
+        #expect(config!.baseURL == "http://localhost:3000")
+    }
+
     // MARK: - Available Agents
 
     @Test("availableAgents includes built-in models and ollama placeholder")
@@ -360,6 +407,8 @@ struct AIAgentProviderTests {
         #expect(agents.contains("claude-sonnet-4-6"))
         #expect(agents.contains("claude-haiku-4-5"))
         #expect(agents.contains("gpt-4o"))
+        #expect(agents.contains("embacle"))
+        #expect(agents.contains("embacle:claude"))
         #expect(agents.contains("ollama:<model>"))
     }
 
@@ -387,6 +436,14 @@ struct AIAgentProviderTests {
         let provider = AIAgentRegistry.createProvider(config: config)
         #expect(provider != nil)
         #expect(provider is OllamaProvider)
+    }
+
+    @Test("createProvider returns EmbacleProvider for embacle config")
+    func createEmbacleProvider() {
+        let config = AIAgentRegistry.builtInAgents["embacle"]!
+        let provider = AIAgentRegistry.createProvider(config: config)
+        #expect(provider != nil)
+        #expect(provider is EmbacleProvider)
     }
 
     @Test("createProvider returns CommandProvider for command config")

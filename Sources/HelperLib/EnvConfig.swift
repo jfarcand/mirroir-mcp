@@ -283,6 +283,10 @@ public enum EnvConfig {
         readInt("anthropicTimeoutSeconds", default: TimingConstants.anthropicTimeoutSeconds)
     }
 
+    public static var embacleTimeoutSeconds: Int {
+        readInt("embacleTimeoutSeconds", default: TimingConstants.embacleTimeoutSeconds)
+    }
+
     public static var commandTimeoutSeconds: Int {
         readInt("commandTimeoutSeconds", default: TimingConstants.commandTimeoutSeconds)
     }
@@ -612,6 +616,7 @@ public enum EnvConfig {
                 ("openAITimeoutSeconds", "\(openAITimeoutSeconds)"),
                 ("ollamaTimeoutSeconds", "\(ollamaTimeoutSeconds)"),
                 ("anthropicTimeoutSeconds", "\(anthropicTimeoutSeconds)"),
+                ("embacleTimeoutSeconds", "\(embacleTimeoutSeconds)"),
                 ("commandTimeoutSeconds", "\(commandTimeoutSeconds)"),
                 ("defaultAIMaxTokens", "\(defaultAIMaxTokens)"),
             ]),

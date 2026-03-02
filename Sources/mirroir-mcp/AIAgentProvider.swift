@@ -18,6 +18,7 @@ enum ProviderType: String {
     case anthropic
     case openai
     case ollama
+    case embacle
 }
 
 /// Configuration for an AI agent, either from the built-in registry or a YAML profile.
@@ -107,6 +108,16 @@ enum AIAgentRegistry {
             name: "gpt-4o", mode: .api, provider: .openai,
             model: "gpt-4o", apiKeyEnvVar: "OPENAI_API_KEY",
             baseURL: "https://api.openai.com", systemPrompt: nil,
+            maxTokens: EnvConfig.defaultAIMaxTokens, command: nil, args: nil),
+        "embacle": AgentConfig(
+            name: "embacle", mode: .api, provider: .embacle,
+            model: "copilot", apiKeyEnvVar: nil,
+            baseURL: "http://localhost:3000", systemPrompt: nil,
+            maxTokens: EnvConfig.defaultAIMaxTokens, command: nil, args: nil),
+        "embacle:claude": AgentConfig(
+            name: "embacle:claude", mode: .api, provider: .embacle,
+            model: "claude", apiKeyEnvVar: nil,
+            baseURL: "http://localhost:3000", systemPrompt: nil,
             maxTokens: EnvConfig.defaultAIMaxTokens, command: nil, args: nil),
     ]
 
@@ -253,6 +264,8 @@ enum AIAgentRegistry {
                 return OpenAIProvider(config: config)
             case .ollama:
                 return OllamaProvider(config: config)
+            case .embacle:
+                return EmbacleProvider(config: config)
             }
         }
     }
