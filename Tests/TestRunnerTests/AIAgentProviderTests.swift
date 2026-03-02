@@ -34,12 +34,12 @@ struct AIAgentProviderTests {
         #expect(config!.model == "claude-haiku-4-5-20251001")
     }
 
-    @Test("Resolves gpt-5.2 from built-in registry")
+    @Test("Resolves gpt-5.3 from built-in registry")
     func resolveGPT52() {
-        let config = AIAgentRegistry.resolve(name: "gpt-5.2")
+        let config = AIAgentRegistry.resolve(name: "gpt-5.3")
         #expect(config != nil)
         #expect(config!.provider == .openai)
-        #expect(config!.model == "gpt-5.2")
+        #expect(config!.model == "gpt-5.3")
         #expect(config!.apiKeyEnvVar == "OPENAI_API_KEY")
     }
 
@@ -143,7 +143,7 @@ struct AIAgentProviderTests {
         let yaml = """
             mode: api
             provider: openai
-            model: gpt-5.2
+            model: gpt-5.3
             api_key_env: OPENAI_API_KEY
             """
         let path = tmpDir + "/custom-bot.yaml"
@@ -406,7 +406,7 @@ struct AIAgentProviderTests {
         let agents = AIAgentRegistry.availableAgents()
         #expect(agents.contains("claude-sonnet-4-6"))
         #expect(agents.contains("claude-haiku-4-5"))
-        #expect(agents.contains("gpt-5.2"))
+        #expect(agents.contains("gpt-5.3"))
         #expect(agents.contains("embacle"))
         #expect(agents.contains("embacle:claude"))
         #expect(agents.contains("ollama:<model>"))
@@ -424,7 +424,7 @@ struct AIAgentProviderTests {
 
     @Test("createProvider returns OpenAIProvider for openai config")
     func createOpenAIProvider() {
-        let config = AIAgentRegistry.builtInAgents["gpt-5.2"]!
+        let config = AIAgentRegistry.builtInAgents["gpt-5.3"]!
         let provider = AIAgentRegistry.createProvider(config: config)
         #expect(provider != nil)
         #expect(provider is OpenAIProvider)

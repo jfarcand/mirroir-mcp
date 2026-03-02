@@ -221,7 +221,7 @@ AI agents auto-compile skills as a side-effect of the first MCP run. See [Compil
 When a test step fails, pass `--agent` to get an AI diagnosis of what went wrong and suggested fixes:
 
 ```bash
-mirroir test --agent gpt-5.2 apps/settings/check-about
+mirroir test --agent gpt-5.3 apps/settings/check-about
 mirroir test --agent claude-sonnet-4-6 apps/settings/check-about
 mirroir test --agent ollama:llama3 apps/settings/check-about
 mirroir test --agent embacle apps/settings/check-about
@@ -231,12 +231,10 @@ Built-in agents:
 
 | Agent | Provider | API Key |
 |-------|----------|---------|
-| `gpt-5.2` | OpenAI | `OPENAI_API_KEY` |
-| `claude-sonnet-4-6` | Anthropic | `ANTHROPIC_API_KEY` |
-| `claude-haiku-4-5` | Anthropic | `ANTHROPIC_API_KEY` |
+| `gpt-5.3` | OpenAI | `OPENAI_API_KEY` |
+| `claude-sonnet-4-6`, `claude-haiku-4-5` | Anthropic | `ANTHROPIC_API_KEY` |
 | `ollama:<model>` | [Ollama](https://ollama.com) (local) | None |
-| `embacle` | [embacle-server](https://github.com/dravr-ai/dravr-embacle) (Copilot) | None |
-| `embacle:claude` | [embacle-server](https://github.com/dravr-ai/dravr-embacle) (Claude Code) | None |
+| `embacle`, `embacle:claude` | [embacle-server](https://github.com/dravr-ai/dravr-embacle) | None |
 
 Custom agents can be defined as YAML profiles in `~/.mirroir-mcp/agents/`.
 
