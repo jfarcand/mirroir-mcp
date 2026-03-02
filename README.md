@@ -234,7 +234,7 @@ Built-in agents:
 | `gpt-5.3` | OpenAI | `OPENAI_API_KEY` |
 | `claude-sonnet-4-6`, `claude-haiku-4-5` | Anthropic | `ANTHROPIC_API_KEY` |
 | `ollama:<model>` | [Ollama](https://ollama.com) (local) | None |
-| `embacle`, `embacle:claude` | [embacle-server](https://github.com/dravr-ai/dravr-embacle) | None |
+| `embacle`, `embacle:claude` | [embacle-server](https://github.com/dravr-ai/dravr-embacle) | CLI agent key |
 
 Custom agents can be defined as YAML profiles in `~/.mirroir-mcp/agents/`.
 
