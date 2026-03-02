@@ -221,29 +221,36 @@ AI agents auto-compile skills as a side-effect of the first MCP run. See [Compil
 When a test step fails, pass `--agent` to get an AI diagnosis of what went wrong and suggested fixes:
 
 ```bash
-mirroir test --agent embacle apps/settings/check-about
-mirroir test --agent embacle:claude apps/settings/check-about
 mirroir test --agent gpt-4o apps/settings/check-about
+mirroir test --agent claude-sonnet-4-6 apps/settings/check-about
+mirroir test --agent ollama:llama3 apps/settings/check-about
 ```
 
-| Agent | Provider | API Key Required |
-|-------|----------|-----------------|
-| `embacle` | [embacle-server](https://github.com/nicholasgasior/embacle) (Copilot) | No |
-| `embacle:claude` | [embacle-server](https://github.com/nicholasgasior/embacle) (Claude Code) | No |
+Built-in agents:
+
+| Agent | Provider | API Key |
+|-------|----------|---------|
 | `gpt-4o` | OpenAI | `OPENAI_API_KEY` |
 | `claude-sonnet-4-6` | Anthropic | `ANTHROPIC_API_KEY` |
 | `claude-haiku-4-5` | Anthropic | `ANTHROPIC_API_KEY` |
-| `ollama:<model>` | Ollama (local) | No |
+| `ollama:<model>` | [Ollama](https://ollama.com) (local) | None |
+| `embacle` | [embacle-server](https://github.com/nicholasgasior/embacle) | None |
+| `embacle:claude` | [embacle-server](https://github.com/nicholasgasior/embacle) | None |
 
-**Zero-config option:** [embacle-server](https://crates.io/crates/embacle-server) wraps already-authenticated CLI tools (GitHub Copilot, Claude Code, etc.) behind an OpenAI-compatible API — no API keys needed. If you have a Copilot or Claude Code subscription, you already have access:
+Custom agents can be defined as YAML profiles in `~/.mirroir-mcp/agents/`.
+
+<details>
+<summary>No API key? Use embacle-server</summary>
+
+[embacle-server](https://crates.io/crates/embacle-server) wraps already-authenticated CLI tools (GitHub Copilot, Claude Code, etc.) behind an OpenAI-compatible API. If you have a Copilot or Claude Code subscription, you already have access — no separate API key needed:
 
 ```bash
 cargo install embacle-server
-embacle-server --port 3000 --provider copilot
+embacle-server --port 3000 --provider copilot   # or: --provider claude_code
 mirroir test --agent embacle my-skill
 ```
 
-Custom agents can be defined as YAML profiles in `~/.mirroir-mcp/agents/`. See `mirroir test --help` for details.
+</details>
 
 ## Recorder
 
