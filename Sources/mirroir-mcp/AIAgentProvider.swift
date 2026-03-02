@@ -104,9 +104,9 @@ enum AIAgentRegistry {
             model: "claude-haiku-4-5-20251001", apiKeyEnvVar: "ANTHROPIC_API_KEY",
             baseURL: "https://api.anthropic.com", systemPrompt: nil,
             maxTokens: EnvConfig.defaultAIMaxTokens, command: nil, args: nil),
-        "gpt-4o": AgentConfig(
-            name: "gpt-4o", mode: .api, provider: .openai,
-            model: "gpt-4o", apiKeyEnvVar: "OPENAI_API_KEY",
+        "gpt-5.2": AgentConfig(
+            name: "gpt-5.2", mode: .api, provider: .openai,
+            model: "gpt-5.2", apiKeyEnvVar: "OPENAI_API_KEY",
             baseURL: "https://api.openai.com", systemPrompt: nil,
             maxTokens: EnvConfig.defaultAIMaxTokens, command: nil, args: nil),
         "embacle": AgentConfig(

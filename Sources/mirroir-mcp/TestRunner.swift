@@ -524,7 +524,7 @@ enum TestRunner {
           --no-compiled       Skip compiled skills (force full OCR)
           --agent [model]     Diagnose compiled failures. Without model: deterministic OCR only.
                               With model: deterministic + AI diagnosis.
-                              Built-in: claude-sonnet-4-6, claude-haiku-4-5, gpt-4o
+                              Built-in: gpt-5.2, claude-sonnet-4-6, claude-haiku-4-5, embacle
                               Ollama: ollama:<model>  Custom: name from agents/ dir
           --help, -h          Show this help
 

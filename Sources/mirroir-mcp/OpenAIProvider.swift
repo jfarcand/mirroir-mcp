@@ -36,7 +36,7 @@ struct OpenAIProvider: AIAgentProviding {
         }
 
         let requestBody: [String: Any] = [
-            "model": config.model ?? "gpt-4o",
+            "model": config.model ?? "gpt-5.2",
             "max_tokens": config.maxTokens,
             "messages": [
                 ["role": "system", "content": systemPrompt],
