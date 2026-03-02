@@ -215,6 +215,10 @@ public enum TimingConstants {
     /// Default timeout for Anthropic API requests (seconds).
     public static let anthropicTimeoutSeconds: Int = 30
 
+    /// Default timeout for embacle-server API requests (seconds).
+    /// Higher than direct API providers because embacle spawns CLI subprocesses.
+    public static let embacleTimeoutSeconds: Int = 60
+
     /// Default timeout for command-based AI agent processes (seconds).
     public static let commandTimeoutSeconds: Int = 60
 
