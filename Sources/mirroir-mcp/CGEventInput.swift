@@ -121,14 +121,16 @@ enum CGEventInput {
         // Trackpad-style continuous scroll requires gesture phase flags and
         // precise point-delta fields. iPhone Mirroring ignores bare scroll
         // wheel events that lack these trackpad attributes.
-        let scrollPhaseField = CGEventField(rawValue: 99)!   // kCGScrollWheelEventScrollPhase
-        let isContinuousField = CGEventField(rawValue: 88)!  // kCGScrollWheelEventIsContinuous
-        let pointDeltaY = CGEventField(rawValue: 96)!        // kCGScrollWheelEventPointDeltaAxis1
-        let pointDeltaX = CGEventField(rawValue: 97)!        // kCGScrollWheelEventPointDeltaAxis2
+        let scrollPhaseField = CGEventField(rawValue: 99)!    // kCGScrollWheelEventScrollPhase
+        let momentumPhaseField = CGEventField(rawValue: 123)!  // kCGScrollWheelEventMomentumPhase
+        let isContinuousField = CGEventField(rawValue: 88)!    // kCGScrollWheelEventIsContinuous
+        let pointDeltaY = CGEventField(rawValue: 96)!          // kCGScrollWheelEventPointDeltaAxis1
+        let pointDeltaX = CGEventField(rawValue: 97)!          // kCGScrollWheelEventPointDeltaAxis2
 
         let phaseBegan: Int64 = 1
         let phaseChanged: Int64 = 2
         let phaseEnded: Int64 = 4
+        let phaseNone: Int64 = 0
 
         for i in 1...steps {
             let prevFraction = Double(i - 1) / Double(steps)
@@ -156,10 +158,31 @@ enum CGEventInput {
             else if i == steps { phase = phaseEnded }
             else { phase = phaseChanged }
             scroll.setIntegerValueField(scrollPhaseField, value: phase)
+            scroll.setIntegerValueField(momentumPhaseField, value: phaseNone)
 
             scroll.post(tap: .cghidEventTap)
             usleep(stepDelay)
         }
+
+        // Send a zero-delta momentum-end event to fully close the gesture.
+        // Without this, iPhone Mirroring may wait for momentum events and
+        // ignore the next gesture's phaseBegan, causing stuck scrolls.
+        if let momentumEnd = CGEvent(
+            scrollWheelEvent2Source: nil,
+            units: .pixel,
+            wheelCount: 2,
+            wheel1: 0, wheel2: 0, wheel3: 0
+        ) {
+            momentumEnd.location = midpoint
+            momentumEnd.setIntegerValueField(isContinuousField, value: 1)
+            momentumEnd.setIntegerValueField(scrollPhaseField, value: phaseNone)
+            momentumEnd.setIntegerValueField(momentumPhaseField, value: phaseEnded)
+            momentumEnd.setIntegerValueField(pointDeltaY, value: 0)
+            momentumEnd.setIntegerValueField(pointDeltaX, value: 0)
+            momentumEnd.post(tap: .cghidEventTap)
+            usleep(stepDelay)
+        }
+
         return true
     }
 
