@@ -1,8 +1,8 @@
 // Copyright 2026 jfarcand@apache.org
 // Licensed under the Apache License, Version 2.0
 //
-// ABOUTME: Shared utility functions for app exploration: alert dismissal, back button navigation.
-// ABOUTME: Used by BFSExplorer for common operations independent of traversal strategy.
+// ABOUTME: Shared utility functions for app exploration: alert dismissal, back button navigation, app context verification.
+// ABOUTME: Used by BFSExplorer and DFSExplorer for common operations independent of traversal strategy.
 
 import Foundation
 import HelperLib
@@ -110,5 +110,85 @@ enum ExplorerUtilities {
     ) -> ScreenDescriber.DescribeResult? {
         tapBackButton(elements: currentElements, input: input, windowSize: windowSize)
         return dismissAlertIfPresent(describer: describer, input: input)
+    }
+
+    // MARK: - App Context Verification
+
+    /// Result of verifying the explorer is still inside the target app.
+    enum ContextCheckResult: Sendable {
+        /// The explorer is inside the app — no action needed.
+        case ok
+        /// The explorer had left the app but was recovered via relaunch.
+        case recovered
+        /// The explorer left the app and recovery failed.
+        case failed(reason: String)
+    }
+
+    /// Verify that OCR elements indicate the explorer is still inside the target app.
+    /// If the explorer has escaped (home screen, system screen), attempts recovery
+    /// by relaunching the app via Spotlight.
+    ///
+    /// - Parameters:
+    ///   - elements: OCR elements from the current screen.
+    ///   - screenHeight: Height of the mirroring window in points.
+    ///   - appName: Name of the target app for recovery via relaunch.
+    ///   - input: Input provider for app relaunch.
+    ///   - describer: Screen describer for post-recovery OCR.
+    /// - Returns: `.ok` if still in app, `.recovered` if relaunched successfully, `.failed` if unrecoverable.
+    static func verifyAppContext(
+        elements: [TapPoint],
+        screenHeight: Double,
+        appName: String,
+        input: InputProviding,
+        describer: ScreenDescribing
+    ) -> ContextCheckResult {
+        let diagnosis = AppContextDetector.diagnose(elements: elements, screenHeight: screenHeight)
+
+        switch diagnosis {
+        case .inApp:
+            return .ok
+
+        case .homeScreen:
+            DebugLog.log("context", "Detected home screen — explorer escaped \(appName)")
+            return attemptRecovery(appName: appName, input: input, describer: describer)
+
+        case .lockOrSystemScreen(let description):
+            DebugLog.log("context", "Detected system screen (\(description)) — explorer escaped \(appName)")
+            return attemptRecovery(appName: appName, input: input, describer: describer)
+        }
+    }
+
+    /// Attempt to recover by relaunching the app via Spotlight.
+    /// Re-diagnoses after relaunch to confirm we're back inside the app.
+    private static func attemptRecovery(
+        appName: String,
+        input: InputProviding,
+        describer: ScreenDescribing
+    ) -> ContextCheckResult {
+        DebugLog.log("context", "Attempting recovery: relaunching \"\(appName)\"")
+
+        _ = input.launchApp(name: appName)
+
+        // Wait for Spotlight to dismiss and app to appear
+        guard let result = SpotlightDetector.waitForDismissal(describer: describer) else {
+            return .failed(reason: "OCR failed after relaunch attempt")
+        }
+
+        // Verify we landed back in the app
+        let postDiagnosis = AppContextDetector.diagnose(
+            elements: result.elements, screenHeight: Double(result.elements.map(\.tapY).max() ?? 890)
+        )
+
+        switch postDiagnosis {
+        case .inApp:
+            DebugLog.log("context", "Recovery successful — back inside \"\(appName)\"")
+            return .recovered
+        case .homeScreen:
+            DebugLog.log("context", "Recovery failed — still on home screen")
+            return .failed(reason: "Still on home screen after relaunch")
+        case .lockOrSystemScreen(let desc):
+            DebugLog.log("context", "Recovery failed — still on system screen (\(desc))")
+            return .failed(reason: "Still on system screen (\(desc)) after relaunch")
+        }
     }
 }

@@ -19,6 +19,8 @@ enum CalibrationScroller {
         let scrollCount: Int
         /// Base64-encoded screenshot of the final viewport.
         let screenshotBase64: String
+        /// Total cumulative scroll offset in points (sum of all viewport offsets).
+        let totalScrollOffset: Double
     }
 
     /// Scroll through a full page collecting OCR elements from each viewport.
@@ -43,29 +45,39 @@ enum CalibrationScroller {
             return nil
         }
 
-        var allElements = firstResult.elements
-        var previousTexts = Set(firstResult.elements.map { $0.text })
         var lastScreenshot = firstResult.screenshotBase64
         var scrollCount = 0
+        var previousElements = firstResult.elements
+        var previousTexts = Set(firstResult.elements.map(\.text))
+        var cumulativeOffset: Double = 0.0
 
         guard let windowInfo = bridge.getWindowInfo() else {
             return ScrollResult(
-                elements: allElements,
+                elements: firstResult.elements,
                 scrollCount: 0,
-                screenshotBase64: lastScreenshot
+                screenshotBase64: lastScreenshot,
+                totalScrollOffset: 0.0
             )
         }
 
+        let windowHeight = Double(windowInfo.size.height)
         let centerX = Double(windowInfo.size.width) / 2.0
-        let centerY = Double(windowInfo.size.height) / 2.0
-        let swipeDistance = Double(windowInfo.size.height) * EnvConfig.swipeDistanceFraction
+        let scrollFromY = windowHeight * EnvConfig.scrollSwipeFromYFraction
+        let scrollToY = windowHeight * EnvConfig.scrollSwipeToYFraction
+        let dedupStrategy = ScrollDedupStrategy(rawValue: EnvConfig.scrollDedupStrategy) ?? .exact
+        let minAnchors = EnvConfig.scrollAnchorMinCount
+
+        // Start with first viewport elements (page-absolute Y = viewport Y for first frame)
+        var allElements = firstResult.elements
 
         for _ in 0..<maxScrolls {
-            // Swipe up (scroll content down)
+            // Swipe up (scroll content down) using configurable Y positions.
+            // The midpoint must land in the upper content area of the window
+            // for iPhone Mirroring to accept scroll wheel events.
             let fromX = centerX
-            let fromY = centerY + swipeDistance / 2
+            let fromY = scrollFromY
             let toX = centerX
-            let toY = centerY - swipeDistance / 2
+            let toY = scrollToY
 
             if input.swipe(fromX: fromX, fromY: fromY,
                            toX: toX, toY: toY,
@@ -83,31 +95,49 @@ enum CalibrationScroller {
             lastScreenshot = result.screenshotBase64
 
             // Check scroll exhaustion: if no new texts appeared, stop
-            let currentTexts = Set(result.elements.map { $0.text })
+            let currentTexts = Set(result.elements.map(\.text))
             let newTexts = currentTexts.subtracting(previousTexts)
             if newTexts.isEmpty {
                 break
             }
 
-            // Add only elements with new text content (dedup by text)
-            for element in result.elements {
-                if !previousTexts.contains(element.text) {
-                    allElements.append(element)
+            // Try anchor-based offset detection
+            if let offsetResult = ScrollAnchorDetector.computeOffset(
+                previous: previousElements, current: result.elements,
+                windowHeight: windowHeight, minAnchors: minAnchors
+            ) {
+                // Anchor-based: merge with overlap deduplication
+                cumulativeOffset += offsetResult.scrollOffset
+                allElements = OverlapDeduplicator.merge(
+                    accumulated: allElements, newViewport: result.elements,
+                    cumulativeOffset: cumulativeOffset,
+                    viewportOffset: offsetResult.scrollOffset,
+                    windowHeight: windowHeight,
+                    strategy: dedupStrategy
+                )
+            } else {
+                // Fallback: text-set dedup (original behavior)
+                for element in result.elements {
+                    if !previousTexts.contains(element.text) {
+                        allElements.append(element)
+                    }
                 }
             }
+
+            previousElements = result.elements
             previousTexts.formUnion(currentTexts)
         }
 
         // Apply configurable dedup strategy to the final collected set
-        let strategy = ScrollDedupStrategy(rawValue: EnvConfig.scrollDedupStrategy) ?? .exact
         let beforeCount = allElements.count
-        let deduped = ScrollDeduplicator.deduplicate(allElements, strategy: strategy)
-        DebugLog.persist("ScrollDedup", "strategy=\(strategy.rawValue) before=\(beforeCount) after=\(deduped.count) removed=\(beforeCount - deduped.count)")
+        let deduped = ScrollDeduplicator.deduplicate(allElements, strategy: dedupStrategy)
+        DebugLog.persist("ScrollDedup", "strategy=\(dedupStrategy.rawValue) before=\(beforeCount) after=\(deduped.count) removed=\(beforeCount - deduped.count) totalOffset=\(Int(cumulativeOffset))")
 
         return ScrollResult(
             elements: deduped,
             scrollCount: scrollCount,
-            screenshotBase64: lastScreenshot
+            screenshotBase64: lastScreenshot,
+            totalScrollOffset: cumulativeOffset
         )
     }
 

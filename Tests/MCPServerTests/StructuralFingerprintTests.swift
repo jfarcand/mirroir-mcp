@@ -236,4 +236,124 @@ final class StructuralFingerprintTests: XCTestCase {
         XCTAssertFalse(StructuralFingerprint.isDatePattern("General"))
         XCTAssertFalse(StructuralFingerprint.isDatePattern("February Blues"))
     }
+
+    // MARK: - Nav Bar Title Extraction
+
+    func testExtractNavBarTitle() {
+        let elements = [
+            TapPoint(text: "Settings", tapX: 205, tapY: 150, confidence: 0.98),
+            TapPoint(text: "Wi", tapX: 50, tapY: 120, confidence: 0.90),
+            TapPoint(text: "General", tapX: 205, tapY: 340, confidence: 0.95),
+        ]
+
+        let title = StructuralFingerprint.extractNavBarTitle(from: elements)
+        XCTAssertEqual(title, "Settings",
+            "Should pick the longest text in the header zone")
+    }
+
+    func testExtractNavBarTitleFiltersTimePatterns() {
+        let elements = [
+            TapPoint(text: "12:25", tapX: 100, tapY: 150, confidence: 0.95),
+            TapPoint(text: "Settings", tapX: 205, tapY: 180, confidence: 0.98),
+        ]
+
+        let title = StructuralFingerprint.extractNavBarTitle(from: elements)
+        XCTAssertEqual(title, "Settings",
+            "Time patterns should be excluded from title candidates")
+    }
+
+    func testExtractNavBarTitleReturnsNilForEmptyHeaderZone() {
+        let elements = [
+            TapPoint(text: "Settings", tapX: 205, tapY: 340, confidence: 0.98),
+            TapPoint(text: "General", tapX: 205, tapY: 420, confidence: 0.95),
+        ]
+
+        let title = StructuralFingerprint.extractNavBarTitle(from: elements)
+        XCTAssertNil(title,
+            "Should return nil when no qualifying elements in header zone")
+    }
+
+    func testExtractNavBarTitleFiltersShortText() {
+        let elements = [
+            TapPoint(text: "Ab", tapX: 205, tapY: 150, confidence: 0.98),
+            TapPoint(text: "Settings", tapX: 205, tapY: 180, confidence: 0.95),
+        ]
+
+        let title = StructuralFingerprint.extractNavBarTitle(from: elements)
+        XCTAssertEqual(title, "Settings",
+            "Text shorter than 3 chars should be excluded")
+    }
+
+    // MARK: - Title-Aware Similarity
+
+    func testTitleAwareSimilarityDifferentTitles() {
+        // Both screens share many elements but have different nav bar titles
+        let settings = [
+            TapPoint(text: "Settings", tapX: 205, tapY: 150, confidence: 0.98),
+            TapPoint(text: "General", tapX: 205, tapY: 340, confidence: 0.95),
+            TapPoint(text: "Privacy", tapX: 205, tapY: 420, confidence: 0.95),
+            TapPoint(text: "About", tapX: 205, tapY: 500, confidence: 0.95),
+        ]
+        let general = [
+            TapPoint(text: "General", tapX: 205, tapY: 150, confidence: 0.98),
+            TapPoint(text: "Privacy", tapX: 205, tapY: 340, confidence: 0.95),
+            TapPoint(text: "About", tapX: 205, tapY: 420, confidence: 0.95),
+            TapPoint(text: "Storage", tapX: 205, tapY: 500, confidence: 0.95),
+        ]
+
+        let sim = StructuralFingerprint.titleAwareSimilarity(settings, general)
+        XCTAssertEqual(sim, 0.0,
+            "Different nav bar titles should short-circuit to 0.0")
+    }
+
+    func testTitleAwareSimilaritySameTitles() {
+        // Same title, same elements — should get 1.0
+        let lhs = [
+            TapPoint(text: "Settings", tapX: 205, tapY: 150, confidence: 0.98),
+            TapPoint(text: "General", tapX: 205, tapY: 340, confidence: 0.95),
+        ]
+        let rhs = [
+            TapPoint(text: "Settings", tapX: 210, tapY: 155, confidence: 0.92),
+            TapPoint(text: "General", tapX: 200, tapY: 345, confidence: 0.90),
+        ]
+
+        let sim = StructuralFingerprint.titleAwareSimilarity(lhs, rhs)
+        XCTAssertEqual(sim, 1.0, accuracy: 0.001,
+            "Same titles should fall through to Jaccard similarity")
+    }
+
+    func testTitleAwareSimilarityOneTitleMissing() {
+        // One screen has a title, the other does not — fall through to Jaccard
+        let withTitle = [
+            TapPoint(text: "Settings", tapX: 205, tapY: 150, confidence: 0.98),
+            TapPoint(text: "General", tapX: 205, tapY: 340, confidence: 0.95),
+        ]
+        let noTitle = [
+            TapPoint(text: "General", tapX: 205, tapY: 340, confidence: 0.95),
+            TapPoint(text: "Settings", tapX: 205, tapY: 500, confidence: 0.95),
+        ]
+
+        let sim = StructuralFingerprint.titleAwareSimilarity(withTitle, noTitle)
+        XCTAssertGreaterThan(sim, 0.0,
+            "When one title is missing, should fall through to Jaccard")
+    }
+
+    func testAreEquivalentTitleAwareRejectsDifferentTitles() {
+        let settings = [
+            TapPoint(text: "Settings", tapX: 205, tapY: 150, confidence: 0.98),
+            TapPoint(text: "General", tapX: 205, tapY: 340, confidence: 0.95),
+            TapPoint(text: "Privacy", tapX: 205, tapY: 420, confidence: 0.95),
+            TapPoint(text: "About", tapX: 205, tapY: 500, confidence: 0.95),
+        ]
+        let general = [
+            TapPoint(text: "General", tapX: 205, tapY: 150, confidence: 0.98),
+            TapPoint(text: "Privacy", tapX: 205, tapY: 340, confidence: 0.95),
+            TapPoint(text: "About", tapX: 205, tapY: 420, confidence: 0.95),
+            TapPoint(text: "Storage", tapX: 205, tapY: 500, confidence: 0.95),
+        ]
+
+        XCTAssertFalse(
+            StructuralFingerprint.areEquivalentTitleAware(settings, general),
+            "Settings vs General should never be confused")
+    }
 }

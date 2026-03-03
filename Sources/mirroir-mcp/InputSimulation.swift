@@ -47,7 +47,8 @@ final class InputSimulation: Sendable {
     /// (layout-independent), same as HID — substitution is still needed.
     private let layoutSubstitution: [Character: Character]
 
-    init(bridge: any WindowBridging, cursorMode: CursorMode = .direct) {
+    init(bridge: any WindowBridging, cursorMode: CursorMode = .direct,
+         layoutSubstitution override: [Character: Character]? = nil) {
         self.bridge = bridge
         self.cursorMode = cursorMode
         // Resolve the process name for AppleScript focus management.
@@ -65,7 +66,9 @@ final class InputSimulation: Sendable {
         // layout differs from US QWERTY. Option-modified keycodes go through
         // the iPhone's configured layout, so dead-key sequences (é, è, ç, etc.)
         // produce wrong characters without substitution.
-        if let usData = LayoutMapper.layoutData(forSourceID: "com.apple.keylayout.US"),
+        if let explicitSubstitution = override {
+            self.layoutSubstitution = explicitSubstitution
+        } else if let usData = LayoutMapper.layoutData(forSourceID: "com.apple.keylayout.US"),
            let (targetID, targetData) = LayoutMapper.findNonUSLayout()
         {
             self.layoutSubstitution = LayoutMapper.buildSubstitution(
@@ -193,6 +196,11 @@ final class InputSimulation: Sendable {
         if let boundsError = validateBounds(x: toX, y: toY, info: info, tag: "swipe") {
             return boundsError
         }
+
+        // Scroll wheel events are delivered to the focused window, unlike
+        // click events which go to whatever is under the cursor. Ensure
+        // the target window is frontmost before sending scroll events.
+        ensureTargetFrontmost()
 
         let saved = saveCursor(mode: override)
         defer { restoreCursor(saved) }

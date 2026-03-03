@@ -18,6 +18,7 @@ final class BFSExplorer: @unchecked Sendable {
     let session: ExplorationSession
     let budget: ExplorationBudget
     let windowSize: CGSize
+    let appName: String
     /// Loaded component definitions for grouping OCR elements into UI components.
     let componentDefinitions: [ComponentDefinition]
     /// Classifier for grouping OCR elements into components. nil uses legacy element-level planning.
@@ -51,6 +52,7 @@ final class BFSExplorer: @unchecked Sendable {
         self.graph = session.currentGraph
         self.budget = budget
         self.windowSize = windowSize
+        self.appName = session.currentAppName
         self.componentDefinitions = componentDefinitions
         self.classifier = classifier
     }
@@ -260,6 +262,8 @@ final class BFSExplorer: @unchecked Sendable {
             return .paused(reason: "Failed to capture screen during exploration")
         }
 
+        if let exit = handleContextEscape(elements: result.elements, input: input, describer: describer) { return exit }
+
         // Log all OCR elements so we can compare with what's visible on screen
         let ocrTexts = result.elements.map { "\($0.text)@(\(Int($0.tapX)),\(Int($0.tapY)))" }
         DebugLog.log("bfs", "OCR elements (\(result.elements.count)): \(ocrTexts.joined(separator: ", "))")
@@ -333,6 +337,8 @@ final class BFSExplorer: @unchecked Sendable {
         ) else {
             return .paused(reason: "Failed to capture screen after tap")
         }
+
+        if let exit = handleContextEscape(elements: afterResult.elements, input: input, describer: describer) { return exit }
 
         let screenType = strategy.classifyScreen(
             elements: afterResult.elements, hints: afterResult.hints
@@ -431,6 +437,25 @@ final class BFSExplorer: @unchecked Sendable {
         return .continue(
             description: "Returning to root (\(remaining) level\(remaining == 1 ? "" : "s") remaining)"
         )
+    }
+
+    /// Check if the explorer has left the target app and handle accordingly.
+    /// Returns an ExploreStepResult to return early, or nil if still in-app.
+    private func handleContextEscape(
+        elements: [TapPoint], input: InputProviding, describer: ScreenDescribing
+    ) -> ExploreStepResult? {
+        let check = ExplorerUtilities.verifyAppContext(
+            elements: elements, screenHeight: windowSize.height,
+            appName: appName, input: input, describer: describer)
+        switch check {
+        case .ok: return nil
+        case .recovered:
+            lock.lock(); isFinished = true; lock.unlock()
+            return .finished(bundle: generateBundle())
+        case .failed(let reason):
+            lock.lock(); isFinished = true; lock.unlock()
+            return .paused(reason: "Left app: \(reason)")
+        }
     }
 
     // MARK: - Plan Building

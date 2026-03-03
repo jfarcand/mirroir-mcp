@@ -261,12 +261,27 @@ public enum EnvConfig {
         readDouble("swipeDistanceFraction", default: TimingConstants.swipeDistanceFraction)
     }
 
+    /// Scroll-swipe start Y as a fraction of window height.
+    public static var scrollSwipeFromYFraction: Double {
+        readDouble("scrollSwipeFromYFraction", default: TimingConstants.scrollSwipeFromYFraction)
+    }
+
+    /// Scroll-swipe end Y as a fraction of window height.
+    public static var scrollSwipeToYFraction: Double {
+        readDouble("scrollSwipeToYFraction", default: TimingConstants.scrollSwipeToYFraction)
+    }
+
     public static var defaultSwipeDurationMs: Int {
         readInt("defaultSwipeDurationMs", default: TimingConstants.defaultSwipeDurationMs)
     }
 
     public static var defaultScrollMaxAttempts: Int {
         readInt("defaultScrollMaxAttempts", default: TimingConstants.defaultScrollMaxAttempts)
+    }
+
+    /// Minimum anchor matches required for anchor-based scroll offset detection.
+    public static var scrollAnchorMinCount: Int {
+        readInt("scrollAnchorMinCount", default: TimingConstants.scrollAnchorMinCount)
     }
 
     // MARK: - AI Provider
@@ -525,6 +540,8 @@ public enum EnvConfig {
                 ("swipeInterpolationSteps", "\(swipeInterpolationSteps)"),
                 ("scrollPixelScale", "\(scrollPixelScale)"),
                 ("swipeDistanceFraction", "\(swipeDistanceFraction)"),
+                ("scrollSwipeFromYFraction", "\(scrollSwipeFromYFraction)"),
+                ("scrollSwipeToYFraction", "\(scrollSwipeToYFraction)"),
                 ("defaultSwipeDurationMs", "\(defaultSwipeDurationMs)"),
                 ("defaultDragDurationMs", "\(defaultDragDurationMs)"),
                 ("defaultLongPressDurationMs", "\(defaultLongPressDurationMs)"),
@@ -544,6 +561,7 @@ public enum EnvConfig {
                 ("scrollDedupStrategy", scrollDedupStrategy),
                 ("scrollDedupLevenshteinMax", "\(scrollDedupLevenshteinMax)"),
                 ("scrollDedupProximityPt", "\(scrollDedupProximityPt)"),
+                ("scrollAnchorMinCount", "\(scrollAnchorMinCount)"),
             ]),
             ("Content Bounds", [
                 ("brightnessThreshold", "\(brightnessThreshold)"),

@@ -208,4 +208,15 @@ final class ScreenToolHandlerTests: XCTestCase {
         let text = extractText(response)
         XCTAssertTrue(text?.contains("no file") ?? false)
     }
+
+    // MARK: - describe_screen scroll parameter
+
+    func testDescribeScreenScrollDescriberFailsReturnsError() {
+        bridge.processRunning = true
+        describer.describeResult = nil
+        let response = callTool("describe_screen", args: ["scroll": .bool(true)])
+        XCTAssertTrue(isError(response))
+        let text = extractText(response)
+        XCTAssertTrue(text?.contains("Failed to capture") ?? false)
+    }
 }
