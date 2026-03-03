@@ -72,6 +72,49 @@ enum StructuralFingerprint {
         return similarity(leftSet, rightSet) >= similarityThreshold
     }
 
+    // MARK: - Title-Aware Similarity
+
+    /// Extract the probable nav bar title from OCR elements.
+    /// Picks the longest text in the header zone (100–250pt Y), excluding time patterns,
+    /// bare numbers, dates, and text shorter than 3 characters.
+    static func extractNavBarTitle(from elements: [TapPoint]) -> String? {
+        var candidate: String?
+        var candidateLength = 0
+        for el in elements {
+            guard headerZoneRange.contains(el.tapY) else { continue }
+            guard el.text.count >= 3 else { continue }
+            guard !LandmarkPicker.isTimePattern(el.text) else { continue }
+            guard !LandmarkPicker.isBareNumber(el.text) else { continue }
+            guard !isDatePattern(el.text) else { continue }
+            if el.text.count > candidateLength {
+                candidate = el.text
+                candidateLength = el.text.count
+            }
+        }
+        return candidate
+    }
+
+    /// Compute similarity with a nav bar title short-circuit.
+    /// If both element sets have extractable titles that differ, returns 0.0 immediately.
+    /// Otherwise falls through to standard Jaccard similarity.
+    static func titleAwareSimilarity(_ lhs: [TapPoint], _ rhs: [TapPoint]) -> Double {
+        let leftTitle = extractNavBarTitle(from: lhs)
+        let rightTitle = extractNavBarTitle(from: rhs)
+        // Short-circuit: both have titles and they differ → definitely different screens.
+        if let lt = leftTitle, let rt = rightTitle, lt != rt {
+            return 0.0
+        }
+        let leftSet = extractStructural(from: lhs)
+        let rightSet = extractStructural(from: rhs)
+        return similarity(leftSet, rightSet)
+    }
+
+    /// Check if two element arrays represent the same screen, using title-aware comparison.
+    /// If both screens have distinct nav bar titles, they are never considered equivalent.
+    static func areEquivalentTitleAware(_ lhs: [TapPoint], _ rhs: [TapPoint]) -> Bool {
+        titleAwareSimilarity(lhs, rhs) >= similarityThreshold
+    }
+
     // MARK: - Filtering
 
     /// Determine if an element is structural (stable across captures).

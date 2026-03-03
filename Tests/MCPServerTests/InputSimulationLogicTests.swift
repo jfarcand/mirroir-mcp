@@ -18,7 +18,8 @@ final class InputSimulationLogicTests: XCTestCase {
     override func setUp() {
         super.setUp()
         let bridge = MirroringBridge()
-        simulation = InputSimulation(bridge: bridge)
+        // Pass empty substitution to test pure segment logic independent of host keyboard layout
+        simulation = InputSimulation(bridge: bridge, layoutSubstitution: [:])
     }
 
     // MARK: - validateBounds

@@ -155,11 +155,13 @@ final class DFSExplorerFastBacktrackTests: XCTestCase {
         }
     }
 
-    func testFastBacktrackDoesNotTriggerForNonTabApp() {
+    func testFrontierBacktrackTriggersForDeepNonTabApp() {
         let session = ExplorationSession()
         session.start(appName: "TestApp", goal: "test")
 
-        // Root is settings (not tabRoot)
+        // Root is settings (not tabRoot) — FrontierPlanner still triggers
+        // because the root has unvisited elements and the depth bonus makes
+        // it a higher-value target than the immediate parent.
         let rootElements = makeElements(["Settings", "General", "Privacy"])
         session.capture(
             elements: rootElements, hints: [], icons: [],
@@ -208,16 +210,26 @@ final class DFSExplorerFastBacktrackTests: XCTestCase {
         let tapsBefore = input.taps.count
         let desc4 = MockExplorerDescriber(screens: [
             ScreenDescriber.DescribeResult(elements: l3, screenshotBase64: "img3"),
-            // Backtrack verification: back at l2 (parent)
+            // Frontier backtrack: 3 levels back through l2, l1, root
             ScreenDescriber.DescribeResult(elements: l2, screenshotBase64: "img2"),
+            ScreenDescriber.DescribeResult(elements: l1, screenshotBase64: "img1"),
+            ScreenDescriber.DescribeResult(elements: rootElements, screenshotBase64: "img0"),
         ])
-        _ = explorer.step(describer: desc4, input: input, strategy: MobileAppStrategy.self)
 
-        // Non-tab app: should do normal single backtrack, not fast
-        let newBackTaps = input.taps.dropFirst(tapsBefore)
-        let backButtonTaps = newBackTaps.filter { $0.x < 60 && $0.y < 140 }
-        XCTAssertEqual(backButtonTaps.count, 1,
-            "Non-tab app should use single backtrack")
+        let result = explorer.step(
+            describer: desc4, input: input, strategy: MobileAppStrategy.self
+        )
+
+        if case .backtracked = result {
+            // FrontierPlanner identifies root as the highest-value ancestor
+            // even for non-tab apps, because depth bonus outweighs the tab bonus.
+            let newBackTaps = input.taps.dropFirst(tapsBefore)
+            let backButtonTaps = newBackTaps.filter { $0.x < 60 && $0.y < 140 }
+            XCTAssertEqual(backButtonTaps.count, 3,
+                "Deep non-tab app should frontier-backtrack to root (3 taps)")
+        } else {
+            XCTFail("Expected .backtracked for frontier backtrack, got \(result)")
+        }
     }
 
     // MARK: - Depth Limit

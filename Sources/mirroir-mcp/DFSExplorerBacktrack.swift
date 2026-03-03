@@ -82,31 +82,70 @@ extension DFSExplorer {
             return .finished(bundle: generateBundle())
         }
 
-        // Fast-backtrack: skip multiple levels to reach tab root if beneficial
-        if let fastResult = performFastBacktrackIfNeeded(
+        // Frontier-aware backtrack: check if a shallower ancestor has higher-value
+        // unvisited elements than the immediate parent. If so, backtrack directly there.
+        if let frontierResult = performFrontierBacktrackIfNeeded(
             stackDepth: stackDepth, input: input, describer: describer, elements: elements
         ) {
-            return fastResult
+            return frontierResult
         }
 
-        let backtrackAction = strategy.backtrackMethod(
-            currentHints: hints, depth: stackDepth - 1
-        )
+        // Check if the incoming edge tells us how to backtrack
+        let incomingEdge = graph.incomingEdge(to: currentFP)
+        let edgeBasedBacktrack = incomingEdge.map { edge -> Bool in
+            switch edge.edgeType {
+            case .modal:
+                // Dismiss modal: find Close/Done/Cancel button and tap it
+                if let dismissTarget = EdgeClassifier.findDismissTarget(
+                    elements: elements, screenHeight: windowSize.height
+                ) {
+                    _ = input.tap(x: dismissTarget.tapX, y: dismissTarget.tapY)
+                    usleep(EnvConfig.stepSettlingDelayMs * 1000)
+                    return true
+                }
+                // Fall through to default backtracking if no dismiss button found
+                return false
+            case .tab:
+                // Tab switch: find the original tab element and tap it
+                if let sourceNode = graph.node(for: incomingEdge?.fromFingerprint ?? "") {
+                    let tabBarZone = windowSize.height * EdgeClassifier.tabBarZoneFraction
+                    if let tabElement = sourceNode.elements.first(where: { $0.tapY >= tabBarZone }) {
+                        _ = input.tap(x: tabElement.tapX, y: tabElement.tapY)
+                        usleep(EnvConfig.stepSettlingDelayMs * 1000)
+                        return true
+                    }
+                }
+                return false
+            case .dead:
+                // Dead end: press Home to escape
+                _ = input.pressKey(keyName: "h", modifiers: ["command", "shift"])
+                usleep(EnvConfig.stepSettlingDelayMs * 1000)
+                return true
+            case .push, .same:
+                return false
+            }
+        } ?? false
 
-        // Execute backtrack action by tapping the "<" back button.
-        // iPhone Mirroring does not support iOS edge-swipe-back gestures,
-        // so tapping the OCR-detected back chevron is the only reliable method.
-        // tapBackButton always succeeds (falls back to canonical position if OCR misses the chevron).
-        switch backtrackAction {
-        case .pressBack, .tapBack:
-            _ = tapBackButton(elements: elements, input: input)
-        case .pressHome:
-            _ = input.pressKey(keyName: "h", modifiers: ["command", "shift"])
-        case .none:
-            lock.lock()
-            isFinished = true
-            lock.unlock()
-            return .finished(bundle: generateBundle())
+        if !edgeBasedBacktrack {
+            let backtrackAction = strategy.backtrackMethod(
+                currentHints: hints, depth: stackDepth - 1
+            )
+
+            // Execute backtrack action by tapping the "<" back button.
+            // iPhone Mirroring does not support iOS edge-swipe-back gestures,
+            // so tapping the OCR-detected back chevron is the only reliable method.
+            // tapBackButton always succeeds (falls back to canonical position if OCR misses the chevron).
+            switch backtrackAction {
+            case .pressBack, .tapBack:
+                _ = tapBackButton(elements: elements, input: input)
+            case .pressHome:
+                _ = input.pressKey(keyName: "h", modifiers: ["command", "shift"])
+            case .none:
+                lock.lock()
+                isFinished = true
+                lock.unlock()
+                return .finished(bundle: generateBundle())
+            }
         }
 
         lock.lock()
@@ -158,7 +197,7 @@ extension DFSExplorer {
 
         // Check if we landed on the expected parent
         if let expectedNode = graph.node(for: expectedFP),
-           StructuralFingerprint.areEquivalent(expectedNode.elements, afterResult.elements) {
+           StructuralFingerprint.areEquivalentTitleAware(expectedNode.elements, afterResult.elements) {
             return expectedFP
         }
 
@@ -170,7 +209,7 @@ extension DFSExplorer {
         }
 
         if let expectedNode = graph.node(for: expectedFP),
-           StructuralFingerprint.areEquivalent(expectedNode.elements, retryResult.elements) {
+           StructuralFingerprint.areEquivalentTitleAware(expectedNode.elements, retryResult.elements) {
             return expectedFP
         }
 
@@ -192,50 +231,63 @@ extension DFSExplorer {
         return expectedFP
     }
 
-    // MARK: - Fast Backtrack
+    // MARK: - Frontier-Aware Backtrack
 
-    /// Fast-backtrack to root for tab-based apps when deep in a subtree.
-    /// Taps the back button at each level to navigate up to the root.
+    /// Frontier-aware backtrack that jumps to the best ancestor with unvisited elements.
+    /// Uses `FrontierPlanner` to score all ancestors and their unvisited elements,
+    /// then navigates directly to the highest-value one.
     ///
     /// Triggers when:
     /// 1. Stack depth > 2 (at least 2 levels above root)
-    /// 2. Root screen is a tabRoot
-    /// 3. Root has unvisited elements (likely unexplored tabs)
-    func performFastBacktrackIfNeeded(
+    /// 2. A frontier target exists that is shallower than the immediate parent
+    ///
+    /// Subsumes the previous fast-backtrack-to-root behavior by generalizing it:
+    /// tabRoot screens naturally score higher due to the tabRootBonus.
+    func performFrontierBacktrackIfNeeded(
         stackDepth: Int,
         input: InputProviding,
         describer: ScreenDescribing,
         elements: [TapPoint]
     ) -> ExploreStepResult? {
         guard stackDepth > 2 else { return nil }
-        guard graph.rootScreenType() == .tabRoot else { return nil }
-        guard graph.hasUnvisitedElements(for: graph.rootFingerprint) else { return nil }
 
-        let stepsToRoot = stackDepth - 1
+        lock.lock()
+        let stack = backtrackStack
+        lock.unlock()
+
+        guard let target = FrontierPlanner.bestTarget(
+            graph: graph, backtrackStack: stack, screenHeight: windowSize.height
+        ) else {
+            return nil
+        }
+
+        // Only jump if the frontier target is shallower than the immediate parent
+        let parentDepth = graph.node(for: stack[stack.count - 2])?.depth ?? (stackDepth - 2)
+        guard target.depth < parentDepth else { return nil }
+
+        // Calculate how many levels to backtrack
+        guard let targetIndex = stack.firstIndex(of: target.fingerprint) else { return nil }
+        let stepsBack = stack.count - 1 - targetIndex
+
         var currentElements = elements
-        for _ in 0..<stepsToRoot {
-            // Tap the back button to go back one level
+        for _ in 0..<stepsBack {
             guard tapBackButton(elements: currentElements, input: input) else { break }
-            // OCR the new screen for the next level's back button
             if let result = describer.describe(skipOCR: false) {
                 currentElements = result.elements
             }
         }
 
-        let rootFP = graph.rootFingerprint
-
         lock.lock()
         let previousFP = backtrackStack.last ?? ""
-        // Pop entire stack down to root
-        while backtrackStack.count > 1 {
+        // Pop stack down to the target
+        while backtrackStack.count > targetIndex + 1 {
             backtrackStack.removeLast()
         }
         actionsOnCurrentScreen = 0
         lock.unlock()
 
-        // Sync graph's current fingerprint to root
-        graph.setCurrentFingerprint(rootFP)
+        graph.setCurrentFingerprint(target.fingerprint)
 
-        return .backtracked(from: previousFP, to: rootFP)
+        return .backtracked(from: previousFP, to: target.fingerprint)
     }
 }

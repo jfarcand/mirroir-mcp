@@ -63,6 +63,8 @@ struct ScreenNode: Sendable {
     let screenshotBase64: String
     /// Set of element texts that have been tapped/visited from this screen.
     var visitedElements: Set<String>
+    /// Extracted nav bar title for fast screen identity comparison.
+    let navBarTitle: String?
 }
 
 /// A directed edge in the navigation graph representing a navigation action.
@@ -75,6 +77,8 @@ struct NavigationEdge: Sendable {
     let actionType: String
     /// The element text or value associated with the action.
     let elementText: String
+    /// Classified transition type for intelligent backtracking.
+    let edgeType: EdgeType
 }
 
 /// Immutable export of the navigation graph state for downstream consumers.
@@ -130,6 +134,7 @@ final class NavigationGraph: @unchecked Sendable {
         screenPlans = [:]
 
         let fp = StructuralFingerprint.compute(elements: rootElements, icons: icons)
+        let title = StructuralFingerprint.extractNavBarTitle(from: rootElements)
         let node = ScreenNode(
             fingerprint: fp,
             elements: rootElements,
@@ -138,7 +143,8 @@ final class NavigationGraph: @unchecked Sendable {
             depth: 0,
             screenType: screenType,
             screenshotBase64: screenshot,
-            visitedElements: []
+            visitedElements: [],
+            navBarTitle: title
         )
         nodes[fp] = node
         currentFP = fp
@@ -157,6 +163,7 @@ final class NavigationGraph: @unchecked Sendable {
     ///   - actionType: The action that caused navigation (e.g. "tap").
     ///   - elementText: The element text associated with the action.
     ///   - screenType: Classified type of the new screen.
+    ///   - edgeType: Classified transition type for backtracking (default `.push`).
     /// - Returns: A `TransitionResult` indicating what happened.
     func recordTransition(
         elements: [TapPoint],
@@ -165,7 +172,8 @@ final class NavigationGraph: @unchecked Sendable {
         screenshot: String,
         actionType: String,
         elementText: String,
-        screenType: ScreenType
+        screenType: ScreenType,
+        edgeType: EdgeType = .push
     ) -> TransitionResult {
         lock.lock()
         defer { lock.unlock() }
@@ -174,11 +182,10 @@ final class NavigationGraph: @unchecked Sendable {
 
         // Check if action had no effect (same screen)
         if newFP == currentFP {
-            // Double-check with similarity in case hash collision or minor OCR variation
+            // Double-check with title-aware similarity in case hash collision or minor OCR variation
             if let currentNode = nodes[currentFP] {
-                let sim = StructuralFingerprint.similarity(
-                    StructuralFingerprint.extractStructural(from: currentNode.elements),
-                    StructuralFingerprint.extractStructural(from: elements)
+                let sim = StructuralFingerprint.titleAwareSimilarity(
+                    currentNode.elements, elements
                 )
                 if sim >= StructuralFingerprint.similarityThreshold {
                     return .duplicate
@@ -195,7 +202,8 @@ final class NavigationGraph: @unchecked Sendable {
             fromFingerprint: currentFP,
             toFingerprint: matchingFP ?? newFP,
             actionType: actionType,
-            elementText: elementText
+            elementText: elementText,
+            edgeType: edgeType
         )
         edges.append(edge)
 
@@ -206,6 +214,7 @@ final class NavigationGraph: @unchecked Sendable {
 
         // New screen: add node
         let currentDepth = nodes[currentFP]?.depth ?? 0
+        let title = StructuralFingerprint.extractNavBarTitle(from: elements)
         let node = ScreenNode(
             fingerprint: newFP,
             elements: elements,
@@ -214,7 +223,8 @@ final class NavigationGraph: @unchecked Sendable {
             depth: currentDepth + 1,
             screenType: screenType,
             screenshotBase64: screenshot,
-            visitedElements: []
+            visitedElements: [],
+            navBarTitle: title
         )
         nodes[newFP] = node
         currentFP = newFP
@@ -261,6 +271,21 @@ final class NavigationGraph: @unchecked Sendable {
         lock.lock()
         defer { lock.unlock() }
         return currentFP
+    }
+
+    /// Get all edges originating from a given screen fingerprint.
+    func edges(from fingerprint: String) -> [NavigationEdge] {
+        lock.lock()
+        defer { lock.unlock() }
+        return edges.filter { $0.fromFingerprint == fingerprint }
+    }
+
+    /// Get the incoming edge that led to a given screen fingerprint.
+    /// Returns the most recent edge pointing to this fingerprint.
+    func incomingEdge(to fingerprint: String) -> NavigationEdge? {
+        lock.lock()
+        defer { lock.unlock() }
+        return edges.last { $0.toFingerprint == fingerprint }
     }
 
     /// Whether the graph has been initialized with a root screen.
@@ -312,7 +337,8 @@ final class NavigationGraph: @unchecked Sendable {
             depth: node.depth,
             screenType: node.screenType,
             screenshotBase64: node.screenshotBase64,
-            visitedElements: node.visitedElements
+            visitedElements: node.visitedElements,
+            navBarTitle: node.navBarTitle
         )
         return novel.count
     }
@@ -435,13 +461,12 @@ final class NavigationGraph: @unchecked Sendable {
 
     /// Find an existing node whose structural elements are similar to the given elements.
     /// Returns the fingerprint of the matching node, or nil if no match found.
+    /// Uses title-aware similarity: screens with different nav bar titles are never matched.
     /// Used internally for transition recording and externally for backtrack verification.
     func findMatchingNode(elements: [TapPoint]) -> String? {
-        let newStructural = StructuralFingerprint.extractStructural(from: elements)
         for (fp, node) in nodes {
-            let existingStructural = StructuralFingerprint.extractStructural(from: node.elements)
-            if StructuralFingerprint.similarity(newStructural, existingStructural)
-                >= StructuralFingerprint.similarityThreshold {
+            let sim = StructuralFingerprint.titleAwareSimilarity(elements, node.elements)
+            if sim >= StructuralFingerprint.similarityThreshold {
                 return fp
             }
         }

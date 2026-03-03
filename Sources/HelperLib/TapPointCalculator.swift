@@ -43,6 +43,13 @@ public struct TapPoint: Sendable {
     public let tapY: Double
     /// Vision confidence score (0.0–1.0).
     public let confidence: Float
+
+    public init(text: String, tapX: Double, tapY: Double, confidence: Float) {
+        self.text = text
+        self.tapX = tapX
+        self.tapY = tapY
+        self.confidence = confidence
+    }
 }
 
 /// Converts raw OCR bounding box data into smart tap coordinates.

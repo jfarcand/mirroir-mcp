@@ -29,6 +29,7 @@ final class DFSExplorer: @unchecked Sendable {
     let session: ExplorationSession
     let budget: ExplorationBudget
     let windowSize: CGSize
+    let appName: String
     var backtrackStack: [String] = []
     private var startTime: Date = Date()
     var actionCount: Int = 0
@@ -47,6 +48,7 @@ final class DFSExplorer: @unchecked Sendable {
         self.graph = session.currentGraph
         self.budget = budget
         self.windowSize = windowSize
+        self.appName = session.currentAppName
     }
 
     /// Record the exploration start time. Call once after the initial screen capture.
@@ -94,6 +96,20 @@ final class DFSExplorer: @unchecked Sendable {
         // OCR current screen, dismissing any alert that may be present
         guard let result = dismissAlertIfPresent(describer: describer, input: input) else {
             return .paused(reason: "Failed to capture screen")
+        }
+
+        // Verify we're still inside the target app
+        switch ExplorerUtilities.verifyAppContext(
+            elements: result.elements, screenHeight: windowSize.height,
+            appName: appName, input: input, describer: describer
+        ) {
+        case .ok: break
+        case .recovered:
+            lock.lock(); isFinished = true; lock.unlock()
+            return .finished(bundle: generateBundle())
+        case .failed(let reason):
+            lock.lock(); isFinished = true; lock.unlock()
+            return .paused(reason: "Left app: \(reason)")
         }
 
         let currentFP = graph.currentFingerprint
@@ -215,15 +231,44 @@ final class DFSExplorer: @unchecked Sendable {
             return .paused(reason: "Failed to capture screen after tap")
         }
 
+        // Verify we're still inside the target app after the tap
+        switch ExplorerUtilities.verifyAppContext(
+            elements: afterResult.elements, screenHeight: windowSize.height,
+            appName: appName, input: input, describer: describer
+        ) {
+        case .ok: break
+        case .recovered:
+            lock.lock(); isFinished = true; lock.unlock()
+            return .finished(bundle: generateBundle())
+        case .failed(let reason):
+            lock.lock(); isFinished = true; lock.unlock()
+            return .paused(reason: "Left app: \(reason)")
+        }
+
         let screenType = strategy.classifyScreen(
             elements: afterResult.elements, hints: afterResult.hints
         )
+
+        // Classify the transition type for intelligent backtracking
+        let edgeType: EdgeType
+        if let sourceNode = graph.node(for: currentFP) {
+            edgeType = EdgeClassifier.classify(
+                sourceNode: sourceNode,
+                destinationElements: afterResult.elements,
+                destinationHints: afterResult.hints,
+                tappedElement: target,
+                screenHeight: windowSize.height
+            )
+        } else {
+            edgeType = .push
+        }
 
         // Record transition in graph
         let transition = graph.recordTransition(
             elements: afterResult.elements, icons: afterResult.icons,
             hints: afterResult.hints, screenshot: afterResult.screenshotBase64,
-            actionType: "tap", elementText: target.text, screenType: screenType
+            actionType: "tap", elementText: target.text, screenType: screenType,
+            edgeType: edgeType
         )
 
         // Also record in session for flat screen list.
@@ -283,11 +328,25 @@ final class DFSExplorer: @unchecked Sendable {
             return .paused(reason: "Failed to capture screen after scout tap")
         }
 
+        // Verify we're still inside the target app after the scout tap
+        switch ExplorerUtilities.verifyAppContext(
+            elements: afterResult.elements, screenHeight: windowSize.height,
+            appName: appName, input: input, describer: describer
+        ) {
+        case .ok: break
+        case .recovered:
+            lock.lock(); isFinished = true; lock.unlock()
+            return .finished(bundle: generateBundle())
+        case .failed(let reason):
+            lock.lock(); isFinished = true; lock.unlock()
+            return .paused(reason: "Left app: \(reason)")
+        }
+
         // Compare using structural similarity (not exact hash) for consistency
         // with NavigationGraph's Jaccard-based node matching.
         let navigated: Bool
         if let currentNode = graph.node(for: currentFP) {
-            navigated = !StructuralFingerprint.areEquivalent(
+            navigated = !StructuralFingerprint.areEquivalentTitleAware(
                 currentNode.elements, afterResult.elements
             )
         } else {
@@ -310,10 +369,23 @@ final class DFSExplorer: @unchecked Sendable {
             let screenType = strategy.classifyScreen(
                 elements: afterResult.elements, hints: afterResult.hints
             )
+            let scoutEdgeType: EdgeType
+            if let sourceNode = graph.node(for: currentFP) {
+                scoutEdgeType = EdgeClassifier.classify(
+                    sourceNode: sourceNode,
+                    destinationElements: afterResult.elements,
+                    destinationHints: afterResult.hints,
+                    tappedElement: target,
+                    screenHeight: windowSize.height
+                )
+            } else {
+                scoutEdgeType = .push
+            }
             _ = graph.recordTransition(
                 elements: afterResult.elements, icons: afterResult.icons,
                 hints: afterResult.hints, screenshot: afterResult.screenshotBase64,
-                actionType: "tap", elementText: target.text, screenType: screenType
+                actionType: "tap", elementText: target.text, screenType: screenType,
+                edgeType: scoutEdgeType
             )
             // Record in session for flat screen list.
             // Skip graph transition since the explorer manages the graph directly above.

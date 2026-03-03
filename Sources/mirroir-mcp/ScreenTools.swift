@@ -62,6 +62,8 @@ extension MirroirMCP {
                 tap tool (0,0 = top-left of mirroring window). \
                 Set skip_ocr to true to skip Vision OCR and return only the grid-overlaid \
                 screenshot, letting the MCP client use its own vision model. \
+                Set scroll to true to scroll through the full page and collect all elements \
+                with page-absolute Y coordinates. \
                 Note: tapping nav bar back buttons ("<") is unreliable in iPhone Mirroring. \
                 Use press_key with key="[" modifiers=["command"] for back navigation instead.
                 """,
@@ -72,7 +74,12 @@ extension MirroirMCP {
                         "type": .string("boolean"),
                         "description": .string(
                             "Skip Vision OCR and return only the grid-overlaid screenshot (default: false)"),
-                    ])
+                    ]),
+                    "scroll": .object([
+                        "type": .string("boolean"),
+                        "description": .string(
+                            "Scroll through the full page to collect all elements with page-absolute Y coordinates (default: false)"),
+                    ]),
                 ]),
             ],
             handler: { args in
@@ -93,6 +100,37 @@ extension MirroirMCP {
                 }
 
                 let skipOCR = args["skip_ocr"]?.asBool() ?? false
+                let scrollEnabled = args["scroll"]?.asBool() ?? false
+
+                // Full-page scroll mode: collect all elements across viewports
+                if scrollEnabled && !skipOCR {
+                    let input = ctx.input
+                    guard let scrollResult = describer.describeFullPage(
+                        input: input, bridge: bridge
+                    ) else {
+                        return .error(
+                            "Failed to capture/analyze screen. Is the '\(ctx.name)' window visible?")
+                    }
+
+                    var lines = ["Screen elements (page-absolute tap coordinates in points):"]
+                    for el in scrollResult.elements.sorted(by: { $0.tapY < $1.tapY }) {
+                        lines.append("- \"\(el.text)\" at (\(Int(el.tapX)), \(Int(el.tapY)))")
+                    }
+                    if scrollResult.elements.isEmpty {
+                        lines.append("(no text detected)")
+                    }
+                    lines.append("")
+                    lines.append("_meta: scroll_count=\(scrollResult.scrollCount) total_offset=\(Int(scrollResult.totalScrollOffset)) element_count=\(scrollResult.elements.count)")
+                    let description = lines.joined(separator: "\n")
+
+                    return MCPToolResult(
+                        content: [
+                            .text(description),
+                            .image(scrollResult.screenshotBase64, mimeType: "image/png"),
+                        ],
+                        isError: false
+                    )
+                }
 
                 guard let result = describer.describe(skipOCR: skipOCR) else {
                     return .error(

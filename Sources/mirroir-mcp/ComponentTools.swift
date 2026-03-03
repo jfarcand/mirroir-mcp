@@ -88,8 +88,8 @@ extension MirroirMCP {
                 let screenshotBase64: String
 
                 if scrollEnabled {
-                    guard let scrollResult = CalibrationScroller.collectFullPage(
-                        describer: describer, input: input, bridge: bridge
+                    guard let scrollResult = describer.describeFullPage(
+                        input: input, bridge: bridge
                     ) else {
                         return .error(
                             "Failed to capture/analyze screen. Is the '\(ctx.name)' window visible?")

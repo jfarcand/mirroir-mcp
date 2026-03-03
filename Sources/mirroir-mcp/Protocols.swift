@@ -105,6 +105,33 @@ protocol TextRecognizing: Sendable {
 /// Abstracts OCR-based screen element detection.
 protocol ScreenDescribing: Sendable {
     func describe(skipOCR: Bool) -> ScreenDescriber.DescribeResult?
+
+    /// Describe the full page by scrolling through all viewports.
+    /// Delegates to `CalibrationScroller.collectFullPage()` for element collection.
+    ///
+    /// - Parameters:
+    ///   - input: Input provider for scroll gestures.
+    ///   - bridge: Window bridge for getting window dimensions.
+    ///   - maxScrolls: Maximum number of scroll attempts.
+    /// - Returns: The scroll result with all unique elements, or nil if OCR failed.
+    func describeFullPage(
+        input: any InputProviding,
+        bridge: any WindowBridging,
+        maxScrolls: Int
+    ) -> CalibrationScroller.ScrollResult?
+}
+
+extension ScreenDescribing {
+    func describeFullPage(
+        input: any InputProviding,
+        bridge: any WindowBridging,
+        maxScrolls: Int = EnvConfig.defaultScrollMaxAttempts
+    ) -> CalibrationScroller.ScrollResult? {
+        CalibrationScroller.collectFullPage(
+            describer: self, input: input,
+            bridge: bridge, maxScrolls: maxScrolls
+        )
+    }
 }
 
 /// Strategy for customizing autonomous app exploration behavior.

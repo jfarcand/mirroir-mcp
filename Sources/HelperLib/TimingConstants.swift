@@ -198,11 +198,24 @@ public enum TimingConstants {
     /// Swipe distance as a fraction of window height.
     public static let swipeDistanceFraction: Double = 0.3
 
+    /// Scroll-swipe start Y as a fraction of window height.
+    /// Scroll wheel events require the cursor midpoint to be in the upper
+    /// content area of iPhone Mirroring. Default produces fromY≈500 on 898px.
+    public static let scrollSwipeFromYFraction: Double = 0.56
+
+    /// Scroll-swipe end Y as a fraction of window height.
+    /// Default produces toY≈100 on 898px, giving midpoint≈300.
+    public static let scrollSwipeToYFraction: Double = 0.11
+
     /// Default swipe duration in milliseconds.
     public static let defaultSwipeDurationMs: Int = 300
 
     /// Default maximum scroll attempts before giving up.
     public static let defaultScrollMaxAttempts: Int = 10
+
+    /// Minimum number of matching anchors required for anchor-based scroll offset.
+    /// When fewer anchors match, falls back to text-set deduplication.
+    public static let scrollAnchorMinCount: Int = 1
 
     // MARK: - AI Provider
 

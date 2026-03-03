@@ -488,4 +488,59 @@ final class NavigationGraphTests: XCTestCase {
         XCTAssertEqual(count, 0, "Should return 0 for unknown fingerprint")
     }
 
+    // MARK: - Nav Bar Title
+
+    func testNavBarTitleStoredInNode() {
+        let graph = NavigationGraph()
+        // "Settings" at Y=150 is in header zone (100-250)
+        let elements = [
+            TapPoint(text: "Settings", tapX: 205, tapY: 150, confidence: 0.98),
+            TapPoint(text: "General", tapX: 205, tapY: 340, confidence: 0.95),
+        ]
+        graph.start(
+            rootElements: elements, icons: noIcons(), hints: [],
+            screenshot: "img", screenType: .settings
+        )
+
+        let node = graph.node(for: graph.currentFingerprint)
+        XCTAssertEqual(node?.navBarTitle, "Settings",
+            "Nav bar title should be extracted and stored in node")
+    }
+
+    func testTitleAwareRevisitDetection() {
+        let graph = NavigationGraph()
+        // Root: "Settings" in header zone, shared items below
+        let rootElements = [
+            TapPoint(text: "Settings", tapX: 205, tapY: 150, confidence: 0.98),
+            TapPoint(text: "General", tapX: 205, tapY: 340, confidence: 0.95),
+            TapPoint(text: "Privacy", tapX: 205, tapY: 420, confidence: 0.95),
+            TapPoint(text: "About", tapX: 205, tapY: 500, confidence: 0.95),
+        ]
+        graph.start(
+            rootElements: rootElements, icons: noIcons(), hints: [],
+            screenshot: "img0", screenType: .settings
+        )
+
+        // Navigate to "General" screen — different title, overlapping items
+        let generalElements = [
+            TapPoint(text: "General", tapX: 205, tapY: 150, confidence: 0.98),
+            TapPoint(text: "About", tapX: 205, tapY: 340, confidence: 0.95),
+            TapPoint(text: "Storage", tapX: 205, tapY: 420, confidence: 0.95),
+        ]
+        let result = graph.recordTransition(
+            elements: generalElements, icons: noIcons(), hints: [],
+            screenshot: "img1", actionType: "tap",
+            elementText: "General", screenType: .settings
+        )
+
+        // Without title-aware similarity, the Jaccard overlap might cause confusion.
+        // With title-aware, "Settings" vs "General" title mismatch prevents false revisit.
+        if case .newScreen = result {
+            XCTAssertEqual(graph.nodeCount, 2,
+                "Should be recognized as a new screen due to different title")
+        } else {
+            XCTFail("Expected .newScreen for screen with different nav bar title, got \(result)")
+        }
+    }
+
 }
