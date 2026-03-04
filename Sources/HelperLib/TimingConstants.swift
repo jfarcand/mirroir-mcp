@@ -193,6 +193,14 @@ public enum TimingConstants {
     /// UI settling delay after App Switcher or network toggle operations (microseconds).
     public static let toolSettlingDelayUs: UInt32 = 500_000
 
+    // MARK: - Focus Recovery
+
+    /// Y coordinate in window-relative points for the status bar engagement tap.
+    /// After a macOS Space switch, scroll events require the window to be the
+    /// key window. A click at this Y engages the window; the iOS status bar
+    /// is a safe tap target (most apps scroll to top, no navigation changes).
+    public static let statusBarTapY: Double = 15.0
+
     // MARK: - Swipe & Scroll Defaults
 
     /// Swipe distance as a fraction of window height.
