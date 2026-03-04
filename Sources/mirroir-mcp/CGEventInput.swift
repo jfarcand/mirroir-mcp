@@ -103,6 +103,33 @@ enum CGEventInput {
 
         usleep(warpSettleUs)
 
+        // Send a zero-delta "may begin" scroll event to engage the window's
+        // scroll handler. After a focus switch, iPhone Mirroring silently drops
+        // scroll wheel events until the scroll subsystem is primed. MayBegin
+        // (phase 32) simulates a finger touching the trackpad before movement,
+        // waking the handler without any visible effect on the iOS screen.
+        let scrollPhaseField = CGEventField(rawValue: 99)!    // kCGScrollWheelEventScrollPhase
+        let momentumPhaseField = CGEventField(rawValue: 123)!  // kCGScrollWheelEventMomentumPhase
+        let isContinuousField = CGEventField(rawValue: 88)!    // kCGScrollWheelEventIsContinuous
+        let pointDeltaY = CGEventField(rawValue: 96)!          // kCGScrollWheelEventPointDeltaAxis1
+        let pointDeltaX = CGEventField(rawValue: 97)!          // kCGScrollWheelEventPointDeltaAxis2
+
+        let phaseMayBegin: Int64 = 32
+
+        if let prime = CGEvent(
+            scrollWheelEvent2Source: nil, units: .pixel,
+            wheelCount: 2, wheel1: 0, wheel2: 0, wheel3: 0
+        ) {
+            prime.location = midpoint
+            prime.setIntegerValueField(isContinuousField, value: 1)
+            prime.setIntegerValueField(scrollPhaseField, value: phaseMayBegin)
+            prime.setIntegerValueField(momentumPhaseField, value: 0)
+            prime.setIntegerValueField(pointDeltaY, value: 0)
+            prime.setIntegerValueField(pointDeltaX, value: 0)
+            prime.post(tap: .cghidEventTap)
+            usleep(warpSettleUs)
+        }
+
         // Split into steps for a smooth scroll gesture
         let steps = max(5, durationMs / 16) // ~60fps step rate
         let stepDelay = UInt32(durationMs) * 1000 / UInt32(steps)
@@ -121,12 +148,6 @@ enum CGEventInput {
         // Trackpad-style continuous scroll requires gesture phase flags and
         // precise point-delta fields. iPhone Mirroring ignores bare scroll
         // wheel events that lack these trackpad attributes.
-        let scrollPhaseField = CGEventField(rawValue: 99)!    // kCGScrollWheelEventScrollPhase
-        let momentumPhaseField = CGEventField(rawValue: 123)!  // kCGScrollWheelEventMomentumPhase
-        let isContinuousField = CGEventField(rawValue: 88)!    // kCGScrollWheelEventIsContinuous
-        let pointDeltaY = CGEventField(rawValue: 96)!          // kCGScrollWheelEventPointDeltaAxis1
-        let pointDeltaX = CGEventField(rawValue: 97)!          // kCGScrollWheelEventPointDeltaAxis2
-
         let phaseBegan: Int64 = 1
         let phaseChanged: Int64 = 2
         let phaseEnded: Int64 = 4
