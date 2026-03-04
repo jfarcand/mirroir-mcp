@@ -199,7 +199,7 @@ public enum TimingConstants {
     /// After a macOS Space switch, scroll events require the window to be the
     /// key window. A click at this Y engages the window; the iOS status bar
     /// is a safe tap target (most apps scroll to top, no navigation changes).
-    public static let statusBarTapY: Double = 15.0
+    public static let statusBarTapY: Double = 30.0
 
     // MARK: - Swipe & Scroll Defaults
 
