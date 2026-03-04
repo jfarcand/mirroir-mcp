@@ -104,24 +104,24 @@ final class InputSimulation: Sendable {
     /// Common preamble for pointing operations (tap, swipe, drag, long press, double tap).
     /// Validates that the target is connected, the window exists, and coordinates are in bounds.
     /// All pointing operations use CGEvent — no external dependencies.
-    /// Returns `(info, nil)` on success, or `(nil, errorMessage)` on failure.
-    private func preparePointingInput(tag: String, x: Double, y: Double) -> (info: WindowInfo?, error: String?) {
+    /// Returns `(info, focusChanged, nil)` on success, or `(nil, false, errorMessage)` on failure.
+    private func preparePointingInput(tag: String, x: Double, y: Double) -> (info: WindowInfo?, focusChanged: Bool, error: String?) {
         if let stateError = checkMirroringConnected(tag: tag) {
-            return (nil, stateError)
+            return (nil, false, stateError)
         }
 
         guard let info = bridge.getWindowInfo() else {
             DebugLog.log(tag, "ERROR: window not found")
-            return (nil, "Target '\(bridge.targetName)' window not found")
+            return (nil, false, "Target '\(bridge.targetName)' window not found")
         }
 
         if let boundsError = validateBounds(x: x, y: y, info: info, tag: tag) {
-            return (nil, boundsError)
+            return (nil, false, boundsError)
         }
 
         logWindowState(tag, info)
-        ensureTargetFrontmost()
-        return (info, nil)
+        let changed = ensureTargetFrontmost()
+        return (info, changed, nil)
     }
 
     /// Common preamble for keyboard operations (type, press_key, shake).
@@ -171,7 +171,7 @@ final class InputSimulation: Sendable {
     /// Returns nil on success, or an error message on failure.
     func tap(x: Double, y: Double, cursorMode override: CursorMode? = nil) -> String? {
         let prep = preparePointingInput(tag: "tap", x: x, y: y)
-        guard let info = prep.info else { return prep.error }
+        guard let info = prep.info else { return prep.error ?? "Unknown error" }
 
         let saved = saveCursor(mode: override)
         defer { restoreCursor(saved) }
@@ -191,22 +191,17 @@ final class InputSimulation: Sendable {
                durationMs: Int = 300, cursorMode override: CursorMode? = nil) -> String?
     {
         let prep = preparePointingInput(tag: "swipe", x: fromX, y: fromY)
-        guard let info = prep.info else { return prep.error }
+        guard let info = prep.info else { return prep.error ?? "Unknown error" }
 
         if let boundsError = validateBounds(x: toX, y: toY, info: info, tag: "swipe") {
             return boundsError
         }
 
-        // Scroll wheel events are delivered to the focused window, unlike
-        // click events which go to whatever is under the cursor. Ensure
-        // the target window is frontmost before sending scroll events.
-        let focusChanged = ensureTargetFrontmost()
-
         // After a macOS Space switch, the window is "frontmost" but not
         // the key window for scroll input. A click promotes it to key
         // window. Click the iOS status bar area (top of screen) which
         // in most apps harmlessly scrolls to top.
-        if focusChanged {
+        if prep.focusChanged {
             let statusBarY = Double(info.position.y) + EnvConfig.statusBarTapY
             let centerScreenX = Double(info.position.x) + Double(info.size.width) / 2.0
             DebugLog.log("swipe", "focus changed — clicking status bar to engage key window")
@@ -238,7 +233,7 @@ final class InputSimulation: Sendable {
     func longPress(x: Double, y: Double, durationMs: Int = 500,
                    cursorMode override: CursorMode? = nil) -> String? {
         let prep = preparePointingInput(tag: "longPress", x: x, y: y)
-        guard let info = prep.info else { return prep.error }
+        guard let info = prep.info else { return prep.error ?? "Unknown error" }
 
         let saved = saveCursor(mode: override)
         defer { restoreCursor(saved) }
@@ -256,7 +251,7 @@ final class InputSimulation: Sendable {
     /// Returns nil on success, or an error message on failure.
     func doubleTap(x: Double, y: Double, cursorMode override: CursorMode? = nil) -> String? {
         let prep = preparePointingInput(tag: "doubleTap", x: x, y: y)
-        guard let info = prep.info else { return prep.error }
+        guard let info = prep.info else { return prep.error ?? "Unknown error" }
 
         let saved = saveCursor(mode: override)
         defer { restoreCursor(saved) }
@@ -277,7 +272,7 @@ final class InputSimulation: Sendable {
     func drag(fromX: Double, fromY: Double, toX: Double, toY: Double,
               durationMs: Int = 1000, cursorMode override: CursorMode? = nil) -> String? {
         let prep = preparePointingInput(tag: "drag", x: fromX, y: fromY)
-        guard let info = prep.info else { return prep.error }
+        guard let info = prep.info else { return prep.error ?? "Unknown error" }
 
         if let boundsError = validateBounds(x: toX, y: toY, info: info, tag: "drag") {
             return boundsError
