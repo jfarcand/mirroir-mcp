@@ -19,10 +19,10 @@ struct PermissionClassificationTests {
         #expect(overlap.isEmpty, "Readonly and mutating sets must not overlap: \(overlap)")
     }
 
-    @Test("all 30 tools are classified")
+    @Test("all tools are classified")
     func allToolsClassified() {
         let total = PermissionPolicy.readonlyTools.count + PermissionPolicy.mutatingTools.count
-        #expect(total == 31, "Expected 31 tools, got \(total)")
+        #expect(total == 32, "Expected 32 tools, got \(total)")
     }
 
     @Test("readonly tools contains expected tools")
@@ -31,7 +31,7 @@ struct PermissionClassificationTests {
             "screenshot", "describe_screen", "start_recording",
             "stop_recording", "get_orientation", "status",
             "check_health", "list_targets", "list_skills",
-            "get_skill",
+            "get_skill", "calibrate_component",
         ]
         #expect(PermissionPolicy.readonlyTools == expected)
     }

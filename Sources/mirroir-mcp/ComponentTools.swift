@@ -58,8 +58,12 @@ extension MirroirMCP {
 
                 let scrollEnabled = args["scroll"]?.asBool() ?? false
 
-                // Read the component definition file
+                // Validate file extension and resolve symlinks to prevent path traversal
                 let fileURL = URL(fileURLWithPath: componentPath)
+                    .standardized.resolvingSymlinksInPath()
+                guard fileURL.pathExtension == "md" else {
+                    return .error("component_path must be a .md file")
+                }
                 guard let content = try? String(contentsOf: fileURL, encoding: .utf8) else {
                     return .error("Cannot read file: \(componentPath)")
                 }

@@ -517,7 +517,7 @@ if (!skillsAvailable) {
       />
       <ul id="skill-results"></ul>
     </div>
-    <script id="skill-data" type="application/json" set:html={JSON.stringify(skills)} />
+    <script id="skill-data" type="application/json" set:text={JSON.stringify(skills)} />
     <script define:vars={{ skillsAvailable }}>
       const skills = JSON.parse(
         document.getElementById("skill-data").textContent ?? "[]"
@@ -611,7 +611,7 @@ if (!skillsAvailable) {
   <!-- What it does -->
   <section>
     <h2>What Does mirroir-mcp Do?</h2>
-    <p>31 tools exposed as an MCP server.</p>
+    <p>32 tools exposed as an MCP server.</p>
 
     <div class="tool-grid">
       <div class="tool-category cat-touch">

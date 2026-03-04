@@ -70,6 +70,7 @@ public struct PermissionPolicy: Sendable {
         "list_targets",
         "list_skills",
         "get_skill",
+        "calibrate_component",
     ]
 
     /// Tools that mutate iPhone state and require explicit permission.
