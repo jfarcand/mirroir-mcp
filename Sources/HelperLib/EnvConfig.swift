@@ -255,6 +255,15 @@ public enum EnvConfig {
         readUInt32("toolSettlingDelayUs", default: TimingConstants.toolSettlingDelayUs)
     }
 
+    // MARK: - Focus Recovery
+
+    /// Y coordinate in window-relative points for the status bar engagement tap.
+    /// After a macOS Space switch, a click at this position makes the window
+    /// the key window so scroll events are accepted.
+    public static var statusBarTapY: Double {
+        readDouble("statusBarTapY", default: TimingConstants.statusBarTapY)
+    }
+
     // MARK: - Swipe & Scroll Defaults
 
     public static var swipeDistanceFraction: Double {
@@ -518,6 +527,7 @@ public enum EnvConfig {
                 ("keystrokeDelayUs", "\(keystrokeDelayUs)"),
             ]),
             ("App Switching", [
+                ("statusBarTapY", "\(statusBarTapY)"),
                 ("spaceSwitchSettleUs", "\(spaceSwitchSettleUs)"),
                 ("spotlightAppearanceUs", "\(spotlightAppearanceUs)"),
                 ("searchResultsPopulateUs", "\(searchResultsPopulateUs)"),

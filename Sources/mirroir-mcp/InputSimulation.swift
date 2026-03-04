@@ -200,7 +200,19 @@ final class InputSimulation: Sendable {
         // Scroll wheel events are delivered to the focused window, unlike
         // click events which go to whatever is under the cursor. Ensure
         // the target window is frontmost before sending scroll events.
-        ensureTargetFrontmost()
+        let focusChanged = ensureTargetFrontmost()
+
+        // After a macOS Space switch, the window is "frontmost" but not
+        // the key window for scroll input. A click promotes it to key
+        // window. Click the iOS status bar area (top of screen) which
+        // in most apps harmlessly scrolls to top.
+        if focusChanged {
+            let statusBarY = Double(info.position.y) + EnvConfig.statusBarTapY
+            let centerScreenX = Double(info.position.x) + Double(info.size.width) / 2.0
+            DebugLog.log("swipe", "focus changed — clicking status bar to engage key window")
+            _ = CGEventInput.click(at: CGPoint(x: centerScreenX, y: statusBarY))
+            usleep(EnvConfig.spaceSwitchSettleUs)
+        }
 
         let saved = saveCursor(mode: override)
         defer { restoreCursor(saved) }
@@ -389,7 +401,10 @@ final class InputSimulation: Sendable {
     /// Uses AppleScript `set frontmost to true` via System Events for
     /// cross-Space activation (NSRunningApplication.activate() cannot trigger
     /// a macOS Space switch, deprecated in macOS 14).
-    private func ensureTargetFrontmost() {
+    ///
+    /// - Returns: `true` if the window was not already frontmost (focus changed).
+    @discardableResult
+    private func ensureTargetFrontmost() -> Bool {
         let frontApp = NSWorkspace.shared.frontmostApplication
         let alreadyFront = frontApp?.bundleIdentifier == mirroringBundleID
 
@@ -411,7 +426,7 @@ final class InputSimulation: Sendable {
             // Fallback: use NSRunningApplication.activate() directly
             bridge.activate()
             if !alreadyFront { usleep(EnvConfig.spaceSwitchSettleUs) }
-            return
+            return !alreadyFront
         }
 
         let script = NSAppleScript(source: """
@@ -434,6 +449,7 @@ final class InputSimulation: Sendable {
 
         let afterApp = NSWorkspace.shared.frontmostApplication
         DebugLog.log("focus", "after activation frontApp=\(afterApp?.bundleIdentifier ?? "nil")")
+        return !alreadyFront
     }
 
     /// Type text via CGEvent keyboard events.
