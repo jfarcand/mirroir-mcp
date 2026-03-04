@@ -177,4 +177,44 @@ struct CGKeyMapTests {
         #expect(sequence.steps[0].keycode == mapping.keycode)
         #expect(sequence.steps[0].flags == mapping.flags)
     }
+
+    // MARK: - Accent Family Completeness
+
+    @Test("All accent families cover standard vowels (lower + upper)")
+    func allAccentFamiliesComplete() {
+        // Each dead-key family should cover all 5 standard vowels in both cases.
+        // Tilde is an exception — it only applies to n/a/o on US QWERTY.
+        let vowelFamilies: [(String, [(Character, Character)])] = [
+            ("acute", [("á", "Á"), ("é", "É"), ("í", "Í"), ("ó", "Ó"), ("ú", "Ú")]),
+            ("grave", [("à", "À"), ("è", "È"), ("ì", "Ì"), ("ò", "Ò"), ("ù", "Ù")]),
+            ("umlaut", [("ä", "Ä"), ("ë", "Ë"), ("ï", "Ï"), ("ö", "Ö"), ("ü", "Ü")]),
+            ("circumflex", [("â", "Â"), ("ê", "Ê"), ("î", "Î"), ("ô", "Ô"), ("û", "Û")]),
+        ]
+        var missing: [(String, Character)] = []
+        for (family, pairs) in vowelFamilies {
+            for (lower, upper) in pairs {
+                if CGKeyMap.lookupSequence(lower) == nil {
+                    missing.append((family, lower))
+                }
+                if CGKeyMap.lookupSequence(upper) == nil {
+                    missing.append((family, upper))
+                }
+            }
+        }
+        #expect(missing.isEmpty, "Missing dead-key mappings: \(missing)")
+
+        // Tilde family: n, a, o (not all vowels apply)
+        let tildeChars: [(Character, Character)] = [("ñ", "Ñ"), ("ã", "Ã"), ("õ", "Õ")]
+        for (lower, upper) in tildeChars {
+            #expect(CGKeyMap.lookupSequence(lower) != nil, "Missing tilde mapping for '\(lower)'")
+            #expect(CGKeyMap.lookupSequence(upper) != nil, "Missing tilde mapping for '\(upper)'")
+        }
+    }
+
+    @Test("Dead-key count guards against mass deletion")
+    func deadKeyCountMinimum() {
+        // 4 vowel families × 5 vowels × 2 cases = 40, plus tilde (6) + ç/Ç (2) + ÿ/Ÿ (2) = 50
+        #expect(CGKeyMap.deadKeyCount >= 50,
+                "Expected at least 50 dead-key sequences, got \(CGKeyMap.deadKeyCount)")
+    }
 }

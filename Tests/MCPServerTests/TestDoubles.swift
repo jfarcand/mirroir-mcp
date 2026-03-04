@@ -55,6 +55,11 @@ final class StubBridge: MenuActionCapable, @unchecked Sendable {
 
 // MARK: - StubInput
 
+/// Recorded arguments from a single swipe() call.
+struct SwipeCall {
+    let fromX: Double, fromY: Double, toX: Double, toY: Double, durationMs: Int
+}
+
 final class StubInput: InputProviding, @unchecked Sendable {
     var tapResult: String?
     var swipeResult: String?
@@ -66,9 +71,17 @@ final class StubInput: InputProviding, @unchecked Sendable {
     var pressKeyResult = TypeResult(success: true, warning: nil, error: nil)
     var launchAppResult: String?
     var openURLResult: String?
+
+    /// Records every swipe() invocation for coordinate verification.
+    var swipeCalls: [SwipeCall] = []
+
     func tap(x: Double, y: Double, cursorMode: CursorMode? = nil) -> String? { tapResult }
     func swipe(fromX: Double, fromY: Double, toX: Double, toY: Double,
-               durationMs: Int, cursorMode: CursorMode? = nil) -> String? { swipeResult }
+               durationMs: Int, cursorMode: CursorMode? = nil) -> String? {
+        swipeCalls.append(SwipeCall(fromX: fromX, fromY: fromY,
+                                    toX: toX, toY: toY, durationMs: durationMs))
+        return swipeResult
+    }
     func drag(fromX: Double, fromY: Double, toX: Double, toY: Double,
               durationMs: Int, cursorMode: CursorMode? = nil) -> String? { dragResult }
     func longPress(x: Double, y: Double, durationMs: Int, cursorMode: CursorMode? = nil) -> String? { longPressResult }
@@ -132,8 +145,18 @@ final class StubDescriber: ScreenDescribing, @unchecked Sendable {
     var describeResult: ScreenDescriber.DescribeResult?
     var lastSkipOCR: Bool = false
 
+    /// Sequential results returned by successive describe() calls.
+    /// When set, each call returns the next result (falling back to the last).
+    var describeResults: [ScreenDescriber.DescribeResult?] = []
+    private var describeIndex = 0
+
     func describe(skipOCR: Bool) -> ScreenDescriber.DescribeResult? {
         lastSkipOCR = skipOCR
+        if !describeResults.isEmpty {
+            let result = describeResults[min(describeIndex, describeResults.count - 1)]
+            describeIndex += 1
+            return result
+        }
         return describeResult
     }
 }
