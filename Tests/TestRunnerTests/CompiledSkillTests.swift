@@ -25,6 +25,8 @@ final class CompiledSkillTests: XCTestCase {
                 CompiledStep(index: 3, type: "scroll_to", label: "Model",
                              hints: .scrollSequence(count: 3, direction: "up")),
                 CompiledStep(index: 4, type: "remember", label: nil, hints: nil),
+                CompiledStep(index: 5, type: "assert_visible", label: "OK",
+                             hints: .assertion(delayMs: 300)),
             ]
         )
 
@@ -248,6 +250,14 @@ final class CompiledSkillTests: XCTestCase {
         XCTAssertEqual(hints.scrollDirection, "up")
     }
 
+    func testAssertionHints() {
+        let hints = StepHints.assertion(delayMs: 300)
+        XCTAssertEqual(hints.compiledAction, .assertion)
+        XCTAssertEqual(hints.observedDelayMs, 300)
+        XCTAssertNil(hints.tapX)
+        XCTAssertNil(hints.scrollCount)
+    }
+
     func testPassthroughHints() {
         let hints = StepHints.passthrough()
         XCTAssertEqual(hints.compiledAction, .passthrough)
@@ -283,5 +293,162 @@ final class CompiledSkillTests: XCTestCase {
         XCTAssertNil(SkillStep.home.labelValue)
         XCTAssertNil(SkillStep.shake.labelValue)
         XCTAssertNil(SkillStep.skipped(stepType: "remember", reason: "AI").labelValue)
+    }
+
+    // MARK: - Screen Fingerprint
+
+    func testScreenFingerprintRoundTrip() throws {
+        let fingerprint = ScreenFingerprint(
+            hash: "abc123", structuralTexts: ["General", "Settings"], iconCount: 3)
+
+        let compiled = CompiledSkill(
+            version: CompiledSkill.currentVersion,
+            source: SourceInfo(sha256: "hash", compiledAt: "2026-03-06T00:00:00Z"),
+            device: DeviceInfo(windowWidth: 410, windowHeight: 898, orientation: "portrait"),
+            steps: [],
+            screenFingerprint: fingerprint
+        )
+
+        let data = try JSONEncoder().encode(compiled)
+        let decoded = try JSONDecoder().decode(CompiledSkill.self, from: data)
+
+        XCTAssertEqual(decoded.screenFingerprint, fingerprint)
+        XCTAssertEqual(decoded.screenFingerprint?.hash, "abc123")
+        XCTAssertEqual(decoded.screenFingerprint?.structuralTexts, ["General", "Settings"])
+        XCTAssertEqual(decoded.screenFingerprint?.iconCount, 3)
+    }
+
+    func testBackwardCompatNoFingerprint() throws {
+        // JSON from v1 compiled skill without screenFingerprint field
+        let compiled = CompiledSkill(
+            version: 1,
+            source: SourceInfo(sha256: "hash", compiledAt: "2026-01-01T00:00:00Z"),
+            device: DeviceInfo(windowWidth: 410, windowHeight: 898, orientation: "portrait"),
+            steps: []
+        )
+
+        let data = try JSONEncoder().encode(compiled)
+        let decoded = try JSONDecoder().decode(CompiledSkill.self, from: data)
+
+        XCTAssertNil(decoded.screenFingerprint,
+            "Omitted screenFingerprint should decode as nil")
+    }
+
+    func testFreshWithMatchingFingerprint() throws {
+        let tempDir = NSTemporaryDirectory() + "compiled-test-\(UUID().uuidString)"
+        try FileManager.default.createDirectory(atPath: tempDir, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(atPath: tempDir) }
+
+        let yamlPath = tempDir + "/test.yaml"
+        try "content".write(toFile: yamlPath, atomically: true, encoding: .utf8)
+        let hash = try CompiledSkillIO.sha256(of: yamlPath)
+
+        let fingerprint = ScreenFingerprint(
+            hash: "fp1", structuralTexts: ["Settings", "General"], iconCount: 2)
+        let compiled = CompiledSkill(
+            version: CompiledSkill.currentVersion,
+            source: SourceInfo(sha256: hash, compiledAt: "2026-03-06T00:00:00Z"),
+            device: DeviceInfo(windowWidth: 410, windowHeight: 898, orientation: "portrait"),
+            steps: [],
+            screenFingerprint: fingerprint
+        )
+
+        let result = CompiledSkillIO.checkStaleness(
+            compiled: compiled, skillPath: yamlPath,
+            windowWidth: 410, windowHeight: 898,
+            liveFingerprint: fingerprint)
+
+        XCTAssertEqual(result, .fresh)
+    }
+
+    func testDriftedWithLowSimilarity() throws {
+        let tempDir = NSTemporaryDirectory() + "compiled-test-\(UUID().uuidString)"
+        try FileManager.default.createDirectory(atPath: tempDir, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(atPath: tempDir) }
+
+        let yamlPath = tempDir + "/test.yaml"
+        try "content".write(toFile: yamlPath, atomically: true, encoding: .utf8)
+        let hash = try CompiledSkillIO.sha256(of: yamlPath)
+
+        let baseline = ScreenFingerprint(
+            hash: "fp1", structuralTexts: ["Settings", "General", "Privacy", "About"], iconCount: 2)
+        let live = ScreenFingerprint(
+            hash: "fp2", structuralTexts: ["Photos", "Albums", "Shared", "Favorites"], iconCount: 5)
+
+        let compiled = CompiledSkill(
+            version: CompiledSkill.currentVersion,
+            source: SourceInfo(sha256: hash, compiledAt: "2026-03-06T00:00:00Z"),
+            device: DeviceInfo(windowWidth: 410, windowHeight: 898, orientation: "portrait"),
+            steps: [],
+            screenFingerprint: baseline
+        )
+
+        let result = CompiledSkillIO.checkStaleness(
+            compiled: compiled, skillPath: yamlPath,
+            windowWidth: 410, windowHeight: 898,
+            liveFingerprint: live)
+
+        if case .drifted(let similarity, _) = result {
+            XCTAssertLessThan(similarity, 0.8)
+        } else {
+            XCTFail("Expected .drifted result, got \(result)")
+        }
+    }
+
+    func testStalenessSkipsWhenBaselineNil() throws {
+        let tempDir = NSTemporaryDirectory() + "compiled-test-\(UUID().uuidString)"
+        try FileManager.default.createDirectory(atPath: tempDir, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(atPath: tempDir) }
+
+        let yamlPath = tempDir + "/test.yaml"
+        try "content".write(toFile: yamlPath, atomically: true, encoding: .utf8)
+        let hash = try CompiledSkillIO.sha256(of: yamlPath)
+
+        let compiled = CompiledSkill(
+            version: CompiledSkill.currentVersion,
+            source: SourceInfo(sha256: hash, compiledAt: "2026-03-06T00:00:00Z"),
+            device: DeviceInfo(windowWidth: 410, windowHeight: 898, orientation: "portrait"),
+            steps: []
+            // screenFingerprint omitted — defaults to nil
+        )
+
+        let live = ScreenFingerprint(
+            hash: "fp2", structuralTexts: ["Totally", "Different"], iconCount: 0)
+
+        let result = CompiledSkillIO.checkStaleness(
+            compiled: compiled, skillPath: yamlPath,
+            windowWidth: 410, windowHeight: 898,
+            liveFingerprint: live)
+
+        XCTAssertEqual(result, .fresh,
+            "Should skip fingerprint check when baseline is nil")
+    }
+
+    func testStalenessSkipsWhenLiveNil() throws {
+        let tempDir = NSTemporaryDirectory() + "compiled-test-\(UUID().uuidString)"
+        try FileManager.default.createDirectory(atPath: tempDir, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(atPath: tempDir) }
+
+        let yamlPath = tempDir + "/test.yaml"
+        try "content".write(toFile: yamlPath, atomically: true, encoding: .utf8)
+        let hash = try CompiledSkillIO.sha256(of: yamlPath)
+
+        let baseline = ScreenFingerprint(
+            hash: "fp1", structuralTexts: ["Settings", "General"], iconCount: 2)
+        let compiled = CompiledSkill(
+            version: CompiledSkill.currentVersion,
+            source: SourceInfo(sha256: hash, compiledAt: "2026-03-06T00:00:00Z"),
+            device: DeviceInfo(windowWidth: 410, windowHeight: 898, orientation: "portrait"),
+            steps: [],
+            screenFingerprint: baseline
+        )
+
+        let result = CompiledSkillIO.checkStaleness(
+            compiled: compiled, skillPath: yamlPath,
+            windowWidth: 410, windowHeight: 898,
+            liveFingerprint: nil)
+
+        XCTAssertEqual(result, .fresh,
+            "Should skip fingerprint check when live fingerprint is nil")
     }
 }

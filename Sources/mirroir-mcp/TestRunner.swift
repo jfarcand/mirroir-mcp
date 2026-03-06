@@ -98,16 +98,34 @@ enum TestRunner {
         if !config.noCompiled {
             let windowWidth = windowInfo.map { Double($0.size.width) } ?? 0
             let windowHeight = windowInfo.map { Double($0.size.height) } ?? 0
+
+            // Build a live fingerprint if any compiled skill has a baseline fingerprint
+            let anyHasFingerprint = skills.contains { skill in
+                (try? CompiledSkillIO.load(for: skill.filePath))?.screenFingerprint != nil
+            }
+            let liveFingerprint: ScreenFingerprint?
+            if anyHasFingerprint, let describeResult = describer.describe(skipOCR: false) {
+                liveFingerprint = StructuralFingerprint.buildScreenFingerprint(
+                    elements: describeResult.elements,
+                    icons: describeResult.icons)
+            } else {
+                liveFingerprint = nil
+            }
+
             for skill in skills {
                 if let compiled = try? CompiledSkillIO.load(for: skill.filePath) {
                     let staleness = CompiledSkillIO.checkStaleness(
                         compiled: compiled, skillPath: skill.filePath,
-                        windowWidth: windowWidth, windowHeight: windowHeight)
+                        windowWidth: windowWidth, windowHeight: windowHeight,
+                        liveFingerprint: liveFingerprint)
                     switch staleness {
                     case .fresh:
                         compiledMap[skill.filePath] = compiled
                     case .stale(let reason):
                         fputs("Warning: compiled skill stale for \(skill.name): \(reason)\n", stderr)
+                    case .drifted(_, let reason):
+                        fputs("Warning: \(skill.name): \(reason) — using compiled skill anyway\n", stderr)
+                        compiledMap[skill.filePath] = compiled
                     }
                 }
             }

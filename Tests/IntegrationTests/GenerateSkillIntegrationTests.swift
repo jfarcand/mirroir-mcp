@@ -33,6 +33,13 @@ final class GenerateSkillIntegrationTests: XCTestCase {
         }
 
         bridge = MirroringBridge(bundleID: IntegrationTestHelper.fakeBundleID)
+
+        // Ensure window is capturable — prior test classes may have exhausted screencapture
+        guard IntegrationTestHelper.ensureWindowReady(bridge: bridge) else {
+            XCTFail("FakeMirroring window not capturable after retries")
+            return
+        }
+
         describer = ScreenDescriber(bridge: bridge, capture: ScreenCapture(bridge: bridge))
     }
 

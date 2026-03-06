@@ -125,7 +125,7 @@ final class CompilationToolsTests: XCTestCase {
             elapsedMs: 300, scrollCount: nil, scrollDirection: nil)
 
         XCTAssertNotNil(hints)
-        XCTAssertEqual(hints?.compiledAction, .sleep)
+        XCTAssertEqual(hints?.compiledAction, .assertion)
         XCTAssertEqual(hints?.observedDelayMs, 300)
     }
 
@@ -136,7 +136,7 @@ final class CompilationToolsTests: XCTestCase {
             elapsedMs: 100, scrollCount: nil, scrollDirection: nil)
 
         XCTAssertNotNil(hints)
-        XCTAssertEqual(hints?.compiledAction, .sleep)
+        XCTAssertEqual(hints?.compiledAction, .assertion)
         XCTAssertEqual(hints?.observedDelayMs, 100)
     }
 

@@ -213,6 +213,16 @@ extension MirroirMCP {
                 let windowHeight = windowInfo.map { Double($0.size.height) } ?? 0
                 let orientation = target.bridge.getOrientation()?.rawValue ?? "unknown"
 
+                // Capture screen fingerprint via 1 OCR call for content drift detection
+                let fingerprint: ScreenFingerprint?
+                if let describeResult = target.describer.describe(skipOCR: false) {
+                    fingerprint = StructuralFingerprint.buildScreenFingerprint(
+                        elements: describeResult.elements,
+                        icons: describeResult.icons)
+                } else {
+                    fingerprint = nil
+                }
+
                 // Build compiled skill
                 let steps = session.finalizeAndClear()
                 let compiled = CompiledSkill(
@@ -226,7 +236,8 @@ extension MirroirMCP {
                         windowHeight: windowHeight,
                         orientation: orientation
                     ),
-                    steps: steps
+                    steps: steps,
+                    screenFingerprint: fingerprint
                 )
 
                 // Check if compiled file already exists
@@ -285,8 +296,11 @@ extension MirroirMCP {
             }
             return nil
 
-        case "wait_for", "assert_visible", "assert_not_visible":
+        case "wait_for":
             return .sleep(delayMs: elapsedMs ?? 500)
+
+        case "assert_visible", "assert_not_visible":
+            return .assertion(delayMs: elapsedMs ?? 500)
 
         case "scroll_to":
             let count = scrollCount ?? 1

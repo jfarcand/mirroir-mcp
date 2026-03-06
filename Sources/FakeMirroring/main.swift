@@ -1,43 +1,32 @@
 // Copyright 2026 jfarcand@apache.org
 // Licensed under the Apache License, Version 2.0
 // ABOUTME: Fake macOS app that mimics the iPhone Mirroring window for integration testing.
-// ABOUTME: Renders a settings-like screen with header, rows, and tab bar for OCR and icon detection.
+// ABOUTME: Renders switchable scenario screens with header, rows, cards, and tab bar for OCR testing.
 
 import AppKit
 
-/// View that renders an iOS Settings-style screen for OCR testing.
-/// Draws a large title, category rows, and a tab bar with icons.
+/// View that renders an iOS-style screen for OCR testing.
+/// Draws a large title, category rows, summary cards, and optionally a tab bar with icons.
+/// The `scenario` property controls which content is displayed.
 final class FakeScreenView: NSView {
+
+    /// The active scenario controlling what content is rendered.
+    var scenario: FakeScenario = .settings {
+        didSet { needsDisplay = true }
+    }
 
     /// Status bar time display.
     private let statusBarLabel = ("9:41", CGPoint(x: 175, y: 30))
-
-    /// Large title in the header zone.
-    private let headerLabel = ("Settings", CGPoint(x: 100, y: 120))
-
-    /// Category rows — simulate tappable list items like iOS Settings.
-    private let rowLabels: [(String, CGPoint)] = [
-        ("General", CGPoint(x: 100, y: 250)),
-        ("Display", CGPoint(x: 100, y: 310)),
-        ("Privacy", CGPoint(x: 100, y: 370)),
-        ("About", CGPoint(x: 100, y: 430)),
-        ("Software Update", CGPoint(x: 130, y: 490)),
-        ("Developer", CGPoint(x: 110, y: 550)),
-    ]
 
     /// Disclosure indicators for rows (simulating ">" chevrons).
     private let chevronX: CGFloat = 370
 
     override var isFlipped: Bool { true }
 
-    /// Tab bar icon positions (x-center) and sizes — 5 evenly spaced icons
-    /// on a white bar at the bottom, simulating an iOS tab bar for icon detection testing.
+    /// Tab bar layout constants.
     private let tabBarHeight: CGFloat = 60
     private let iconSize: CGFloat = 24
     private let tabBarIconXPositions: [CGFloat] = [50, 130, 210, 290, 370]
-
-    /// Tab bar labels below each icon — simulates real iOS tab bars with text labels
-    /// positioned in the bottom zone of the window for tap offset testing.
     private let tabBarLabels = ["Home", "Search", "Feed", "Chat", "Profile"]
 
     /// Row height and separator styling.
@@ -45,21 +34,28 @@ final class FakeScreenView: NSView {
     private let separatorInset: CGFloat = 20
 
     override func draw(_ dirtyRect: NSRect) {
-        // Dark background for high OCR contrast
         NSColor(red: 0.1, green: 0.1, blue: 0.15, alpha: 1.0).setFill()
         dirtyRect.fill()
 
+        let content = ScenarioContent.data(for: scenario)
+
         drawStatusBar()
-        drawHeader()
-        drawRows()
-        drawTabBar()
+        if content.hasBackChevron { drawBackChevron() }
+        drawHeader(content.header)
+        drawPlaceholders(content.placeholders)
+        drawCards(content.cards)
+        drawRows(content.rows)
+        drawPlainTexts(content.plainTexts)
+        drawButtons(content.buttons)
+        if content.hasTabBar { drawTabBar() }
     }
+
+    // MARK: - Drawing Primitives
 
     private func drawStatusBar() {
         let font = NSFont.systemFont(ofSize: 14, weight: .semibold)
         let attrs: [NSAttributedString.Key: Any] = [
-            .font: font,
-            .foregroundColor: NSColor.white,
+            .font: font, .foregroundColor: NSColor.white,
         ]
         let (text, origin) = statusBarLabel
         let size = (text as NSString).size(withAttributes: attrs)
@@ -67,37 +63,36 @@ final class FakeScreenView: NSView {
         (text as NSString).draw(at: NSPoint(x: centeredX, y: origin.y), withAttributes: attrs)
     }
 
-    private func drawHeader() {
-        let font = NSFont.systemFont(ofSize: 28, weight: .bold)
+    private func drawBackChevron() {
+        let font = NSFont.systemFont(ofSize: 22, weight: .medium)
         let attrs: [NSAttributedString.Key: Any] = [
-            .font: font,
-            .foregroundColor: NSColor.white,
+            .font: font, .foregroundColor: NSColor.systemBlue,
         ]
-        let (text, origin) = headerLabel
-        (text as NSString).draw(at: NSPoint(x: origin.x, y: origin.y), withAttributes: attrs)
+        ("<" as NSString).draw(at: NSPoint(x: 20, y: 80), withAttributes: attrs)
     }
 
-    private func drawRows() {
+    private func drawHeader(_ headerText: String) {
+        let font = NSFont.systemFont(ofSize: 28, weight: .bold)
+        let attrs: [NSAttributedString.Key: Any] = [
+            .font: font, .foregroundColor: NSColor.white,
+        ]
+        (headerText as NSString).draw(at: NSPoint(x: 100, y: 120), withAttributes: attrs)
+    }
+
+    private func drawRows(_ rowLabels: [(String, CGPoint)]) {
         let rowFont = NSFont.systemFont(ofSize: 18, weight: .regular)
         let rowAttrs: [NSAttributedString.Key: Any] = [
-            .font: rowFont,
-            .foregroundColor: NSColor.white,
+            .font: rowFont, .foregroundColor: NSColor.white,
         ]
         let chevronFont = NSFont.systemFont(ofSize: 18, weight: .regular)
         let chevronAttrs: [NSAttributedString.Key: Any] = [
-            .font: chevronFont,
-            .foregroundColor: NSColor(white: 0.5, alpha: 1.0),
+            .font: chevronFont, .foregroundColor: NSColor(white: 0.5, alpha: 1.0),
         ]
 
         for (text, origin) in rowLabels {
-            // Draw row text
             (text as NSString).draw(at: NSPoint(x: origin.x, y: origin.y), withAttributes: rowAttrs)
-
-            // Draw chevron indicator
             (">" as NSString).draw(
                 at: NSPoint(x: chevronX, y: origin.y), withAttributes: chevronAttrs)
-
-            // Draw separator line below row
             let separatorY = origin.y + rowHeight
             NSColor(white: 0.3, alpha: 1.0).setStroke()
             let path = NSBezierPath()
@@ -108,31 +103,83 @@ final class FakeScreenView: NSView {
         }
     }
 
+    private func drawPlainTexts(_ texts: [(String, CGPoint)]) {
+        let font = NSFont.systemFont(ofSize: 15, weight: .regular)
+        let attrs: [NSAttributedString.Key: Any] = [
+            .font: font, .foregroundColor: NSColor.white,
+        ]
+        for (text, origin) in texts {
+            (text as NSString).draw(at: NSPoint(x: origin.x, y: origin.y), withAttributes: attrs)
+        }
+    }
+
+    private func drawButtons(_ buttons: [(String, CGRect)]) {
+        let font = NSFont.systemFont(ofSize: 16, weight: .semibold)
+        let attrs: [NSAttributedString.Key: Any] = [
+            .font: font, .foregroundColor: NSColor.white,
+        ]
+        for (title, rect) in buttons {
+            NSColor.systemBlue.setFill()
+            NSBezierPath(roundedRect: rect, xRadius: 8, yRadius: 8).fill()
+            let size = (title as NSString).size(withAttributes: attrs)
+            let textX = rect.origin.x + (rect.width - size.width) / 2
+            let textY = rect.origin.y + (rect.height - size.height) / 2
+            (title as NSString).draw(at: NSPoint(x: textX, y: textY), withAttributes: attrs)
+        }
+    }
+
+    private func drawPlaceholders(_ rects: [CGRect]) {
+        NSColor(white: 0.25, alpha: 1.0).setFill()
+        for rect in rects {
+            NSBezierPath(roundedRect: rect, xRadius: 6, yRadius: 6).fill()
+        }
+    }
+
+    private func drawCards(_ cards: [CardData]) {
+        guard !cards.isEmpty else { return }
+        let titleFont = NSFont.systemFont(ofSize: 14, weight: .semibold)
+        let valueFont = NSFont.systemFont(ofSize: 28, weight: .bold)
+        let subFont = NSFont.systemFont(ofSize: 12, weight: .regular)
+        let subColor = NSColor(white: 0.6, alpha: 1.0)
+        for card in cards {
+            // Card background
+            NSColor(white: 0.18, alpha: 1.0).setFill()
+            NSBezierPath(roundedRect: card.rect, xRadius: 12, yRadius: 12).fill()
+            // Colored accent strip on left edge
+            card.color.setFill()
+            let strip = NSRect(x: card.rect.minX, y: card.rect.minY,
+                               width: 4, height: card.rect.height)
+            NSBezierPath(roundedRect: strip, xRadius: 2, yRadius: 2).fill()
+            // Text content
+            let x = card.rect.minX + 16
+            (card.title as NSString).draw(at: NSPoint(x: x, y: card.rect.minY + 12),
+                withAttributes: [.font: titleFont, .foregroundColor: card.color])
+            (card.value as NSString).draw(at: NSPoint(x: x, y: card.rect.minY + 36),
+                withAttributes: [.font: valueFont, .foregroundColor: NSColor.white])
+            (card.subtitle as NSString).draw(at: NSPoint(x: x, y: card.rect.minY + 78),
+                withAttributes: [.font: subFont, .foregroundColor: subColor])
+        }
+    }
+
     private func drawTabBar() {
-        // Draw white tab bar background at the bottom
         let barY = bounds.height - tabBarHeight
         NSColor.white.setFill()
         NSRect(x: 0, y: barY, width: bounds.width, height: tabBarHeight).fill()
 
-        // Draw dark icon shapes (simple filled rectangles) on the tab bar
         let iconColor = NSColor(red: 0.15, green: 0.15, blue: 0.15, alpha: 1.0)
         iconColor.setFill()
         let iconY = barY + 6
         for iconX in tabBarIconXPositions {
             let rect = NSRect(
-                x: iconX - iconSize / 2,
-                y: iconY,
-                width: iconSize,
-                height: iconSize
+                x: iconX - iconSize / 2, y: iconY,
+                width: iconSize, height: iconSize
             )
             NSBezierPath(roundedRect: rect, xRadius: 4, yRadius: 4).fill()
         }
 
-        // Draw text labels below each icon
         let labelFont = NSFont.systemFont(ofSize: 10, weight: .medium)
         let labelAttrs: [NSAttributedString.Key: Any] = [
-            .font: labelFont,
-            .foregroundColor: iconColor,
+            .font: labelFont, .foregroundColor: iconColor,
         ]
         let labelY = iconY + iconSize + 4
         for (idx, label) in tabBarLabels.enumerated() {
@@ -166,18 +213,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         buildMenuBar()
     }
 
-    /// Build a View menu with navigation items for AX menu traversal tests.
+    /// Build menus: View menu for AX traversal tests, Scenario menu for content switching.
     private func buildMenuBar() {
         let mainMenu = NSMenu()
 
-        // App menu (required by macOS)
         let appMenuItem = NSMenuItem()
         let appMenu = NSMenu()
         appMenu.addItem(NSMenuItem(title: "Quit FakeMirroring", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q"))
         appMenuItem.submenu = appMenu
         mainMenu.addItem(appMenuItem)
 
-        // View menu with navigation items
         let viewMenuItem = NSMenuItem()
         let viewMenu = NSMenu(title: "View")
         viewMenu.addItem(NSMenuItem(title: "Home Screen", action: #selector(noOp(_:)), keyEquivalent: ""))
@@ -186,11 +231,32 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         viewMenuItem.submenu = viewMenu
         mainMenu.addItem(viewMenuItem)
 
+        let scenarioMenuItem = NSMenuItem()
+        let scenarioMenu = NSMenu(title: "Scenario")
+        for scenario in FakeScenario.allCases {
+            let item = NSMenuItem(
+                title: scenario.rawValue,
+                action: #selector(switchScenario(_:)),
+                keyEquivalent: ""
+            )
+            item.representedObject = scenario.rawValue
+            scenarioMenu.addItem(item)
+        }
+        scenarioMenuItem.submenu = scenarioMenu
+        mainMenu.addItem(scenarioMenuItem)
+
         NSApp.mainMenu = mainMenu
     }
 
     @objc func noOp(_ sender: Any?) {
         // Menu items exist for AX traversal testing; no action needed.
+    }
+
+    @objc func switchScenario(_ sender: NSMenuItem) {
+        guard let rawValue = sender.representedObject as? String,
+              let scenario = FakeScenario(rawValue: rawValue),
+              let view = window?.contentView as? FakeScreenView else { return }
+        view.scenario = scenario
     }
 }
 

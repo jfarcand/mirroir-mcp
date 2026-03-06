@@ -53,6 +53,10 @@ final class CompiledStepExecutor {
             return executeTap(step: step, hints: hints, startTime: startTime)
         case .sleep:
             return executeSleep(step: step, hints: hints, startTime: startTime)
+        case .assertion:
+            return executeAssertion(step: step, hints: hints,
+                                     stepIndex: stepIndex, skillName: skillName,
+                                     startTime: startTime)
         case .scrollSequence:
             return executeScrollSequence(step: step, hints: hints, startTime: startTime)
         case .passthrough:
@@ -85,6 +89,19 @@ final class CompiledStepExecutor {
         usleep(config.settlingDelayMs * 1000)
 
         return result
+    }
+
+    private func executeAssertion(step: SkillStep, hints: StepHints,
+                                   stepIndex: Int, skillName: String,
+                                   startTime: CFAbsoluteTime) -> StepResult {
+        let delayMs = (hints.observedDelayMs ?? 0) + Self.sleepBufferMs
+        if delayMs > 0 {
+            usleep(UInt32(delayMs) * 1000)
+        }
+
+        // Delegate to the normal StepExecutor for real OCR verification
+        return normalExecutor.execute(step: step, stepIndex: stepIndex,
+                                       skillName: skillName)
     }
 
     private func executeSleep(step: SkillStep, hints: StepHints,

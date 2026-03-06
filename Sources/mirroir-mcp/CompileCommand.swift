@@ -177,12 +177,23 @@ enum CompileCommand {
         let formatter = ISO8601DateFormatter()
         let compiledAt = formatter.string(from: Date())
 
+        // Build screen fingerprint from first OCR result for content drift detection
+        let fingerprint: ScreenFingerprint?
+        if let firstResult = recordingDescriber.firstResult {
+            fingerprint = StructuralFingerprint.buildScreenFingerprint(
+                elements: firstResult.elements,
+                icons: firstResult.icons)
+        } else {
+            fingerprint = nil
+        }
+
         return CompiledSkill(
             version: CompiledSkill.currentVersion,
             source: SourceInfo(sha256: sourceHash, compiledAt: compiledAt),
             device: DeviceInfo(windowWidth: windowWidth, windowHeight: windowHeight,
                                orientation: orientation),
-            steps: compiledSteps
+            steps: compiledSteps,
+            screenFingerprint: fingerprint
         )
     }
 
@@ -208,7 +219,7 @@ enum CompileCommand {
             return .sleep(delayMs: elapsedMs)
 
         case .assertVisible, .assertNotVisible:
-            return .sleep(delayMs: elapsedMs)
+            return .assertion(delayMs: elapsedMs)
 
         case .scrollTo(_, let direction, _):
             // Parse scroll count from result message (e.g. "found after 3 scroll(s)")

@@ -57,6 +57,20 @@ jobs:
         run: |
           .build/release/mirroir-mcp test --junit test-results.xml --verbose Tests/Fixtures/skills/fake-mirroring-check.yaml
 
+      - name: Compile skill (FakeMirroring)
+        env:
+          MIRROIR_BUNDLE_ID: com.jfarcand.FakeMirroring
+          MIRROIR_PROCESS_NAME: FakeMirroring
+        run: |
+          .build/release/mirroir-mcp compile Tests/Fixtures/skills/fake-mirroring-compiled.yaml
+
+      - name: Test compiled skill (FakeMirroring)
+        env:
+          MIRROIR_BUNDLE_ID: com.jfarcand.FakeMirroring
+          MIRROIR_PROCESS_NAME: FakeMirroring
+        run: |
+          .build/release/mirroir-mcp test --verbose Tests/Fixtures/skills/fake-mirroring-compiled.yaml
+
       - name: Upload test results
         if: always()
         uses: actions/upload-artifact@v4

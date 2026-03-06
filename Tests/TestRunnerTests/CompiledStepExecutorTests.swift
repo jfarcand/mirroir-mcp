@@ -129,9 +129,9 @@ final class CompiledStepExecutorTests: XCTestCase {
     }
 
     func testCompiledSleepWithZeroDelay() {
-        let step = SkillStep.assertVisible(label: "OK")
+        let step = SkillStep.waitFor(label: "OK", timeoutSeconds: nil)
         let compiledStep = CompiledStep(
-            index: 0, type: "assert_visible", label: "OK",
+            index: 0, type: "wait_for", label: "OK",
             hints: .sleep(delayMs: 0)
         )
 
@@ -140,6 +140,86 @@ final class CompiledStepExecutorTests: XCTestCase {
             stepIndex: 0, skillName: "test")
 
         XCTAssertEqual(result.status, .passed)
+    }
+
+    // MARK: - Compiled Assertion
+
+    func testCompiledAssertVisiblePerformsOCR() {
+        describer.describeResult = ScreenDescriber.DescribeResult(
+            elements: [TapPoint(text: "OK", tapX: 100, tapY: 200, confidence: 0.9)],
+            screenshotBase64: ""
+        )
+
+        let step = SkillStep.assertVisible(label: "OK")
+        let compiledStep = CompiledStep(
+            index: 0, type: "assert_visible", label: "OK",
+            hints: .assertion(delayMs: 0)
+        )
+
+        let result = compiledExecutor.execute(
+            step: step, compiledStep: compiledStep,
+            stepIndex: 0, skillName: "test")
+
+        XCTAssertEqual(result.status, .passed)
+    }
+
+    func testCompiledAssertVisibleFailsWhenMissing() {
+        describer.describeResult = ScreenDescriber.DescribeResult(
+            elements: [TapPoint(text: "Cancel", tapX: 100, tapY: 200, confidence: 0.9)],
+            screenshotBase64: ""
+        )
+
+        let step = SkillStep.assertVisible(label: "OK")
+        let compiledStep = CompiledStep(
+            index: 0, type: "assert_visible", label: "OK",
+            hints: .assertion(delayMs: 0)
+        )
+
+        let result = compiledExecutor.execute(
+            step: step, compiledStep: compiledStep,
+            stepIndex: 0, skillName: "test")
+
+        XCTAssertEqual(result.status, .failed)
+        XCTAssertTrue(result.message?.contains("visible") ?? false)
+    }
+
+    func testCompiledAssertNotVisiblePasses() {
+        describer.describeResult = ScreenDescriber.DescribeResult(
+            elements: [TapPoint(text: "Cancel", tapX: 100, tapY: 200, confidence: 0.9)],
+            screenshotBase64: ""
+        )
+
+        let step = SkillStep.assertNotVisible(label: "OK")
+        let compiledStep = CompiledStep(
+            index: 0, type: "assert_not_visible", label: "OK",
+            hints: .assertion(delayMs: 0)
+        )
+
+        let result = compiledExecutor.execute(
+            step: step, compiledStep: compiledStep,
+            stepIndex: 0, skillName: "test")
+
+        XCTAssertEqual(result.status, .passed)
+    }
+
+    func testCompiledAssertNotVisibleFailsWhenPresent() {
+        describer.describeResult = ScreenDescriber.DescribeResult(
+            elements: [TapPoint(text: "OK", tapX: 100, tapY: 200, confidence: 0.9)],
+            screenshotBase64: ""
+        )
+
+        let step = SkillStep.assertNotVisible(label: "OK")
+        let compiledStep = CompiledStep(
+            index: 0, type: "assert_not_visible", label: "OK",
+            hints: .assertion(delayMs: 0)
+        )
+
+        let result = compiledExecutor.execute(
+            step: step, compiledStep: compiledStep,
+            stepIndex: 0, skillName: "test")
+
+        XCTAssertEqual(result.status, .failed)
+        XCTAssertTrue(result.message?.contains("NOT be visible") ?? false)
     }
 
     // MARK: - Compiled Scroll Sequence
@@ -299,5 +379,27 @@ final class CompiledStepExecutorTests: XCTestCase {
         XCTAssertNil(result)
         XCTAssertNil(recording.lastResult)
         XCTAssertEqual(recording.callCount, 1)
+    }
+
+    func testRecordingDescriberCapturesFirstResult() {
+        let inner = StubDescriber()
+        let first = ScreenDescriber.DescribeResult(
+            elements: [TapPoint(text: "First", tapX: 100, tapY: 200, confidence: 0.9)],
+            screenshotBase64: "")
+        let second = ScreenDescriber.DescribeResult(
+            elements: [TapPoint(text: "Second", tapX: 100, tapY: 200, confidence: 0.9)],
+            screenshotBase64: "")
+        inner.describeResults = [first, second]
+
+        let recording = RecordingDescriber(wrapping: inner)
+        XCTAssertNil(recording.firstResult)
+
+        _ = recording.describe(skipOCR: false)
+        XCTAssertEqual(recording.firstResult?.elements.first?.text, "First")
+
+        _ = recording.describe(skipOCR: false)
+        XCTAssertEqual(recording.firstResult?.elements.first?.text, "First",
+            "firstResult should not change after first capture")
+        XCTAssertEqual(recording.lastResult?.elements.first?.text, "Second")
     }
 }
