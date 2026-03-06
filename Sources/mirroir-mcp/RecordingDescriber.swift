@@ -15,6 +15,9 @@ final class RecordingDescriber: ScreenDescribing, @unchecked Sendable {
     /// The most recent describe result, available after each `describe()` call.
     private(set) var lastResult: ScreenDescriber.DescribeResult?
 
+    /// The first non-nil describe result, captured for screen fingerprinting at compile time.
+    private(set) var firstResult: ScreenDescriber.DescribeResult?
+
     /// Number of describe() calls made.
     private(set) var callCount: Int = 0
 
@@ -25,6 +28,9 @@ final class RecordingDescriber: ScreenDescribing, @unchecked Sendable {
     func describe(skipOCR: Bool) -> ScreenDescriber.DescribeResult? {
         let result = wrapped.describe(skipOCR: skipOCR)
         lastResult = result
+        if firstResult == nil && result != nil {
+            firstResult = result
+        }
         callCount += 1
         return result
     }

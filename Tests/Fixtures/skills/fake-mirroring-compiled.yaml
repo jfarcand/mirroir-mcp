@@ -1,0 +1,14 @@
+name: FakeMirroring compiled assertions
+app: FakeMirroring
+description: Validates compiled assertion pipeline (compile then run with real OCR)
+
+steps:
+  - wait_for: "Settings"
+  - assert_visible: "Settings"
+  - assert_visible: "General"
+  - assert_visible: "Display"
+  - assert_visible: "Privacy"
+  - assert_visible: "About"
+  - assert_not_visible: "NonExistent"
+  - assert_not_visible: "Instagram"
+  - screenshot: "compiled_assertions"

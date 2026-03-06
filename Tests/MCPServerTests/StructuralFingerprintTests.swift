@@ -356,4 +356,65 @@ final class StructuralFingerprintTests: XCTestCase {
             StructuralFingerprint.areEquivalentTitleAware(settings, general),
             "Settings vs General should never be confused")
     }
+
+    // MARK: - Screen Fingerprint
+
+    func testBuildScreenFingerprint() {
+        let elements = [
+            TapPoint(text: "Settings", tapX: 205, tapY: 120, confidence: 0.98),
+            TapPoint(text: "General", tapX: 205, tapY: 340, confidence: 0.95),
+        ]
+        let icons = [
+            IconDetector.DetectedIcon(tapX: 56, tapY: 850, estimatedSize: 24),
+        ]
+
+        let fp = StructuralFingerprint.buildScreenFingerprint(
+            elements: elements, icons: icons)
+
+        XCTAssertEqual(fp.hash.count, 64, "SHA256 hex = 64 chars")
+        XCTAssertTrue(fp.structuralTexts.contains("Settings"))
+        XCTAssertTrue(fp.structuralTexts.contains("General"))
+        XCTAssertEqual(fp.structuralTexts, fp.structuralTexts.sorted(),
+            "structuralTexts should be sorted")
+        XCTAssertEqual(fp.iconCount, 1)
+    }
+
+    func testScreenFingerprintSimilarityExactMatch() {
+        let fp = ScreenFingerprint(
+            hash: "abc", structuralTexts: ["A", "B", "C"], iconCount: 2)
+
+        XCTAssertEqual(
+            StructuralFingerprint.screenFingerprintSimilarity(fp, fp),
+            1.0, accuracy: 0.001,
+            "Identical hashes should fast-path to 1.0")
+    }
+
+    func testScreenFingerprintSimilarityPartialOverlap() {
+        let fp1 = ScreenFingerprint(
+            hash: "hash1",
+            structuralTexts: ["Settings", "General", "Privacy"],
+            iconCount: 2)
+        let fp2 = ScreenFingerprint(
+            hash: "hash2",
+            structuralTexts: ["Settings", "General", "About"],
+            iconCount: 3)
+
+        // Jaccard: 2 / 4 = 0.5
+        let sim = StructuralFingerprint.screenFingerprintSimilarity(fp1, fp2)
+        XCTAssertEqual(sim, 0.5, accuracy: 0.001)
+    }
+
+    func testScreenFingerprintSimilarityNoOverlap() {
+        let fp1 = ScreenFingerprint(
+            hash: "hash1",
+            structuralTexts: ["Settings", "General"],
+            iconCount: 0)
+        let fp2 = ScreenFingerprint(
+            hash: "hash2",
+            structuralTexts: ["Photos", "Albums"],
+            iconCount: 5)
+
+        let sim = StructuralFingerprint.screenFingerprintSimilarity(fp1, fp2)
+        XCTAssertEqual(sim, 0.0, accuracy: 0.001)
+    }
 }

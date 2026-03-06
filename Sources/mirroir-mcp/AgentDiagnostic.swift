@@ -52,7 +52,7 @@ enum AgentDiagnostic {
         case .tap:
             return diagnoseTap(compiledStep: compiledStep, hints: hints,
                                screen: screen, failureMessage: failureMessage)
-        case .sleep:
+        case .sleep, .assertion:
             return diagnoseSleep(compiledStep: compiledStep, hints: hints,
                                  screen: screen, failureMessage: failureMessage)
         case .scrollSequence:

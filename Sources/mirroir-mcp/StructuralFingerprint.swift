@@ -27,6 +27,35 @@ enum StructuralFingerprint {
     /// Bottom percentage of screen considered tab bar zone. Elements here are structural.
     static let tabBarFraction: Double = 0.15
 
+    // MARK: - Screen Fingerprint
+
+    /// Build a `ScreenFingerprint` from OCR elements and detected icons.
+    /// Used at compile time to capture the app's visual state for content drift detection.
+    static func buildScreenFingerprint(
+        elements: [TapPoint],
+        icons: [IconDetector.DetectedIcon]
+    ) -> ScreenFingerprint {
+        let structural = extractStructural(from: elements)
+        let sorted = structural.sorted()
+        let hash = compute(elements: elements, icons: icons)
+        return ScreenFingerprint(
+            hash: hash,
+            structuralTexts: sorted,
+            iconCount: icons.count
+        )
+    }
+
+    /// Compute Jaccard similarity between two `ScreenFingerprint` values.
+    /// Fast-path: if hashes match, returns 1.0 without set comparison.
+    static func screenFingerprintSimilarity(
+        _ lhs: ScreenFingerprint, _ rhs: ScreenFingerprint
+    ) -> Double {
+        if lhs.hash == rhs.hash { return 1.0 }
+        let lhsSet = Set(lhs.structuralTexts)
+        let rhsSet = Set(rhs.structuralTexts)
+        return similarity(lhsSet, rhsSet)
+    }
+
     // MARK: - Entry Point
 
     /// Compute a SHA256-based fingerprint string from screen elements and icons.

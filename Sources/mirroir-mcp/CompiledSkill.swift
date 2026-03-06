@@ -17,9 +17,23 @@ struct CompiledSkill: Codable, Equatable {
     let device: DeviceInfo
     /// Pre-compiled steps with cached coordinates and timing.
     let steps: [CompiledStep]
+    /// OCR-based screen fingerprint captured at compile time for content drift detection.
+    var screenFingerprint: ScreenFingerprint? = nil
 
-    /// Current format version.
-    static let currentVersion = 1
+    /// Current format version. Bump forces recompilation of all existing compiled skills.
+    static let currentVersion = 2
+}
+
+/// Fingerprint of the app's screen content at compilation time.
+/// Used to detect content drift (e.g. app updates that move elements)
+/// even when the skill YAML and window dimensions haven't changed.
+struct ScreenFingerprint: Codable, Equatable {
+    /// SHA-256 of sorted structural texts + icon count for fast-path equality.
+    let hash: String
+    /// Sorted structural text elements for Jaccard comparison when hash differs.
+    let structuralTexts: [String]
+    /// Number of detected icons (coarse structural signal).
+    let iconCount: Int
 }
 
 /// Metadata about the source skill file used to detect staleness.
@@ -74,9 +88,16 @@ struct StepHints: Codable, Equatable {
                   observedDelayMs: nil, scrollCount: nil, scrollDirection: nil)
     }
 
-    /// Create hints for a sleep action (wait_for / assert_visible).
+    /// Create hints for a sleep action (wait_for, measure).
     static func sleep(delayMs: Int) -> StepHints {
         StepHints(compiledAction: .sleep, tapX: nil, tapY: nil,
+                  confidence: nil, matchStrategy: nil,
+                  observedDelayMs: delayMs, scrollCount: nil, scrollDirection: nil)
+    }
+
+    /// Create hints for an assertion action — sleeps observed delay, then performs real OCR.
+    static func assertion(delayMs: Int) -> StepHints {
+        StepHints(compiledAction: .assertion, tapX: nil, tapY: nil,
                   confidence: nil, matchStrategy: nil,
                   observedDelayMs: delayMs, scrollCount: nil, scrollDirection: nil)
     }
@@ -100,8 +121,10 @@ struct StepHints: Codable, Equatable {
 enum CompiledAction: String, Codable, Equatable {
     /// Direct tap at cached coordinates.
     case tap
-    /// Sleep for observed delay (used for wait_for, assert_visible).
+    /// Sleep for observed delay (used for wait_for, measure).
     case sleep
+    /// Sleep observed delay then delegate to normal StepExecutor for real OCR assertion.
+    case assertion
     /// Replay a sequence of scroll/swipe gestures.
     case scrollSequence = "scroll_sequence"
     /// Delegate to normal StepExecutor (step is already OCR-free).
@@ -155,10 +178,12 @@ enum CompiledSkillIO {
     }
 
     /// Check if a compiled skill is stale relative to its source file.
+    /// Optionally compares a live screen fingerprint against the baseline for content drift.
     static func checkStaleness(compiled: CompiledSkill,
                                 skillPath: String,
                                 windowWidth: Double,
-                                windowHeight: Double) -> StalenessResult {
+                                windowHeight: Double,
+                                liveFingerprint: ScreenFingerprint? = nil) -> StalenessResult {
         // Version check
         if compiled.version != CompiledSkill.currentVersion {
             return .stale(reason: "compiled version \(compiled.version) != current \(CompiledSkill.currentVersion)")
@@ -176,6 +201,16 @@ enum CompiledSkillIO {
             return .stale(reason: "window dimensions changed: compiled \(Int(compiled.device.windowWidth))x\(Int(compiled.device.windowHeight)) vs current \(Int(windowWidth))x\(Int(windowHeight))")
         }
 
+        // Content drift check via screen fingerprint
+        if let baseline = compiled.screenFingerprint, let live = liveFingerprint {
+            let similarity = StructuralFingerprint.screenFingerprintSimilarity(baseline, live)
+            if similarity < StructuralFingerprint.similarityThreshold {
+                return .drifted(
+                    similarity: similarity,
+                    reason: "screen content has drifted (similarity: \(String(format: "%.2f", similarity)))")
+            }
+        }
+
         return .fresh
     }
 }
@@ -184,4 +219,6 @@ enum CompiledSkillIO {
 enum StalenessResult: Equatable {
     case fresh
     case stale(reason: String)
+    /// Content has drifted but skill is still usable — warning only.
+    case drifted(similarity: Double, reason: String)
 }
