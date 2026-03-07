@@ -48,20 +48,22 @@ final class TapNavigationTests: XCTestCase {
 
     // MARK: - Row Tap Navigation
 
-    /// Tap "General" row on Settings → should navigate to Detail screen (header: "General").
+    /// Tap "General" row on Settings → should navigate to Detail screen.
+    /// Verifies by checking for "Keyboard" which exists only on Detail, not Settings.
     func testTapGeneralNavigatesToDetail() throws {
         try tapAndVerifyNavigation(
             tapLabel: "General",
-            expectedHeader: "General",
+            expectedElement: "Keyboard",
             description: "Settings → General → Detail"
         )
     }
 
     /// Tap "About" row on Settings → should navigate to Detail (Back) screen with "<" chevron.
+    /// Verifies by checking for "Model Name" which exists only on Detail (Back), not Settings.
     func testTapAboutNavigatesToDetailWithBack() throws {
         try tapAndVerifyNavigation(
             tapLabel: "About",
-            expectedHeader: "About",
+            expectedElement: "Model Name",
             description: "Settings → About → Detail (Back)"
         )
     }
@@ -100,13 +102,14 @@ final class TapNavigationTests: XCTestCase {
     // MARK: - Button Tap
 
     /// On Login screen, tap "Log In" button → should navigate to Feed.
+    /// Verifies by checking for "johndoe" which exists only on Feed, not Login.
     func testTapLoginButtonNavigatesToFeed() throws {
         _ = bridge.triggerMenuAction(menu: "Scenario", item: "Login")
         usleep(500_000)
 
         try tapAndVerifyNavigation(
             tapLabel: "Log In",
-            expectedHeader: "Home",
+            expectedElement: "johndoe",
             description: "Login → Log In → Feed"
         )
     }
@@ -114,13 +117,14 @@ final class TapNavigationTests: XCTestCase {
     // MARK: - Card Tap
 
     /// On Health screen, tap "Steps" card → should navigate to Detail (Back).
+    /// Verifies by checking for "Model Name" which exists only on Detail (Back), not Health.
     func testTapHealthCardNavigatesToDetail() throws {
         _ = bridge.triggerMenuAction(menu: "Scenario", item: "Health")
         usleep(500_000)
 
         try tapAndVerifyNavigation(
             tapLabel: "Steps",
-            expectedHeader: "About",
+            expectedElement: "Model Name",
             description: "Health → Steps → Detail (Back)"
         )
     }
@@ -128,10 +132,11 @@ final class TapNavigationTests: XCTestCase {
     // MARK: - Helpers
 
     /// OCR the current screen, find the element matching `tapLabel`, tap it,
-    /// then OCR again and verify the header changed to `expectedHeader`.
+    /// then OCR again and verify that `expectedElement` (unique to the destination screen)
+    /// appears in the OCR results.
     private func tapAndVerifyNavigation(
         tapLabel: String,
-        expectedHeader: String,
+        expectedElement: String,
         description: String
     ) throws {
         let screen = try describeOrSkip()
@@ -150,8 +155,8 @@ final class TapNavigationTests: XCTestCase {
         let afterScreen = try describeOrSkip()
         let afterTexts = afterScreen.elements.map { $0.text.lowercased() }
         XCTAssertTrue(
-            afterTexts.contains(expectedHeader.lowercased()),
-            "\(description): expected header '\(expectedHeader)' after tap. Found: \(afterTexts)"
+            afterTexts.contains(expectedElement.lowercased()),
+            "\(description): expected '\(expectedElement)' after tap. Found: \(afterTexts)"
         )
     }
 
