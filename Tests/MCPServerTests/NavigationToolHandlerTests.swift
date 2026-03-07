@@ -100,9 +100,43 @@ final class NavigationToolHandlerTests: XCTestCase {
         XCTAssertTrue(text?.contains("Missing required parameter") ?? false)
     }
 
-    func testOpenURLSuccess() {
+    func testOpenURLBlockedForIPhoneMirroring() {
         input.openURLResult = nil
         let response = callTool("open_url", args: ["url": .string("https://example.com")])
+        XCTAssertTrue(isError(response))
+        let text = extractText(response)
+        XCTAssertTrue(text?.contains("not supported for iPhone Mirroring") ?? false)
+    }
+
+    func testOpenURLSuccessForGenericWindow() {
+        let policy = PermissionPolicy(skipPermissions: true, config: nil)
+        let gwServer = MCPServer(policy: policy)
+        let gwCtx = TargetContext(
+            name: "browser",
+            targetType: "generic-window",
+            bundleID: nil,
+            bridge: bridge,
+            input: input,
+            capture: StubCapture(),
+            describer: StubDescriber(),
+            recorder: StubRecorder(),
+            capabilities: [.menuActions]
+        )
+        let gwRegistry = TargetRegistry(targets: ["browser": gwCtx], defaultName: "browser")
+        MirroirMCP.registerNavigationTools(
+            server: gwServer, registry: gwRegistry, policy: policy
+        )
+
+        input.openURLResult = nil
+        let request = JSONRPCRequest(
+            jsonrpc: "2.0", id: .number(1),
+            method: "tools/call",
+            params: .object([
+                "name": .string("open_url"),
+                "arguments": .object(["url": .string("https://example.com")]),
+            ])
+        )
+        let response = gwServer.handleRequest(request)!
         XCTAssertFalse(isError(response))
         XCTAssertEqual(extractText(response), "Opened URL: https://example.com")
     }
