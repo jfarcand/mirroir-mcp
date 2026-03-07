@@ -53,10 +53,9 @@ final class FakeScreenView: NSView {
     // MARK: - Hit Detection
 
     override func mouseUp(with event: NSEvent) {
-        let point = convert(event.locationInWindow, from: nil)
-        // NSView flipped coordinate: convert from bottom-left to top-left origin
-        let flippedY = bounds.height - point.y
-        let clickPoint = CGPoint(x: point.x, y: flippedY)
+        // convert() returns coordinates in the view's own coordinate system.
+        // Since isFlipped = true, result is already top-left origin — no manual flip needed.
+        let clickPoint = convert(event.locationInWindow, from: nil)
 
         let regions = ScenarioContent.hitRegions(for: scenario)
         for (label, rect) in regions {

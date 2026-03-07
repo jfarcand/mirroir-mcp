@@ -225,6 +225,11 @@ final class CompiledStepExecutorTests: XCTestCase {
     // MARK: - Compiled Scroll Sequence
 
     func testCompiledScrollSequencePerformsCorrectSwipes() {
+        // Post-scroll OCR verification needs to find "About" on screen
+        let aboutElement = TapPoint(text: "About", tapX: 100, tapY: 300, confidence: 0.95)
+        describer.describeResult = ScreenDescriber.DescribeResult(
+            elements: [aboutElement], hints: [], screenshotBase64: "", ocrTimeMs: 0)
+
         let step = SkillStep.scrollTo(label: "About", direction: "up", maxScrolls: 10)
         let compiledStep = CompiledStep(
             index: 0, type: "scroll_to", label: "About",
