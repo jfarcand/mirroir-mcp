@@ -292,7 +292,7 @@ extension MirroirMCP {
                 Supported keys: return, escape, tab, delete, space, up, down, left, right, \
                 or any single character (a-z, 0-9, etc.) for shortcuts. \
                 Optional modifiers: command, shift, option, control. \
-                Examples: press Return to confirm, Escape to cancel, Cmd+L for address bar.
+                Examples: press Return to confirm, Escape to cancel, Ctrl+Cmd+Z for shake.
                 """,
             inputSchema: [
                 "type": .string("object"),

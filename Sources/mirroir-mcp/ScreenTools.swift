@@ -63,9 +63,7 @@ extension MirroirMCP {
                 Set skip_ocr to true to skip Vision OCR and return only the grid-overlaid \
                 screenshot, letting the MCP client use its own vision model. \
                 Set scroll to true to scroll through the full page and collect all elements \
-                with page-absolute Y coordinates. \
-                Note: tapping nav bar back buttons ("<") is unreliable in iPhone Mirroring. \
-                Use press_key with key="[" modifiers=["command"] for back navigation instead.
+                with page-absolute Y coordinates.
                 """,
             inputSchema: [
                 "type": .string("object"),

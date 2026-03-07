@@ -1,16 +1,14 @@
 // Copyright 2026 jfarcand@apache.org
 // Licensed under the Apache License, Version 2.0
 //
-// ABOUTME: Detects navigation patterns in OCR results and generates keyboard shortcut hints.
-// ABOUTME: Solves the iPhone Mirroring limitation where nav bar back button taps are unreliable.
+// ABOUTME: Detects navigation patterns in OCR results and generates target-aware navigation hints.
+// ABOUTME: Mobile targets get tap-based advice; desktop targets get keyboard shortcut advice.
 
 /// Analyzes OCR-detected elements for navigation patterns and generates
-/// actionable hints suggesting reliable keyboard shortcuts.
+/// actionable hints appropriate for the target type.
 ///
-/// iPhone Mirroring has a known limitation where tapping UINavigationBar
-/// back buttons (`<`) is unreliable — the HID events arrive but the nav
-/// bar doesn't respond. Keyboard shortcuts like `Cmd+[` bypass this
-/// limitation entirely.
+/// Mobile targets (iPhone Mirroring) receive tap-based back navigation
+/// hints, while desktop targets receive keyboard shortcut hints (Cmd+[).
 public enum NavigationHintDetector {
     /// Fraction of window height that defines the top navigation zone.
     /// Elements in the top 15% are considered nav bar candidates.
@@ -26,9 +24,11 @@ public enum NavigationHintDetector {
     /// - Parameters:
     ///   - elements: OCR-detected tap points from the current screen.
     ///   - windowHeight: Height of the mirroring window in points.
-    /// - Returns: Array of hint strings describing reliable alternatives
+    ///   - isMobile: When true, emits tap-based hints (for iPhone Mirroring).
+    ///     When false, emits keyboard shortcut hints (for desktop targets).
+    /// - Returns: Array of hint strings describing navigation alternatives
     ///   for detected navigation elements.
-    public static func detect(elements: [TapPoint], windowHeight: Double) -> [String] {
+    public static func detect(elements: [TapPoint], windowHeight: Double, isMobile: Bool = true) -> [String] {
         var hints: [String] = []
         let topZone = windowHeight * topZoneFraction
         let bottomZone = windowHeight * bottomZoneFraction
@@ -48,10 +48,16 @@ public enum NavigationHintDetector {
         }
 
         if foundBackInTop || foundBackInBottom {
-            hints.append(
-                "Back navigation: \"<\" detected — use press_key with key=\"[\" "
-                + "modifiers=[\"command\"] instead of tapping (more reliable)"
-            )
+            if isMobile {
+                hints.append(
+                    "Back navigation: \"<\" detected — tap it to go back."
+                )
+            } else {
+                hints.append(
+                    "Back navigation: \"<\" detected — use press_key with "
+                    + "key=\"[\" modifiers=[\"command\"] (more reliable than tapping)."
+                )
+            }
         }
 
         return hints

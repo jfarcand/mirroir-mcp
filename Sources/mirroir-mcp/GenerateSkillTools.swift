@@ -213,7 +213,8 @@ extension MirroirMCP {
             hints: result.hints,
             startElements: nil,
             actionLog: [],
-            screenCount: 1
+            screenCount: 1,
+            isMobile: ctx.targetType == "iphone-mirroring"
         )
 
         let guidanceText = ExplorationGuide.formatGuidance(guidance)
@@ -260,7 +261,8 @@ extension MirroirMCP {
             // Still provide guidance even on duplicate rejection — use strategy if graph available
             let guidance = ExplorationGuidanceHelper.generateGuidance(
                 session: session, elements: result.elements,
-                icons: result.icons, hints: result.hints
+                icons: result.icons, hints: result.hints,
+                isMobile: ctx.targetType == "iphone-mirroring"
             )
             let guidanceText = ExplorationGuide.formatGuidance(guidance)
 
@@ -282,7 +284,8 @@ extension MirroirMCP {
         // Generate guidance for the agent — prefer strategy-based when graph available
         let guidance = ExplorationGuidanceHelper.generateGuidance(
             session: session, elements: result.elements,
-            icons: result.icons, hints: result.hints
+            icons: result.icons, hints: result.hints,
+            isMobile: ctx.targetType == "iphone-mirroring"
         )
 
         let guidanceText = ExplorationGuide.formatGuidance(guidance)

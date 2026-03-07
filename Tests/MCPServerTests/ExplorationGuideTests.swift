@@ -220,8 +220,32 @@ final class ExplorationGuideTests: XCTestCase {
             screenCount: 3
         )
         XCTAssertFalse(guidance.isFlowComplete)
+        XCTAssertTrue(guidance.suggestions.contains(where: { $0.contains("Tap the back button") }),
+            "Mid-exploration on mobile should suggest tapping back button")
+    }
+
+    func testDiscoveryMidExplorationSuggestsBackDesktop() {
+        let elements = [
+            TapPoint(text: "About", tapX: 205, tapY: 120, confidence: 0.96),
+            TapPoint(text: "iOS Version", tapX: 205, tapY: 300, confidence: 0.88),
+        ]
+        let startElements = [
+            TapPoint(text: "Settings", tapX: 205, tapY: 120, confidence: 0.98),
+            TapPoint(text: "General", tapX: 205, tapY: 250, confidence: 0.95),
+        ]
+        let guidance = ExplorationGuide.analyze(
+            mode: .discovery,
+            goal: "",
+            elements: elements,
+            hints: [],
+            startElements: startElements,
+            actionLog: [],
+            screenCount: 3,
+            isMobile: false
+        )
+        XCTAssertFalse(guidance.isFlowComplete)
         XCTAssertTrue(guidance.suggestions.contains(where: { $0.contains("Press Back") }),
-            "Mid-exploration should suggest going back")
+            "Mid-exploration on desktop should suggest Press Back (Cmd+[)")
     }
 
     // MARK: - Stuck Detection

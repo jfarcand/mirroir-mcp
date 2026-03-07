@@ -50,7 +50,8 @@ enum ExplorationGuide {
         hints: [String],
         startElements: [TapPoint]?,
         actionLog: [ExplorationAction],
-        screenCount: Int
+        screenCount: Int,
+        isMobile: Bool = true
     ) -> Guidance {
         let backAtStart: Bool
         if let startElements, screenCount >= minScreensForFlowBoundary {
@@ -77,7 +78,8 @@ enum ExplorationGuide {
         case .discovery:
             return analyzeDiscovery(
                 elements: elements, hints: hints,
-                backAtStart: backAtStart, warning: warning, screenCount: screenCount)
+                backAtStart: backAtStart, warning: warning, screenCount: screenCount,
+                isMobile: isMobile)
         }
     }
 
@@ -147,7 +149,8 @@ enum ExplorationGuide {
         hints: [String],
         backAtStart: Bool,
         warning: String?,
-        screenCount: Int
+        screenCount: Int,
+        isMobile: Bool = true
     ) -> Guidance {
         let candidates = filterNavigableElements(elements)
         var suggestions: [String] = []
@@ -171,7 +174,11 @@ enum ExplorationGuide {
             for el in candidates.prefix(maxSuggestions) {
                 suggestions.append("Tap \"\(el.text)\"")
             }
-            suggestions.append("Press Back (Cmd+[) \u{2014} return to previous screen")
+            if isMobile {
+                suggestions.append("Tap the back button \u{2014} return to previous screen")
+            } else {
+                suggestions.append("Press Back (Cmd+[) \u{2014} return to previous screen")
+            }
         }
 
         return Guidance(
