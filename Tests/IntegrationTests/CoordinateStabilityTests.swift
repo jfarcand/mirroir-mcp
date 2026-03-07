@@ -33,11 +33,22 @@ final class CoordinateStabilityTests: XCTestCase {
     func testCoordinateStabilityAcrossRepeatedDescribes() throws {
         let sampleCount = 20
         var coordinatesByLabel: [String: [(x: Double, y: Double)]] = [:]
+        /// Labels that appear more than once on a single screen (e.g., ">" chevrons
+        /// at 6 different Y positions). These are different elements, not jitter.
+        var duplicateLabels: Set<String> = []
 
         for i in 0..<sampleCount {
             guard let result = describer.describe(skipOCR: false) else {
                 XCTFail("describe() returned nil on iteration \(i)")
                 return
+            }
+            // Track labels appearing multiple times in a single describe() call
+            var seenThisCall: [String: Int] = [:]
+            for element in result.elements {
+                seenThisCall[element.text, default: 0] += 1
+            }
+            for (label, count) in seenThisCall where count > 1 {
+                duplicateLabels.insert(label)
             }
             for element in result.elements {
                 coordinatesByLabel[element.text, default: []].append(
@@ -50,7 +61,10 @@ final class CoordinateStabilityTests: XCTestCase {
         var maxStddev: Double = 0
         var unstableElements: [(label: String, stddevX: Double, stddevY: Double)] = []
 
-        for (label, coords) in coordinatesByLabel where coords.count >= stableThreshold {
+        // Skip labels that appear multiple times per screen — these represent
+        // distinct elements at different positions (e.g., 6 ">" chevrons), not jitter.
+        for (label, coords) in coordinatesByLabel
+            where coords.count >= stableThreshold && !duplicateLabels.contains(label) {
             let xs = coords.map { $0.x }
             let ys = coords.map { $0.y }
             let stddevX = standardDeviation(xs)
