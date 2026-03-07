@@ -15,15 +15,18 @@ final class ScreenDescriber: Sendable {
     private let bridge: any WindowBridging
     private let capture: any ScreenCapturing
     private let textRecognizer: any TextRecognizing
+    private let isMobile: Bool
 
     init(
         bridge: any WindowBridging,
         capture: any ScreenCapturing,
-        textRecognizer: any TextRecognizing = AppleVisionTextRecognizer()
+        textRecognizer: any TextRecognizing = AppleVisionTextRecognizer(),
+        isMobile: Bool = true
     ) {
         self.bridge = bridge
         self.capture = capture
         self.textRecognizer = textRecognizer
+        self.isMobile = isMobile
     }
 
     /// Result of a describe operation: detected elements, unlabeled icons, navigation hints,
@@ -91,9 +94,9 @@ final class ScreenDescriber: Sendable {
             image: cgImage, ocrElements: elements, windowSize: info.size
         )
 
-        // Detect navigation patterns and generate keyboard shortcut hints
+        // Detect navigation patterns and generate target-appropriate hints
         let hints = NavigationHintDetector.detect(
-            elements: elements, windowHeight: windowHeight
+            elements: elements, windowHeight: windowHeight, isMobile: isMobile
         )
 
         let griddedData = GridOverlay.addOverlay(to: data, windowSize: info.size) ?? data

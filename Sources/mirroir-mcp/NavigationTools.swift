@@ -82,6 +82,15 @@ extension MirroirMCP {
                     return .error("Missing required parameter: url (string)")
                 }
 
+                if ctx.targetType == "iphone-mirroring" {
+                    return .error(
+                        "open_url is not supported for iPhone Mirroring targets. "
+                        + "Keyboard shortcuts (Cmd+L) do not work through iPhone Mirroring. "
+                        + "To navigate in Safari: launch Safari, tap the address bar, "
+                        + "use type_text to enter the URL, then press_key(key: \"return\")."
+                    )
+                }
+
                 if let error = input.openURL(url) {
                     return .error(error)
                 }

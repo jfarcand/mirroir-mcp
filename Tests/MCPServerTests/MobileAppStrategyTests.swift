@@ -45,7 +45,7 @@ final class MobileAppStrategyTests: XCTestCase {
 
     func testClassifyDetailScreen() {
         let elements = makeElements(["About", "Version 18.0"])
-        let hints = ["Back navigation: \"<\" detected — use press_key with key=\"[\" modifiers=[\"command\"] instead of tapping (more reliable)"]
+        let hints = ["Back navigation: \"<\" detected — tap it to go back."]
 
         let result = MobileAppStrategy.classifyScreen(elements: elements, hints: hints)
 
@@ -54,7 +54,7 @@ final class MobileAppStrategyTests: XCTestCase {
 
     func testClassifyListScreen() {
         let elements = makeElements(["General", "Privacy", "About", "Display", "Sound"])
-        let hints = ["Back navigation: \"<\" detected — use press_key with key=\"[\" modifiers=[\"command\"] instead of tapping (more reliable)"]
+        let hints = ["Back navigation: \"<\" detected — tap it to go back."]
 
         let result = MobileAppStrategy.classifyScreen(elements: elements, hints: hints)
 
@@ -134,7 +134,7 @@ final class MobileAppStrategyTests: XCTestCase {
     // MARK: - Backtracking
 
     func testBacktrackWithBackButton() {
-        let hints = ["Back navigation: \"<\" detected — use press_key with key=\"[\" modifiers=[\"command\"] instead of tapping (more reliable)"]
+        let hints = ["Back navigation: \"<\" detected — tap it to go back."]
 
         let result = MobileAppStrategy.backtrackMethod(currentHints: hints, depth: 2)
 

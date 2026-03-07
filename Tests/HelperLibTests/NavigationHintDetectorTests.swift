@@ -16,7 +16,7 @@ struct NavigationHintDetectorTests {
         TapPoint(text: text, tapX: x, tapY: y, confidence: 0.95)
     }
 
-    @Test("detects back chevron in nav bar zone")
+    @Test("detects back chevron in nav bar zone (mobile)")
     func backChevronInNavBar() {
         let elements = [
             makeTapPoint("<", x: 30, y: 80),
@@ -24,11 +24,10 @@ struct NavigationHintDetectorTests {
         ]
         let hints = NavigationHintDetector.detect(elements: elements, windowHeight: windowHeight)
         #expect(hints.count == 1)
-        #expect(hints[0].contains("press_key"))
-        #expect(hints[0].contains("command"))
+        #expect(hints[0].contains("tap it to go back"))
     }
 
-    @Test("detects back chevron in bottom toolbar zone")
+    @Test("detects back chevron in bottom toolbar zone (mobile)")
     func backChevronInToolbar() {
         let elements = [
             makeTapPoint("<", x: 55, y: 840),
@@ -36,7 +35,19 @@ struct NavigationHintDetectorTests {
         ]
         let hints = NavigationHintDetector.detect(elements: elements, windowHeight: windowHeight)
         #expect(hints.count == 1)
+        #expect(hints[0].contains("tap it to go back"))
+    }
+
+    @Test("desktop mode suggests press_key for back navigation")
+    func backChevronDesktopMode() {
+        let elements = [
+            makeTapPoint("<", x: 30, y: 80),
+            makeTapPoint("Settings", x: 200, y: 80),
+        ]
+        let hints = NavigationHintDetector.detect(elements: elements, windowHeight: windowHeight, isMobile: false)
+        #expect(hints.count == 1)
         #expect(hints[0].contains("press_key"))
+        #expect(hints[0].contains("command"))
     }
 
     @Test("no hint when no back chevron present")

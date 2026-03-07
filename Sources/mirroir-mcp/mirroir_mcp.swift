@@ -175,7 +175,8 @@ struct MirroirMCP {
                 input: InputSimulation(bridge: bridge, cursorMode: cursorMode),
                 capture: capture,
                 describer: ScreenDescriber(bridge: bridge, capture: capture,
-                                           textRecognizer: textRecognizer),
+                                           textRecognizer: textRecognizer,
+                                           isMobile: config.type == "iphone-mirroring"),
                 recorder: ScreenRecorder(bridge: bridge),
                 capabilities: capabilities
             )

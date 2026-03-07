@@ -17,7 +17,8 @@ enum ExplorationGuidanceHelper {
         session: ExplorationSession,
         elements: [TapPoint],
         icons: [IconDetector.DetectedIcon],
-        hints: [String]
+        hints: [String],
+        isMobile: Bool = true
     ) -> ExplorationGuide.Guidance {
         let graph = session.currentGraph
         if graph.started {
@@ -33,7 +34,8 @@ enum ExplorationGuidanceHelper {
             hints: hints,
             startElements: session.startScreenElements,
             actionLog: session.actions,
-            screenCount: session.screenCount
+            screenCount: session.screenCount,
+            isMobile: isMobile
         )
     }
 
