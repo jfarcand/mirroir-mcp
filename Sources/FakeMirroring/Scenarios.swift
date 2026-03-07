@@ -45,6 +45,10 @@ struct ScenarioData {
     var hasBackChevron: Bool = false
     /// Health/Santé-style summary cards with accent color and stats.
     var cards: [CardData] = []
+    /// Horizontal slider track rect + label prefix for drag testing.
+    var sliderTrack: (label: String, rect: CGRect)? = nil
+    /// Text field placeholder rects that accept keyboard input on tap.
+    var textFieldRects: [CGRect] = []
 }
 
 /// Scenario content definitions. Row positions follow the same layout grid
@@ -136,10 +140,12 @@ enum ScenarioContent {
         )
     }
 
-    /// Profile screen with stats, action buttons, and grid tabs.
-    /// Exercises: tap (Follow/Message buttons, tab switching), assert_visible (stats).
+    /// Profile screen with stats, action buttons, grid tabs, and brightness slider.
+    /// Exercises: tap (Follow/Message buttons, tab switching), assert_visible (stats),
+    /// drag (slider adjustment).
     private static func profileScenario() -> ScenarioData {
         let btnW: CGFloat = 170, btnH: CGFloat = 36, btnY: CGFloat = 310
+        let sliderRect = CGRect(x: 40, y: 700, width: 330, height: 30)
         return ScenarioData(
             header: "johndoe",
             rows: [],
@@ -155,6 +161,7 @@ enum ScenarioContent {
                 ("Posts", CGPoint(x: 55, y: 370)),
                 ("Reels", CGPoint(x: 185, y: 370)),
                 ("Tagged", CGPoint(x: 305, y: 370)),
+                ("Brightness", CGPoint(x: 40, y: 675)),
             ],
             buttons: [
                 ("Follow", CGRect(x: 20, y: btnY, width: btnW, height: btnH)),
@@ -167,7 +174,8 @@ enum ScenarioContent {
                 CGRect(x: 5, y: 533, width: 128, height: 128),
                 CGRect(x: 138, y: 533, width: 128, height: 128),
                 CGRect(x: 271, y: 533, width: 128, height: 128),
-            ]
+            ],
+            sliderTrack: (label: "Brightness", rect: sliderRect)
         )
     }
 
@@ -175,6 +183,8 @@ enum ScenarioContent {
     /// Exercises: type_text (field context), tap (Log In, links), assert_visible.
     private static func loginScenario() -> ScenarioData {
         let fW: CGFloat = 340, fH: CGFloat = 44, cx: CGFloat = 35
+        let usernameRect = CGRect(x: cx, y: 250, width: fW, height: fH)
+        let passwordRect = CGRect(x: cx, y: 320, width: fW, height: fH)
         return ScenarioData(
             header: "Welcome",
             rows: [],
@@ -190,9 +200,10 @@ enum ScenarioContent {
                 ("Log In", CGRect(x: cx, y: 390, width: fW, height: fH)),
             ],
             placeholders: [
-                CGRect(x: cx, y: 250, width: fW, height: fH),
-                CGRect(x: cx, y: 320, width: fW, height: fH),
-            ]
+                usernameRect,
+                passwordRect,
+            ],
+            textFieldRects: [usernameRect, passwordRect]
         )
     }
 
