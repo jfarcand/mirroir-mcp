@@ -340,6 +340,23 @@ public enum TimingConstants {
     /// Maximum Euclidean distance in points for coordinate proximity dedup.
     public static let scrollDedupProximityPt: Double = 15.0
 
+    // MARK: - Exploration Budget
+
+    /// Maximum DFS depth before forcing backtrack.
+    public static let explorationMaxDepth: Int = 6
+
+    /// Maximum distinct screens before stopping exploration.
+    public static let explorationMaxScreens: Int = 30
+
+    /// Maximum wall-clock seconds before stopping exploration.
+    public static let explorationMaxTimeSeconds: Int = 300
+
+    // MARK: - Compiled Safety
+
+    /// Minimum confidence threshold for compiled taps (0.0–1.0).
+    /// Taps below this threshold fall back to live OCR.
+    public static let compiledTapMinConfidence: Double = 0.7
+
     // MARK: - Input Tool Defaults
 
     /// Default drag duration in milliseconds.

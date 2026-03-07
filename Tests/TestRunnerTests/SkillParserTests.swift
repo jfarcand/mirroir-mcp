@@ -498,4 +498,58 @@ final class SkillParserTests: XCTestCase {
             XCTFail("Expected wait_for step without timeout")
         }
     }
+
+    // MARK: - long_press
+
+    func testParseLongPressSimple() {
+        let steps = SkillParser.parseSteps(
+            from: "steps:\n  - long_press: \"Photo\"")
+        XCTAssertEqual(steps.count, 1)
+        if case .longPress(let label, let duration) = steps[0] {
+            XCTAssertEqual(label, "Photo")
+            XCTAssertNil(duration)
+        } else {
+            XCTFail("Expected .longPress, got \(steps[0])")
+        }
+    }
+
+    func testParseLongPressWithDuration() {
+        let steps = SkillParser.parseSteps(
+            from: "steps:\n  - long_press: \"Photo\" duration: 2000")
+        XCTAssertEqual(steps.count, 1)
+        if case .longPress(let label, let duration) = steps[0] {
+            XCTAssertEqual(label, "Photo")
+            XCTAssertEqual(duration, 2000)
+        } else {
+            XCTFail("Expected .longPress with duration, got \(steps[0])")
+        }
+    }
+
+    func testDisplayNameLongPress() {
+        let step = SkillStep.longPress(label: "Photo", durationMs: 1000)
+        XCTAssertEqual(step.displayName, "long_press: \"Photo\"")
+        XCTAssertEqual(step.typeKey, "long_press")
+        XCTAssertEqual(step.labelValue, "Photo")
+    }
+
+    // MARK: - drag
+
+    func testParseDragStep() {
+        let steps = SkillParser.parseSteps(
+            from: "steps:\n  - drag: { from: \"Source\", to: \"Target\" }")
+        XCTAssertEqual(steps.count, 1)
+        if case .drag(let fromLabel, let toLabel) = steps[0] {
+            XCTAssertEqual(fromLabel, "Source")
+            XCTAssertEqual(toLabel, "Target")
+        } else {
+            XCTFail("Expected .drag, got \(steps[0])")
+        }
+    }
+
+    func testDisplayNameDrag() {
+        let step = SkillStep.drag(fromLabel: "A", toLabel: "B")
+        XCTAssertEqual(step.displayName, "drag: \"A\" -> \"B\"")
+        XCTAssertEqual(step.typeKey, "drag")
+        XCTAssertEqual(step.labelValue, "A")
+    }
 }

@@ -35,6 +35,8 @@ enum SkillStep {
     case resetApp(appName: String)
     case setNetwork(mode: String)
     indirect case measure(name: String, action: SkillStep, until: String, maxSeconds: Double?)
+    case longPress(label: String, durationMs: Int?)
+    case drag(fromLabel: String, toLabel: String)
     case switchTarget(name: String)
     case skipped(stepType: String, reason: String)
 
@@ -57,6 +59,8 @@ enum SkillStep {
         case .resetApp: return "reset_app"
         case .setNetwork: return "set_network"
         case .measure: return "measure"
+        case .longPress: return "long_press"
+        case .drag: return "drag"
         case .switchTarget: return "target"
         case .skipped(let stepType, _): return stepType
         }
@@ -81,6 +85,8 @@ enum SkillStep {
         case .resetApp(let name): return name
         case .setNetwork(let mode): return mode
         case .measure(let name, _, _, _): return name
+        case .longPress(let label, _): return label
+        case .drag(let fromLabel, _): return fromLabel
         case .switchTarget(let name): return name
         case .skipped: return nil
         }
@@ -107,6 +113,8 @@ enum SkillStep {
         case .resetApp(let name): return "reset_app: \"\(name)\""
         case .setNetwork(let mode): return "set_network: \"\(mode)\""
         case .measure(let name, _, _, _): return "measure: \"\(name)\""
+        case .longPress(let label, _): return "long_press: \"\(label)\""
+        case .drag(let from, let to): return "drag: \"\(from)\" -> \"\(to)\""
         case .switchTarget(let name): return "target: \"\(name)\""
         case .skipped(let type, _): return "\(type) (skipped)"
         }
@@ -264,6 +272,10 @@ enum SkillParser {
             return .resetApp(appName: value)
         case "set_network":
             return .setNetwork(mode: value)
+        case "long_press":
+            return parseLongPress(value)
+        case "drag":
+            return parseDrag(value)
         case "target":
             return .switchTarget(name: value)
         case "measure":
@@ -328,6 +340,58 @@ enum SkillParser {
         }
 
         return .waitFor(label: value, timeoutSeconds: nil)
+    }
+
+    /// Parse a long_press value which may include a duration.
+    /// Formats: `"Element"`, `"Element" duration: 1000`
+    private static func parseLongPress(_ value: String) -> SkillStep {
+        if let durationRange = value.range(of: #" duration: "#, options: .regularExpression) {
+            let label = stripQuotes(
+                String(value[value.startIndex..<durationRange.lowerBound])
+                    .trimmingCharacters(in: .whitespaces)
+            )
+            let durationStr = String(value[durationRange.upperBound...])
+                .trimmingCharacters(in: .whitespaces)
+            let duration = Int(durationStr)
+            return .longPress(label: label, durationMs: duration)
+        }
+        return .longPress(label: value, durationMs: nil)
+    }
+
+    /// Parse a drag value with from/to labels.
+    /// Format: `{ from: "Source", to: "Target" }`
+    private static func parseDrag(_ value: String) -> SkillStep {
+        var inner = value
+        if inner.hasPrefix("{") && inner.hasSuffix("}") {
+            inner = String(inner.dropFirst().dropLast())
+        }
+
+        let parts = inner.components(separatedBy: ",").map {
+            $0.trimmingCharacters(in: .whitespaces)
+        }
+
+        var fromLabel = ""
+        var toLabel = ""
+
+        for part in parts {
+            guard let colonIdx = part.firstIndex(of: ":") else { continue }
+            let key = String(part[part.startIndex..<colonIdx])
+                .trimmingCharacters(in: .whitespaces)
+            let val = stripQuotes(
+                String(part[part.index(after: colonIdx)...])
+                    .trimmingCharacters(in: .whitespaces)
+            )
+            switch key {
+            case "from": fromLabel = val
+            case "to": toLabel = val
+            default: break
+            }
+        }
+
+        if fromLabel.isEmpty && toLabel.isEmpty {
+            return .skipped(stepType: "drag", reason: "Missing from/to labels")
+        }
+        return .drag(fromLabel: fromLabel, toLabel: toLabel)
     }
 
     /// Parse a measure step value.

@@ -526,6 +526,8 @@ final class SkillFileTests: XCTestCase {
         case .resetApp: return "reset_app"
         case .setNetwork: return "set_network"
         case .measure: return "measure"
+        case .longPress: return "long_press"
+        case .drag: return "drag"
         case .switchTarget: return "target"
         case .skipped(let type, _): return type
         }

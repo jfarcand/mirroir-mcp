@@ -214,6 +214,48 @@ enum ScenarioContent {
         )
     }
 
+    /// Returns the hit regions for a scenario, mapping tappable rects to their labels.
+    /// Used by FakeScreenView's mouseUp to determine which element was clicked.
+    static func hitRegions(for scenario: FakeScenario) -> [(label: String, rect: CGRect)] {
+        let content = data(for: scenario)
+        let rowHeight: CGFloat = 44
+        let viewWidth: CGFloat = 410
+        var regions: [(String, CGRect)] = []
+
+        // Back chevron
+        if content.hasBackChevron {
+            regions.append(("<", CGRect(x: 0, y: 70, width: 60, height: 40)))
+        }
+
+        // Rows — full-width tappable band
+        for (text, origin) in content.rows {
+            regions.append((text, CGRect(x: 0, y: origin.y - 5, width: viewWidth, height: rowHeight)))
+        }
+
+        // Buttons — their exact CGRects
+        for (title, rect) in content.buttons {
+            regions.append((title, rect))
+        }
+
+        // Cards — their exact CGRects
+        for card in content.cards {
+            regions.append((card.title, card.rect))
+        }
+
+        // Tab bar labels — 60pt wide band around each label position
+        if content.hasTabBar {
+            let tabBarY: CGFloat = 898 - 60
+            let tabBarLabels = ["Home", "Search", "Feed", "Chat", "Profile"]
+            let tabBarXPositions: [CGFloat] = [50, 130, 210, 290, 370]
+            for (idx, label) in tabBarLabels.enumerated() {
+                let cx = tabBarXPositions[idx]
+                regions.append((label, CGRect(x: cx - 30, y: tabBarY, width: 60, height: 60)))
+            }
+        }
+
+        return regions
+    }
+
     /// Health/Santé-style dashboard with colored summary cards.
     /// Exercises: scroll_to (cards extend below fold), tap (card drill-down),
     /// assert_visible (stats values), fingerprinting (dense structured text).
@@ -242,5 +284,66 @@ enum ScenarioContent {
                          color: .systemOrange, rect: cardRect(5)),
             ]
         )
+    }
+}
+
+/// Maps (currentScenario, tappedLabel) → target scenario for interactive navigation.
+/// Defines which taps cause screen transitions in FakeMirroring, enabling
+/// integration tests to validate full tap → navigation → verify flows.
+enum NavigationMap {
+
+    /// Returns the target scenario when a user taps the given label on the current scenario.
+    /// Returns nil if the tap does not trigger a navigation (e.g., tapping a non-interactive element).
+    static func destination(from scenario: FakeScenario, tapping label: String) -> FakeScenario? {
+        switch scenario {
+        case .settings:
+            switch label {
+            case "General": return .detail
+            case "About": return .detailWithBack
+            case "Display", "Privacy": return .detail
+            case "Profile": return .profile            // tab bar
+            default: return nil
+            }
+        case .settingsUpdated:
+            switch label {
+            case "Accessibility", "Sounds", "Wallpaper": return .detail
+            default: return nil
+            }
+        case .detail:
+            switch label {
+            case "<": return .settings                  // back chevron
+            case "Home": return .feed                   // tab bar
+            default: return nil
+            }
+        case .detailWithBack:
+            switch label {
+            case "<": return .settings                  // back chevron
+            default: return nil
+            }
+        case .feed:
+            switch label {
+            case "Profile": return .profile             // tab bar
+            case "Home": return .feed
+            default: return nil
+            }
+        case .profile:
+            switch label {
+            case "Home": return .feed                   // tab bar
+            case "Follow": return .profile              // stays on same screen
+            default: return nil
+            }
+        case .login:
+            switch label {
+            case "Log In": return .feed
+            default: return nil
+            }
+        case .health:
+            switch label {
+            case "Steps", "Heart Rate", "Sleep": return .detailWithBack
+            default: return nil
+            }
+        case .empty:
+            return nil
+        }
     }
 }

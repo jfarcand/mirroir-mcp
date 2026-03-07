@@ -13,6 +13,7 @@ import HelperLib
 final class CompiledStepExecutor {
     private let bridge: any WindowBridging
     private let input: InputProviding
+    private let describer: ScreenDescribing
     private let capture: ScreenCapturing
     private let normalExecutor: StepExecutor
     private let config: StepExecutorConfig
@@ -27,6 +28,7 @@ final class CompiledStepExecutor {
          config: StepExecutorConfig = .default) {
         self.bridge = bridge
         self.input = input
+        self.describer = describer
         self.capture = capture
         self.config = config
         self.normalExecutor = StepExecutor(
@@ -50,7 +52,9 @@ final class CompiledStepExecutor {
 
         switch hints.compiledAction {
         case .tap:
-            return executeTap(step: step, hints: hints, startTime: startTime)
+            return executeTap(step: step, hints: hints,
+                              stepIndex: stepIndex, skillName: skillName,
+                              startTime: startTime)
         case .sleep:
             return executeSleep(step: step, hints: hints, startTime: startTime)
         case .assertion:
@@ -68,7 +72,17 @@ final class CompiledStepExecutor {
     // MARK: - Compiled Actions
 
     private func executeTap(step: SkillStep, hints: StepHints,
+                            stepIndex: Int, skillName: String,
                             startTime: CFAbsoluteTime) -> StepResult {
+        // Confidence gating: if compiled confidence is below threshold, fall back to live OCR
+        let confidence = Double(hints.confidence ?? 1.0)
+        let minConfidence = EnvConfig.compiledTapMinConfidence
+        if confidence < minConfidence {
+            fputs("  Warning: compiled tap confidence \(String(format: "%.2f", confidence)) < \(String(format: "%.2f", minConfidence)) — falling back to live OCR\n", stderr)
+            return normalExecutor.execute(step: step, stepIndex: stepIndex,
+                                           skillName: skillName)
+        }
+
         guard let x = hints.tapX, let y = hints.tapY else {
             return StepResult(step: step, status: .failed,
                               message: "compiled tap missing coordinates",
@@ -80,15 +94,27 @@ final class CompiledStepExecutor {
                               durationSeconds: elapsed(startTime))
         }
 
-        let strategy = hints.matchStrategy ?? "compiled"
-        let result = StepResult(step: step, status: .passed,
-                                message: "compiled tap via \(strategy)",
-                                durationSeconds: elapsed(startTime))
-
         // Inter-step settling delay
         usleep(config.settlingDelayMs * 1000)
 
-        return result
+        // Optional post-tap verification via OCR
+        if EnvConfig.verifyTaps {
+            if let screen = describer.describe(skipOCR: false) {
+                if let label = step.labelValue,
+                   let match = ElementMatcher.findMatch(label: label, in: screen.elements) {
+                    let dx = abs(match.element.tapX - x)
+                    let dy = abs(match.element.tapY - y)
+                    if dx < 5 && dy < 5 {
+                        fputs("  Warning: tap target \"\(label)\" still at same position — navigation may not have occurred\n", stderr)
+                    }
+                }
+            }
+        }
+
+        let strategy = hints.matchStrategy ?? "compiled"
+        return StepResult(step: step, status: .passed,
+                          message: "compiled tap via \(strategy)",
+                          durationSeconds: elapsed(startTime))
     }
 
     private func executeAssertion(step: SkillStep, hints: StepHints,
@@ -166,6 +192,47 @@ final class CompiledStepExecutor {
             }
 
             usleep(config.settlingDelayMs * 1000)
+        }
+
+        // Post-scroll OCR verification: check if the target label is visible
+        if case .scrollTo(let label, _, _) = step {
+            if let screen = describer.describe(skipOCR: false),
+               ElementMatcher.isVisible(label: label, in: screen.elements) {
+                return StepResult(step: step, status: .passed,
+                                  message: "compiled \(count) scroll(s) \(direction), target verified",
+                                  durationSeconds: elapsed(startTime))
+            }
+
+            // Target not found — try one more scroll in each direction
+            for extraDirection in [direction] {
+                let fromX: Double, fromY: Double, toX: Double, toY: Double
+                switch extraDirection.lowercased() {
+                case "up":
+                    fromX = centerX; fromY = centerY + swipeDistance / 2
+                    toX = centerX; toY = centerY - swipeDistance / 2
+                case "down":
+                    fromX = centerX; fromY = centerY - swipeDistance / 2
+                    toX = centerX; toY = centerY + swipeDistance / 2
+                default:
+                    fromX = centerX; fromY = centerY + swipeDistance / 2
+                    toX = centerX; toY = centerY - swipeDistance / 2
+                }
+
+                _ = input.swipe(fromX: fromX, fromY: fromY,
+                                 toX: toX, toY: toY, durationMs: EnvConfig.defaultSwipeDurationMs)
+                usleep(config.settlingDelayMs * 1000)
+
+                if let screen = describer.describe(skipOCR: false),
+                   ElementMatcher.isVisible(label: label, in: screen.elements) {
+                    return StepResult(step: step, status: .passed,
+                                      message: "compiled \(count + 1) scroll(s) \(direction), target verified after extra scroll",
+                                      durationSeconds: elapsed(startTime))
+                }
+            }
+
+            return StepResult(step: step, status: .failed,
+                              message: "compiled \(count) scroll(s) \(direction), target \"\(label)\" not found after OCR verification",
+                              durationSeconds: elapsed(startTime))
         }
 
         return StepResult(step: step, status: .passed,

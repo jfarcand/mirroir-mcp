@@ -234,6 +234,20 @@ enum CompileCommand {
             // AI-only steps cannot be compiled
             return nil
 
+        case .longPress(let label, _):
+            // Compile like tap — cached coordinates from OCR
+            if let lastResult = describer.lastResult,
+               let match = ElementMatcher.findMatch(label: label, in: lastResult.elements) {
+                return .tap(x: match.element.tapX, y: match.element.tapY,
+                           confidence: match.element.confidence,
+                           strategy: match.strategy.rawValue)
+            }
+            return .passthrough()
+
+        case .drag:
+            // Drag requires two OCR lookups at runtime — compile as passthrough
+            return .passthrough()
+
         // Steps that are already OCR-free
         case .launch, .type, .pressKey, .swipe, .home, .openURL, .shake,
              .resetApp, .setNetwork, .screenshot, .switchTarget:

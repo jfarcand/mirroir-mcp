@@ -19,6 +19,7 @@ struct TestRunConfig {
     let noCompiled: Bool
     /// Agent mode: nil = no agent, "" = deterministic only, non-empty = AI model name.
     let agent: String?
+    let noAutoRecompile: Bool
     let showHelp: Bool
 }
 
@@ -124,8 +125,21 @@ enum TestRunner {
                     case .stale(let reason):
                         fputs("Warning: compiled skill stale for \(skill.name): \(reason)\n", stderr)
                     case .drifted(_, let reason):
-                        fputs("Warning: \(skill.name): \(reason) — using compiled skill anyway\n", stderr)
-                        compiledMap[skill.filePath] = compiled
+                        if config.noAutoRecompile {
+                            fputs("Warning: \(skill.name): \(reason) — using compiled skill anyway\n", stderr)
+                            compiledMap[skill.filePath] = compiled
+                        } else {
+                            fputs("Warning: \(skill.name): \(reason) — auto-recompiling\n", stderr)
+                            if let recompiled = autoRecompile(
+                                skill: skill, bridge: bridge, input: input,
+                                describer: describer, capture: capture,
+                                config: executorConfig) {
+                                compiledMap[skill.filePath] = recompiled
+                            } else {
+                                fputs("  Falling back to original compiled skill\n", stderr)
+                                compiledMap[skill.filePath] = compiled
+                            }
+                        }
                     }
                 }
             }
@@ -235,145 +249,6 @@ enum TestRunner {
         return skillResult
     }
 
-    /// Execute a skill using compiled hints for OCR-free replay.
-    /// When `agent` is non-nil, failed steps trigger a diagnostic OCR call.
-    /// When `agent` is a non-empty model name, AI diagnosis runs after deterministic analysis.
-    static func executeCompiledSkill(
-        skill: SkillDefinition,
-        compiled: CompiledSkill,
-        compiledExecutor: CompiledStepExecutor,
-        normalExecutor: StepExecutor,
-        describer: ScreenDescribing,
-        agent: String?,
-        verbose: Bool
-    ) -> ConsoleReporter.SkillResult {
-        let agentEnabled = agent != nil
-        let stepCount = skill.steps.count
-        let tag: String
-        if let modelName = agent, !modelName.isEmpty {
-            tag = " [compiled+agent:\(modelName)]"
-        } else if agentEnabled {
-            tag = " [compiled+agent]"
-        } else {
-            tag = " [compiled]"
-        }
-        ConsoleReporter.reportSkillStart(
-            name: skill.name + tag,
-            filePath: skill.filePath, stepCount: stepCount)
-
-        let startTime = CFAbsoluteTimeGetCurrent()
-        var stepResults: [StepResult] = []
-        var stopOnFailure = false
-        var recommendations: [AgentDiagnostic.Recommendation] = []
-
-        for (index, step) in skill.steps.enumerated() {
-            if stopOnFailure {
-                let skippedResult = StepResult(
-                    step: step, status: .skipped,
-                    message: "Skipped due to previous failure",
-                    durationSeconds: 0)
-                stepResults.append(skippedResult)
-                ConsoleReporter.reportStep(index: index, total: stepCount,
-                                           result: skippedResult, verbose: verbose)
-                continue
-            }
-
-            let result: StepResult
-            if index < compiled.steps.count {
-                let compiledStep = compiled.steps[index]
-                result = compiledExecutor.execute(
-                    step: step, compiledStep: compiledStep,
-                    stepIndex: index, skillName: skill.name)
-
-                // Agent diagnostic on failure
-                if agentEnabled && result.status == .failed {
-                    if let rec = AgentDiagnostic.diagnose(
-                        step: step, compiledStep: compiledStep,
-                        failureMessage: result.message, describer: describer) {
-                        recommendations.append(rec)
-                    }
-                }
-            } else {
-                result = normalExecutor.execute(
-                    step: step, stepIndex: index, skillName: skill.name)
-
-                // Agent diagnostic on normal step failure within a compiled skill
-                if agentEnabled && result.status == .failed {
-                    let synthStep = CompiledStep(
-                        index: index, type: step.typeKey,
-                        label: step.labelValue,
-                        hints: StepHints.passthrough())
-                    if let rec = AgentDiagnostic.diagnose(
-                        step: step, compiledStep: synthStep,
-                        failureMessage: result.message, describer: describer) {
-                        recommendations.append(rec)
-                    }
-                }
-            }
-
-            stepResults.append(result)
-            ConsoleReporter.reportStep(index: index, total: stepCount,
-                                       result: result, verbose: verbose)
-
-            if result.status == .failed {
-                stopOnFailure = true
-            }
-        }
-
-        // Print deterministic diagnostic report
-        if agentEnabled && !recommendations.isEmpty {
-            AgentDiagnostic.printReport(recommendations: recommendations,
-                                         skillName: skill.name)
-        }
-
-        // Run AI diagnosis if a model name was specified
-        if let modelName = agent, !modelName.isEmpty, !recommendations.isEmpty {
-            runAIDiagnosis(
-                modelName: modelName,
-                recommendations: recommendations,
-                skillName: skill.name,
-                skillFilePath: skill.filePath)
-        }
-
-        let totalDuration = CFAbsoluteTimeGetCurrent() - startTime
-        let skillResult = ConsoleReporter.SkillResult(
-            name: skill.name,
-            filePath: skill.filePath,
-            stepResults: stepResults,
-            durationSeconds: totalDuration
-        )
-        ConsoleReporter.reportSkillEnd(result: skillResult)
-        return skillResult
-    }
-
-    /// Resolve and invoke the AI agent for diagnosis. Errors are non-fatal warnings.
-    private static func runAIDiagnosis(
-        modelName: String,
-        recommendations: [AgentDiagnostic.Recommendation],
-        skillName: String,
-        skillFilePath: String
-    ) {
-        guard let agentConfig = AIAgentRegistry.resolve(name: modelName) else {
-            let available = AIAgentRegistry.availableAgents().joined(separator: ", ")
-            fputs("Error: Unknown agent '\(modelName)'. Available: \(available)\n", stderr)
-            return
-        }
-
-        guard let provider = AIAgentRegistry.createProvider(config: agentConfig) else {
-            fputs("Warning: Could not create provider for agent '\(modelName)'\n", stderr)
-            return
-        }
-
-        let payload = AgentDiagnostic.buildPayload(
-            recommendations: recommendations,
-            skillName: skillName,
-            skillFilePath: skillFilePath)
-
-        if let diagnosis = provider.diagnose(payload: payload) {
-            AgentDiagnostic.printAIReport(diagnosis: diagnosis, skillName: skillName)
-        }
-    }
-
     // MARK: - Argument Parsing
 
     /// Parse CLI arguments into TestRunConfig.
@@ -386,6 +261,7 @@ enum TestRunner {
         var dryRun = false
         var noCompiled = false
         var agent: String?
+        var noAutoRecompile = false
         var showHelp = false
 
         var i = 0
@@ -409,6 +285,8 @@ enum TestRunner {
                 dryRun = true
             case "--no-compiled":
                 noCompiled = true
+            case "--no-auto-recompile":
+                noAutoRecompile = true
             case "--agent":
                 // Peek-ahead: if next arg doesn't start with "-" and isn't a .yaml path,
                 // consume it as the model name. Otherwise, bare --agent = deterministic only.
@@ -440,6 +318,7 @@ enum TestRunner {
             dryRun: dryRun,
             noCompiled: noCompiled,
             agent: agent,
+            noAutoRecompile: noAutoRecompile,
             showHelp: showHelp
         )
     }
@@ -540,6 +419,7 @@ enum TestRunner {
           --verbose, -v       Show detailed output
           --dry-run           Parse and validate without executing
           --no-compiled       Skip compiled skills (force full OCR)
+          --no-auto-recompile Skip auto-recompilation of drifted compiled skills
           --agent [model]     Diagnose compiled failures. Without model: deterministic OCR only.
                               With model: deterministic + AI diagnosis.
                               Built-in: gpt-5.3, claude-sonnet-4-6, claude-haiku-4-5, embacle

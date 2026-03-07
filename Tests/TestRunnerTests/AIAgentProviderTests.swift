@@ -355,7 +355,8 @@ struct AIAgentProviderTests {
                 diagnosis: "Element moved",
                 patches: [
                     AgentDiagnostic.Patch(field: "tapX", was: "50.0", shouldBe: "75.0"),
-                ]
+                ],
+                screenshotBase64: nil
             ),
         ]
 

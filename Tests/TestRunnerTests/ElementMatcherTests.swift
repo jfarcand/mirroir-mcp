@@ -100,6 +100,50 @@ final class ElementMatcherTests: XCTestCase {
         XCTAssertEqual(result?.element.text, "Sett")
     }
 
+    // MARK: - Diacritic-Insensitive Match
+
+    func testDiacriticInsensitiveMatch() {
+        let elements = [makeTapPoint(text: "Résumé")]
+        let result = ElementMatcher.findMatch(label: "Resume", in: elements)
+        XCTAssertNotNil(result)
+        XCTAssertEqual(result?.element.text, "Résumé")
+        XCTAssertEqual(result?.strategy, .diacriticInsensitive)
+    }
+
+    func testDiacriticInsensitiveMatchCafe() {
+        let elements = [makeTapPoint(text: "café")]
+        let result = ElementMatcher.findMatch(label: "cafe", in: elements)
+        XCTAssertNotNil(result)
+        XCTAssertEqual(result?.element.text, "café")
+        XCTAssertEqual(result?.strategy, .diacriticInsensitive)
+    }
+
+    func testDiacriticInsensitiveMatchReversed() {
+        let elements = [makeTapPoint(text: "Resume")]
+        let result = ElementMatcher.findMatch(label: "Résumé", in: elements)
+        XCTAssertNotNil(result)
+        XCTAssertEqual(result?.element.text, "Resume")
+        XCTAssertEqual(result?.strategy, .diacriticInsensitive)
+    }
+
+    func testDiacriticInsensitiveRankedBelowCaseInsensitive() {
+        // "RESUME" matches "Resume" via case-insensitive (priority 2),
+        // "Résumé" would match "Resume" via diacritic-insensitive (priority 3)
+        let elements = [makeTapPoint(text: "Résumé"), makeTapPoint(text: "RESUME")]
+        let result = ElementMatcher.findMatch(label: "Resume", in: elements)
+        XCTAssertNotNil(result)
+        // Should prefer case-insensitive exact match over diacritic match
+        XCTAssertEqual(result?.element.text, "RESUME")
+        XCTAssertEqual(result?.strategy, .caseInsensitive)
+    }
+
+    func testDiacriticInsensitiveWithAccentedChars() {
+        let elements = [makeTapPoint(text: "Réglages")]
+        let result = ElementMatcher.findMatch(label: "Reglages", in: elements)
+        XCTAssertNotNil(result)
+        XCTAssertEqual(result?.strategy, .diacriticInsensitive)
+    }
+
     // MARK: - No Match
 
     func testNoMatch() {

@@ -50,6 +50,25 @@ final class FakeScreenView: NSView {
         if content.hasTabBar { drawTabBar() }
     }
 
+    // MARK: - Hit Detection
+
+    override func mouseUp(with event: NSEvent) {
+        let point = convert(event.locationInWindow, from: nil)
+        // NSView flipped coordinate: convert from bottom-left to top-left origin
+        let flippedY = bounds.height - point.y
+        let clickPoint = CGPoint(x: point.x, y: flippedY)
+
+        let regions = ScenarioContent.hitRegions(for: scenario)
+        for (label, rect) in regions {
+            if rect.contains(clickPoint) {
+                if let target = NavigationMap.destination(from: scenario, tapping: label) {
+                    scenario = target
+                }
+                return
+            }
+        }
+    }
+
     // MARK: - Drawing Primitives
 
     private func drawStatusBar() {

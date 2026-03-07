@@ -18,6 +18,8 @@ enum AgentDiagnostic {
         let label: String?
         let diagnosis: String
         let patches: [Patch]
+        /// Base64-encoded screenshot of the screen at the time of diagnosis.
+        let screenshotBase64: String?
     }
 
     /// A single field change in the compiled JSON.
@@ -44,23 +46,30 @@ enum AgentDiagnostic {
                 stepType: compiledStep.type,
                 label: compiledStep.label,
                 diagnosis: "Cannot OCR screen for diagnosis (capture failed)",
-                patches: []
+                patches: [],
+                screenshotBase64: nil
             )
         }
+
+        let screenshot = screen.screenshotBase64
 
         switch hints.compiledAction {
         case .tap:
             return diagnoseTap(compiledStep: compiledStep, hints: hints,
-                               screen: screen, failureMessage: failureMessage)
+                               screen: screen, failureMessage: failureMessage,
+                               screenshot: screenshot)
         case .sleep, .assertion:
             return diagnoseSleep(compiledStep: compiledStep, hints: hints,
-                                 screen: screen, failureMessage: failureMessage)
+                                 screen: screen, failureMessage: failureMessage,
+                                 screenshot: screenshot)
         case .scrollSequence:
             return diagnoseScroll(compiledStep: compiledStep, hints: hints,
-                                  screen: screen, failureMessage: failureMessage)
+                                  screen: screen, failureMessage: failureMessage,
+                                  screenshot: screenshot)
         case .passthrough:
             return diagnosePassthrough(compiledStep: compiledStep,
-                                       screen: screen, failureMessage: failureMessage)
+                                       screen: screen, failureMessage: failureMessage,
+                                       screenshot: screenshot)
         }
     }
 
@@ -70,7 +79,8 @@ enum AgentDiagnostic {
         compiledStep: CompiledStep,
         hints: StepHints,
         screen: ScreenDescriber.DescribeResult,
-        failureMessage: String?
+        failureMessage: String?,
+        screenshot: String
     ) -> Recommendation {
         let label = compiledStep.label ?? ""
         let compiledX = hints.tapX ?? 0
@@ -87,7 +97,8 @@ enum AgentDiagnostic {
                     stepType: compiledStep.type,
                     label: label,
                     diagnosis: "Element \"\(label)\" is at the compiled position — tap may have been absorbed by the UI",
-                    patches: []
+                    patches: [],
+                    screenshotBase64: screenshot
                 )
             }
 
@@ -99,7 +110,8 @@ enum AgentDiagnostic {
                 patches: [
                     Patch(field: "tapX", was: fmt(compiledX), shouldBe: fmt(match.element.tapX)),
                     Patch(field: "tapY", was: fmt(compiledY), shouldBe: fmt(match.element.tapY)),
-                ]
+                ],
+                screenshotBase64: screenshot
             )
         }
 
@@ -110,7 +122,8 @@ enum AgentDiagnostic {
             stepType: compiledStep.type,
             label: label,
             diagnosis: "Element \"\(label)\" not found on screen. Visible: \(visible.joined(separator: ", "))",
-            patches: []
+            patches: [],
+            screenshotBase64: screenshot
         )
     }
 
@@ -120,7 +133,8 @@ enum AgentDiagnostic {
         compiledStep: CompiledStep,
         hints: StepHints,
         screen: ScreenDescriber.DescribeResult,
-        failureMessage: String?
+        failureMessage: String?,
+        screenshot: String
     ) -> Recommendation {
         let label = compiledStep.label ?? ""
 
@@ -136,7 +150,8 @@ enum AgentDiagnostic {
                     patches: [
                         Patch(field: "observedDelayMs", was: "\(delayMs)",
                               shouldBe: "\(delayMs + 1000)")
-                    ]
+                    ],
+                    screenshotBase64: screenshot
                 )
             }
 
@@ -146,7 +161,8 @@ enum AgentDiagnostic {
                 stepType: compiledStep.type,
                 label: label,
                 diagnosis: "Element \"\(label)\" not visible after compiled sleep. Screen shows: \(visible.joined(separator: ", ")). Previous step may have navigated to wrong screen.",
-                patches: []
+                patches: [],
+                screenshotBase64: screenshot
             )
         }
 
@@ -157,7 +173,8 @@ enum AgentDiagnostic {
                     stepType: compiledStep.type,
                     label: label,
                     diagnosis: "Element \"\(label)\" is correctly not visible. Step should have passed.",
-                    patches: []
+                    patches: [],
+                    screenshotBase64: screenshot
                 )
             }
 
@@ -166,7 +183,8 @@ enum AgentDiagnostic {
                 stepType: compiledStep.type,
                 label: label,
                 diagnosis: "Element \"\(label)\" is unexpectedly visible. Previous step may not have navigated away.",
-                patches: []
+                patches: [],
+                screenshotBase64: screenshot
             )
         }
 
@@ -175,7 +193,8 @@ enum AgentDiagnostic {
             stepType: compiledStep.type,
             label: label,
             diagnosis: failureMessage ?? "Sleep step failed",
-            patches: []
+            patches: [],
+            screenshotBase64: screenshot
         )
     }
 
@@ -185,7 +204,8 @@ enum AgentDiagnostic {
         compiledStep: CompiledStep,
         hints: StepHints,
         screen: ScreenDescriber.DescribeResult,
-        failureMessage: String?
+        failureMessage: String?,
+        screenshot: String
     ) -> Recommendation {
         let label = compiledStep.label ?? ""
         let compiledCount = hints.scrollCount ?? 0
@@ -196,7 +216,8 @@ enum AgentDiagnostic {
                 stepType: compiledStep.type,
                 label: label,
                 diagnosis: "Element \"\(label)\" IS visible after \(compiledCount) scroll(s) — scroll count may need adjustment",
-                patches: []
+                patches: [],
+                screenshotBase64: screenshot
             )
         }
 
@@ -209,7 +230,8 @@ enum AgentDiagnostic {
             patches: [
                 Patch(field: "scrollCount", was: "\(compiledCount)",
                       shouldBe: "\(compiledCount + 2)")
-            ]
+            ],
+            screenshotBase64: screenshot
         )
     }
 
@@ -218,7 +240,8 @@ enum AgentDiagnostic {
     private static func diagnosePassthrough(
         compiledStep: CompiledStep,
         screen: ScreenDescriber.DescribeResult,
-        failureMessage: String?
+        failureMessage: String?,
+        screenshot: String
     ) -> Recommendation {
         let visible = screen.elements.prefix(8).map { "\"\($0.text)\"" }
         return Recommendation(
@@ -226,7 +249,8 @@ enum AgentDiagnostic {
             stepType: compiledStep.type,
             label: compiledStep.label,
             diagnosis: "Passthrough step failed: \(failureMessage ?? "unknown"). Screen shows: \(visible.joined(separator: ", "))",
-            patches: []
+            patches: [],
+            screenshotBase64: screenshot
         )
     }
 

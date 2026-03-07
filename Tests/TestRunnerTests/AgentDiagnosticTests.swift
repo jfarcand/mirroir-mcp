@@ -287,7 +287,8 @@ struct AgentDiagnosticTests {
                 patches: [
                     AgentDiagnostic.Patch(field: "tapX", was: "100.0", shouldBe: "150.0"),
                     AgentDiagnostic.Patch(field: "tapY", was: "200.0", shouldBe: "250.0"),
-                ]),
+                ],
+                screenshotBase64: nil),
         ]
 
         // Capture stderr output

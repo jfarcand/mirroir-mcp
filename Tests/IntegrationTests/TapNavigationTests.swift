@@ -1,0 +1,165 @@
+// Copyright 2026 jfarcand@apache.org
+// Licensed under the Apache License, Version 2.0
+// ABOUTME: Integration tests for interactive FakeMirroring tap → navigation flows.
+// ABOUTME: Validates that tapping elements in FakeMirroring triggers scenario transitions detected by OCR.
+
+import XCTest
+import HelperLib
+@testable import mirroir_mcp
+
+/// Tests that tapping rendered elements in FakeMirroring causes visible screen transitions.
+/// Validates the full pipeline: OCR → compute coordinates → tap → verify new screen content.
+///
+/// These tests exercise real CGEvent taps against FakeMirroring's mouseUp hit detection,
+/// proving that the input simulation and OCR pipeline produce correct, actionable coordinates.
+final class TapNavigationTests: XCTestCase {
+
+    private var bridge: MirroringBridge!
+    private var input: InputSimulation!
+    private var describer: ScreenDescriber!
+
+    override func setUpWithError() throws {
+        try super.setUpWithError()
+        guard IntegrationTestHelper.isFakeMirroringRunning else {
+            throw XCTSkip("FakeMirroring not running")
+        }
+        bridge = MirroringBridge(bundleID: IntegrationTestHelper.fakeBundleID)
+        guard IntegrationTestHelper.ensureWindowReady(bridge: bridge) else {
+            throw XCTSkip("FakeMirroring window not capturable")
+        }
+        let capture = ScreenCapture(bridge: bridge)
+        describer = ScreenDescriber(bridge: bridge, capture: capture)
+        input = InputSimulation(bridge: bridge)
+
+        // Start every test on Settings scenario
+        _ = bridge.triggerMenuAction(menu: "Scenario", item: "Settings")
+        usleep(500_000)
+    }
+
+    override func tearDown() {
+        // Restore Settings scenario for other test classes
+        if let bridge = bridge {
+            _ = bridge.triggerMenuAction(menu: "Scenario", item: "Settings")
+            usleep(500_000)
+            IntegrationTestHelper.ensureWindowReady(bridge: bridge)
+        }
+        super.tearDown()
+    }
+
+    // MARK: - Row Tap Navigation
+
+    /// Tap "General" row on Settings → should navigate to Detail screen (header: "General").
+    func testTapGeneralNavigatesToDetail() throws {
+        try tapAndVerifyNavigation(
+            tapLabel: "General",
+            expectedHeader: "General",
+            description: "Settings → General → Detail"
+        )
+    }
+
+    /// Tap "About" row on Settings → should navigate to Detail (Back) screen with "<" chevron.
+    func testTapAboutNavigatesToDetailWithBack() throws {
+        try tapAndVerifyNavigation(
+            tapLabel: "About",
+            expectedHeader: "About",
+            description: "Settings → About → Detail (Back)"
+        )
+    }
+
+    // MARK: - Back Chevron Navigation
+
+    /// Navigate to Detail (Back) then tap "<" → should return to Settings.
+    func testBackChevronReturnsToSettings() throws {
+        // First navigate to Detail (Back)
+        _ = bridge.triggerMenuAction(menu: "Scenario", item: "Detail (Back)")
+        usleep(500_000)
+
+        // Verify we're on the About screen
+        let beforeScreen = try describeOrSkip()
+        let beforeTexts = beforeScreen.elements.map { $0.text.lowercased() }
+        XCTAssertTrue(beforeTexts.contains("about"), "Should be on Detail (Back) screen before back tap")
+
+        // Find and tap the "<" back chevron
+        guard let chevron = beforeScreen.elements.first(where: {
+            $0.text == "<" || $0.text == "‹" || $0.text == "〈" || $0.text == "く"
+        }) else {
+            throw XCTSkip("Back chevron not detected by OCR")
+        }
+
+        let tapError = input.tap(x: chevron.tapX, y: chevron.tapY)
+        XCTAssertNil(tapError, "Tap on back chevron should succeed: \(tapError ?? "")")
+        usleep(800_000)
+
+        // Verify we navigated back to Settings
+        let afterScreen = try describeOrSkip()
+        let afterTexts = afterScreen.elements.map { $0.text.lowercased() }
+        XCTAssertTrue(afterTexts.contains("settings"),
+                      "After back tap, should be on Settings. Found: \(afterTexts)")
+    }
+
+    // MARK: - Button Tap
+
+    /// On Login screen, tap "Log In" button → should navigate to Feed.
+    func testTapLoginButtonNavigatesToFeed() throws {
+        _ = bridge.triggerMenuAction(menu: "Scenario", item: "Login")
+        usleep(500_000)
+
+        try tapAndVerifyNavigation(
+            tapLabel: "Log In",
+            expectedHeader: "Home",
+            description: "Login → Log In → Feed"
+        )
+    }
+
+    // MARK: - Card Tap
+
+    /// On Health screen, tap "Steps" card → should navigate to Detail (Back).
+    func testTapHealthCardNavigatesToDetail() throws {
+        _ = bridge.triggerMenuAction(menu: "Scenario", item: "Health")
+        usleep(500_000)
+
+        try tapAndVerifyNavigation(
+            tapLabel: "Steps",
+            expectedHeader: "About",
+            description: "Health → Steps → Detail (Back)"
+        )
+    }
+
+    // MARK: - Helpers
+
+    /// OCR the current screen, find the element matching `tapLabel`, tap it,
+    /// then OCR again and verify the header changed to `expectedHeader`.
+    private func tapAndVerifyNavigation(
+        tapLabel: String,
+        expectedHeader: String,
+        description: String
+    ) throws {
+        let screen = try describeOrSkip()
+        let elements = screen.elements
+
+        guard let target = elements.first(where: {
+            $0.text.caseInsensitiveCompare(tapLabel) == .orderedSame
+        }) else {
+            throw XCTSkip("'\(tapLabel)' not found by OCR for: \(description)")
+        }
+
+        let tapError = input.tap(x: target.tapX, y: target.tapY)
+        XCTAssertNil(tapError, "Tap on '\(tapLabel)' should succeed: \(tapError ?? "")")
+        usleep(800_000)
+
+        let afterScreen = try describeOrSkip()
+        let afterTexts = afterScreen.elements.map { $0.text.lowercased() }
+        XCTAssertTrue(
+            afterTexts.contains(expectedHeader.lowercased()),
+            "\(description): expected header '\(expectedHeader)' after tap. Found: \(afterTexts)"
+        )
+    }
+
+    private func describeOrSkip() throws -> ScreenDescriber.DescribeResult {
+        for attempt in 1...3 {
+            if let result = describer.describe(skipOCR: false) { return result }
+            if attempt < 3 { usleep(500_000) }
+        }
+        throw XCTSkip("describe() returned nil after retries")
+    }
+}

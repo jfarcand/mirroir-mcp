@@ -128,6 +128,12 @@ final class StepExecutor {
             result = executeOpenURL(url: url, startTime: startTime)
         case .shake:
             result = executeShake(startTime: startTime)
+        case .longPress(let label, let durationMs):
+            result = executeLongPress(label: label, durationMs: durationMs,
+                                       startTime: startTime)
+        case .drag(let fromLabel, let toLabel):
+            result = executeDrag(fromLabel: fromLabel, toLabel: toLabel,
+                                  startTime: startTime)
         case .scrollTo(let label, let direction, let maxScrolls):
             result = executeScrollTo(label: label, direction: direction,
                                       maxScrolls: maxScrolls, startTime: startTime)
@@ -253,18 +259,24 @@ final class StepExecutor {
     private func executeWaitFor(label: String, timeoutSeconds: Int,
                                 startTime: CFAbsoluteTime) -> StepResult {
         let step = SkillStep.waitFor(label: label, timeoutSeconds: timeoutSeconds)
-        let pollIntervalUs: useconds_t = EnvConfig.waitForPollIntervalUs
+        let deadline = CFAbsoluteTimeGetCurrent() + Double(timeoutSeconds)
 
-        for _ in 0..<timeoutSeconds {
+        // Exponential backoff: start at 200ms, double each iteration, cap at 2s
+        let initialPollUs: useconds_t = 200_000
+        let maxPollUs: useconds_t = 2_000_000
+        var currentPollUs = initialPollUs
+
+        while CFAbsoluteTimeGetCurrent() < deadline {
             if let describeResult = describer.describe(skipOCR: false),
                ElementMatcher.isVisible(label: label, in: describeResult.elements) {
                 return StepResult(step: step, status: .passed, message: nil,
                                   durationSeconds: elapsed(startTime))
             }
-            usleep(pollIntervalUs)
+            usleep(currentPollUs)
+            currentPollUs = min(currentPollUs * 2, maxPollUs)
         }
 
-        // Final check
+        // Final check after deadline
         if let describeResult = describer.describe(skipOCR: false),
            ElementMatcher.isVisible(label: label, in: describeResult.elements) {
             return StepResult(step: step, status: .passed, message: nil,

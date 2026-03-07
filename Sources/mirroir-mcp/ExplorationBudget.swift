@@ -5,6 +5,7 @@
 // ABOUTME: Prevents runaway exploration by enforcing configurable limits on DFS traversal.
 
 import Foundation
+import HelperLib
 
 /// Budget constraints for autonomous app exploration.
 /// Prevents runaway exploration by enforcing limits on depth, screen count,
@@ -53,12 +54,13 @@ struct ExplorationBudget: Sendable {
     }
 
     /// Default budget suitable for most mobile app explorations.
+    /// Reads limits from EnvConfig (settings.json / env vars) with sensible defaults.
     /// Includes built-in safety skip patterns for destructive, network, ad, and purchase actions.
     /// permissions.json `skipElements` can add patterns on top of these via `mergedWith(_:)`.
     static let `default` = ExplorationBudget(
-        maxDepth: 6,
-        maxScreens: 30,
-        maxTimeSeconds: 300,
+        maxDepth: EnvConfig.explorationMaxDepth,
+        maxScreens: EnvConfig.explorationMaxScreens,
+        maxTimeSeconds: EnvConfig.explorationMaxTimeSeconds,
         maxActionsPerScreen: 5,
         scrollLimit: 3,
         maxScoutsPerScreen: 8,

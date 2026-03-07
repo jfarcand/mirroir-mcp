@@ -72,6 +72,73 @@ extension StepExecutor {
                           durationSeconds: elapsed(startTime))
     }
 
+    // MARK: - long_press
+
+    func executeLongPress(label: String, durationMs: Int?,
+                           startTime: CFAbsoluteTime) -> StepResult {
+        let step = SkillStep.longPress(label: label, durationMs: durationMs)
+
+        guard let describeResult = describer.describe(skipOCR: false) else {
+            return StepResult(step: step, status: .failed,
+                              message: "Failed to capture screen for OCR",
+                              durationSeconds: elapsed(startTime))
+        }
+
+        guard let match = ElementMatcher.findMatch(label: label, in: describeResult.elements) else {
+            let available = describeResult.elements.map { $0.text }.joined(separator: ", ")
+            return StepResult(step: step, status: .failed,
+                              message: "Element \"\(label)\" not found. Visible: [\(available)]",
+                              durationSeconds: elapsed(startTime))
+        }
+
+        let duration = durationMs ?? EnvConfig.defaultLongPressDurationMs
+        if let error = input.longPress(x: match.element.tapX, y: match.element.tapY,
+                                        durationMs: duration) {
+            return StepResult(step: step, status: .failed, message: error,
+                              durationSeconds: elapsed(startTime))
+        }
+
+        return StepResult(step: step, status: .passed,
+                          message: "long press \(duration)ms via \(match.strategy.rawValue)",
+                          durationSeconds: elapsed(startTime))
+    }
+
+    // MARK: - drag
+
+    func executeDrag(fromLabel: String, toLabel: String,
+                      startTime: CFAbsoluteTime) -> StepResult {
+        let step = SkillStep.drag(fromLabel: fromLabel, toLabel: toLabel)
+
+        guard let describeResult = describer.describe(skipOCR: false) else {
+            return StepResult(step: step, status: .failed,
+                              message: "Failed to capture screen for OCR",
+                              durationSeconds: elapsed(startTime))
+        }
+
+        guard let fromMatch = ElementMatcher.findMatch(label: fromLabel, in: describeResult.elements) else {
+            return StepResult(step: step, status: .failed,
+                              message: "Drag source \"\(fromLabel)\" not found",
+                              durationSeconds: elapsed(startTime))
+        }
+
+        guard let toMatch = ElementMatcher.findMatch(label: toLabel, in: describeResult.elements) else {
+            return StepResult(step: step, status: .failed,
+                              message: "Drag target \"\(toLabel)\" not found",
+                              durationSeconds: elapsed(startTime))
+        }
+
+        if let error = input.drag(fromX: fromMatch.element.tapX, fromY: fromMatch.element.tapY,
+                                   toX: toMatch.element.tapX, toY: toMatch.element.tapY,
+                                   durationMs: EnvConfig.defaultDragDurationMs) {
+            return StepResult(step: step, status: .failed, message: error,
+                              durationSeconds: elapsed(startTime))
+        }
+
+        return StepResult(step: step, status: .passed,
+                          message: "dragged from \"\(fromLabel)\" to \"\(toLabel)\"",
+                          durationSeconds: elapsed(startTime))
+    }
+
     // MARK: - reset_app
 
     func executeResetApp(appName: String, startTime: CFAbsoluteTime) -> StepResult {
