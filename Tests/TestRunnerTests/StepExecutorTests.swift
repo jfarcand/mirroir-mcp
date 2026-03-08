@@ -405,6 +405,36 @@ final class StepExecutorTests: XCTestCase {
         XCTAssertTrue(result.message?.contains("App Switcher") ?? false)
     }
 
+    func testResetAppFailsClosedOnNilOCR() {
+        // When OCR/capture returns nil, reset_app must NOT proceed with the
+        // destructive swipe. It should fail instead of silently killing the
+        // wrong app.
+        describer.describeResult = nil
+
+        let result = executor.execute(
+            step: .resetApp(appName: "Settings"), stepIndex: 0, skillName: "test")
+        XCTAssertEqual(result.status, .failed)
+        XCTAssertTrue(result.message?.contains("capture") ?? false)
+        XCTAssertEqual(input.dragCalls.count, 0, "Must not swipe when OCR fails")
+        XCTAssertTrue(bridge.menuActionCalls.contains(where: { $0.item == "Home Screen" }),
+                       "Should return to Home Screen on OCR failure")
+    }
+
+    func testResetAppNotFoundInSwitcher() {
+        // When the app name is not visible in OCR, the app is treated as
+        // already quit. No swipe should occur.
+        describer.describeResult = ScreenDescriber.DescribeResult(
+            elements: [TapPoint(text: "Messages", tapX: 200, tapY: 400, confidence: 0.95)],
+            screenshotBase64: ""
+        )
+
+        let result = executor.execute(
+            step: .resetApp(appName: "Settings"), stepIndex: 0, skillName: "test")
+        XCTAssertEqual(result.status, .passed)
+        XCTAssertTrue(result.message?.contains("already quit") ?? false)
+        XCTAssertEqual(input.dragCalls.count, 0, "Must not swipe when app not in switcher")
+    }
+
     // MARK: - set_network
 
     func testSetNetworkAirplaneOn() {

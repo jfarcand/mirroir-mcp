@@ -58,9 +58,24 @@ extension MirroirMCP {
                 }
                 usleep(EnvConfig.toolSettlingDelayUs)
 
-                // Drag up on the centered card to dismiss it. No OCR needed —
-                // the target app is always the first card after launching it.
+                // Verify the target app is actually visible in the App Switcher
+                // before swiping. If the Spotlight launch failed or the app wasn't
+                // found, the centered card belongs to a different app — don't kill it.
+                let describer = ctx.describer
                 let windowSize = ctx.bridge.getWindowInfo()?.size
+                guard let ocrResult = describer.describe(skipOCR: false) else {
+                    _ = menuBridge.triggerMenuAction(menu: "View", item: "Home Screen")
+                    return .error("Failed to capture App Switcher screen for verification")
+                }
+                let visibleTexts = ocrResult.elements.map { $0.text.lowercased() }
+                let appNameLower = appName.lowercased()
+                let appFound = visibleTexts.contains { $0.contains(appNameLower) }
+                if !appFound {
+                    _ = menuBridge.triggerMenuAction(menu: "View", item: "Home Screen")
+                    return .text("'\(appName)' is not in the App Switcher (already quit)")
+                }
+
+                // Drag up on the centered card to dismiss it.
                 let cardX = (windowSize.map { Double($0.width) } ?? 410.0) * EnvConfig.appSwitcherCardXFraction
                 let cardY = (windowSize.map { Double($0.height) } ?? 890.0) * EnvConfig.appSwitcherCardYFraction
                 let toY = max(0, cardY - EnvConfig.appSwitcherSwipeDistance)

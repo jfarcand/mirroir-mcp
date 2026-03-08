@@ -168,8 +168,26 @@ extension StepExecutor {
         }
         usleep(config.settlingDelayMs * 1000)
 
-        // Drag up on the centered card to dismiss it. No OCR needed —
-        // the target app is always the first card after launching it.
+        // Verify the target app is actually visible in the App Switcher
+        // before swiping. If the Spotlight launch failed or the app wasn't
+        // found, the centered card belongs to a different app — don't kill it.
+        guard let ocrResult = describer.describe(skipOCR: false) else {
+            _ = menuBridge.triggerMenuAction(menu: "View", item: "Home Screen")
+            return StepResult(step: step, status: .failed,
+                              message: "Failed to capture App Switcher screen for verification",
+                              durationSeconds: elapsed(startTime))
+        }
+        let visibleTexts = ocrResult.elements.map { $0.text.lowercased() }
+        let appNameLower = appName.lowercased()
+        let appFound = visibleTexts.contains { $0.contains(appNameLower) }
+        if !appFound {
+            _ = menuBridge.triggerMenuAction(menu: "View", item: "Home Screen")
+            return StepResult(step: step, status: .passed,
+                              message: "'\(appName)' is not in the App Switcher (already quit)",
+                              durationSeconds: elapsed(startTime))
+        }
+
+        // Drag up on the centered card to dismiss it.
         let windowSize = bridge.getWindowInfo()?.size
         let cardX = (windowSize.map { Double($0.width) } ?? 410.0) * EnvConfig.appSwitcherCardXFraction
         let cardY = (windowSize.map { Double($0.height) } ?? 890.0) * EnvConfig.appSwitcherCardYFraction

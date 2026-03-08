@@ -78,3 +78,19 @@ jobs:
       - name: Run unit tests (Swift Testing)
         timeout-minutes: 5
         run: swift test --skip IntegrationTests --disable-xctest --no-parallel
+
+      - name: Build and package FakeMirroring
+        run: |
+          swift build -c release --product FakeMirroring
+          ./scripts/package-fake-app.sh
+
+      - name: Launch FakeMirroring
+        run: |
+          open .build/release/FakeMirroring.app
+          sleep 3
+
+      - name: Integration tests (FakeMirroring)
+        env:
+          MIRROIR_BUNDLE_ID: com.jfarcand.FakeMirroring
+          MIRROIR_PROCESS_NAME: FakeMirroring
+        run: swift test --filter IntegrationTests

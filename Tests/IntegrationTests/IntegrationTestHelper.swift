@@ -25,16 +25,16 @@ enum IntegrationTestHelper {
     @discardableResult
     static func ensureWindowReady(
         bridge: MirroringBridge,
-        maxAttempts: Int = 5
+        maxAttempts: Int = 10
     ) -> Bool {
         for attempt in 1...maxAttempts {
             bridge.activate()
-            usleep(300_000) // 300ms for activation to take effect
+            usleep(500_000) // 500ms for activation to take effect
             if let info = bridge.getWindowInfo(), info.windowID != 0 {
                 return true
             }
             if attempt < maxAttempts {
-                usleep(500_000) // 500ms between retries
+                usleep(1_000_000) // 1s between retries under test contention
             }
         }
         return false
