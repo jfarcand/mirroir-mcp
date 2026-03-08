@@ -12,6 +12,8 @@ jobs:
   source-install:
     name: Source install (mirroir.sh)
     runs-on: macos-15
+    permissions:
+      contents: read
     env:
       MIRROIR_BUNDLE_ID: com.jfarcand.FakeMirroring
       MIRROIR_PROCESS_NAME: FakeMirroring
@@ -69,6 +71,8 @@ jobs:
   homebrew-install:
     name: Homebrew install (local formula)
     runs-on: macos-15
+    permissions:
+      contents: read
     env:
       MIRROIR_BUNDLE_ID: com.jfarcand.FakeMirroring
       MIRROIR_PROCESS_NAME: FakeMirroring
@@ -168,6 +172,8 @@ jobs:
   npx-install:
     name: NPX install (npm package)
     runs-on: macos-15
+    permissions:
+      contents: read
     env:
       MIRROIR_BUNDLE_ID: com.jfarcand.FakeMirroring
       MIRROIR_PROCESS_NAME: FakeMirroring

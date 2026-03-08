@@ -128,6 +128,8 @@ jobs:
   update-homebrew:
     needs: release
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
       - name: Checkout homebrew-tap
         uses: actions/checkout@v4
@@ -168,6 +170,8 @@ jobs:
   update-skills:
     needs: release
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
       - name: Checkout mirroir-skills
         uses: actions/checkout@v4

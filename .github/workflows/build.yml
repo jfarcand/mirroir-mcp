@@ -11,6 +11,8 @@ on:
 jobs:
   build:
     runs-on: macos-15
+    permissions:
+      contents: read
     steps:
       - uses: actions/checkout@v4
 
