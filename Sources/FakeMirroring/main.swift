@@ -343,6 +343,23 @@ final class FakeScreenView: NSView {
 
 }
 
+/// Window subclass that accepts mouse events even when not key.
+/// Integration tests post CGEvents via postToPid while the user works
+/// in another app; the default NSWindow drops mouse events when not key.
+final class AlwaysAcceptingWindow: NSWindow {
+    override var canBecomeKey: Bool { true }
+    override var canBecomeMain: Bool { true }
+
+    override func sendEvent(_ event: NSEvent) {
+        // When not key, NSWindow discards mouse events. Force-promote
+        // ourselves to key before dispatch so the content view receives them.
+        if !isKeyWindow, event.type == .leftMouseDown {
+            makeKey()
+        }
+        super.sendEvent(event)
+    }
+}
+
 /// Application delegate that creates the main window.
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
@@ -352,7 +369,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let windowWidth: CGFloat = 410
         let windowHeight: CGFloat = 898
 
-        let window = NSWindow(
+        let window = AlwaysAcceptingWindow(
             contentRect: NSRect(x: 200, y: 200, width: windowWidth, height: windowHeight),
             styleMask: [.titled, .closable, .miniaturizable],
             backing: .buffered,
@@ -360,6 +377,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         )
         window.title = "FakeMirroring"
         window.contentView = FakeScreenView(frame: NSRect(x: 0, y: 0, width: windowWidth, height: windowHeight))
+        window.acceptsMouseMovedEvents = true
         window.makeKeyAndOrderFront(nil)
         self.window = window
 

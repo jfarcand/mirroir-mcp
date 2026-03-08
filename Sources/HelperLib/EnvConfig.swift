@@ -537,6 +537,15 @@ public enum EnvConfig {
                    default: "iPhone Mirroring")
     }
 
+    /// Post mouse events directly to the target PID instead of moving the
+    /// system cursor. Works for regular macOS apps (e.g. FakeMirroring) but
+    /// NOT for iPhone Mirroring, which ignores event coordinates and reads
+    /// the actual cursor position. Enables local integration tests without
+    /// cursor interference.
+    public static var cursorFreeInput: Bool {
+        readBool("cursorFreeInput", envVar: "MIRROIR_CURSOR_FREE", default: false)
+    }
+
     // MARK: - Settings File Loading
 
     /// Load settings from the first available settings.json file.

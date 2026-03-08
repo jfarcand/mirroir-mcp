@@ -46,11 +46,20 @@ final class InputSimulation: Sendable {
     /// keyboard layout found on the Mac. CGEvent keycodes are physical keys
     /// (layout-independent), same as HID — substitution is still needed.
     private let layoutSubstitution: [Character: Character]
+    /// When non-nil, mouse events are posted directly to this PID without
+    /// moving the system cursor. Only works for regular macOS apps, not
+    /// iPhone Mirroring. Resolved at init from MIRROIR_CURSOR_FREE env var.
+    private let cursorFreePID: pid_t?
 
     init(bridge: any WindowBridging, cursorMode: CursorMode = .direct,
          layoutSubstitution override: [Character: Character]? = nil) {
         self.bridge = bridge
         self.cursorMode = cursorMode
+        if EnvConfig.cursorFreeInput, let app = bridge.findProcess() {
+            self.cursorFreePID = app.processIdentifier
+        } else {
+            self.cursorFreePID = nil
+        }
         // Resolve the process name for AppleScript focus management.
         // iPhone Mirroring uses the configured process name; generic targets
         // fall back to the process name from the running application.
@@ -180,7 +189,7 @@ final class InputSimulation: Sendable {
         let screenY = info.position.y + CGFloat(y)
         DebugLog.log("tap", "relative=(\(x),\(y)) screen=(\(Int(screenX)),\(Int(screenY)))")
 
-        let result = CGEventInput.click(at: CGPoint(x: screenX, y: screenY))
+        let result = CGEventInput.click(at: CGPoint(x: screenX, y: screenY), targetPID: cursorFreePID)
         DebugLog.log("tap", "CGEvent=\(result ? "OK" : "FAILED")")
         return result ? nil : "CGEvent click failed"
     }
@@ -205,7 +214,7 @@ final class InputSimulation: Sendable {
             let statusBarY = Double(info.position.y) + EnvConfig.statusBarTapY
             let centerScreenX = Double(info.position.x) + Double(info.size.width) / 2.0
             DebugLog.log("swipe", "focus changed — clicking status bar to engage key window")
-            _ = CGEventInput.click(at: CGPoint(x: centerScreenX, y: statusBarY))
+            _ = CGEventInput.click(at: CGPoint(x: centerScreenX, y: statusBarY), targetPID: cursorFreePID)
             usleep(EnvConfig.spaceSwitchSettleUs)
         }
 
@@ -222,7 +231,8 @@ final class InputSimulation: Sendable {
         let result = CGEventInput.swipe(
             from: CGPoint(x: startX, y: startY),
             to: CGPoint(x: endX, y: endY),
-            durationMs: durationMs
+            durationMs: durationMs,
+            targetPID: cursorFreePID
         )
         DebugLog.log("swipe", "CGEvent=\(result ? "OK" : "FAILED")")
         return result ? nil : "CGEvent swipe failed"
@@ -242,7 +252,7 @@ final class InputSimulation: Sendable {
         let screenY = Double(info.position.y) + y
         DebugLog.log("longPress", "relative=(\(x),\(y)) screen=(\(Int(screenX)),\(Int(screenY))) duration=\(durationMs)ms")
 
-        let result = CGEventInput.longPress(at: CGPoint(x: screenX, y: screenY), durationMs: durationMs)
+        let result = CGEventInput.longPress(at: CGPoint(x: screenX, y: screenY), durationMs: durationMs, targetPID: cursorFreePID)
         DebugLog.log("longPress", "CGEvent=\(result ? "OK" : "FAILED")")
         return result ? nil : "CGEvent long press failed"
     }
@@ -260,7 +270,7 @@ final class InputSimulation: Sendable {
         let screenY = Double(info.position.y) + y
         DebugLog.log("doubleTap", "relative=(\(x),\(y)) screen=(\(Int(screenX)),\(Int(screenY)))")
 
-        let result = CGEventInput.doubleTap(at: CGPoint(x: screenX, y: screenY))
+        let result = CGEventInput.doubleTap(at: CGPoint(x: screenX, y: screenY), targetPID: cursorFreePID)
         DebugLog.log("doubleTap", "CGEvent=\(result ? "OK" : "FAILED")")
         return result ? nil : "CGEvent double tap failed"
     }
@@ -291,7 +301,8 @@ final class InputSimulation: Sendable {
         let result = CGEventInput.drag(
             from: CGPoint(x: startX, y: startY),
             to: CGPoint(x: endX, y: endY),
-            durationMs: durationMs
+            durationMs: durationMs,
+            targetPID: cursorFreePID
         )
         DebugLog.log("drag", "CGEvent=\(result ? "OK" : "FAILED")")
         return result ? nil : "CGEvent drag failed"

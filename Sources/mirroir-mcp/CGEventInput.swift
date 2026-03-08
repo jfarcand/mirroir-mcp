@@ -10,6 +10,12 @@ import Foundation
 /// CGEvent-based input operations for pointing and keyboard.
 /// iPhone Mirroring accepts physical mouse and keyboard input;
 /// CGEvent posts into the same macOS event pipeline as physical devices.
+///
+/// Pointing methods accept an optional `targetPID`. When set, events are
+/// posted directly to that process via `CGEvent.postToPid` without moving
+/// the system cursor. This works for regular macOS apps (e.g. FakeMirroring)
+/// but NOT for iPhone Mirroring, which ignores event coordinates and reads
+/// the actual cursor position.
 enum CGEventInput {
 
     /// Milliseconds to pause between mouse-down and mouse-up for a click.
@@ -19,43 +25,41 @@ enum CGEventInput {
     private static let warpSettleUs: UInt32 = 30_000
 
     /// Click (tap) at a screen-absolute point.
-    static func click(at point: CGPoint) -> Bool {
+    static func click(at point: CGPoint, targetPID: pid_t? = nil) -> Bool {
         guard let down = makeMouseEvent(.leftMouseDown, at: point),
               let up = makeMouseEvent(.leftMouseUp, at: point) else {
             return false
         }
 
-        CGWarpMouseCursorPosition(point)
-        CGAssociateMouseAndMouseCursorPosition(0)
-        defer { CGAssociateMouseAndMouseCursorPosition(1) }
+        let cursorEngaged = engageCursor(at: point, targetPID: targetPID)
+        defer { disengageCursor(cursorEngaged) }
 
-        usleep(warpSettleUs)
-        down.post(tap: .cghidEventTap)
+        if cursorEngaged { usleep(warpSettleUs) }
+        post(down, targetPID: targetPID)
         usleep(clickHoldUs)
-        up.post(tap: .cghidEventTap)
+        post(up, targetPID: targetPID)
         return true
     }
 
     /// Long press at a screen-absolute point for the specified duration.
-    static func longPress(at point: CGPoint, durationMs: Int) -> Bool {
+    static func longPress(at point: CGPoint, durationMs: Int, targetPID: pid_t? = nil) -> Bool {
         guard let down = makeMouseEvent(.leftMouseDown, at: point),
               let up = makeMouseEvent(.leftMouseUp, at: point) else {
             return false
         }
 
-        CGWarpMouseCursorPosition(point)
-        CGAssociateMouseAndMouseCursorPosition(0)
-        defer { CGAssociateMouseAndMouseCursorPosition(1) }
+        let cursorEngaged = engageCursor(at: point, targetPID: targetPID)
+        defer { disengageCursor(cursorEngaged) }
 
-        usleep(warpSettleUs)
-        down.post(tap: .cghidEventTap)
+        if cursorEngaged { usleep(warpSettleUs) }
+        post(down, targetPID: targetPID)
         usleep(UInt32(durationMs) * 1000)
-        up.post(tap: .cghidEventTap)
+        post(up, targetPID: targetPID)
         return true
     }
 
     /// Double-tap at a screen-absolute point.
-    static func doubleTap(at point: CGPoint) -> Bool {
+    static func doubleTap(at point: CGPoint, targetPID: pid_t? = nil) -> Bool {
         guard let down1 = makeMouseEvent(.leftMouseDown, at: point),
               let up1 = makeMouseEvent(.leftMouseUp, at: point),
               let down2 = makeMouseEvent(.leftMouseDown, at: point),
@@ -63,45 +67,44 @@ enum CGEventInput {
             return false
         }
 
-        CGWarpMouseCursorPosition(point)
-        CGAssociateMouseAndMouseCursorPosition(0)
-        defer { CGAssociateMouseAndMouseCursorPosition(1) }
+        let cursorEngaged = engageCursor(at: point, targetPID: targetPID)
+        defer { disengageCursor(cursorEngaged) }
 
         // First click
-        usleep(warpSettleUs)
+        if cursorEngaged { usleep(warpSettleUs) }
         down1.setIntegerValueField(.mouseEventClickState, value: 1)
-        down1.post(tap: .cghidEventTap)
+        post(down1, targetPID: targetPID)
         usleep(clickHoldUs)
         up1.setIntegerValueField(.mouseEventClickState, value: 1)
-        up1.post(tap: .cghidEventTap)
+        post(up1, targetPID: targetPID)
 
         // Brief inter-click pause (under the double-click threshold)
         usleep(clickHoldUs)
 
         // Second click with clickState=2 so macOS treats it as a double-click
         down2.setIntegerValueField(.mouseEventClickState, value: 2)
-        down2.post(tap: .cghidEventTap)
+        post(down2, targetPID: targetPID)
         usleep(clickHoldUs)
         up2.setIntegerValueField(.mouseEventClickState, value: 2)
-        up2.post(tap: .cghidEventTap)
+        post(up2, targetPID: targetPID)
         return true
     }
 
     /// Swipe (scroll wheel) from one screen-absolute point to another.
     /// Uses scroll wheel events since iPhone Mirroring interprets scroll
     /// wheel as swipe gestures (page scrolling, list scrolling).
-    static func swipe(from start: CGPoint, to end: CGPoint, durationMs: Int) -> Bool {
+    static func swipe(from start: CGPoint, to end: CGPoint, durationMs: Int,
+                      targetPID: pid_t? = nil) -> Bool {
         let deltaX = end.x - start.x
         let deltaY = end.y - start.y
 
         // Post scroll at the midpoint so it's within the window
         let midpoint = CGPoint(x: start.x + deltaX / 2, y: start.y + deltaY / 2)
 
-        CGWarpMouseCursorPosition(midpoint)
-        CGAssociateMouseAndMouseCursorPosition(0)
-        defer { CGAssociateMouseAndMouseCursorPosition(1) }
+        let cursorEngaged = engageCursor(at: midpoint, targetPID: targetPID)
+        defer { disengageCursor(cursorEngaged) }
 
-        usleep(warpSettleUs)
+        if cursorEngaged { usleep(warpSettleUs) }
 
         // Send a zero-delta "may begin" scroll event to engage the window's
         // scroll handler. After a focus switch, iPhone Mirroring silently drops
@@ -126,7 +129,7 @@ enum CGEventInput {
             prime.setIntegerValueField(momentumPhaseField, value: 0)
             prime.setIntegerValueField(pointDeltaY, value: 0)
             prime.setIntegerValueField(pointDeltaX, value: 0)
-            prime.post(tap: .cghidEventTap)
+            post(prime, targetPID: targetPID)
             usleep(warpSettleUs)
         }
 
@@ -181,7 +184,7 @@ enum CGEventInput {
             scroll.setIntegerValueField(scrollPhaseField, value: phase)
             scroll.setIntegerValueField(momentumPhaseField, value: phaseNone)
 
-            scroll.post(tap: .cghidEventTap)
+            post(scroll, targetPID: targetPID)
             usleep(stepDelay)
         }
 
@@ -200,7 +203,7 @@ enum CGEventInput {
             momentumEnd.setIntegerValueField(momentumPhaseField, value: phaseEnded)
             momentumEnd.setIntegerValueField(pointDeltaY, value: 0)
             momentumEnd.setIntegerValueField(pointDeltaX, value: 0)
-            momentumEnd.post(tap: .cghidEventTap)
+            post(momentumEnd, targetPID: targetPID)
             usleep(stepDelay)
         }
 
@@ -210,18 +213,18 @@ enum CGEventInput {
     /// Drag (sustained mouse contact) from one screen-absolute point to another.
     /// Uses click-drag events (not scroll wheel) for rearranging icons,
     /// adjusting sliders, and drag-and-drop operations.
-    static func drag(from start: CGPoint, to end: CGPoint, durationMs: Int) -> Bool {
+    static func drag(from start: CGPoint, to end: CGPoint, durationMs: Int,
+                     targetPID: pid_t? = nil) -> Bool {
         guard let down = makeMouseEvent(.leftMouseDown, at: start),
               let up = makeMouseEvent(.leftMouseUp, at: end) else {
             return false
         }
 
-        CGWarpMouseCursorPosition(start)
-        CGAssociateMouseAndMouseCursorPosition(0)
-        defer { CGAssociateMouseAndMouseCursorPosition(1) }
+        let cursorEngaged = engageCursor(at: start, targetPID: targetPID)
+        defer { disengageCursor(cursorEngaged) }
 
-        usleep(warpSettleUs)
-        down.post(tap: .cghidEventTap)
+        if cursorEngaged { usleep(warpSettleUs) }
+        post(down, targetPID: targetPID)
 
         // Interpolate drag movement
         let steps = max(10, durationMs / 16) // ~60fps
@@ -234,11 +237,11 @@ enum CGEventInput {
             let point = CGPoint(x: x, y: y)
 
             guard let dragEvent = makeMouseEvent(.leftMouseDragged, at: point) else { continue }
-            dragEvent.post(tap: .cghidEventTap)
+            post(dragEvent, targetPID: targetPID)
             usleep(stepDelay)
         }
 
-        up.post(tap: .cghidEventTap)
+        post(up, targetPID: targetPID)
         return true
     }
 
@@ -367,5 +370,31 @@ enum CGEventInput {
             mouseCursorPosition: point,
             mouseButton: .left
         )
+    }
+
+    /// Post an event either to the HID event tap (system-wide) or directly to a PID.
+    private static func post(_ event: CGEvent, targetPID: pid_t?) {
+        if let pid = targetPID {
+            event.postToPid(pid)
+        } else {
+            event.post(tap: .cghidEventTap)
+        }
+    }
+
+    /// Warp cursor and disassociate mouse tracking for HID-mode pointing.
+    /// In cursor-free mode (targetPID set), this is a no-op.
+    /// Returns true if cursor management was engaged.
+    private static func engageCursor(at point: CGPoint, targetPID: pid_t?) -> Bool {
+        guard targetPID == nil else { return false }
+        CGWarpMouseCursorPosition(point)
+        CGAssociateMouseAndMouseCursorPosition(0)
+        return true
+    }
+
+    /// Re-associate mouse tracking if cursor management was engaged.
+    private static func disengageCursor(_ engaged: Bool) {
+        if engaged {
+            CGAssociateMouseAndMouseCursorPosition(1)
+        }
     }
 }
