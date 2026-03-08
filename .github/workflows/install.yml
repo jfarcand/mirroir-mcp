@@ -10,6 +10,8 @@ on:
 jobs:
   install-test:
     runs-on: macos-15
+    permissions:
+      contents: read
     env:
       MCP_BIN: mirroir-mcp
 
