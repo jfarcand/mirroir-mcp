@@ -17,11 +17,11 @@ final class ReplayReliabilityTests: XCTestCase {
     override func setUpWithError() throws {
         try super.setUpWithError()
         guard IntegrationTestHelper.isFakeMirroringRunning else {
-            throw XCTSkip("FakeMirroring not running")
+            throw IntegrationTestError.fakeMirroringNotRunning
         }
         bridge = MirroringBridge(bundleID: IntegrationTestHelper.fakeBundleID)
         guard IntegrationTestHelper.ensureWindowReady(bridge: bridge) else {
-            throw XCTSkip("FakeMirroring window not capturable")
+            throw IntegrationTestError.windowNotCapturable
         }
     }
 
@@ -33,7 +33,7 @@ final class ReplayReliabilityTests: XCTestCase {
         let recordingDescriber = RecordingDescriber(wrapping: describer)
 
         guard let windowInfo = bridge.getWindowInfo() else {
-            throw XCTSkip("Cannot get window info")
+            throw IntegrationTestError.windowInfoUnavailable
         }
 
         let windowWidth = Double(windowInfo.size.width)

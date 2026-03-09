@@ -26,11 +26,7 @@ final class CompiledSkillIntegrationTests: XCTestCase {
         try super.setUpWithError()
 
         guard IntegrationTestHelper.isFakeMirroringRunning else {
-            XCTFail(
-                "FakeMirroring app is not running. "
-                + "Launch it with: open .build/release/FakeMirroring.app"
-            )
-            return
+            throw IntegrationTestError.fakeMirroringNotRunning
         }
 
         bridge = MirroringBridge(bundleID: IntegrationTestHelper.fakeBundleID)
@@ -41,8 +37,7 @@ final class CompiledSkillIntegrationTests: XCTestCase {
         // Ensure window is capturable before each test — heavy OCR in prior tests
         // can cause CGWindowList to transiently lose the window.
         guard IntegrationTestHelper.ensureWindowReady(bridge: bridge) else {
-            XCTFail("FakeMirroring window not capturable after retries")
-            return
+            throw IntegrationTestError.windowNotCapturable
         }
 
         // Ensure we're on the default "Settings" scenario and window is settled

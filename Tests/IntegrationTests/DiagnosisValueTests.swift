@@ -18,11 +18,11 @@ final class DiagnosisValueTests: XCTestCase {
     override func setUpWithError() throws {
         try super.setUpWithError()
         guard IntegrationTestHelper.isFakeMirroringRunning else {
-            throw XCTSkip("FakeMirroring not running")
+            throw IntegrationTestError.fakeMirroringNotRunning
         }
         bridge = MirroringBridge(bundleID: IntegrationTestHelper.fakeBundleID)
         guard IntegrationTestHelper.ensureWindowReady(bridge: bridge) else {
-            throw XCTSkip("FakeMirroring window not capturable")
+            throw IntegrationTestError.windowNotCapturable
         }
     }
 
@@ -33,11 +33,11 @@ final class DiagnosisValueTests: XCTestCase {
 
         // Get current screen to find a real element
         guard let screen = describer.describe(skipOCR: false) else {
-            throw XCTSkip("Cannot describe screen")
+            throw IntegrationTestError.describeReturnedNil
         }
 
         guard let element = screen.elements.first else {
-            throw XCTSkip("No elements on screen")
+            throw IntegrationTestError.notEnoughElements(0)
         }
 
         // Create a compiled step with intentionally wrong coordinates

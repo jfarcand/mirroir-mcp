@@ -19,11 +19,11 @@ final class CoordinateStabilityTests: XCTestCase {
     override func setUpWithError() throws {
         try super.setUpWithError()
         guard IntegrationTestHelper.isFakeMirroringRunning else {
-            throw XCTSkip("FakeMirroring not running")
+            throw IntegrationTestError.fakeMirroringNotRunning
         }
         bridge = MirroringBridge(bundleID: IntegrationTestHelper.fakeBundleID)
         guard IntegrationTestHelper.ensureWindowReady(bridge: bridge) else {
-            throw XCTSkip("FakeMirroring window not capturable")
+            throw IntegrationTestError.windowNotCapturable
         }
         let capture = ScreenCapture(bridge: bridge)
         describer = ScreenDescriber(bridge: bridge, capture: capture)

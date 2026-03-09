@@ -21,11 +21,11 @@ final class InputPipelineTests: XCTestCase {
     override func setUpWithError() throws {
         try super.setUpWithError()
         guard IntegrationTestHelper.isFakeMirroringRunning else {
-            throw XCTSkip("FakeMirroring not running")
+            throw IntegrationTestError.fakeMirroringNotRunning
         }
         bridge = MirroringBridge(bundleID: IntegrationTestHelper.fakeBundleID)
         guard IntegrationTestHelper.ensureWindowReady(bridge: bridge) else {
-            throw XCTSkip("FakeMirroring window not capturable")
+            throw IntegrationTestError.windowNotCapturable
         }
         let capture = ScreenCapture(bridge: bridge)
         describer = ScreenDescriber(bridge: bridge, capture: capture)
@@ -52,12 +52,12 @@ final class InputPipelineTests: XCTestCase {
         usleep(500_000)
 
         // Before scroll: "Mindful Minutes" may not be visible or may be partially clipped
-        let beforeScreen = try describeOrSkip()
+        let beforeScreen = try describeOrFail()
         let beforeTexts = beforeScreen.elements.map { $0.text }
 
         // Scroll down: swipe from bottom to top (scroll content up)
         guard let info = bridge.getWindowInfo() else {
-            throw XCTSkip("Cannot get window info")
+            throw IntegrationTestError.windowInfoUnavailable
         }
         let centerX = Double(info.size.width) / 2
         let scrollFromY = Double(info.size.height) * 0.7
@@ -67,7 +67,7 @@ final class InputPipelineTests: XCTestCase {
         XCTAssertNil(swipeError, "Swipe should succeed: \(swipeError ?? "")")
         usleep(800_000)
 
-        let afterScreen = try describeOrSkip()
+        let afterScreen = try describeOrFail()
         let afterTexts = afterScreen.elements.map { $0.text }
 
         // After scrolling down, we should see elements that weren't visible or
@@ -89,11 +89,11 @@ final class InputPipelineTests: XCTestCase {
         usleep(500_000)
 
         // Find the Username label to locate the text field
-        let screen = try describeOrSkip()
+        let screen = try describeOrFail()
         guard let usernameLabel = screen.elements.first(where: {
             $0.text.caseInsensitiveCompare("Username") == .orderedSame
         }) else {
-            throw XCTSkip("'Username' not found by OCR on Login screen")
+            throw IntegrationTestError.elementNotFound("Username")
         }
 
         // Tap the Username field area (the placeholder rect is at the same Y)
@@ -108,7 +108,7 @@ final class InputPipelineTests: XCTestCase {
         usleep(500_000)
 
         // Verify typed text appears in OCR
-        let afterScreen = try describeOrSkip()
+        let afterScreen = try describeOrFail()
         let afterTexts = afterScreen.elements.map { $0.text.lowercased() }
         XCTAssertTrue(afterTexts.contains(where: { $0.contains(typedString) }),
             "Typed text '\(typedString)' should appear via OCR. Found: \(afterTexts)")
@@ -120,11 +120,11 @@ final class InputPipelineTests: XCTestCase {
     /// that is detectable via OCR.
     func testLongPressShowsContextMenu() throws {
         // Settings scenario is default (set in tearDown)
-        let screen = try describeOrSkip()
+        let screen = try describeOrFail()
         guard let general = screen.elements.first(where: {
             $0.text.caseInsensitiveCompare("General") == .orderedSame
         }) else {
-            throw XCTSkip("'General' not found by OCR on Settings screen")
+            throw IntegrationTestError.elementNotFound("General")
         }
 
         // Long press on "General" row
@@ -133,7 +133,7 @@ final class InputPipelineTests: XCTestCase {
         usleep(500_000)
 
         // Verify "Context Menu" overlay appeared
-        let afterScreen = try describeOrSkip()
+        let afterScreen = try describeOrFail()
         let afterTexts = afterScreen.elements.map { $0.text }
         XCTAssertTrue(afterTexts.contains(where: { $0.contains("Context Menu") }),
             "Long press should show 'Context Menu' overlay. Found: \(afterTexts)")
@@ -154,7 +154,7 @@ final class InputPipelineTests: XCTestCase {
         usleep(500_000)
 
         // Verify slider renders at default 50%
-        let beforeScreen = try describeOrSkip()
+        let beforeScreen = try describeOrFail()
         let beforePct = beforeScreen.elements.first(where: { $0.text.hasSuffix("%") })?.text
         XCTAssertEqual(beforePct, "50%",
             "Initial slider should be at 50%. Found: \(beforePct ?? "nil")")
@@ -172,7 +172,7 @@ final class InputPipelineTests: XCTestCase {
         usleep(800_000)
 
         // Verify percentage changed
-        let afterScreen = try describeOrSkip()
+        let afterScreen = try describeOrFail()
         let afterPct = afterScreen.elements.first(where: { $0.text.hasSuffix("%") })?.text
         XCTAssertNotNil(afterPct, "Slider percentage should be visible after change")
         if let afterPct = afterPct {
@@ -194,11 +194,11 @@ final class InputPipelineTests: XCTestCase {
         // Use OCR to find a tappable position on the feed content.
         // The "johndoe" label is in the image area — double tapping there
         // should trigger the Zoomed overlay.
-        let screen = try describeOrSkip()
+        let screen = try describeOrFail()
         guard let target = screen.elements.first(where: {
             $0.text.caseInsensitiveCompare("johndoe") == .orderedSame
         }) else {
-            throw XCTSkip("'johndoe' not found by OCR on Feed screen")
+            throw IntegrationTestError.elementNotFound("johndoe")
         }
 
         let doubleTapError = input.doubleTap(x: target.tapX, y: target.tapY)
@@ -206,7 +206,7 @@ final class InputPipelineTests: XCTestCase {
         usleep(500_000)
 
         // Verify "Zoomed" overlay appeared
-        let afterScreen = try describeOrSkip()
+        let afterScreen = try describeOrFail()
         let afterTexts = afterScreen.elements.map { $0.text }
         XCTAssertTrue(afterTexts.contains(where: { $0.contains("Zoomed") }),
             "Double tap should show 'Zoomed' overlay. Found: \(afterTexts)")
@@ -222,11 +222,11 @@ final class InputPipelineTests: XCTestCase {
         usleep(500_000)
 
         // Tap the Username field to activate it
-        let screen = try describeOrSkip()
+        let screen = try describeOrFail()
         guard let usernameLabel = screen.elements.first(where: {
             $0.text.caseInsensitiveCompare("Username") == .orderedSame
         }) else {
-            throw XCTSkip("'Username' not found by OCR on Login screen")
+            throw IntegrationTestError.elementNotFound("Username")
         }
 
         let tapError = input.tap(x: usernameLabel.tapX, y: usernameLabel.tapY)
@@ -244,7 +244,7 @@ final class InputPipelineTests: XCTestCase {
         usleep(500_000)
 
         // Verify text is still visible (field deactivated but text persists)
-        let afterScreen = try describeOrSkip()
+        let afterScreen = try describeOrFail()
         let afterTexts = afterScreen.elements.map { $0.text.lowercased() }
         XCTAssertTrue(afterTexts.contains(where: { $0.contains("test") }),
             "Typed text 'test' should remain visible after Return. Found: \(afterTexts)")
@@ -254,18 +254,18 @@ final class InputPipelineTests: XCTestCase {
 
     /// Basic tap verification: tap "General" on Settings navigates to Detail.
     func testTapStillWorks() throws {
-        let screen = try describeOrSkip()
+        let screen = try describeOrFail()
         guard let general = screen.elements.first(where: {
             $0.text.caseInsensitiveCompare("General") == .orderedSame
         }) else {
-            throw XCTSkip("'General' not found by OCR")
+            throw IntegrationTestError.elementNotFound("General")
         }
 
         let tapError = input.tap(x: general.tapX, y: general.tapY)
         XCTAssertNil(tapError, "Tap should succeed: \(tapError ?? "")")
         usleep(800_000)
 
-        let afterScreen = try describeOrSkip()
+        let afterScreen = try describeOrFail()
         let afterTexts = afterScreen.elements.map { $0.text.lowercased() }
         XCTAssertTrue(afterTexts.contains("keyboard"),
             "Tap General should navigate to Detail showing 'Keyboard'. Found: \(afterTexts)")
@@ -273,11 +273,11 @@ final class InputPipelineTests: XCTestCase {
 
     // MARK: - Helpers
 
-    private func describeOrSkip() throws -> ScreenDescriber.DescribeResult {
+    private func describeOrFail() throws -> ScreenDescriber.DescribeResult {
         for attempt in 1...3 {
             if let result = describer.describe(skipOCR: false) { return result }
             if attempt < 3 { usleep(500_000) }
         }
-        throw XCTSkip("describe() returned nil after retries")
+        throw IntegrationTestError.describeReturnedNil
     }
 }

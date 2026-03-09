@@ -24,11 +24,11 @@ final class ComponentE2ETests: XCTestCase {
     override func setUpWithError() throws {
         try super.setUpWithError()
         guard IntegrationTestHelper.isFakeMirroringRunning else {
-            throw XCTSkip("FakeMirroring not running")
+            throw IntegrationTestError.fakeMirroringNotRunning
         }
         bridge = MirroringBridge(bundleID: IntegrationTestHelper.fakeBundleID)
         guard IntegrationTestHelper.ensureWindowReady(bridge: bridge) else {
-            throw XCTSkip("FakeMirroring window not capturable")
+            throw IntegrationTestError.windowNotCapturable
         }
         capture = ScreenCapture(bridge: bridge)
         describer = ScreenDescriber(bridge: bridge, capture: capture)
@@ -97,12 +97,12 @@ final class ComponentE2ETests: XCTestCase {
     /// Calibrate the table-row-disclosure component against FakeMirroring Settings screen.
     /// Settings has 6 rows with ">" chevrons — the component should match most of them.
     func testCalibrateComponentMatchesSettingsRows() throws {
-        guard let screen = describeOrSkip() else {
-            throw XCTSkip("describe() returned nil")
+        guard let screen = describeWithRetry() else {
+            throw IntegrationTestError.describeReturnedNil
         }
 
         guard let windowInfo = bridge.getWindowInfo() else {
-            throw XCTSkip("Cannot get window info")
+            throw IntegrationTestError.windowInfoUnavailable
         }
         let screenHeight = Double(windowInfo.size.height)
 
@@ -213,11 +213,11 @@ final class ComponentE2ETests: XCTestCase {
     /// Full end-to-end: calibrate → compile → reset → replay compiled → verify.
     func testFullPipeline_CalibrateCompileReplay() throws {
         // --- Phase 1: Calibrate ---
-        guard let screen = describeOrSkip() else {
-            throw XCTSkip("describe() returned nil")
+        guard let screen = describeWithRetry() else {
+            throw IntegrationTestError.describeReturnedNil
         }
         guard let windowInfo = bridge.getWindowInfo() else {
-            throw XCTSkip("Cannot get window info")
+            throw IntegrationTestError.windowInfoUnavailable
         }
         let screenHeight = Double(windowInfo.size.height)
 
@@ -308,7 +308,7 @@ final class ComponentE2ETests: XCTestCase {
 
     // MARK: - Helpers
 
-    private func describeOrSkip() -> ScreenDescriber.DescribeResult? {
+    private func describeWithRetry() -> ScreenDescriber.DescribeResult? {
         for attempt in 1...3 {
             if let result = describer.describe(skipOCR: false) { return result }
             if attempt < 3 { usleep(500_000) }

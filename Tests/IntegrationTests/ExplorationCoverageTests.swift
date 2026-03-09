@@ -17,11 +17,11 @@ final class ExplorationCoverageTests: XCTestCase {
     override func setUpWithError() throws {
         try super.setUpWithError()
         guard IntegrationTestHelper.isFakeMirroringRunning else {
-            throw XCTSkip("FakeMirroring not running")
+            throw IntegrationTestError.fakeMirroringNotRunning
         }
         bridge = MirroringBridge(bundleID: IntegrationTestHelper.fakeBundleID)
         guard IntegrationTestHelper.ensureWindowReady(bridge: bridge) else {
-            throw XCTSkip("FakeMirroring window not capturable")
+            throw IntegrationTestError.windowNotCapturable
         }
     }
 
@@ -32,7 +32,7 @@ final class ExplorationCoverageTests: XCTestCase {
 
         // Get the initial screen
         guard let initialScreen = describer.describe(skipOCR: false) else {
-            throw XCTSkip("Cannot describe initial screen")
+            throw IntegrationTestError.describeReturnedNil
         }
 
         // Start an exploration session

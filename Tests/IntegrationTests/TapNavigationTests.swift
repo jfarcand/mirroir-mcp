@@ -21,11 +21,11 @@ final class TapNavigationTests: XCTestCase {
     override func setUpWithError() throws {
         try super.setUpWithError()
         guard IntegrationTestHelper.isFakeMirroringRunning else {
-            throw XCTSkip("FakeMirroring not running")
+            throw IntegrationTestError.fakeMirroringNotRunning
         }
         bridge = MirroringBridge(bundleID: IntegrationTestHelper.fakeBundleID)
         guard IntegrationTestHelper.ensureWindowReady(bridge: bridge) else {
-            throw XCTSkip("FakeMirroring window not capturable")
+            throw IntegrationTestError.windowNotCapturable
         }
         let capture = ScreenCapture(bridge: bridge)
         describer = ScreenDescriber(bridge: bridge, capture: capture)
@@ -77,7 +77,7 @@ final class TapNavigationTests: XCTestCase {
         usleep(500_000)
 
         // Verify we're on the About screen
-        let beforeScreen = try describeOrSkip()
+        let beforeScreen = try describeOrFail()
         let beforeTexts = beforeScreen.elements.map { $0.text.lowercased() }
         XCTAssertTrue(beforeTexts.contains("about"), "Should be on Detail (Back) screen before back tap")
 
@@ -85,7 +85,7 @@ final class TapNavigationTests: XCTestCase {
         guard let chevron = beforeScreen.elements.first(where: {
             $0.text == "<" || $0.text == "‹" || $0.text == "〈" || $0.text == "く"
         }) else {
-            throw XCTSkip("Back chevron not detected by OCR")
+            throw IntegrationTestError.elementNotFound("< (back chevron)")
         }
 
         let tapError = input.tap(x: chevron.tapX, y: chevron.tapY)
@@ -93,7 +93,7 @@ final class TapNavigationTests: XCTestCase {
         usleep(800_000)
 
         // Verify we navigated back to Settings
-        let afterScreen = try describeOrSkip()
+        let afterScreen = try describeOrFail()
         let afterTexts = afterScreen.elements.map { $0.text.lowercased() }
         XCTAssertTrue(afterTexts.contains("settings"),
                       "After back tap, should be on Settings. Found: \(afterTexts)")
@@ -139,20 +139,20 @@ final class TapNavigationTests: XCTestCase {
         expectedElement: String,
         description: String
     ) throws {
-        let screen = try describeOrSkip()
+        let screen = try describeOrFail()
         let elements = screen.elements
 
         guard let target = elements.first(where: {
             $0.text.caseInsensitiveCompare(tapLabel) == .orderedSame
         }) else {
-            throw XCTSkip("'\(tapLabel)' not found by OCR for: \(description)")
+            throw IntegrationTestError.elementNotFound("\(tapLabel) (\(description))")
         }
 
         let tapError = input.tap(x: target.tapX, y: target.tapY)
         XCTAssertNil(tapError, "Tap on '\(tapLabel)' should succeed: \(tapError ?? "")")
         usleep(800_000)
 
-        let afterScreen = try describeOrSkip()
+        let afterScreen = try describeOrFail()
         let afterTexts = afterScreen.elements.map { $0.text.lowercased() }
         XCTAssertTrue(
             afterTexts.contains(expectedElement.lowercased()),
@@ -160,11 +160,11 @@ final class TapNavigationTests: XCTestCase {
         )
     }
 
-    private func describeOrSkip() throws -> ScreenDescriber.DescribeResult {
+    private func describeOrFail() throws -> ScreenDescriber.DescribeResult {
         for attempt in 1...3 {
             if let result = describer.describe(skipOCR: false) { return result }
             if attempt < 3 { usleep(500_000) }
         }
-        throw XCTSkip("describe() returned nil after retries")
+        throw IntegrationTestError.describeReturnedNil
     }
 }

@@ -19,11 +19,11 @@ final class AssertIntegrityTests: XCTestCase {
     override func setUpWithError() throws {
         try super.setUpWithError()
         guard IntegrationTestHelper.isFakeMirroringRunning else {
-            throw XCTSkip("FakeMirroring not running")
+            throw IntegrationTestError.fakeMirroringNotRunning
         }
         bridge = MirroringBridge(bundleID: IntegrationTestHelper.fakeBundleID)
         guard IntegrationTestHelper.ensureWindowReady(bridge: bridge) else {
-            throw XCTSkip("FakeMirroring window not capturable")
+            throw IntegrationTestError.windowNotCapturable
         }
     }
 
@@ -35,12 +35,12 @@ final class AssertIntegrityTests: XCTestCase {
 
         // Get the current screen elements to build an assertion skill
         guard let initialScreen = describer.describe(skipOCR: false) else {
-            throw XCTSkip("Cannot describe screen")
+            throw IntegrationTestError.describeReturnedNil
         }
 
         let elements = initialScreen.elements
         guard elements.count >= 2 else {
-            throw XCTSkip("Not enough elements on screen for test")
+            throw IntegrationTestError.notEnoughElements(elements.count)
         }
 
         // Pick elements that are visible and build assert_visible steps for them
@@ -68,7 +68,7 @@ final class AssertIntegrityTests: XCTestCase {
         )
 
         guard let windowInfo = bridge.getWindowInfo() else {
-            throw XCTSkip("Cannot get window info")
+            throw IntegrationTestError.windowInfoUnavailable
         }
 
         // Compile the skill against current screen

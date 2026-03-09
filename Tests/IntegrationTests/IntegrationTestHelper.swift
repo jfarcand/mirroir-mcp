@@ -6,6 +6,35 @@
 import AppKit
 @testable import mirroir_mcp
 
+/// Errors thrown by integration tests when the FakeMirroring environment is not ready.
+/// These produce hard test failures (not silent skips) because FakeMirroring must
+/// always be running when integration tests execute.
+enum IntegrationTestError: Error, CustomStringConvertible {
+    case fakeMirroringNotRunning
+    case windowNotCapturable
+    case describeReturnedNil
+    case windowInfoUnavailable
+    case elementNotFound(String)
+    case notEnoughElements(Int)
+
+    var description: String {
+        switch self {
+        case .fakeMirroringNotRunning:
+            return "FakeMirroring must be running. Launch: open .build/release/FakeMirroring.app"
+        case .windowNotCapturable:
+            return "FakeMirroring window not capturable after retries"
+        case .describeReturnedNil:
+            return "describe() returned nil after retries"
+        case .windowInfoUnavailable:
+            return "Cannot get window info from bridge"
+        case .elementNotFound(let name):
+            return "'\(name)' not found by OCR on FakeMirroring screen"
+        case .notEnoughElements(let count):
+            return "Only \(count) elements on screen, need more for test"
+        }
+    }
+}
+
 /// Shared helpers for integration tests that need FakeMirroring.
 enum IntegrationTestHelper {
 
