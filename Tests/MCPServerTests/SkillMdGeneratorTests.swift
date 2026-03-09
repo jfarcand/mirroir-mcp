@@ -437,4 +437,75 @@ final class SkillMdGeneratorTests: XCTestCase {
         XCTAssertFalse(result.contains("6."),
             "Should only have 5 steps total")
     }
+
+    // MARK: - displayLabel Preference
+
+    func testDisplayLabelPreferredOverArrivedVia() {
+        // Simulate a component-detected tap where arrivedVia is raw OCR ("icon")
+        // but displayLabel is the cleaned label ("General")
+        let screens = [
+            ExploredScreen(
+                index: 0,
+                elements: [
+                    TapPoint(text: "Settings", tapX: 205, tapY: 120, confidence: 0.98),
+                ],
+                hints: [],
+                actionType: nil,
+                arrivedVia: nil,
+                screenshotBase64: "img0"
+            ),
+            ExploredScreen(
+                index: 1,
+                elements: [
+                    TapPoint(text: "About", tapX: 205, tapY: 300, confidence: 0.9),
+                ],
+                hints: [],
+                actionType: "tap",
+                arrivedVia: "icon",
+                displayLabel: "General",
+                screenshotBase64: "img1"
+            ),
+        ]
+
+        let result = SkillMdGenerator.generate(
+            appName: "Settings", goal: "test display label", screens: screens)
+
+        XCTAssertTrue(result.contains("Tap \"General\""),
+            "Should use displayLabel 'General', not raw arrivedVia 'icon'")
+        XCTAssertFalse(result.contains("Tap \"icon\""),
+            "Raw OCR artifact should not appear in skill steps")
+    }
+
+    func testFallsBackToArrivedViaWhenNoDisplayLabel() {
+        // When displayLabel is nil, fall back to resolved arrivedVia
+        let screens = [
+            ExploredScreen(
+                index: 0,
+                elements: [
+                    TapPoint(text: "Settings", tapX: 205, tapY: 120, confidence: 0.98),
+                ],
+                hints: [],
+                actionType: nil,
+                arrivedVia: nil,
+                screenshotBase64: "img0"
+            ),
+            ExploredScreen(
+                index: 1,
+                elements: [
+                    TapPoint(text: "General", tapX: 205, tapY: 300, confidence: 0.9),
+                ],
+                hints: [],
+                actionType: "tap",
+                arrivedVia: "general",
+                screenshotBase64: "img1"
+            ),
+        ]
+
+        let result = SkillMdGenerator.generate(
+            appName: "Settings", goal: "test fallback", screens: screens)
+
+        // arrivedVia "general" should be resolved to "General" via element matching
+        XCTAssertTrue(result.contains("Tap \"General\""),
+            "Should resolve arrivedVia case against elements when no displayLabel")
+    }
 }

@@ -291,8 +291,8 @@ final class BFSExplorer: @unchecked Sendable {
         }
 
         // Get the next unvisited element from the plan
-        let actionable: TapPoint? = if let ranked = graph.nextPlannedElement(for: currentFP),
-            !strategy.shouldSkip(elementText: ranked.point.text, budget: budget) { ranked.point } else { nil }
+        let rankedElement: RankedElement? = if let ranked = graph.nextPlannedElement(for: currentFP),
+            !strategy.shouldSkip(elementText: ranked.point.text, budget: budget) { ranked } else { nil }
 
         lock.lock()
         let currentActions = actionsOnCurrentScreen
@@ -301,9 +301,9 @@ final class BFSExplorer: @unchecked Sendable {
         let visited = graph.node(for: currentFP)?.visitedElements ?? []
         DebugLog.log("bfs", "exploring depth=\(screen.depth) fp=\(currentFP.prefix(8)) " +
             "actions=\(currentActions)/\(budget.maxActionsPerScreen) " +
-            "visited=\(visited) next=\(actionable?.text ?? "nil")")
+            "visited=\(visited) next=\(rankedElement?.displayLabel ?? "nil")")
 
-        guard let target = actionable, currentActions < budget.maxActionsPerScreen else {
+        guard let ranked = rankedElement, currentActions < budget.maxActionsPerScreen else {
             // Try scrolling to reveal hidden elements
             if let scrollResult = performScrollIfAvailable(
                 currentFP: currentFP, input: input, describer: describer
@@ -324,7 +324,10 @@ final class BFSExplorer: @unchecked Sendable {
             return .continue(description: "Finished exploring depth-\(screen.depth) screen")
         }
 
-        // Mark visited before tapping
+        let target = ranked.point
+        let label = ranked.displayLabel
+
+        // Mark visited before tapping (raw text for identity matching)
         graph.markElementVisited(fingerprint: currentFP, elementText: target.text)
 
         // Tap the element
@@ -344,18 +347,20 @@ final class BFSExplorer: @unchecked Sendable {
             elements: afterResult.elements, hints: afterResult.hints
         )
 
-        // Record transition in graph
+        // Record transition in graph (raw text for visited-state, displayLabel for naming)
         let transition = graph.recordTransition(
             elements: afterResult.elements, icons: afterResult.icons,
             hints: afterResult.hints, screenshot: afterResult.screenshotBase64,
-            actionType: "tap", elementText: target.text, screenType: screenType
+            actionType: "tap", elementText: target.text, displayLabel: label,
+            screenType: screenType
         )
 
         // Record in session for flat screen list
         session.capture(
             elements: afterResult.elements, hints: afterResult.hints,
             icons: afterResult.icons, actionType: "tap",
-            arrivedVia: target.text, screenshotBase64: afterResult.screenshotBase64,
+            arrivedVia: target.text, displayLabel: label,
+            screenshotBase64: afterResult.screenshotBase64,
             skipGraphTransition: true
         )
 
@@ -364,7 +369,7 @@ final class BFSExplorer: @unchecked Sendable {
         actionsOnCurrentScreen += 1
         lock.unlock()
 
-        DebugLog.log("bfs", "tapped \"\(target.text)\" at (\(target.tapX),\(target.tapY)) → \(transition)")
+        DebugLog.log("bfs", "tapped \"\(label)\" at (\(target.tapX),\(target.tapY)) → \(transition)")
 
         switch transition {
         case .newScreen(let fp):

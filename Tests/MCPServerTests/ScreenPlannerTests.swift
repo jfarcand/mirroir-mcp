@@ -539,4 +539,70 @@ final class ScreenPlannerTests: XCTestCase {
                 "Plan entry '\(entry.point.text)' should come from an explorable component")
         }
     }
+
+    // MARK: - displayLabel Wiring
+
+    func testComponentPlanCarriesDisplayLabel() {
+        // Build a component with first_text label rule whose tapTarget differs from displayLabel
+        let definition = ComponentDefinition(
+            name: "tab-bar-item",
+            platform: "ios",
+            description: "Tab with icon and text",
+            visualPattern: [],
+            matchRules: ComponentMatchRules(
+                rowHasChevron: nil, chevronMode: nil,
+                minElements: 1, maxElements: 3,
+                maxRowHeightPt: 60,
+                hasNumericValue: nil, hasLongText: nil, hasDismissButton: nil,
+                zone: .tabBar, minConfidence: 0.5,
+                excludeNumericOnly: false, textPattern: nil
+            ),
+            interaction: ComponentInteraction(
+                clickable: true, clickTarget: .centered,
+                clickResult: .switchesContext, backAfterClick: false,
+                labelRule: .firstText
+            ),
+            exploration: ComponentExploration(
+                explorable: true, role: .breadthNavigation, priority: .high
+            ),
+            grouping: ComponentGrouping(
+                absorbsSameRow: true, absorbsBelowWithinPt: 0,
+                absorbCondition: .any, splitMode: .perItem
+            )
+        )
+
+        // The tap target is "icon" but the first non-decoration text is "Home"
+        // Use Y=400 to avoid safe bottom margin exclusion (safeBottomMarginPt=62)
+        let component = ScreenComponent(
+            kind: "tab-bar-item",
+            definition: definition,
+            elements: [
+                ClassifiedElement(
+                    point: TapPoint(text: "icon", tapX: 50, tapY: 400, confidence: 0.8),
+                    role: .navigation, hasChevronContext: false
+                ),
+                ClassifiedElement(
+                    point: TapPoint(text: "Home", tapX: 50, tapY: 410, confidence: 0.9),
+                    role: .navigation, hasChevronContext: false
+                ),
+            ],
+            tapTarget: TapPoint(text: "icon", tapX: 50, tapY: 400, confidence: 0.8),
+            hasChevron: false,
+            topY: 400,
+            bottomY: 410
+        )
+
+        let plan = ScreenPlanner.buildComponentPlan(
+            components: [component],
+            visitedElements: [],
+            scoutResults: [:],
+            screenHeight: 890
+        )
+
+        XCTAssertEqual(plan.count, 1)
+        // Raw tap target is "icon" but displayLabel should be "Home" (firstText rule)
+        XCTAssertEqual(plan[0].point.text, "icon", "Tap target should be raw OCR text")
+        XCTAssertEqual(plan[0].displayLabel, "Home",
+            "displayLabel should use firstText label rule, not raw tap target")
+    }
 }

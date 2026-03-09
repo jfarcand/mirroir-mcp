@@ -75,8 +75,12 @@ struct NavigationEdge: Sendable {
     let toFingerprint: String
     /// Type of action that caused the transition (e.g. "tap", "swipe").
     let actionType: String
-    /// The element text or value associated with the action.
+    /// The raw element text used for visited-state matching (must match what was tapped).
     let elementText: String
+    /// Clean label derived from the component's LabelRule, free of OCR artifacts.
+    /// Used for skill step naming and path display. Falls back to `elementText` when
+    /// no component context is available.
+    let displayLabel: String
     /// Classified transition type for intelligent backtracking.
     let edgeType: EdgeType
 }
@@ -161,7 +165,8 @@ final class NavigationGraph: @unchecked Sendable {
     ///   - hints: Navigation hints from the new screen.
     ///   - screenshot: Base64-encoded screenshot.
     ///   - actionType: The action that caused navigation (e.g. "tap").
-    ///   - elementText: The element text associated with the action.
+    ///   - elementText: The raw element text associated with the action (for visited-state matching).
+    ///   - displayLabel: Clean label derived from the component's LabelRule (for skill naming).
     ///   - screenType: Classified type of the new screen.
     ///   - edgeType: Classified transition type for backtracking (default `.push`).
     /// - Returns: A `TransitionResult` indicating what happened.
@@ -172,6 +177,7 @@ final class NavigationGraph: @unchecked Sendable {
         screenshot: String,
         actionType: String,
         elementText: String,
+        displayLabel: String? = nil,
         screenType: ScreenType,
         edgeType: EdgeType = .push
     ) -> TransitionResult {
@@ -203,6 +209,7 @@ final class NavigationGraph: @unchecked Sendable {
             toFingerprint: matchingFP ?? newFP,
             actionType: actionType,
             elementText: elementText,
+            displayLabel: displayLabel ?? elementText,
             edgeType: edgeType
         )
         edges.append(edge)
