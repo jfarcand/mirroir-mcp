@@ -9,50 +9,17 @@ import HelperLib
 
 extension DFSExplorer {
 
-    // MARK: - Back Navigation Constants
-
-    /// Fraction of window width for the canonical back button X position.
-    /// iOS UINavigationBar back buttons sit at roughly 11% from the left edge.
-    static let backButtonXFraction = 0.112
-
-    /// Fraction of window height for the canonical back button Y position.
-    /// iOS UINavigationBar back buttons sit at roughly 13.5% from the top.
-    static let backButtonYFraction = 0.135
-
     // MARK: - Back Button Tap
 
     /// Find and tap the "<" back button on the current screen.
-    /// iPhone Mirroring does not support iOS edge-swipe-back gestures (neither
-    /// scroll wheel nor touch-drag triggers UIScreenEdgePanGestureRecognizer).
-    /// Tapping the OCR-detected back chevron is the only reliable backtrack method.
-    ///
-    /// First attempts to find the "<" chevron via OCR elements. If OCR misses the
-    /// back button (which happens on some screen types), falls back to tapping at
-    /// the canonical iOS navigation bar back button position.
+    /// Delegates to `ExplorerUtilities.tapBackButton` which owns the shared implementation.
     ///
     /// - Parameters:
     ///   - elements: OCR elements from the current screen (avoids redundant OCR call).
     ///   - input: Input provider for tap actions.
     /// - Returns: `true` if a back button was found and tapped (always true with fallback).
     func tapBackButton(elements: [TapPoint], input: InputProviding) -> Bool {
-        let topZone = windowSize.height * NavigationHintDetector.topZoneFraction
-        if let backButton = elements.first(where: { element in
-            let trimmed = element.text.trimmingCharacters(in: .whitespaces)
-            return NavigationHintDetector.backChevronPatterns.contains(trimmed)
-                && element.tapY <= topZone
-        }) {
-            _ = input.tap(x: backButton.tapX, y: backButton.tapY)
-            usleep(EnvConfig.stepSettlingDelayMs * 1000)
-            return true
-        }
-
-        // OCR sometimes fails to detect the "<" chevron, but the back button is
-        // at a predictable position in the iOS navigation bar. Tap there as fallback.
-        let fallbackX = windowSize.width * Self.backButtonXFraction
-        let fallbackY = windowSize.height * Self.backButtonYFraction
-        _ = input.tap(x: fallbackX, y: fallbackY)
-        usleep(EnvConfig.stepSettlingDelayMs * 1000)
-        return true
+        ExplorerUtilities.tapBackButton(elements: elements, input: input, windowSize: windowSize)
     }
 
     // MARK: - Backtrack with Verification
