@@ -16,9 +16,9 @@ extension MirroirMCP {
         server.registerTool(MCPToolDefinition(
             name: "reset_app",
             description: """
-                Force-quit an app on the mirrored iPhone by opening the App Switcher, \
-                finding the app card by name via OCR, and swiping it up to dismiss. \
-                If the app is not in the App Switcher, it is treated as already quit. \
+                Force-quit an app on the mirrored iPhone by launching it via Spotlight \
+                (which handles localization), opening the App Switcher where the \
+                just-launched app is the centered card, and swiping it up to dismiss. \
                 Use this before launch_app to ensure a fresh start.
                 """,
             inputSchema: [
@@ -58,21 +58,19 @@ extension MirroirMCP {
                 }
                 usleep(EnvConfig.toolSettlingDelayUs)
 
-                // Verify the target app is actually visible in the App Switcher
-                // before swiping. If the Spotlight launch failed or the app wasn't
-                // found, the centered card belongs to a different app — don't kill it.
+                // Verify the App Switcher is showing cards before swiping.
+                // We don't match the app name because Spotlight already
+                // resolved localization (e.g. "Settings" → "Réglages") and
+                // the just-launched app is guaranteed to be the centered card.
                 let describer = ctx.describer
                 let windowSize = ctx.bridge.getWindowInfo()?.size
                 guard let ocrResult = describer.describe(skipOCR: false) else {
                     _ = menuBridge.triggerMenuAction(menu: "View", item: "Home Screen")
                     return .error("Failed to capture App Switcher screen for verification")
                 }
-                let visibleTexts = ocrResult.elements.map { $0.text.lowercased() }
-                let appNameLower = appName.lowercased()
-                let appFound = visibleTexts.contains { $0.contains(appNameLower) }
-                if !appFound {
+                guard !ocrResult.elements.isEmpty else {
                     _ = menuBridge.triggerMenuAction(menu: "View", item: "Home Screen")
-                    return .text("'\(appName)' is not in the App Switcher (already quit)")
+                    return .error("App Switcher appears empty — no app cards detected")
                 }
 
                 // Drag up on the centered card to dismiss it.

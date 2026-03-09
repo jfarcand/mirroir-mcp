@@ -420,19 +420,36 @@ final class StepExecutorTests: XCTestCase {
                        "Should return to Home Screen on OCR failure")
     }
 
-    func testResetAppNotFoundInSwitcher() {
-        // When the app name is not visible in OCR, the app is treated as
-        // already quit. No swipe should occur.
+    func testResetAppEmptySwitcher() {
+        // When the App Switcher has no cards (empty OCR), reset_app should
+        // fail rather than blindly swiping.
         describer.describeResult = ScreenDescriber.DescribeResult(
-            elements: [TapPoint(text: "Messages", tapX: 200, tapY: 400, confidence: 0.95)],
+            elements: [],
+            screenshotBase64: ""
+        )
+
+        let result = executor.execute(
+            step: .resetApp(appName: "Settings"), stepIndex: 0, skillName: "test")
+        XCTAssertEqual(result.status, .failed)
+        XCTAssertTrue(result.message?.contains("empty") ?? false)
+        XCTAssertEqual(input.dragCalls.count, 0, "Must not swipe when App Switcher is empty")
+    }
+
+    func testResetAppWorksWithLocalizedName() {
+        // Spotlight resolves localization (e.g. "Settings" → "Réglages").
+        // The App Switcher card shows the localized name, not the English
+        // name the caller passed. reset_app should still swipe because it
+        // trusts the Spotlight launch rather than matching names.
+        describer.describeResult = ScreenDescriber.DescribeResult(
+            elements: [TapPoint(text: "Réglages", tapX: 200, tapY: 400, confidence: 0.95)],
             screenshotBase64: ""
         )
 
         let result = executor.execute(
             step: .resetApp(appName: "Settings"), stepIndex: 0, skillName: "test")
         XCTAssertEqual(result.status, .passed)
-        XCTAssertTrue(result.message?.contains("already quit") ?? false)
-        XCTAssertEqual(input.dragCalls.count, 0, "Must not swipe when app not in switcher")
+        XCTAssertTrue(result.message?.contains("Force-quit") ?? false)
+        XCTAssertEqual(input.dragCalls.count, 1, "Should swipe regardless of display language")
     }
 
     // MARK: - set_network

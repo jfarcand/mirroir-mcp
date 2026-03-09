@@ -168,22 +168,20 @@ extension StepExecutor {
         }
         usleep(config.settlingDelayMs * 1000)
 
-        // Verify the target app is actually visible in the App Switcher
-        // before swiping. If the Spotlight launch failed or the app wasn't
-        // found, the centered card belongs to a different app — don't kill it.
+        // Verify the App Switcher is showing cards before swiping.
+        // We don't match the app name because Spotlight already
+        // resolved localization (e.g. "Settings" → "Réglages") and
+        // the just-launched app is guaranteed to be the centered card.
         guard let ocrResult = describer.describe(skipOCR: false) else {
             _ = menuBridge.triggerMenuAction(menu: "View", item: "Home Screen")
             return StepResult(step: step, status: .failed,
                               message: "Failed to capture App Switcher screen for verification",
                               durationSeconds: elapsed(startTime))
         }
-        let visibleTexts = ocrResult.elements.map { $0.text.lowercased() }
-        let appNameLower = appName.lowercased()
-        let appFound = visibleTexts.contains { $0.contains(appNameLower) }
-        if !appFound {
+        guard !ocrResult.elements.isEmpty else {
             _ = menuBridge.triggerMenuAction(menu: "View", item: "Home Screen")
-            return StepResult(step: step, status: .passed,
-                              message: "'\(appName)' is not in the App Switcher (already quit)",
+            return StepResult(step: step, status: .failed,
+                              message: "App Switcher appears empty — no app cards detected",
                               durationSeconds: elapsed(startTime))
         }
 
