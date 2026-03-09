@@ -45,12 +45,19 @@ final class ComponentTesterTests: XCTestCase {
                 clickable: false,
                 clickTarget: .none,
                 clickResult: .none,
-                backAfterClick: false
+                backAfterClick: false,
+                labelRule: .tapTarget
+            ),
+            exploration: ComponentExploration(
+                explorable: false,
+                role: .info,
+                priority: .normal
             ),
             grouping: ComponentGrouping(
                 absorbsSameRow: true,
                 absorbsBelowWithinPt: 0,
-                absorbCondition: .any
+                absorbCondition: .any,
+                splitMode: .none
             )
         )
     }
@@ -80,12 +87,19 @@ final class ComponentTesterTests: XCTestCase {
                 clickable: true,
                 clickTarget: .firstNavigation,
                 clickResult: .pushesScreen,
-                backAfterClick: true
+                backAfterClick: true,
+                labelRule: .tapTarget
+            ),
+            exploration: ComponentExploration(
+                explorable: true,
+                role: .depthNavigation,
+                priority: .normal
             ),
             grouping: ComponentGrouping(
                 absorbsSameRow: true,
                 absorbsBelowWithinPt: 0,
-                absorbCondition: .any
+                absorbCondition: .any,
+                splitMode: .none
             )
         )
     }
@@ -296,10 +310,17 @@ final class ComponentTesterTests: XCTestCase {
             ),
             interaction: ComponentInteraction(
                 clickable: false, clickTarget: .none,
-                clickResult: .none, backAfterClick: false
+                clickResult: .none, backAfterClick: false,
+                labelRule: .tapTarget
+            ),
+            exploration: ComponentExploration(
+                explorable: false,
+                role: .info,
+                priority: .normal
             ),
             grouping: ComponentGrouping(
-                absorbsSameRow: true, absorbsBelowWithinPt: 0, absorbCondition: .any
+                absorbsSameRow: true, absorbsBelowWithinPt: 0, absorbCondition: .any,
+                splitMode: .none
             )
         )
 
@@ -337,10 +358,17 @@ final class ComponentTesterTests: XCTestCase {
             ),
             interaction: ComponentInteraction(
                 clickable: true, clickTarget: .firstNavigation,
-                clickResult: .pushesScreen, backAfterClick: true
+                clickResult: .pushesScreen, backAfterClick: true,
+                labelRule: .tapTarget
+            ),
+            exploration: ComponentExploration(
+                explorable: true,
+                role: .depthNavigation,
+                priority: .normal
             ),
             grouping: ComponentGrouping(
-                absorbsSameRow: true, absorbsBelowWithinPt: 0, absorbCondition: .any
+                absorbsSameRow: true, absorbsBelowWithinPt: 0, absorbCondition: .any,
+                splitMode: .none
             )
         )
 
@@ -374,10 +402,17 @@ final class ComponentTesterTests: XCTestCase {
             ),
             interaction: ComponentInteraction(
                 clickable: true, clickTarget: .firstNavigation,
-                clickResult: .pushesScreen, backAfterClick: true
+                clickResult: .pushesScreen, backAfterClick: true,
+                labelRule: .tapTarget
+            ),
+            exploration: ComponentExploration(
+                explorable: true,
+                role: .depthNavigation,
+                priority: .normal
             ),
             grouping: ComponentGrouping(
-                absorbsSameRow: true, absorbsBelowWithinPt: 0, absorbCondition: .any
+                absorbsSameRow: true, absorbsBelowWithinPt: 0, absorbCondition: .any,
+                splitMode: .none
             )
         )
 
@@ -434,10 +469,17 @@ final class ComponentTesterTests: XCTestCase {
             ),
             interaction: ComponentInteraction(
                 clickable: false, clickTarget: .none,
-                clickResult: .none, backAfterClick: false
+                clickResult: .none, backAfterClick: false,
+                labelRule: .tapTarget
+            ),
+            exploration: ComponentExploration(
+                explorable: false,
+                role: .info,
+                priority: .normal
             ),
             grouping: ComponentGrouping(
-                absorbsSameRow: true, absorbsBelowWithinPt: 0, absorbCondition: .any
+                absorbsSameRow: true, absorbsBelowWithinPt: 0, absorbCondition: .any,
+                splitMode: .none
             )
         )
 

@@ -40,12 +40,19 @@ final class ComponentScoringTests: XCTestCase {
                 clickable: true,
                 clickTarget: .firstNavigation,
                 clickResult: .pushesScreen,
-                backAfterClick: true
+                backAfterClick: true,
+                labelRule: .tapTarget
+            ),
+            exploration: ComponentExploration(
+                explorable: true,
+                role: .depthNavigation,
+                priority: .normal
             ),
             grouping: ComponentGrouping(
                 absorbsSameRow: true,
                 absorbsBelowWithinPt: 0,
-                absorbCondition: .any
+                absorbCondition: .any,
+                splitMode: .none
             )
         )
     }

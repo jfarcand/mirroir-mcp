@@ -23,6 +23,35 @@ struct ScreenComponent: Sendable {
     let topY: Double
     /// Bottom Y coordinate of this component's bounding box.
     let bottomY: Double
+
+    /// Human-readable label derived from the component's elements using the label rule.
+    /// Prevents raw OCR artifacts ("icon", ">") from leaking into skill step names.
+    var displayLabel: String {
+        switch definition.interaction.labelRule {
+        case .tapTarget:
+            return tapTarget?.text ?? fallbackLabel
+        case .firstText:
+            if let first = elements.first(where: {
+                $0.role != .decoration && $0.point.text != "icon"
+                    && !ElementClassifier.chevronCharacters.contains($0.point.text.trimmingCharacters(in: .whitespaces))
+            }) {
+                return first.point.text
+            }
+            return fallbackLabel
+        case .longestText:
+            if let longest = elements
+                .filter({ $0.role != .decoration })
+                .max(by: { $0.point.text.count < $1.point.text.count }) {
+                return longest.point.text
+            }
+            return fallbackLabel
+        }
+    }
+
+    /// Fallback: first non-decoration element text, or the component kind.
+    private var fallbackLabel: String {
+        elements.first(where: { $0.role != .decoration })?.point.text ?? kind
+    }
 }
 
 /// Groups classified OCR elements into UI components using loaded definitions.
@@ -111,11 +140,19 @@ enum ComponentDetector {
                     }
                 }
 
-                let component = buildComponent(
-                    kind: match.name, definition: match,
-                    elements: allElements
-                )
-                components.append(component)
+                // Split into per-item components when split_mode is per_item
+                if match.grouping.splitMode == .perItem {
+                    let splitComponents = splitIntoPerItem(
+                        definition: match, elements: allElements
+                    )
+                    components.append(contentsOf: splitComponents)
+                } else {
+                    let component = buildComponent(
+                        kind: match.name, definition: match,
+                        elements: allElements
+                    )
+                    components.append(component)
+                }
             } else {
                 // No definition matched — create per-element fallback components
                 consumedRowIndices.insert(rowIndex)
@@ -300,6 +337,28 @@ enum ComponentDetector {
         }
     }
 
+    // MARK: - Split Mode
+
+    /// Split a matched row into one component per non-decoration element.
+    /// Each element becomes its own ScreenComponent with its own tap target,
+    /// enabling per-item exploration of multi-target containers like tab bars.
+    private static func splitIntoPerItem(
+        definition: ComponentDefinition,
+        elements: [ClassifiedElement]
+    ) -> [ScreenComponent] {
+        let qualifying = elements.filter { $0.role != .decoration }
+        guard !qualifying.isEmpty else {
+            return [buildComponent(kind: definition.name, definition: definition, elements: elements)]
+        }
+
+        return qualifying.map { element in
+            buildComponent(
+                kind: definition.name, definition: definition,
+                elements: [element]
+            )
+        }
+    }
+
     // MARK: - Component Building
 
     /// Build a ScreenComponent from matched definition and grouped elements.
@@ -354,12 +413,19 @@ enum ComponentDetector {
                 clickable: false,
                 clickTarget: .none,
                 clickResult: .none,
-                backAfterClick: false
+                backAfterClick: false,
+                labelRule: .tapTarget
+            ),
+            exploration: ComponentExploration(
+                explorable: false,
+                role: .info,
+                priority: .normal
             ),
             grouping: ComponentGrouping(
                 absorbsSameRow: false,
                 absorbsBelowWithinPt: 0,
-                absorbCondition: .any
+                absorbCondition: .any,
+                splitMode: .none
             )
         )
 

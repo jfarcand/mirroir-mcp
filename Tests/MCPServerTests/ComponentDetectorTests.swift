@@ -500,6 +500,102 @@ final class ComponentDetectorTests: XCTestCase {
             "Tap target should be the unicode dismiss button")
     }
 
+    // MARK: - Split Mode
+
+    func testPerItemSplitCreatesOneComponentPerElement() {
+        // Definition with split_mode: per_item, zone: tab_bar
+        let tabItemDef = ComponentDefinition(
+            name: "tab-bar-item",
+            platform: "ios",
+            description: "Tab bar item.",
+            visualPattern: [],
+            matchRules: ComponentMatchRules(
+                rowHasChevron: nil, chevronMode: nil, minElements: 1, maxElements: 6,
+                maxRowHeightPt: 60, hasNumericValue: nil, hasLongText: nil,
+                hasDismissButton: nil, zone: .tabBar,
+                minConfidence: nil, excludeNumericOnly: nil, textPattern: nil
+            ),
+            interaction: ComponentInteraction(
+                clickable: true, clickTarget: .firstText,
+                clickResult: .switchesContext, backAfterClick: false,
+                labelRule: .firstText
+            ),
+            exploration: ComponentExploration(
+                explorable: true,
+                role: .breadthNavigation,
+                priority: .high
+            ),
+            grouping: ComponentGrouping(
+                absorbsSameRow: false, absorbsBelowWithinPt: 0, absorbCondition: .any,
+                splitMode: .perItem
+            )
+        )
+
+        // Three tab labels in the tab bar zone
+        let elements = [
+            classifiedNav("Résumé", x: 100, y: 850),
+            classifiedNav("Partage", x: 200, y: 850),
+            classifiedNav("Explorer", x: 300, y: 850)
+        ]
+
+        let result = ComponentDetector.detect(
+            classified: elements, definitions: [tabItemDef],
+            screenHeight: screenHeight
+        )
+
+        XCTAssertEqual(result.count, 3,
+            "split_mode: per_item should create one component per element")
+        XCTAssertTrue(result.allSatisfy { $0.kind == "tab-bar-item" })
+        XCTAssertEqual(result[0].elements.count, 1)
+        XCTAssertEqual(result[1].elements.count, 1)
+        XCTAssertEqual(result[2].elements.count, 1)
+    }
+
+    func testPerItemSplitSkipsDecoration() {
+        let tabItemDef = ComponentDefinition(
+            name: "tab-bar-item",
+            platform: "ios",
+            description: "Tab bar item.",
+            visualPattern: [],
+            matchRules: ComponentMatchRules(
+                rowHasChevron: nil, chevronMode: nil, minElements: 1, maxElements: 6,
+                maxRowHeightPt: 60, hasNumericValue: nil, hasLongText: nil,
+                hasDismissButton: nil, zone: .tabBar,
+                minConfidence: nil, excludeNumericOnly: nil, textPattern: nil
+            ),
+            interaction: ComponentInteraction(
+                clickable: true, clickTarget: .firstText,
+                clickResult: .switchesContext, backAfterClick: false,
+                labelRule: .firstText
+            ),
+            exploration: ComponentExploration(
+                explorable: true,
+                role: .breadthNavigation,
+                priority: .high
+            ),
+            grouping: ComponentGrouping(
+                absorbsSameRow: false, absorbsBelowWithinPt: 0, absorbCondition: .any,
+                splitMode: .perItem
+            )
+        )
+
+        // Two tab labels plus a decoration element
+        let elements = [
+            classifiedNav("Résumé", x: 100, y: 850),
+            classifiedDeco("icon", x: 150, y: 850),
+            classifiedNav("Explorer", x: 300, y: 850)
+        ]
+
+        let result = ComponentDetector.detect(
+            classified: elements, definitions: [tabItemDef],
+            screenHeight: screenHeight
+        )
+
+        XCTAssertEqual(result.count, 2,
+            "split_mode: per_item should skip decoration elements")
+        XCTAssertTrue(result.allSatisfy { $0.kind == "tab-bar-item" })
+    }
+
     // MARK: - Precision Rules
 
     func testMinConfidenceRejectsLowConfidenceRow() {
@@ -517,10 +613,17 @@ final class ComponentDetectorTests: XCTestCase {
             ),
             interaction: ComponentInteraction(
                 clickable: true, clickTarget: .firstNavigation,
-                clickResult: .pushesScreen, backAfterClick: true
+                clickResult: .pushesScreen, backAfterClick: true,
+                labelRule: .tapTarget
+            ),
+            exploration: ComponentExploration(
+                explorable: true,
+                role: .depthNavigation,
+                priority: .normal
             ),
             grouping: ComponentGrouping(
-                absorbsSameRow: true, absorbsBelowWithinPt: 0, absorbCondition: .any
+                absorbsSameRow: true, absorbsBelowWithinPt: 0, absorbCondition: .any,
+                splitMode: .none
             )
         )
 
@@ -552,10 +655,17 @@ final class ComponentDetectorTests: XCTestCase {
             ),
             interaction: ComponentInteraction(
                 clickable: true, clickTarget: .firstNavigation,
-                clickResult: .pushesScreen, backAfterClick: true
+                clickResult: .pushesScreen, backAfterClick: true,
+                labelRule: .tapTarget
+            ),
+            exploration: ComponentExploration(
+                explorable: true,
+                role: .depthNavigation,
+                priority: .normal
             ),
             grouping: ComponentGrouping(
-                absorbsSameRow: true, absorbsBelowWithinPt: 0, absorbCondition: .any
+                absorbsSameRow: true, absorbsBelowWithinPt: 0, absorbCondition: .any,
+                splitMode: .none
             )
         )
 
@@ -590,10 +700,17 @@ final class ComponentDetectorTests: XCTestCase {
             ),
             interaction: ComponentInteraction(
                 clickable: false, clickTarget: .none,
-                clickResult: .none, backAfterClick: false
+                clickResult: .none, backAfterClick: false,
+                labelRule: .tapTarget
+            ),
+            exploration: ComponentExploration(
+                explorable: false,
+                role: .info,
+                priority: .normal
             ),
             grouping: ComponentGrouping(
-                absorbsSameRow: true, absorbsBelowWithinPt: 0, absorbCondition: .any
+                absorbsSameRow: true, absorbsBelowWithinPt: 0, absorbCondition: .any,
+                splitMode: .none
             )
         )
 
@@ -626,10 +743,17 @@ final class ComponentDetectorTests: XCTestCase {
             ),
             interaction: ComponentInteraction(
                 clickable: false, clickTarget: .none,
-                clickResult: .none, backAfterClick: false
+                clickResult: .none, backAfterClick: false,
+                labelRule: .tapTarget
+            ),
+            exploration: ComponentExploration(
+                explorable: false,
+                role: .info,
+                priority: .normal
             ),
             grouping: ComponentGrouping(
-                absorbsSameRow: true, absorbsBelowWithinPt: 0, absorbCondition: .any
+                absorbsSameRow: true, absorbsBelowWithinPt: 0, absorbCondition: .any,
+                splitMode: .none
             )
         )
 
@@ -661,10 +785,17 @@ final class ComponentDetectorTests: XCTestCase {
             ),
             interaction: ComponentInteraction(
                 clickable: false, clickTarget: .none,
-                clickResult: .none, backAfterClick: false
+                clickResult: .none, backAfterClick: false,
+                labelRule: .tapTarget
+            ),
+            exploration: ComponentExploration(
+                explorable: false,
+                role: .info,
+                priority: .normal
             ),
             grouping: ComponentGrouping(
-                absorbsSameRow: true, absorbsBelowWithinPt: 0, absorbCondition: .any
+                absorbsSameRow: true, absorbsBelowWithinPt: 0, absorbCondition: .any,
+                splitMode: .none
             )
         )
 
@@ -724,11 +855,17 @@ final class ComponentDetectorTests: XCTestCase {
             ),
             interaction: ComponentInteraction(
                 clickable: clickable, clickTarget: .firstNavigation,
-                clickResult: .pushesScreen, backAfterClick: true
+                clickResult: .pushesScreen, backAfterClick: true,
+                labelRule: .tapTarget
+            ),
+            exploration: ComponentExploration(
+                explorable: clickable,
+                role: clickable ? .depthNavigation : .info,
+                priority: .normal
             ),
             grouping: ComponentGrouping(
                 absorbsSameRow: true, absorbsBelowWithinPt: absorbRange,
-                absorbCondition: condition
+                absorbCondition: condition, splitMode: .none
             )
         )
 

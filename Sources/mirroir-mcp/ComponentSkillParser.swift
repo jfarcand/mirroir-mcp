@@ -7,7 +7,7 @@
 import Foundation
 
 /// Parsed component definition describing an iOS UI component's visual pattern,
-/// match rules, interaction behavior, and element grouping rules.
+/// match rules, interaction behavior, exploration policy, and element grouping rules.
 struct ComponentDefinition: Sendable {
     let name: String
     let platform: String
@@ -15,6 +15,7 @@ struct ComponentDefinition: Sendable {
     let visualPattern: [String]
     let matchRules: ComponentMatchRules
     let interaction: ComponentInteraction
+    let exploration: ComponentExploration
     let grouping: ComponentGrouping
 }
 
@@ -68,6 +69,19 @@ struct ComponentInteraction: Sendable {
     let clickResult: ClickResult
     /// Whether the explorer should tap back after clicking.
     let backAfterClick: Bool
+    /// How to derive the human-readable label from the component's elements.
+    let labelRule: LabelRule
+}
+
+/// Rules for picking a display label from a component's OCR elements.
+/// Prevents raw OCR artifacts ("icon", ">") from leaking into skill step names.
+enum LabelRule: String, Sendable {
+    /// Use the tap target's text (current default, backward-compatible).
+    case tapTarget = "tap_target"
+    /// Use the first non-decoration, non-icon element's text.
+    case firstText = "first_text"
+    /// Use the longest text element in the component.
+    case longestText = "longest_text"
 }
 
 /// Rules for absorbing nearby OCR elements into a multi-row component.
@@ -78,6 +92,18 @@ struct ComponentGrouping: Sendable {
     let absorbsBelowWithinPt: Double
     /// Condition for absorbing elements below.
     let absorbCondition: AbsorbCondition
+    /// How to split matched rows into individual components.
+    let splitMode: SplitMode
+}
+
+/// Controls whether a matched row produces one component or many.
+/// Used for multi-item containers like tab bars where each item needs
+/// its own tap target and exploration entry.
+enum SplitMode: String, Sendable {
+    /// One component per matched row (default).
+    case none
+    /// One component per non-decoration element in the row.
+    case perItem = "per_item"
 }
 
 /// Screen zones used for component matching.
@@ -135,6 +161,38 @@ enum ClickResult: String, Sendable {
     }
 }
 
+/// Exploration policy controlling how the BFS explorer treats this component.
+/// Separate from interaction (UI truth) to avoid conflating "is tappable"
+/// with "should be explored."
+struct ComponentExploration: Sendable {
+    /// Whether the explorer should visit this component.
+    let explorable: Bool
+    /// The exploration role determines priority ordering and backtrack behavior.
+    let role: ExplorationRole
+    /// Exploration priority within the role category.
+    let priority: ExplorationPriority
+}
+
+/// Role a component plays in the exploration graph.
+/// Determines frontier ordering: breadth before depth before action.
+enum ExplorationRole: String, Sendable {
+    /// Top-level navigation (tabs, sidebar). Explored first for app coverage.
+    case breadthNavigation = "breadth_navigation"
+    /// Drill-down navigation (rows, cards). Standard BFS ordering.
+    case depthNavigation = "depth_navigation"
+    /// Triggers behavior (search, buttons). Explored cautiously.
+    case action
+    /// Read-only element (headers, titles). Never explored.
+    case info
+}
+
+/// Exploration priority within a role category.
+enum ExplorationPriority: String, Sendable {
+    case high
+    case normal
+    case low
+}
+
 /// Conditions for absorbing nearby elements into a multi-row component.
 enum AbsorbCondition: String, Sendable {
     case any
@@ -163,6 +221,7 @@ enum ComponentSkillParser {
         let visualPattern = extractBulletList(from: sections["Visual Pattern"] ?? "")
         let matchRules = parseMatchRules(sections["Match Rules"] ?? "")
         let interaction = parseInteraction(sections["Interaction"] ?? "")
+        let exploration = parseExploration(sections["Exploration"] ?? "", interaction: interaction)
         let grouping = parseGrouping(sections["Grouping"] ?? "")
 
         return ComponentDefinition(
@@ -172,6 +231,7 @@ enum ComponentSkillParser {
             visualPattern: visualPattern,
             matchRules: matchRules,
             interaction: interaction,
+            exploration: exploration,
             grouping: grouping
         )
     }
@@ -286,7 +346,8 @@ enum ComponentSkillParser {
             clickable: parseBool(kv["clickable"]) ?? false,
             clickTarget: ClickTargetRule(rawValue: kv["click_target"] ?? "none") ?? .none,
             clickResult: ClickResult(legacy: kv["click_result"] ?? "none"),
-            backAfterClick: parseBool(kv["back_after_click"]) ?? false
+            backAfterClick: parseBool(kv["back_after_click"]) ?? false,
+            labelRule: LabelRule(rawValue: kv["label_rule"] ?? "tap_target") ?? .tapTarget
         )
     }
 
@@ -296,7 +357,21 @@ enum ComponentSkillParser {
         return ComponentGrouping(
             absorbsSameRow: parseBool(kv["absorbs_same_row"]) ?? true,
             absorbsBelowWithinPt: parseDouble(kv["absorbs_below_within_pt"]) ?? 0,
-            absorbCondition: AbsorbCondition(rawValue: kv["absorb_condition"] ?? "any") ?? .any
+            absorbCondition: AbsorbCondition(rawValue: kv["absorb_condition"] ?? "any") ?? .any,
+            splitMode: SplitMode(rawValue: kv["split_mode"] ?? "none") ?? .none
+        )
+    }
+
+    /// Parse key-value lines from an Exploration section.
+    /// Defaults when section is absent: explorable = clickable, role = depth_navigation, priority = normal.
+    private static func parseExploration(
+        _ text: String, interaction: ComponentInteraction
+    ) -> ComponentExploration {
+        let kv = extractKeyValues(from: text)
+        return ComponentExploration(
+            explorable: parseBool(kv["explorable"]) ?? interaction.clickable,
+            role: ExplorationRole(rawValue: kv["role"] ?? "depth_navigation") ?? .depthNavigation,
+            priority: ExplorationPriority(rawValue: kv["priority"] ?? "normal") ?? .normal
         )
     }
 

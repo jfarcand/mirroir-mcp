@@ -510,4 +510,33 @@ final class ScreenPlannerTests: XCTestCase {
         XCTAssertEqual(plan[0].point.text, "Works",
             "Scout-confirmed navigation should rank first")
     }
+
+    func testNonExplorableComponentsExcludedFromPlan() {
+        // Toggle row is clickable (UI truth) but NOT explorable (exploration policy)
+        let elements = [
+            TapPoint(text: "Général", tapX: 100, tapY: 300, confidence: 0.9),
+            TapPoint(text: ">", tapX: 370, tapY: 300, confidence: 0.9),
+        ]
+        let classified = ElementClassifier.classify(elements, screenHeight: screenHeight)
+        let components = ComponentDetector.detect(
+            classified: classified,
+            definitions: ComponentCatalog.definitions,
+            screenHeight: screenHeight
+        )
+
+        // Verify that all components in the plan are explorable
+        let plan = ScreenPlanner.buildComponentPlan(
+            components: components,
+            visitedElements: [],
+            scoutResults: [:],
+            screenHeight: screenHeight
+        )
+
+        // Every element in the plan should come from an explorable component
+        for entry in plan {
+            let source = components.first { $0.tapTarget?.text == entry.point.text }
+            XCTAssertTrue(source?.definition.exploration.explorable ?? false,
+                "Plan entry '\(entry.point.text)' should come from an explorable component")
+        }
+    }
 }

@@ -38,6 +38,12 @@ enum ScreenPlanner {
     static let fallbackPenalty: Double = -1.0
     /// Penalty for long labels (> 30 chars), which are more likely descriptive text.
     static let longLabelPenalty: Double = -1.0
+    /// Bonus for breadth_navigation role (tabs explored first for app coverage).
+    static let breadthRoleWeight: Double = 4.0
+    /// Bonus for high exploration priority within a role.
+    static let highPriorityWeight: Double = 2.0
+    /// Penalty for low exploration priority within a role.
+    static let lowPriorityWeight: Double = -2.0
 
     /// Maximum character length to qualify as a "short label".
     static let shortLabelMaxLength = 20
@@ -82,9 +88,9 @@ enum ScreenPlanner {
 
     /// Build a ranked exploration plan from detected screen components.
     ///
-    /// Filters to clickable components with unvisited tap targets, scores using existing
-    /// weights plus component-level bonuses. Components marked as non-clickable are excluded
-    /// entirely, preventing wasted taps on explanatory text and section headers.
+    /// Filters to explorable components with unvisited tap targets, scores using existing
+    /// weights plus exploration role and priority bonuses. Components marked as non-explorable
+    /// are excluded entirely, preventing wasted taps on dismiss buttons, toggles, and headers.
     ///
     /// - Parameters:
     ///   - components: Detected screen components with grouped elements.
@@ -100,8 +106,8 @@ enum ScreenPlanner {
     ) -> [RankedElement] {
         components
             .compactMap { component -> RankedElement? in
-                // Skip non-clickable components
-                guard component.definition.interaction.clickable,
+                // Skip non-explorable components (exploration policy, not just UI truth)
+                guard component.definition.exploration.explorable,
                       let tapTarget = component.tapTarget,
                       !visitedElements.contains(tapTarget.text) else {
                     return nil
@@ -148,6 +154,24 @@ enum ScreenPlanner {
         } else {
             score += fallbackPenalty
             reasons.append("no nav \(Int(fallbackPenalty))")
+        }
+
+        // Exploration role bonus: breadth-first components (tabs) explored before depth
+        if component.definition.exploration.role == .breadthNavigation {
+            score += breadthRoleWeight
+            reasons.append("breadth +\(Int(breadthRoleWeight))")
+        }
+
+        // Exploration priority bonus/penalty
+        switch component.definition.exploration.priority {
+        case .high:
+            score += highPriorityWeight
+            reasons.append("pri:high +\(Int(highPriorityWeight))")
+        case .low:
+            score += lowPriorityWeight
+            reasons.append("pri:low \(Int(lowPriorityWeight))")
+        case .normal:
+            break
         }
 
         // Label length signals (same as element-level)

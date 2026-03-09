@@ -164,6 +164,43 @@ final class ComponentLoaderTests: XCTestCase {
         XCTAssertEqual(tabBarItem?.interaction.clickTarget, .firstText)
     }
 
+    func testTabBarItemExplorationPolicy() {
+        let definitions = ComponentLoader.loadAll()
+        let tabBarItem = definitions.first { $0.name == "tab-bar-item" }
+
+        XCTAssertNotNil(tabBarItem)
+        XCTAssertTrue(tabBarItem?.exploration.explorable ?? false,
+            "Tab bar items should be explorable for app coverage")
+        XCTAssertEqual(tabBarItem?.exploration.role, .breadthNavigation,
+            "Tab bar items are breadth navigation (top-level)")
+        XCTAssertEqual(tabBarItem?.exploration.priority, .high,
+            "Tab bar items have high exploration priority")
+    }
+
+    func testNonExplorableClickableComponents() {
+        let definitions = ComponentLoader.loadAll()
+        let nonExplorable = ["navigation-bar", "modal-sheet", "alert-dialog",
+                             "toggle-row", "search-bar"]
+        for name in nonExplorable {
+            let def = definitions.first { $0.name == name }
+            XCTAssertNotNil(def, "Should load \(name)")
+            XCTAssertTrue(def?.interaction.clickable ?? false,
+                "\(name) should be clickable (UI truth)")
+            XCTAssertFalse(def?.exploration.explorable ?? true,
+                "\(name) should NOT be explorable (exploration policy)")
+        }
+    }
+
+    func testExplorationDefaultsMatchClickable() {
+        let definitions = ComponentLoader.loadAll()
+        for definition in definitions {
+            if !definition.interaction.clickable {
+                XCTAssertFalse(definition.exploration.explorable,
+                    "Non-clickable component '\(definition.name)' should default to non-explorable")
+            }
+        }
+    }
+
     func testAllClickableComponentsHaveTapTargetRule() {
         let definitions = ComponentLoader.loadAll()
         for definition in definitions {
@@ -172,5 +209,41 @@ final class ComponentLoaderTests: XCTestCase {
                     "Clickable component '\(definition.name)' should have a tap target rule")
             }
         }
+    }
+
+    func testTabBarItemHasFirstTextLabelRule() {
+        let definitions = ComponentLoader.loadAll()
+        let tabBarItem = definitions.first { $0.name == "tab-bar-item" }
+
+        XCTAssertNotNil(tabBarItem)
+        XCTAssertEqual(tabBarItem?.interaction.labelRule, .firstText,
+            "Tab bar items should use first_text label rule to skip icon artifacts")
+    }
+
+    func testNavigationBarHasLongestTextLabelRule() {
+        let definitions = ComponentLoader.loadAll()
+        let navBar = definitions.first { $0.name == "navigation-bar" }
+
+        XCTAssertNotNil(navBar)
+        XCTAssertEqual(navBar?.interaction.labelRule, .longestText,
+            "Navigation bar should use longest_text label rule to pick the title")
+    }
+
+    func testSummaryCardHasLongestTextLabelRule() {
+        let definitions = ComponentLoader.loadAll()
+        let card = definitions.first { $0.name == "summary-card" }
+
+        XCTAssertNotNil(card)
+        XCTAssertEqual(card?.interaction.labelRule, .longestText,
+            "Summary card should use longest_text label rule for metric title")
+    }
+
+    func testDefaultLabelRuleIsTapTarget() {
+        let definitions = ComponentLoader.loadAll()
+        let disclosure = definitions.first { $0.name == "table-row-disclosure" }
+
+        XCTAssertNotNil(disclosure)
+        XCTAssertEqual(disclosure?.interaction.labelRule, .tapTarget,
+            "Components without explicit label_rule should default to tap_target")
     }
 }

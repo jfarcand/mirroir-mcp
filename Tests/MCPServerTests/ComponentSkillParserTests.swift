@@ -76,10 +76,93 @@ final class ComponentSkillParserTests: XCTestCase {
         XCTAssertEqual(definition.interaction.clickResult, .pushesScreen)
         XCTAssertTrue(definition.interaction.backAfterClick)
 
+        // Exploration defaults (section absent → derived from interaction)
+        XCTAssertTrue(definition.exploration.explorable,
+            "Exploration.explorable should default to interaction.clickable")
+        XCTAssertEqual(definition.exploration.role, .depthNavigation,
+            "Exploration.role should default to depth_navigation")
+        XCTAssertEqual(definition.exploration.priority, .normal,
+            "Exploration.priority should default to normal")
+
         // Grouping
         XCTAssertTrue(definition.grouping.absorbsSameRow)
         XCTAssertEqual(definition.grouping.absorbsBelowWithinPt, 0)
         XCTAssertEqual(definition.grouping.absorbCondition, .any)
+    }
+
+    func testParseExplicitExplorationSection() {
+        let content = """
+            ---
+            version: 1
+            name: tab-bar-item
+            platform: ios
+            ---
+
+            # Tab Bar Item
+
+            ## Description
+
+            Tab bar button for top-level navigation.
+
+            ## Match Rules
+
+            - zone: tab_bar
+
+            ## Interaction
+
+            - clickable: true
+            - click_target: first_text
+            - click_result: switches_context
+            - back_after_click: false
+
+            ## Exploration
+
+            - explorable: true
+            - role: breadth_navigation
+            - priority: high
+
+            ## Grouping
+
+            - absorbs_same_row: false
+            - absorbs_below_within_pt: 0
+            - absorb_condition: any
+            """
+
+        let definition = ComponentSkillParser.parse(
+            content: content, fallbackName: "fallback"
+        )
+
+        XCTAssertEqual(definition.name, "tab-bar-item")
+        XCTAssertTrue(definition.exploration.explorable)
+        XCTAssertEqual(definition.exploration.role, .breadthNavigation)
+        XCTAssertEqual(definition.exploration.priority, .high)
+    }
+
+    func testExplorationDefaultsToNotExplorableWhenNotClickable() {
+        let content = """
+            ---
+            version: 1
+            name: section-header
+            platform: ios
+            ---
+
+            # Section Header
+
+            ## Interaction
+
+            - clickable: false
+            - click_target: none
+            - click_result: none
+            - back_after_click: false
+            """
+
+        let definition = ComponentSkillParser.parse(
+            content: content, fallbackName: "fallback"
+        )
+
+        XCTAssertFalse(definition.exploration.explorable,
+            "Non-clickable component should default to non-explorable")
+        XCTAssertEqual(definition.exploration.role, .depthNavigation)
     }
 
     func testParseSummaryCardWithAbsorption() {
@@ -540,5 +623,127 @@ final class ComponentSkillParserTests: XCTestCase {
         XCTAssertNil(definition.matchRules.minConfidence)
         XCTAssertNil(definition.matchRules.excludeNumericOnly)
         XCTAssertNil(definition.matchRules.textPattern)
+    }
+
+    // MARK: - Label Rule Parsing
+
+    func testLabelRuleDefaultsToTapTarget() {
+        let content = """
+            ---
+            name: simple
+            ---
+
+            # Simple
+
+            ## Interaction
+
+            - clickable: true
+            - click_target: first_text
+            - click_result: pushes_screen
+            - back_after_click: true
+            """
+
+        let definition = ComponentSkillParser.parse(
+            content: content, fallbackName: "fallback"
+        )
+
+        XCTAssertEqual(definition.interaction.labelRule, .tapTarget,
+            "label_rule should default to tap_target when not specified")
+    }
+
+    func testParsesLabelRuleFirstText() {
+        let content = """
+            ---
+            name: tab-item
+            ---
+
+            # Tab Item
+
+            ## Interaction
+
+            - clickable: true
+            - click_target: first_text
+            - click_result: switches_context
+            - back_after_click: false
+            - label_rule: first_text
+            """
+
+        let definition = ComponentSkillParser.parse(
+            content: content, fallbackName: "fallback"
+        )
+
+        XCTAssertEqual(definition.interaction.labelRule, .firstText)
+    }
+
+    func testParsesLabelRuleLongestText() {
+        let content = """
+            ---
+            name: nav-bar
+            ---
+
+            # Nav Bar
+
+            ## Interaction
+
+            - clickable: true
+            - click_target: first_navigation_element
+            - click_result: dismisses
+            - back_after_click: true
+            - label_rule: longest_text
+            """
+
+        let definition = ComponentSkillParser.parse(
+            content: content, fallbackName: "fallback"
+        )
+
+        XCTAssertEqual(definition.interaction.labelRule, .longestText)
+    }
+
+    // MARK: - Split Mode Parsing
+
+    func testSplitModeDefaultsToNone() {
+        let content = """
+            ---
+            name: simple
+            ---
+
+            # Simple
+
+            ## Grouping
+
+            - absorbs_same_row: true
+            - absorbs_below_within_pt: 0
+            - absorb_condition: any
+            """
+
+        let definition = ComponentSkillParser.parse(
+            content: content, fallbackName: "fallback"
+        )
+
+        XCTAssertEqual(definition.grouping.splitMode, .none,
+            "split_mode should default to none when not specified")
+    }
+
+    func testParsesSplitModePerItem() {
+        let content = """
+            ---
+            name: tab-bar-item
+            ---
+
+            # Tab Bar Item
+
+            ## Grouping
+
+            - absorbs_same_row: false
+            - absorbs_below_within_pt: 0
+            - absorb_condition: any
+            - split_mode: per_item
+            """
+
+        let definition = ComponentSkillParser.parse(
+            content: content, fallbackName: "fallback"
+        )
+
+        XCTAssertEqual(definition.grouping.splitMode, .perItem)
     }
 }
