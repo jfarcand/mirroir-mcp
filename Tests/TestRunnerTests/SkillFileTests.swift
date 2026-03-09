@@ -42,15 +42,14 @@ final class SkillFileTests: XCTestCase {
 
     func testSkillCount() {
         let stems = skillStems()
-        XCTAssertEqual(stems.count, 24, "Expected 24 skills, got \(stems.count): \(stems)")
+        XCTAssertEqual(stems.count, 26, "Expected 26 skills, got \(stems.count): \(stems)")
     }
 
     func testNoUnexpectedUnknownSteps() throws {
         let knownAIOnlyTypes: Set<String> = [
             "remember", "condition", "repeat", "verify", "summarize",
         ]
-        // long_press is used in share-recent — not built into the parser on purpose
-        let expectedUnknownTypes: Set<String> = ["long_press"]
+        let expectedUnknownTypes: Set<String> = []
 
         let files = yamlFilesSkippingLegacy()
         for file in files {
