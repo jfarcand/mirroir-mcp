@@ -175,9 +175,9 @@ final class SkillFileTests: XCTestCase {
         XCTAssertEqual(s.name, "Share Recent Photo")
         if !s.steps.isEmpty {
             XCTAssertEqual(s.steps.count, 16)
-            // long_press is intentionally an unknown step type (AI-only gesture)
+            // long_press is a recognized step type parsed as .longPress
             let longPress = s.steps.filter {
-                if case .skipped(let t, _) = $0, t == "long_press" { return true }
+                if case .longPress = $0 { return true }
                 return false
             }
             XCTAssertEqual(longPress.count, 1,
