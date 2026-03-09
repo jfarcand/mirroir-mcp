@@ -537,11 +537,12 @@ public enum EnvConfig {
                    default: "iPhone Mirroring")
     }
 
-    /// Post mouse events directly to the target PID instead of moving the
-    /// system cursor. Works for regular macOS apps (e.g. FakeMirroring) but
-    /// NOT for iPhone Mirroring, which ignores event coordinates and reads
-    /// the actual cursor position. Enables local integration tests without
-    /// cursor interference.
+    /// Post mouse events directly to the target PID via `postToPid` instead
+    /// of global HID posting. Works for regular macOS apps (e.g. FakeMirroring)
+    /// but NOT for iPhone Mirroring — per-process injection does not register
+    /// taps; only global HID events (`event.post(tap: .cghidEventTap)`) work,
+    /// and those inherently move the system cursor. Enables local integration
+    /// tests without cursor interference.
     public static var cursorFreeInput: Bool {
         readBool("cursorFreeInput", envVar: "MIRROIR_CURSOR_FREE", default: false)
     }

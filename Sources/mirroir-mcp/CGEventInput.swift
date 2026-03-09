@@ -14,14 +14,20 @@ import Foundation
 /// Pointing methods accept an optional `targetPID`. When set, events are
 /// posted directly to that process via `CGEvent.postToPid` without moving
 /// the system cursor. This works for regular macOS apps (e.g. FakeMirroring)
-/// but NOT for iPhone Mirroring, which ignores event coordinates and reads
-/// the actual cursor position.
+/// but NOT for iPhone Mirroring, which requires HID-level event posting.
+///
+/// For HID-mode pointing, mouse events (click/drag) carry their coordinates
+/// and the HID pipeline moves the cursor to match — no explicit
+/// `CGWarpMouseCursorPosition` is needed. Scroll wheel events (swipe) are
+/// routed based on cursor position, so swipe still warps the cursor.
+/// The cursor is hidden during operations to avoid visible teleportation.
 enum CGEventInput {
 
     /// Milliseconds to pause between mouse-down and mouse-up for a click.
     private static let clickHoldUs: UInt32 = 50_000
 
-    /// Milliseconds to settle after warping cursor before posting events.
+    /// Microseconds to settle after warping cursor before posting scroll events.
+    /// Only used by swipe, which needs the cursor pre-positioned for scroll routing.
     private static let warpSettleUs: UInt32 = 30_000
 
     /// Click (tap) at a screen-absolute point.
@@ -31,10 +37,9 @@ enum CGEventInput {
             return false
         }
 
-        let cursorEngaged = engageCursor(at: point, targetPID: targetPID)
+        let cursorEngaged = engageCursor(targetPID: targetPID)
         defer { disengageCursor(cursorEngaged) }
 
-        if cursorEngaged { usleep(warpSettleUs) }
         post(down, targetPID: targetPID)
         usleep(clickHoldUs)
         post(up, targetPID: targetPID)
@@ -48,10 +53,9 @@ enum CGEventInput {
             return false
         }
 
-        let cursorEngaged = engageCursor(at: point, targetPID: targetPID)
+        let cursorEngaged = engageCursor(targetPID: targetPID)
         defer { disengageCursor(cursorEngaged) }
 
-        if cursorEngaged { usleep(warpSettleUs) }
         post(down, targetPID: targetPID)
         usleep(UInt32(durationMs) * 1000)
         post(up, targetPID: targetPID)
@@ -67,11 +71,10 @@ enum CGEventInput {
             return false
         }
 
-        let cursorEngaged = engageCursor(at: point, targetPID: targetPID)
+        let cursorEngaged = engageCursor(targetPID: targetPID)
         defer { disengageCursor(cursorEngaged) }
 
         // First click
-        if cursorEngaged { usleep(warpSettleUs) }
         down1.setIntegerValueField(.mouseEventClickState, value: 1)
         post(down1, targetPID: targetPID)
         usleep(clickHoldUs)
@@ -101,10 +104,8 @@ enum CGEventInput {
         // Post scroll at the midpoint so it's within the window
         let midpoint = CGPoint(x: start.x + deltaX / 2, y: start.y + deltaY / 2)
 
-        let cursorEngaged = engageCursor(at: midpoint, targetPID: targetPID)
+        let cursorEngaged = engageCursor(targetPID: targetPID, warpTo: midpoint)
         defer { disengageCursor(cursorEngaged) }
-
-        if cursorEngaged { usleep(warpSettleUs) }
 
         // Send a zero-delta "may begin" scroll event to engage the window's
         // scroll handler. After a focus switch, iPhone Mirroring silently drops
@@ -220,10 +221,9 @@ enum CGEventInput {
             return false
         }
 
-        let cursorEngaged = engageCursor(at: start, targetPID: targetPID)
+        let cursorEngaged = engageCursor(targetPID: targetPID)
         defer { disengageCursor(cursorEngaged) }
 
-        if cursorEngaged { usleep(warpSettleUs) }
         post(down, targetPID: targetPID)
 
         // Interpolate drag movement
@@ -381,20 +381,30 @@ enum CGEventInput {
         }
     }
 
-    /// Warp cursor and disassociate mouse tracking for HID-mode pointing.
-    /// In cursor-free mode (targetPID set), this is a no-op.
-    /// Returns true if cursor management was engaged.
-    private static func engageCursor(at point: CGPoint, targetPID: pid_t?) -> Bool {
+    /// Prepare cursor for HID-mode pointing: hide cursor and disassociate
+    /// physical mouse tracking. In cursor-free mode (targetPID set), this
+    /// is a no-op.
+    ///
+    /// For mouse events (click, drag), the HID pipeline moves the cursor
+    /// to the event's coordinates automatically — no warp needed. For scroll
+    /// events (swipe), pass `warpTo:` to pre-position the cursor since scroll
+    /// routing is based on cursor position.
+    private static func engageCursor(targetPID: pid_t?, warpTo point: CGPoint? = nil) -> Bool {
         guard targetPID == nil else { return false }
-        CGWarpMouseCursorPosition(point)
+        CGDisplayHideCursor(CGMainDisplayID())
+        if let point {
+            CGWarpMouseCursorPosition(point)
+            usleep(warpSettleUs)
+        }
         CGAssociateMouseAndMouseCursorPosition(0)
         return true
     }
 
-    /// Re-associate mouse tracking if cursor management was engaged.
+    /// Re-associate mouse tracking and show cursor if it was engaged.
     private static func disengageCursor(_ engaged: Bool) {
         if engaged {
             CGAssociateMouseAndMouseCursorPosition(1)
+            CGDisplayShowCursor(CGMainDisplayID())
         }
     }
 }

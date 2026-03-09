@@ -23,11 +23,12 @@ extension MirroirMCP {
                 (3) action="finish" \u{2014} assemble captured screens into a SKILL.md and return it. \
                 Alternatively, use action="explore" for autonomous BFS exploration. \
                 \
-                WARNING: During exploration, the Mac cursor and keyboard are hijacked. \
-                Every tap/swipe physically moves the system cursor to the iPhone Mirroring \
-                window and steals keyboard focus. The user cannot use their Mac until \
-                exploration completes. This is a macOS limitation \u{2014} there is no way to \
-                send mouse events to a window without moving the system cursor. \
+                WARNING: During exploration, the Mac keyboard focus is stolen. \
+                iPhone Mirroring requires global HID event posting, which steals \
+                keyboard focus. The cursor is hidden during operations but still \
+                moves to the target window. The user cannot use their Mac until \
+                exploration completes. Per-process event injection (postToPid) \
+                does not work for iPhone Mirroring. \
                 SECURITY: Exploration may navigate into sensitive screens (accounts, \
                 passwords, payment). Do not run unattended on devices with sensitive \
                 data visible in the target app.
