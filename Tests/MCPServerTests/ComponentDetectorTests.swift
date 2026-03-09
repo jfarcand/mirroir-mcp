@@ -517,7 +517,7 @@ final class ComponentDetectorTests: XCTestCase {
             ),
             interaction: ComponentInteraction(
                 clickable: true, clickTarget: .firstNavigation,
-                clickResult: .navigates, backAfterClick: true
+                clickResult: .pushesScreen, backAfterClick: true
             ),
             grouping: ComponentGrouping(
                 absorbsSameRow: true, absorbsBelowWithinPt: 0, absorbCondition: .any
@@ -552,7 +552,7 @@ final class ComponentDetectorTests: XCTestCase {
             ),
             interaction: ComponentInteraction(
                 clickable: true, clickTarget: .firstNavigation,
-                clickResult: .navigates, backAfterClick: true
+                clickResult: .pushesScreen, backAfterClick: true
             ),
             grouping: ComponentGrouping(
                 absorbsSameRow: true, absorbsBelowWithinPt: 0, absorbCondition: .any
@@ -724,7 +724,7 @@ final class ComponentDetectorTests: XCTestCase {
             ),
             interaction: ComponentInteraction(
                 clickable: clickable, clickTarget: .firstNavigation,
-                clickResult: .navigates, backAfterClick: true
+                clickResult: .pushesScreen, backAfterClick: true
             ),
             grouping: ComponentGrouping(
                 absorbsSameRow: true, absorbsBelowWithinPt: absorbRange,

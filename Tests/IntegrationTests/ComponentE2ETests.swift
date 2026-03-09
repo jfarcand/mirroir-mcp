@@ -74,7 +74,7 @@ final class ComponentE2ETests: XCTestCase {
             interaction: ComponentInteraction(
                 clickable: true,
                 clickTarget: .firstNavigation,
-                clickResult: .navigates,
+                clickResult: .pushesScreen,
                 backAfterClick: true
             ),
             grouping: ComponentGrouping(

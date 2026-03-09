@@ -73,7 +73,7 @@ final class ComponentSkillParserTests: XCTestCase {
         // Interaction
         XCTAssertTrue(definition.interaction.clickable)
         XCTAssertEqual(definition.interaction.clickTarget, .firstNavigation)
-        XCTAssertEqual(definition.interaction.clickResult, .navigates)
+        XCTAssertEqual(definition.interaction.clickResult, .pushesScreen)
         XCTAssertTrue(definition.interaction.backAfterClick)
 
         // Grouping

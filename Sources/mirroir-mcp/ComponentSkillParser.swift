@@ -90,6 +90,7 @@ enum ScreenZone: String, Sendable {
 /// Rules for selecting which element to tap within a component.
 enum ClickTargetRule: String, Sendable {
     case firstNavigation = "first_navigation_element"
+    case firstText = "first_text"
     case firstDismissButton = "first_dismiss_button"
     case centered = "centered_element"
     case none
@@ -97,10 +98,41 @@ enum ClickTargetRule: String, Sendable {
 
 /// The expected result of tapping a component.
 enum ClickResult: String, Sendable {
-    case navigates
-    case toggles
+    case pushesScreen = "pushes_screen"
+    case switchesContext = "switches_context"
+    case opensModal = "opens_modal"
+    case mutatesInPlace = "mutates_in_place"
     case dismisses
     case none
+
+    /// Whether tapping this component leads to a new screen worth exploring.
+    var isNavigational: Bool {
+        switch self {
+        case .pushesScreen, .switchesContext, .opensModal, .dismisses:
+            return true
+        case .mutatesInPlace, .none:
+            return false
+        }
+    }
+
+    /// Whether the explorer should backtrack after visiting.
+    var requiresBacktrack: Bool {
+        switch self {
+        case .pushesScreen, .opensModal:
+            return true
+        case .switchesContext, .dismisses, .mutatesInPlace, .none:
+            return false
+        }
+    }
+
+    /// Initialize from raw string, supporting legacy "navigates" and "toggles" values.
+    init(legacy rawValue: String) {
+        switch rawValue {
+        case "navigates": self = .pushesScreen
+        case "toggles": self = .mutatesInPlace
+        default: self = ClickResult(rawValue: rawValue) ?? .none
+        }
+    }
 }
 
 /// Conditions for absorbing nearby elements into a multi-row component.
@@ -253,7 +285,7 @@ enum ComponentSkillParser {
         return ComponentInteraction(
             clickable: parseBool(kv["clickable"]) ?? false,
             clickTarget: ClickTargetRule(rawValue: kv["click_target"] ?? "none") ?? .none,
-            clickResult: ClickResult(rawValue: kv["click_result"] ?? "none") ?? .none,
+            clickResult: ClickResult(legacy: kv["click_result"] ?? "none"),
             backAfterClick: parseBool(kv["back_after_click"]) ?? false
         )
     }

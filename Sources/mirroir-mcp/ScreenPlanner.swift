@@ -137,7 +137,7 @@ enum ScreenPlanner {
         let text = tapTarget.text
 
         // Component-level navigation signal
-        if component.definition.interaction.clickResult == .navigates {
+        if component.definition.interaction.clickResult.isNavigational {
             if component.hasChevron {
                 score += chevronContextWeight
                 reasons.append("chevron +\(Int(chevronContextWeight))")

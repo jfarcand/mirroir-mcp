@@ -390,6 +390,12 @@ enum ComponentDetector {
             }
             return elements.first(where: { $0.role != .decoration })?.point
 
+        case .firstText:
+            // First element with real text content (skip "icon" and decoration)
+            return elements.first(where: {
+                $0.role != .decoration && $0.point.text != "icon"
+            })?.point
+
         case .firstDismissButton:
             // Find the dismiss button (X, ✕, ×) in the component's elements
             if let dismiss = elements.first(where: { element in

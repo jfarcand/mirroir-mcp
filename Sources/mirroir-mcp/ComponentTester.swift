@@ -351,6 +351,10 @@ enum ComponentTester {
                 return nav.point
             }
             return row.first(where: { $0.role != .decoration })?.point
+        case .firstText:
+            return row.first(where: {
+                $0.role != .decoration && $0.point.text != "icon"
+            })?.point
         case .firstDismissButton:
             if let dismiss = row.first(where: { element in
                 ElementClassifier.dismissCharacters.contains(

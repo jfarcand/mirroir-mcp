@@ -49,7 +49,7 @@ final class ComponentLoaderTests: XCTestCase {
         XCTAssertNotNil(disclosure)
         XCTAssertEqual(disclosure?.matchRules.rowHasChevron, true)
         XCTAssertTrue(disclosure?.interaction.clickable ?? false)
-        XCTAssertEqual(disclosure?.interaction.clickResult, .navigates)
+        XCTAssertEqual(disclosure?.interaction.clickResult, .pushesScreen)
         XCTAssertEqual(disclosure?.matchRules.zone, .content)
     }
 
@@ -59,16 +59,20 @@ final class ComponentLoaderTests: XCTestCase {
 
         XCTAssertNotNil(navBar)
         XCTAssertTrue(navBar?.interaction.clickable ?? false)
+        XCTAssertEqual(navBar?.interaction.clickResult, .dismisses,
+            "Navigation bar back button dismisses the current screen")
         XCTAssertEqual(navBar?.matchRules.zone, .navBar)
     }
 
-    func testToggleRowIsNotClickable() {
+    func testToggleRowIsClickable() {
         let definitions = ComponentLoader.loadAll()
         let toggle = definitions.first { $0.name == "toggle-row" }
 
         XCTAssertNotNil(toggle)
-        XCTAssertFalse(toggle?.interaction.clickable ?? true,
-            "Toggle rows should not be clickable during exploration")
+        XCTAssertTrue(toggle?.interaction.clickable ?? false,
+            "Toggle rows are interactive UI elements")
+        XCTAssertEqual(toggle?.interaction.clickResult, .mutatesInPlace,
+            "Toggle rows mutate state in place")
     }
 
     func testExplanationTextAbsorbsBelow() {
@@ -148,14 +152,16 @@ final class ComponentLoaderTests: XCTestCase {
             "Bottom navigation bar requires at least 2 elements")
     }
 
-    func testTabBarItemNotClickable() {
+    func testTabBarItemIsClickable() {
         let definitions = ComponentLoader.loadAll()
         let tabBarItem = definitions.first { $0.name == "tab-bar-item" }
 
         XCTAssertNotNil(tabBarItem)
-        XCTAssertFalse(tabBarItem?.interaction.clickable ?? true,
-            "Tab bar item should not be clickable during exploration")
-        XCTAssertEqual(tabBarItem?.interaction.clickTarget, ClickTargetRule.none)
+        XCTAssertTrue(tabBarItem?.interaction.clickable ?? false,
+            "Tab bar items are interactive navigation elements")
+        XCTAssertEqual(tabBarItem?.interaction.clickResult, .switchesContext,
+            "Tab bar items switch context, not push screens")
+        XCTAssertEqual(tabBarItem?.interaction.clickTarget, .firstText)
     }
 
     func testAllClickableComponentsHaveTapTargetRule() {

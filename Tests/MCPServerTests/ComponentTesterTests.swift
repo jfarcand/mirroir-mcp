@@ -79,7 +79,7 @@ final class ComponentTesterTests: XCTestCase {
             interaction: ComponentInteraction(
                 clickable: true,
                 clickTarget: .firstNavigation,
-                clickResult: .navigates,
+                clickResult: .pushesScreen,
                 backAfterClick: true
             ),
             grouping: ComponentGrouping(
@@ -337,7 +337,7 @@ final class ComponentTesterTests: XCTestCase {
             ),
             interaction: ComponentInteraction(
                 clickable: true, clickTarget: .firstNavigation,
-                clickResult: .navigates, backAfterClick: true
+                clickResult: .pushesScreen, backAfterClick: true
             ),
             grouping: ComponentGrouping(
                 absorbsSameRow: true, absorbsBelowWithinPt: 0, absorbCondition: .any
@@ -374,7 +374,7 @@ final class ComponentTesterTests: XCTestCase {
             ),
             interaction: ComponentInteraction(
                 clickable: true, clickTarget: .firstNavigation,
-                clickResult: .navigates, backAfterClick: true
+                clickResult: .pushesScreen, backAfterClick: true
             ),
             grouping: ComponentGrouping(
                 absorbsSameRow: true, absorbsBelowWithinPt: 0, absorbCondition: .any
