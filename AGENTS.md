@@ -26,6 +26,14 @@ This project has companion repos on the same machine. Reference them when needed
 
 Compiled `.compiled.json` files live alongside their source `.yaml` in the skills repo.
 
+## Setup After Clone
+
+```bash
+git config core.hooksPath git-hooks
+```
+
+This activates the `commit-msg` hook in `git-hooks/` which enforces conventional commit format, max 2-line messages, and rejects `Co-Authored-By: Claude` lines.
+
 ## Package Manager: Swift Package Manager
 
 This project uses **Swift Package Manager** (SPM) exclusively. The `Package.swift` manifest defines all targets and dependencies.
@@ -127,7 +135,7 @@ When creating a new type or file, walk this checklist in order:
   - Types: `feat`, `fix`, `chore`, `docs`, `test`, `refactor`, `ci`, `style`, `perf`, `build`, `revert`
   - Scope is optional. Multi-scope with `|` is permitted: `fix(module|context): description`
   - Examples: `feat: add check_health tool`, `fix(skills): handle YAML block scalars`, `docs: update architecture guide`
-  - The pre-commit hook enforces this — non-conventional commits are rejected.
+  - The `commit-msg` hook in `git-hooks/` enforces this — non-conventional commits are rejected.
 - Always create a branch when adding new features. Bug fixes go directly to main branch.
 - Always run validation after making changes: `swift build` then `swift test`
 
