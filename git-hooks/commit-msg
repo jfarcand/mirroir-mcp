@@ -1,0 +1,33 @@
+#!/bin/bash
+# ABOUTME: Git commit-msg hook enforcing project commit message rules.
+# ABOUTME: Rejects non-conventional format, >2 lines, and Co-Authored-By: Claude.
+
+MSG_FILE="$1"
+MSG=$(cat "$MSG_FILE")
+
+# Reject Co-Authored-By: Claude lines
+if echo "$MSG" | grep -qi "Co-Authored-By:.*Claude"; then
+    echo "ERROR: Commit message contains 'Co-Authored-By: Claude' line."
+    echo "Remove it and try again."
+    exit 1
+fi
+
+# Max 2 non-empty lines
+LINE_COUNT=$(echo "$MSG" | sed '/^$/d' | wc -l | tr -d ' ')
+if [ "$LINE_COUNT" -gt 2 ]; then
+    echo "ERROR: Commit message has $LINE_COUNT non-empty lines (max 2)."
+    echo "Use a single subject line, optionally followed by one body line."
+    exit 1
+fi
+
+# Conventional commit format on the first line
+FIRST_LINE=$(echo "$MSG" | head -1)
+if ! echo "$FIRST_LINE" | grep -qE '^(feat|fix|chore|docs|test|refactor|ci|style|perf|build|revert)(\([^)]+\))?: .+'; then
+    echo "ERROR: First line must use conventional commit format."
+    echo "  type(scope): description"
+    echo "  Types: feat, fix, chore, docs, test, refactor, ci, style, perf, build, revert"
+    echo "  Got: $FIRST_LINE"
+    exit 1
+fi
+
+exit 0
