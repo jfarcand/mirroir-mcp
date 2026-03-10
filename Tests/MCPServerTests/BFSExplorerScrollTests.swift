@@ -56,12 +56,16 @@ final class BFSExplorerScrollTests: XCTestCase {
         let moodScreen = makeScreen(["Mood Details"], img: "imgMood")
 
         // Build the describe sequence:
+        // Calibration: 1 OCR call (scroll discovers no new elements → breaks)
         // Steps 1-5: each step does 2 OCR calls (before-tap + after-tap)
         // For simplicity, all taps produce "duplicate" (same screen fingerprint).
         var screens: [ScreenDescriber.DescribeResult] = []
         let rootScreen = makeScreen(
             ["Activity", "Heart", "Sleep", "Steps", "Nutrition"], img: "img0"
         )
+
+        // Calibration scroll: discovers same elements → 0 new → breaks
+        screens.append(rootScreen)
 
         // Steps 1-5: tap each of the 5 initial elements → duplicate (same screen)
         for _ in 0..<5 {

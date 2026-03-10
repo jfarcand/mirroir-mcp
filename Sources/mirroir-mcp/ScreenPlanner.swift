@@ -15,6 +15,16 @@ struct RankedElement: Sendable {
     let score: Double
     /// Human-readable explanation of the score for debug logging.
     let reason: String
+    /// Clean label derived from the component's LabelRule, free of OCR artifacts.
+    /// Falls back to `point.text` when no component context is available.
+    let displayLabel: String
+
+    init(point: TapPoint, score: Double, reason: String, displayLabel: String? = nil) {
+        self.point = point
+        self.score = score
+        self.reason = reason
+        self.displayLabel = displayLabel ?? point.text
+    }
 }
 
 /// Builds scored exploration plans for screens, prioritizing elements most likely to
@@ -106,10 +116,12 @@ enum ScreenPlanner {
     ) -> [RankedElement] {
         components
             .compactMap { component -> RankedElement? in
-                // Skip non-explorable components (exploration policy, not just UI truth)
+                // Skip non-explorable components (exploration policy, not just UI truth).
+                // Uses displayLabel for visited check to avoid collisions when multiple
+                // components share the same raw tap target text (e.g. YOLO "icon").
                 guard component.definition.exploration.explorable,
                       let tapTarget = component.tapTarget,
-                      !visitedElements.contains(tapTarget.text) else {
+                      !visitedElements.contains(component.displayLabel) else {
                     return nil
                 }
 
@@ -124,7 +136,7 @@ enum ScreenPlanner {
                     scoutResults: scoutResults,
                     screenHeight: screenHeight
                 )
-                return RankedElement(point: tapTarget, score: score, reason: reason)
+                return RankedElement(point: tapTarget, score: score, reason: reason, displayLabel: component.displayLabel)
             }
             .sorted { $0.score > $1.score }
     }

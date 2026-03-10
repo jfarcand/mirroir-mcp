@@ -50,9 +50,13 @@ enum ComponentLoader {
     private static func loadFromDisk() -> [ComponentDefinition] {
         var seen = Set<String>()
         var definitions: [ComponentDefinition] = []
+        let cwd = FileManager.default.currentDirectoryPath
 
         for searchPath in searchPaths() {
             let files = findComponentFiles(in: searchPath)
+            if !files.isEmpty {
+                DebugLog.log("components", "Found \(files.count) files in \(searchPath.path)")
+            }
             for fileURL in files {
                 let stem = fileURL.deletingPathExtension().lastPathComponent
                 guard !seen.contains(stem) else { continue }
@@ -67,6 +71,7 @@ enum ComponentLoader {
             }
         }
 
+        DebugLog.log("components", "Loaded \(definitions.count) definitions (cwd=\(cwd))")
         return definitions
     }
 

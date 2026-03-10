@@ -82,6 +82,7 @@ enum GraphPathFinder {
                 hints: rootNode.hints,
                 actionType: nil,
                 arrivedVia: nil,
+                displayLabel: nil,
                 screenshotBase64: rootNode.screenshotBase64
             ))
         }
@@ -95,6 +96,7 @@ enum GraphPathFinder {
                     hints: node.hints,
                     actionType: edge.actionType,
                     arrivedVia: edge.elementText,
+                    displayLabel: edge.displayLabel,
                     screenshotBase64: node.screenshotBase64
                 ))
             }

@@ -200,22 +200,24 @@ final class InputSimulation: Sendable {
                durationMs: Int = 300, cursorMode override: CursorMode? = nil) -> String?
     {
         let prep = preparePointingInput(tag: "swipe", x: fromX, y: fromY)
-        guard let info = prep.info else { return prep.error ?? "Unknown error" }
+        guard var info = prep.info else { return prep.error ?? "Unknown error" }
 
         if let boundsError = validateBounds(x: toX, y: toY, info: info, tag: "swipe") {
             return boundsError
         }
 
-        // After a macOS Space switch, the window is "frontmost" but not
-        // the key window for scroll input. A click promotes it to key
-        // window. Click the iOS status bar area (top of screen) which
-        // in most apps harmlessly scrolls to top.
+        // After a focus switch, the window is frontmost but not the "key window"
+        // for scroll input. Re-query window info AFTER activation to get fresh
+        // coordinates, then warp the cursor into the content area. The cursor
+        // warp + MayBegin priming in CGEventInput.swipe() engages the scroll
+        // subsystem. No click needed — a click risks hitting the title bar or
+        // triggering an unwanted iOS action.
         if prep.focusChanged {
-            let statusBarY = Double(info.position.y) + EnvConfig.statusBarTapY
-            let centerScreenX = Double(info.position.x) + Double(info.size.width) / 2.0
-            DebugLog.log("swipe", "focus changed — clicking status bar to engage key window")
-            _ = CGEventInput.click(at: CGPoint(x: centerScreenX, y: statusBarY), targetPID: cursorFreePID)
             usleep(EnvConfig.spaceSwitchSettleUs)
+            if let freshInfo = bridge.getWindowInfo() {
+                info = freshInfo
+                DebugLog.log("swipe", "re-queried window after focus change: (\(Int(info.position.x)),\(Int(info.position.y)))")
+            }
         }
 
         let saved = saveCursor(mode: override)

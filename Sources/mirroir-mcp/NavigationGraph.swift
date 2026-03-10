@@ -75,8 +75,12 @@ struct NavigationEdge: Sendable {
     let toFingerprint: String
     /// Type of action that caused the transition (e.g. "tap", "swipe").
     let actionType: String
-    /// The element text or value associated with the action.
+    /// The raw element text used for visited-state matching (must match what was tapped).
     let elementText: String
+    /// Clean label derived from the component's LabelRule, free of OCR artifacts.
+    /// Used for skill step naming and path display. Falls back to `elementText` when
+    /// no component context is available.
+    let displayLabel: String
     /// Classified transition type for intelligent backtracking.
     let edgeType: EdgeType
 }
@@ -104,6 +108,7 @@ final class NavigationGraph: @unchecked Sendable {
     private var scoutResultsMap: [String: [String: ScoutResult]] = [:]
     private var traversalPhases: [String: TraversalPhase] = [:]
     private var screenPlans: [String: [RankedElement]] = [:]
+    private var tapCaches: [String: TapAreaCache] = [:]
     private let lock = NSLock()
 
     // MARK: - Lifecycle
@@ -132,6 +137,7 @@ final class NavigationGraph: @unchecked Sendable {
         scoutResultsMap = [:]
         traversalPhases = [:]
         screenPlans = [:]
+        tapCaches = [:]
 
         let fp = StructuralFingerprint.compute(elements: rootElements, icons: icons)
         let title = StructuralFingerprint.extractNavBarTitle(from: rootElements)
@@ -161,7 +167,8 @@ final class NavigationGraph: @unchecked Sendable {
     ///   - hints: Navigation hints from the new screen.
     ///   - screenshot: Base64-encoded screenshot.
     ///   - actionType: The action that caused navigation (e.g. "tap").
-    ///   - elementText: The element text associated with the action.
+    ///   - elementText: The raw element text associated with the action (for visited-state matching).
+    ///   - displayLabel: Clean label derived from the component's LabelRule (for skill naming).
     ///   - screenType: Classified type of the new screen.
     ///   - edgeType: Classified transition type for backtracking (default `.push`).
     /// - Returns: A `TransitionResult` indicating what happened.
@@ -172,6 +179,7 @@ final class NavigationGraph: @unchecked Sendable {
         screenshot: String,
         actionType: String,
         elementText: String,
+        displayLabel: String? = nil,
         screenType: ScreenType,
         edgeType: EdgeType = .push
     ) -> TransitionResult {
@@ -203,6 +211,7 @@ final class NavigationGraph: @unchecked Sendable {
             toFingerprint: matchingFP ?? newFP,
             actionType: actionType,
             elementText: elementText,
+            displayLabel: displayLabel ?? elementText,
             edgeType: edgeType
         )
         edges.append(edge)
@@ -441,13 +450,15 @@ final class NavigationGraph: @unchecked Sendable {
     }
 
     /// Get the next unvisited element from the screen's exploration plan.
-    /// Returns the highest-scored element whose text is NOT in the visited set.
+    /// Returns the highest-scored element whose displayLabel is NOT in the visited set.
+    /// Uses displayLabel (not raw point.text) to avoid collisions when multiple
+    /// components share the same raw text (e.g. YOLO "icon" detections).
     func nextPlannedElement(for fingerprint: String) -> RankedElement? {
         lock.lock()
         defer { lock.unlock() }
         guard let plan = screenPlans[fingerprint],
               let node = nodes[fingerprint] else { return nil }
-        return plan.first { !node.visitedElements.contains($0.point.text) }
+        return plan.first { !node.visitedElements.contains($0.displayLabel) }
     }
 
     /// Clear the exploration plan for a screen, forcing a rebuild on next access.
@@ -455,6 +466,29 @@ final class NavigationGraph: @unchecked Sendable {
         lock.lock()
         defer { lock.unlock() }
         screenPlans[fingerprint] = nil
+    }
+
+    // MARK: - Tap Area Cache
+
+    /// Record a tap at the given coordinates on a screen.
+    func recordTap(fingerprint: String, x: Double, y: Double) {
+        lock.lock()
+        defer { lock.unlock() }
+        tapCaches[fingerprint, default: TapAreaCache()].record(x: x, y: y)
+    }
+
+    /// Check whether a point was already tapped on a screen (within proximity radius).
+    func wasAlreadyTapped(fingerprint: String, x: Double, y: Double) -> Bool {
+        lock.lock()
+        defer { lock.unlock() }
+        return tapCaches[fingerprint]?.wasAlreadyTapped(x: x, y: y) ?? false
+    }
+
+    /// Number of tapped areas recorded for a screen.
+    func tapCount(for fingerprint: String) -> Int {
+        lock.lock()
+        defer { lock.unlock() }
+        return tapCaches[fingerprint]?.count ?? 0
     }
 
     // MARK: - Node Matching

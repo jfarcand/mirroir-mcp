@@ -17,8 +17,12 @@ struct ExploredScreen: Sendable {
     let hints: [String]
     /// The action performed to reach this screen (e.g. "tap", "swipe", "type", "press_key").
     let actionType: String?
-    /// The element label or value associated with the action (e.g. "General", "up", "hello").
+    /// The raw element text associated with the action (e.g. "General", "up", "hello").
     let arrivedVia: String?
+    /// Clean label derived from the component's LabelRule, free of OCR artifacts.
+    /// Used for skill step naming. Falls back to `arrivedVia` when no component context
+    /// is available.
+    var displayLabel: String? = nil
     /// Base64-encoded PNG screenshot of the screen.
     let screenshotBase64: String
 }
@@ -28,6 +32,7 @@ struct ExploredScreen: Sendable {
 struct ExplorationAction: Sendable {
     let actionType: String?
     let arrivedVia: String?
+    var displayLabel: String? = nil
     let wasDuplicate: Bool
 }
 
@@ -87,11 +92,13 @@ final class ExplorationSession: @unchecked Sendable {
         hints: [String],
         actionType: String?,
         arrivedVia: String?,
+        displayLabel: String? = nil,
         screenshotBase64: String
     ) -> Bool {
         capture(
             elements: elements, hints: hints, icons: [],
             actionType: actionType, arrivedVia: arrivedVia,
+            displayLabel: displayLabel,
             screenshotBase64: screenshotBase64
         )
     }
@@ -109,6 +116,7 @@ final class ExplorationSession: @unchecked Sendable {
         icons: [IconDetector.DetectedIcon],
         actionType: String?,
         arrivedVia: String?,
+        displayLabel: String? = nil,
         screenshotBase64: String,
         skipGraphTransition: Bool = false
     ) -> Bool {
@@ -119,7 +127,8 @@ final class ExplorationSession: @unchecked Sendable {
         if let lastScreen = screens.last,
            StructuralFingerprint.areEquivalent(lastScreen.elements, elements) {
             actionLog.append(ExplorationAction(
-                actionType: actionType, arrivedVia: arrivedVia, wasDuplicate: true))
+                actionType: actionType, arrivedVia: arrivedVia,
+                displayLabel: displayLabel, wasDuplicate: true))
             return false
         }
 
@@ -141,7 +150,8 @@ final class ExplorationSession: @unchecked Sendable {
                 _ = graph.recordTransition(
                     elements: elements, icons: icons, hints: hints,
                     screenshot: screenshotBase64, actionType: actionType,
-                    elementText: arrivedVia, screenType: screenType
+                    elementText: arrivedVia, displayLabel: displayLabel,
+                    screenType: screenType
                 )
             }
         }
@@ -152,11 +162,13 @@ final class ExplorationSession: @unchecked Sendable {
             hints: hints,
             actionType: actionType,
             arrivedVia: arrivedVia,
+            displayLabel: displayLabel,
             screenshotBase64: screenshotBase64
         )
         screens.append(screen)
         actionLog.append(ExplorationAction(
-            actionType: actionType, arrivedVia: arrivedVia, wasDuplicate: false))
+            actionType: actionType, arrivedVia: arrivedVia,
+            displayLabel: displayLabel, wasDuplicate: false))
         return true
     }
 

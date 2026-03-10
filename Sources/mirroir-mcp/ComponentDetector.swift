@@ -149,7 +149,8 @@ enum ComponentDetector {
                 } else {
                     let component = buildComponent(
                         kind: match.name, definition: match,
-                        elements: allElements
+                        elements: allElements,
+                        anchorElements: classifiedRow
                     )
                     components.append(component)
                 }
@@ -312,9 +313,23 @@ enum ComponentDetector {
             }
 
             if mergedElements.count > component.elements.count {
-                result.append(buildComponent(
-                    kind: component.kind, definition: component.definition,
-                    elements: mergedElements
+                // Rebuild with merged elements for Y range and labeling, but
+                // preserve original tap target — absorbed elements must not
+                // change where the explorer taps.
+                let ys = mergedElements.map { $0.point.tapY }
+                let hasChevron = mergedElements.contains { element in
+                    ElementClassifier.chevronCharacters.contains(
+                        element.point.text.trimmingCharacters(in: .whitespaces)
+                    )
+                }
+                result.append(ScreenComponent(
+                    kind: component.kind,
+                    definition: component.definition,
+                    elements: mergedElements,
+                    tapTarget: component.tapTarget,
+                    hasChevron: hasChevron,
+                    topY: ys.min() ?? 0,
+                    bottomY: ys.max() ?? 0
                 ))
             } else {
                 result.append(component)
@@ -362,10 +377,16 @@ enum ComponentDetector {
     // MARK: - Component Building
 
     /// Build a ScreenComponent from matched definition and grouped elements.
+    ///
+    /// - Parameter anchorElements: Elements from the original matched row, used
+    ///   for tap target selection. When absorption merges additional rows into
+    ///   `elements`, those absorbed elements must not become the tap target.
+    ///   Pass the pre-absorption row here; defaults to `elements` when nil.
     private static func buildComponent(
         kind: String,
         definition: ComponentDefinition,
-        elements: [ClassifiedElement]
+        elements: [ClassifiedElement],
+        anchorElements: [ClassifiedElement]? = nil
     ) -> ScreenComponent {
         let ys = elements.map { $0.point.tapY }
         let topY = ys.min() ?? 0
@@ -378,7 +399,7 @@ enum ComponentDetector {
         }
 
         let tapTarget = selectTapTarget(
-            elements: elements,
+            elements: anchorElements ?? elements,
             rule: definition.interaction.clickTarget,
             clickable: definition.interaction.clickable
         )
@@ -395,9 +416,12 @@ enum ComponentDetector {
     }
 
     /// Build a fallback single-element component when no definition matched.
+    /// Navigation-classified elements remain explorable so they aren't lost
+    /// when the heuristic matcher can't group them into a known component.
     private static func buildFallbackComponent(
         element: ClassifiedElement
     ) -> ScreenComponent {
+        let isNav = element.role == .navigation
         let fallbackDef = ComponentDefinition(
             name: "unclassified",
             platform: "ios",
@@ -410,15 +434,15 @@ enum ComponentDetector {
                 minConfidence: nil, excludeNumericOnly: nil, textPattern: nil
             ),
             interaction: ComponentInteraction(
-                clickable: false,
-                clickTarget: .none,
-                clickResult: .none,
-                backAfterClick: false,
+                clickable: isNav,
+                clickTarget: isNav ? .firstNavigation : .none,
+                clickResult: isNav ? .pushesScreen : .none,
+                backAfterClick: isNav,
                 labelRule: .tapTarget
             ),
             exploration: ComponentExploration(
-                explorable: false,
-                role: .info,
+                explorable: isNav,
+                role: isNav ? .depthNavigation : .info,
                 priority: .normal
             ),
             grouping: ComponentGrouping(
@@ -433,7 +457,7 @@ enum ComponentDetector {
             kind: "unclassified",
             definition: fallbackDef,
             elements: [element],
-            tapTarget: nil,
+            tapTarget: isNav ? element.point : nil,
             hasChevron: element.hasChevronContext,
             topY: element.point.tapY,
             bottomY: element.point.tapY

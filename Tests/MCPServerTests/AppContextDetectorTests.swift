@@ -175,6 +175,26 @@ final class AppContextDetectorTests: XCTestCase {
         XCTAssertEqual(AppContextDetector.countDistinctBands([]), 0)
     }
 
+    func testBackChevronDetectedAsIconInTopLeft() {
+        // OCR sometimes detects "<" back chevron as "icon" via YOLO.
+        // An icon in the top-left back button position should prevent
+        // false positive home screen detection.
+        var elements = makeHomeScreenElements(rows: 4, columnsPerRow: 3, startY: 200)
+        elements.append(TapPoint(text: "icon", tapX: 47, tapY: 121, confidence: 0.9))
+        let diagnosis = AppContextDetector.diagnose(elements: elements, screenHeight: screenHeight)
+        XCTAssertEqual(diagnosis, .inApp,
+            "Icon in back button position should indicate in-app, not home screen")
+    }
+
+    func testIconNotInBackButtonPositionDoesNotSuppressHomeScreen() {
+        // An icon far from the back button position should not prevent detection
+        var elements = makeHomeScreenElements(rows: 4, columnsPerRow: 3, startY: 200)
+        elements.append(TapPoint(text: "icon", tapX: 200, tapY: 121, confidence: 0.9))
+        let diagnosis = AppContextDetector.diagnose(elements: elements, screenHeight: screenHeight)
+        XCTAssertEqual(diagnosis, .homeScreen,
+            "Icon not in back button position should not suppress home screen detection")
+    }
+
     // MARK: - X-Column Grid Check
 
     func testRejectsAppRootWithScatteredXPositions() {

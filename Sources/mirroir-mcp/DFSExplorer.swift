@@ -153,17 +153,18 @@ final class DFSExplorer: @unchecked Sendable {
         }
 
         // Get the next highest-scored unvisited element from the plan
-        let actionable: TapPoint? = if let ranked = graph.nextPlannedElement(for: currentFP),
-            !strategy.shouldSkip(elementText: ranked.point.text, budget: budget) { ranked.point } else { nil }
+        let rankedElement: RankedElement? = if let ranked = graph.nextPlannedElement(for: currentFP),
+            !strategy.shouldSkip(elementText: ranked.point.text, budget: budget) { ranked } else { nil }
 
         lock.lock()
         let currentActions = actionsOnCurrentScreen
         lock.unlock()
 
         // Check if we should tap an element or backtrack
-        if let target = actionable, currentActions < budget.maxActionsPerScreen {
+        if let ranked = rankedElement, currentActions < budget.maxActionsPerScreen {
             return performTap(
-                target: target, currentFP: currentFP,
+                target: ranked.point, displayLabel: ranked.displayLabel,
+                currentFP: currentFP,
                 input: input, describer: describer, strategy: strategy,
                 result: result
             )
@@ -211,13 +212,14 @@ final class DFSExplorer: @unchecked Sendable {
 
     private func performTap<S: ExplorationStrategy>(
         target: TapPoint,
+        displayLabel: String,
         currentFP: String,
         input: InputProviding,
         describer: ScreenDescribing,
         strategy: S.Type,
         result: ScreenDescriber.DescribeResult
     ) -> ExploreStepResult {
-        // Mark element as visited before tapping
+        // Mark element as visited before tapping (raw text for identity matching)
         graph.markElementVisited(fingerprint: currentFP, elementText: target.text)
 
         // Tap the element
@@ -263,12 +265,12 @@ final class DFSExplorer: @unchecked Sendable {
             edgeType = .push
         }
 
-        // Record transition in graph
+        // Record transition in graph (raw text for visited-state, displayLabel for naming)
         let transition = graph.recordTransition(
             elements: afterResult.elements, icons: afterResult.icons,
             hints: afterResult.hints, screenshot: afterResult.screenshotBase64,
-            actionType: "tap", elementText: target.text, screenType: screenType,
-            edgeType: edgeType
+            actionType: "tap", elementText: target.text, displayLabel: displayLabel,
+            screenType: screenType, edgeType: edgeType
         )
 
         // Also record in session for flat screen list.
@@ -276,7 +278,8 @@ final class DFSExplorer: @unchecked Sendable {
         session.capture(
             elements: afterResult.elements, hints: afterResult.hints,
             icons: afterResult.icons, actionType: "tap",
-            arrivedVia: target.text, screenshotBase64: afterResult.screenshotBase64,
+            arrivedVia: target.text, displayLabel: displayLabel,
+            screenshotBase64: afterResult.screenshotBase64,
             skipGraphTransition: true
         )
 
@@ -290,19 +293,19 @@ final class DFSExplorer: @unchecked Sendable {
             backtrackStack.append(fp)
             actionsOnCurrentScreen = 0
             lock.unlock()
-            return .continue(description: "Tapped \"\(target.text)\" → new screen (\(graph.nodeCount) total)")
+            return .continue(description: "Tapped \"\(displayLabel)\" → new screen (\(graph.nodeCount) total)")
 
         case .revisited:
             lock.lock()
             actionsOnCurrentScreen += 1
             lock.unlock()
-            return .continue(description: "Tapped \"\(target.text)\" → revisited screen")
+            return .continue(description: "Tapped \"\(displayLabel)\" → revisited screen")
 
         case .duplicate:
             lock.lock()
             actionsOnCurrentScreen += 1
             lock.unlock()
-            return .continue(description: "Tapped \"\(target.text)\" → no screen change")
+            return .continue(description: "Tapped \"\(displayLabel)\" → no screen change")
         }
     }
 

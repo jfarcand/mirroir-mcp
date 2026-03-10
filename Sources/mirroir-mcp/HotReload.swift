@@ -35,20 +35,17 @@ enum HotReload {
     /// Mtime of the binary when the process started. Captured once on first access.
     private static let initialMtime: Date? = binaryMtime()
 
-    /// Check if the binary on disk is newer than when we started and replace
-    /// the process image via execv(). Only triggers when `--hot-reload-enabled`
-    /// is passed and the binary file has been replaced (mtime changed), so
-    /// normal process termination (kill, SIGTERM) does not cause a restart.
-    static func reloadIfNeeded() {
-        guard hotReloadEnabled else { return }
+    /// Check whether the binary on disk is newer than when we started.
+    /// Returns true when hot-reload is enabled and the binary has been replaced.
+    /// Does NOT trigger the reload itself — the caller decides what to do.
+    static func shouldReload() -> Bool {
+        guard hotReloadEnabled else { return false }
         guard let initial = initialMtime,
               let current = binaryMtime(),
               current > initial else {
-            return
+            return false
         }
-
-        DebugLog.persist("hot-reload", "Binary changed on disk, reloading via execv...")
-        restartViaExecv()
+        return true
     }
 
     /// Saved copy of argv for the signal handler (which cannot capture context).

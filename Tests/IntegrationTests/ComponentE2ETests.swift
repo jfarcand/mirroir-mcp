@@ -23,9 +23,7 @@ final class ComponentE2ETests: XCTestCase {
 
     override func setUpWithError() throws {
         try super.setUpWithError()
-        guard IntegrationTestHelper.isFakeMirroringRunning else {
-            throw IntegrationTestError.fakeMirroringNotRunning
-        }
+        try IntegrationTestHelper.ensureFakeMirroringRunning()
         bridge = MirroringBridge(bundleID: IntegrationTestHelper.fakeBundleID)
         guard IntegrationTestHelper.ensureWindowReady(bridge: bridge) else {
             throw IntegrationTestError.windowNotCapturable

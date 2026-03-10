@@ -67,13 +67,14 @@ enum SkillMdGenerator {
                 }
             }
 
-            // Resolve arrivedVia label against screen elements for proper casing
-            let resolvedVia: String? = screen.arrivedVia.map { via in
+            // Prefer displayLabel (component-derived, OCR-artifact-free) over raw arrivedVia.
+            // Fall back to resolving arrivedVia against screen elements for proper casing.
+            let stepLabel: String? = screen.displayLabel ?? screen.arrivedVia.map { via in
                 ActionStepFormatter.resolveLabel(arrivedVia: via, elements: screen.elements)
             }
 
             // Generate action step based on actionType
-            if let step = ActionStepFormatter.format(actionType: screen.actionType, arrivedVia: resolvedVia) {
+            if let step = ActionStepFormatter.format(actionType: screen.actionType, arrivedVia: stepLabel) {
                 lines.append("\(stepNum). \(step)")
                 stepNum += 1
             }

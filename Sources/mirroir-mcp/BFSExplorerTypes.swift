@@ -37,3 +37,31 @@ enum BFSPhase {
     /// Navigating back to root after exploring a screen.
     case returning(depthRemaining: Int)
 }
+
+/// Tracks tap coordinates per screen to prevent tapping the same area repeatedly.
+/// Uses a proximity radius to detect when a new tap target overlaps a previously tapped area.
+struct TapAreaCache: Sendable {
+
+    /// Minimum distance in points between two taps for them to be considered distinct areas.
+    static let proximityRadius: Double = 30.0
+
+    /// Recorded tap coordinates as (x, y) pairs.
+    private var tappedPoints: [(x: Double, y: Double)] = []
+
+    /// Record a tap at the given coordinates.
+    mutating func record(x: Double, y: Double) {
+        tappedPoints.append((x: x, y: y))
+    }
+
+    /// Check whether a point is within `proximityRadius` of any previously tapped coordinate.
+    func wasAlreadyTapped(x: Double, y: Double) -> Bool {
+        tappedPoints.contains { existing in
+            let dx = existing.x - x
+            let dy = existing.y - y
+            return (dx * dx + dy * dy).squareRoot() < Self.proximityRadius
+        }
+    }
+
+    /// Number of recorded tap points.
+    var count: Int { tappedPoints.count }
+}
