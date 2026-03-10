@@ -25,9 +25,7 @@ final class CompiledSkillIntegrationTests: XCTestCase {
     override func setUpWithError() throws {
         try super.setUpWithError()
 
-        guard IntegrationTestHelper.isFakeMirroringRunning else {
-            throw IntegrationTestError.fakeMirroringNotRunning
-        }
+        try IntegrationTestHelper.ensureFakeMirroringRunning()
 
         bridge = MirroringBridge(bundleID: IntegrationTestHelper.fakeBundleID)
         capture = ScreenCapture(bridge: bridge)

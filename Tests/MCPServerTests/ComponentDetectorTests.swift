@@ -217,6 +217,36 @@ final class ComponentDetectorTests: XCTestCase {
             "Should have at least one multi-element component from absorption")
     }
 
+    func testAbsorptionPreservesAnchorRowTapTarget() {
+        // Anchor row: summary card title (nav) + numeric value at Y=300
+        // Absorbed row: chart icons (nav-classified) at Y=370 (within 80pt)
+        // The tap target must come from the anchor row, not absorbed icons.
+        let classified = [
+            classifiedNav("Pas", x: 70, y: 300),
+            classifiedInfo("6 762 pas", x: 200, y: 300),
+            classifiedNav("icon", x: 367, y: 370),
+            classifiedNav("icon", x: 100, y: 370),
+        ]
+
+        let components = ComponentDetector.detect(
+            classified: classified,
+            definitions: definitions,
+            screenHeight: screenHeight
+        )
+
+        // Find the component that absorbed the icons
+        let absorbed = components.filter { $0.elements.count >= 3 }
+        XCTAssertFalse(absorbed.isEmpty,
+            "Summary card should absorb nearby elements")
+
+        if let card = absorbed.first, let target = card.tapTarget {
+            // Tap target must be from anchor row (Y=300), not absorbed icons (Y=370)
+            XCTAssertEqual(target.tapY, 300,
+                "Tap target should be from anchor row, not absorbed elements " +
+                "(got Y=\(target.tapY))")
+        }
+    }
+
     // MARK: - Fallback Behavior
 
     func testUnmatchedNavigationElementCreatesFallbackComponent() {
@@ -235,10 +265,12 @@ final class ComponentDetectorTests: XCTestCase {
             "Unmatched elements should create fallback components")
         XCTAssertEqual(components[0].kind, "unclassified")
 
-        // Conservative default: unclassified fallback is non-clickable.
-        // Elements that should be clicked need an explicit component definition.
-        XCTAssertNil(components[0].tapTarget,
-            "Unclassified fallback should not be clickable (conservative default)")
+        // Navigation elements preserve their explorability even when unmatched,
+        // preventing the component path from losing elements the legacy path would tap.
+        XCTAssertNotNil(components[0].tapTarget,
+            "Unclassified nav fallback should be tappable")
+        XCTAssertTrue(components[0].definition.exploration.explorable,
+            "Unclassified nav fallback should be explorable")
     }
 
     func testUnmatchedInfoElementNotClickable() {
@@ -814,8 +846,9 @@ final class ComponentDetectorTests: XCTestCase {
             "Row without Q/q should not match text_pattern ^[Qq]$")
     }
 
-    func testUnclassifiedFallbackNotClickable() {
-        // Even a navigation-role element gets non-clickable fallback
+    func testUnclassifiedNavFallbackIsExplorable() {
+        // Navigation-role elements keep their explorability in fallback,
+        // so the component path doesn't lose elements the legacy path would tap.
         let classified = [
             classifiedNav("SomeElement", x: 200, y: 400, hasChevron: true),
         ]
@@ -828,10 +861,12 @@ final class ComponentDetectorTests: XCTestCase {
 
         XCTAssertEqual(components.count, 1)
         XCTAssertEqual(components[0].kind, "unclassified")
-        XCTAssertNil(components[0].tapTarget,
-            "Unclassified fallback must have nil tapTarget (conservative default)")
-        XCTAssertFalse(components[0].definition.interaction.clickable,
-            "Unclassified fallback must not be clickable")
+        XCTAssertNotNil(components[0].tapTarget,
+            "Navigation fallback should have a tap target")
+        XCTAssertTrue(components[0].definition.interaction.clickable,
+            "Navigation fallback should be clickable")
+        XCTAssertTrue(components[0].definition.exploration.explorable,
+            "Navigation fallback should be explorable")
     }
 
     // MARK: - Post-Processing Absorption

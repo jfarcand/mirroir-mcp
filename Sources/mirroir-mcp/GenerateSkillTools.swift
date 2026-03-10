@@ -413,7 +413,8 @@ extension MirroirMCP {
         let explorer = BFSExplorer(
             session: session, budget: budget, windowSize: windowSize,
             componentDefinitions: componentDefinitions,
-            classifier: classifier
+            classifier: classifier,
+            bridge: ctx.bridge
         )
         explorer.markStarted()
 
@@ -449,14 +450,14 @@ extension MirroirMCP {
                 DebugLog.log("explore", "step \(stepResults.count): backtracked")
             case .paused(let reason):
                 stepResults.append("Paused: \(reason)")
-                // Return intermediate results so AI can handle the situation
                 let stats = explorer.stats
                 let summary = stepResults.joined(separator: "\n")
+                let report = explorer.generateReport()
                 return .text(
                     "\(summary)\n\nExploration paused after \(stats.actionCount) actions, " +
-                    "\(stats.nodeCount) screens in \(stats.elapsedSeconds)s.")
+                    "\(stats.nodeCount) screens in \(stats.elapsedSeconds)s.\n\n\(report)")
             case .finished(let bundle):
-                return .text(formatExploreResult(bundle: bundle, stats: explorer.stats))
+                return .text(formatExploreResult(bundle: bundle, explorer: explorer))
             }
         }
 
@@ -478,19 +479,20 @@ extension MirroirMCP {
         return bundle.skills.first?.content ?? ""
     }
 
-    /// Format the final exploration result with stats and skill content.
+    /// Format the final exploration result with stats, skill content, and detailed report.
     private static func formatExploreResult(
         bundle: SkillBundle,
-        stats: (nodeCount: Int, edgeCount: Int, actionCount: Int, elapsedSeconds: Int)
+        explorer: BFSExplorer
     ) -> String {
+        let stats = explorer.stats
         let statLine = "(\(stats.nodeCount) screens, \(stats.actionCount) actions, \(stats.elapsedSeconds)s)"
         guard !bundle.skills.isEmpty else {
-            return "Exploration finished but no skills were generated."
+            return "Exploration finished but no skills were generated.\n\n" + explorer.generateReport()
         }
         let preamble = bundle.skills.count > 1
             ? "Exploration complete! Generated \(bundle.skills.count) skills \(statLine):"
             : "Exploration complete \(statLine):"
-        return formatBundle(bundle, preamble: preamble)
+        return formatBundle(bundle, preamble: preamble) + "\n\n" + explorer.generateReport()
     }
 
 }

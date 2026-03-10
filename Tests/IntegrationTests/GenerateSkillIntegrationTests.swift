@@ -24,13 +24,7 @@ final class GenerateSkillIntegrationTests: XCTestCase {
     override func setUpWithError() throws {
         try super.setUpWithError()
 
-        guard IntegrationTestHelper.isFakeMirroringRunning else {
-            XCTFail(
-                "FakeMirroring app is not running. "
-                + "Launch it with: open .build/release/FakeMirroring.app"
-            )
-            return
-        }
+        try IntegrationTestHelper.ensureFakeMirroringRunning()
 
         bridge = MirroringBridge(bundleID: IntegrationTestHelper.fakeBundleID)
 

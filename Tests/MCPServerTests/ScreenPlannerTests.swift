@@ -358,6 +358,73 @@ final class ScreenPlannerTests: XCTestCase {
             "Non-visited elements should be included")
     }
 
+    func testVisitedUsesDisplayLabelNotRawText() {
+        // Two summary-card-like components whose tap targets are both "icon"
+        // (YOLO detection), but displayLabels differ ("Activité" vs "Pas").
+        // Visiting "Activité" should NOT mark "Pas" as visited.
+        let summaryDef = ComponentDefinition(
+            name: "summary-card", platform: "ios",
+            description: "Summary card with icon tap target.",
+            visualPattern: ["Icon + label text"],
+            matchRules: ComponentMatchRules(
+                rowHasChevron: false, chevronMode: nil,
+                minElements: 1, maxElements: 6,
+                maxRowHeightPt: 90, hasNumericValue: nil,
+                hasLongText: nil, hasDismissButton: nil,
+                zone: .content, minConfidence: nil,
+                excludeNumericOnly: nil, textPattern: nil
+            ),
+            interaction: ComponentInteraction(
+                clickable: true, clickTarget: .firstNavigation,
+                clickResult: .pushesScreen, backAfterClick: true,
+                labelRule: .longestText
+            ),
+            exploration: ComponentExploration(
+                explorable: true, role: .depthNavigation, priority: .normal
+            ),
+            grouping: ComponentGrouping(
+                absorbsSameRow: false, absorbsBelowWithinPt: 0,
+                absorbCondition: .any, splitMode: .none
+            )
+        )
+
+        let comp1 = ScreenComponent(
+            kind: "summary-card", definition: summaryDef,
+            elements: [
+                ClassifiedElement(point: TapPoint(text: "icon", tapX: 200, tapY: 300, confidence: 0.9),
+                                  role: .navigation, hasChevronContext: true),
+                ClassifiedElement(point: TapPoint(text: "O Activité", tapX: 80, tapY: 300, confidence: 0.9),
+                                  role: .navigation, hasChevronContext: true),
+            ],
+            tapTarget: TapPoint(text: "icon", tapX: 200, tapY: 300, confidence: 0.9),
+            hasChevron: true, topY: 300, bottomY: 300
+        )
+        let comp2 = ScreenComponent(
+            kind: "summary-card", definition: summaryDef,
+            elements: [
+                ClassifiedElement(point: TapPoint(text: "icon", tapX: 200, tapY: 500, confidence: 0.9),
+                                  role: .navigation, hasChevronContext: true),
+                ClassifiedElement(point: TapPoint(text: "O Pas", tapX: 80, tapY: 500, confidence: 0.9),
+                                  role: .navigation, hasChevronContext: true),
+            ],
+            tapTarget: TapPoint(text: "icon", tapX: 200, tapY: 500, confidence: 0.9),
+            hasChevron: true, topY: 500, bottomY: 500
+        )
+
+        // Visit "O Activité" (the displayLabel, not the raw "icon" text)
+        let plan = ScreenPlanner.buildComponentPlan(
+            components: [comp1, comp2],
+            visitedElements: ["O Activité"],
+            scoutResults: [:],
+            screenHeight: screenHeight
+        )
+
+        XCTAssertEqual(plan.count, 1,
+            "Only one component should remain after visiting O Activité")
+        XCTAssertEqual(plan[0].displayLabel, "O Pas",
+            "O Pas should not be excluded when O Activité was visited")
+    }
+
     func testBuildComponentPlanSortedByDescendingScore() {
         let elements = [
             TapPoint(text: "Low", tapX: 100, tapY: 100, confidence: 0.9),

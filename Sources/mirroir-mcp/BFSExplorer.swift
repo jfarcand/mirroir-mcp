@@ -23,12 +23,22 @@ final class BFSExplorer: @unchecked Sendable {
     let componentDefinitions: [ComponentDefinition]
     /// Classifier for grouping OCR elements into components. nil uses legacy element-level planning.
     let classifier: (any ComponentClassifying)?
+    /// Window bridge for calibration scroll (CalibrationScroller needs window info).
+    let bridge: (any WindowBridging)?
 
     private var frontier: [FrontierScreen] = []
     private var frontierIndex: Int = 0
     private var phase: BFSPhase = .atRoot
     private var actionsOnCurrentScreen: Int = 0
     private var startTime: Date = Date()
+    /// Whether the root screen has been calibrated (full-page scroll to discover all elements).
+    private var isCalibrated: Bool = false
+    /// Report data: calibration summary, collected during calibration phase.
+    var calibrationSummary: ExplorationReportFormatter.CalibrationSummary?
+    /// Report data: per-screen action entries, keyed by fingerprint.
+    var screenActions: [String: [ExplorationReportFormatter.ActionEntry]] = [:]
+    /// Report data: tap cache hit count per screen.
+    var cacheHitsPerScreen: [String: Int] = [:]
     var actionCount: Int = 0
     var isFinished: Bool = false
     let lock = NSLock()
@@ -41,12 +51,14 @@ final class BFSExplorer: @unchecked Sendable {
     ///   - windowSize: Size of the target window for coordinate computation.
     ///   - componentDefinitions: Component definitions for grouping OCR elements.
     ///   - classifier: Component classifier to use. nil falls back to legacy per-element planning.
+    ///   - bridge: Window bridge for CalibrationScroller. nil falls back to simple scroll calibration.
     init(
         session: ExplorationSession,
         budget: ExplorationBudget,
         windowSize: CGSize = CGSize(width: 410, height: 890),
         componentDefinitions: [ComponentDefinition] = [],
-        classifier: (any ComponentClassifying)? = nil
+        classifier: (any ComponentClassifying)? = nil,
+        bridge: (any WindowBridging)? = nil
     ) {
         self.session = session
         self.graph = session.currentGraph
@@ -55,6 +67,7 @@ final class BFSExplorer: @unchecked Sendable {
         self.appName = session.currentAppName
         self.componentDefinitions = componentDefinitions
         self.classifier = classifier
+        self.bridge = bridge
     }
 
     /// Record the exploration start time and seed the frontier with the root screen.
@@ -173,8 +186,15 @@ final class BFSExplorer: @unchecked Sendable {
             "depth=\(target.depth) path=[\(pathDesc)] fp=\(target.fingerprint.prefix(8))")
 
         if target.pathFromRoot.isEmpty {
-            // Root screen (depth 0) — start exploring directly
+            // Root screen (depth 0) — calibrate by scrolling through the full page
+            // to discover all elements, then scroll back to top before exploring.
             graph.setCurrentFingerprint(target.fingerprint)
+            if !isCalibrated {
+                calibrateRootScreen(
+                    currentFP: target.fingerprint, describer: describer, input: input
+                )
+                isCalibrated = true
+            }
             phase = .exploring(screen: target)
             return stepExploring(
                 screen: target, describer: describer, input: input, strategy: strategy
@@ -286,7 +306,7 @@ final class BFSExplorer: @unchecked Sendable {
         }
 
         if let plan = graph.screenPlan(for: currentFP) {
-            let planTexts = plan.map { "\($0.point.text)(score=\(String(format: "%.1f", $0.score)))" }
+            let planTexts = plan.map { "\($0.displayLabel)(score=\(String(format: "%.1f", $0.score)))" }
             DebugLog.log("bfs", "plan: \(planTexts)")
         }
 
@@ -327,8 +347,27 @@ final class BFSExplorer: @unchecked Sendable {
         let target = ranked.point
         let label = ranked.displayLabel
 
-        // Mark visited before tapping (raw text for identity matching)
-        graph.markElementVisited(fingerprint: currentFP, elementText: target.text)
+        // Check tap area cache — skip if we already tapped near these coordinates
+        if graph.wasAlreadyTapped(fingerprint: currentFP, x: target.tapX, y: target.tapY) {
+            DebugLog.log("bfs", "SKIP \"\(label)\" at (\(Int(target.tapX)),\(Int(target.tapY))) — " +
+                "already tapped nearby (cache has \(graph.tapCount(for: currentFP)) entries)")
+            graph.markElementVisited(fingerprint: currentFP, elementText: label)
+            lock.lock()
+            cacheHitsPerScreen[currentFP, default: 0] += 1
+            screenActions[currentFP, default: []].append(
+                ExplorationReportFormatter.ActionEntry(
+                    label: label, x: target.tapX, y: target.tapY,
+                    result: "cache_skip", skippedByCache: true))
+            lock.unlock()
+            return .continue(description: "Skipped \"\(label)\" — already tapped nearby")
+        }
+
+        // Mark visited using displayLabel (unique per component) to avoid
+        // collisions when multiple components share the same raw text (e.g. "icon").
+        graph.markElementVisited(fingerprint: currentFP, elementText: label)
+
+        // Record tap coordinates in cache before tapping
+        graph.recordTap(fingerprint: currentFP, x: target.tapX, y: target.tapY)
 
         // Tap the element
         _ = input.tap(x: target.tapX, y: target.tapY)
@@ -369,7 +408,19 @@ final class BFSExplorer: @unchecked Sendable {
         actionsOnCurrentScreen += 1
         lock.unlock()
 
-        DebugLog.log("bfs", "tapped \"\(label)\" at (\(target.tapX),\(target.tapY)) → \(transition)")
+        let transitionDesc: String
+        switch transition {
+        case .newScreen: transitionDesc = "new_screen"
+        case .revisited: transitionDesc = "revisited"
+        case .duplicate: transitionDesc = "no_navigation"
+        }
+        DebugLog.log("bfs", "tapped \"\(label)\" at (\(Int(target.tapX)),\(Int(target.tapY))) → \(transitionDesc)")
+        lock.lock()
+        screenActions[currentFP, default: []].append(
+            ExplorationReportFormatter.ActionEntry(
+                label: label, x: target.tapX, y: target.tapY,
+                result: transitionDesc, skippedByCache: false))
+        lock.unlock()
 
         switch transition {
         case .newScreen(let fp):
@@ -391,21 +442,21 @@ final class BFSExplorer: @unchecked Sendable {
             graph.setCurrentFingerprint(currentFP)
 
             return .continue(
-                description: "Tapped \"\(target.text)\" → new screen (\(graph.nodeCount) total)"
+                description: "Tapped \"\(label)\" → new screen (\(graph.nodeCount) total)"
             )
 
         case .revisited:
-            // Already-known screen — tap back, don't add to frontier
+            // Already-known screen — tap back, don't re-explore
             ExplorerUtilities.tapBackButton(
                 elements: afterResult.elements, input: input, windowSize: windowSize
             )
             graph.setCurrentFingerprint(currentFP)
 
-            return .continue(description: "Tapped \"\(target.text)\" → revisited screen")
+            return .continue(description: "Tapped \"\(label)\" → revisited screen")
 
         case .duplicate:
             // Didn't navigate — stay on current screen, no back-tap needed
-            return .continue(description: "Tapped \"\(target.text)\" → no navigation")
+            return .continue(description: "Tapped \"\(label)\" → no navigation")
         }
     }
 

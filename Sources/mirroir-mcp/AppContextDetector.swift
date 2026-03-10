@@ -73,6 +73,9 @@ enum AppContextDetector {
 
     // MARK: - Home Screen Detection
 
+    /// Maximum X coordinate for the back button position on iOS nav bars.
+    static let backButtonMaxX: Double = 80.0
+
     /// Detect the iOS home screen: many short labels arranged in a grid pattern,
     /// with no back chevron (which would indicate being inside an app).
     static func detectHomeScreen(elements: [TapPoint], screenHeight: Double) -> Bool {
@@ -85,6 +88,18 @@ enum AppContextDetector {
                 && el.tapY <= topZone
         }
         if hasBackChevron { return false }
+
+        // OCR sometimes detects the "<" back chevron as "icon" via YOLO.
+        // A lone icon in the top-left corner (back button position) indicates
+        // an app nav bar, not a home screen. Home screens don't have a single
+        // icon at this position — their icon grid starts much further down.
+        let hasBackButtonIcon = elements.contains { el in
+            el.text.lowercased() == "icon"
+                && el.tapX <= backButtonMaxX
+                && el.tapY <= topZone
+                && el.tapY > screenHeight * 0.05
+        }
+        if hasBackButtonIcon { return false }
 
         // Filter candidates: below status bar, short text, not time/number patterns,
         // not YOLO detection labels ("icon" is a generic YOLO class, not a readable label).

@@ -28,7 +28,9 @@ enum CGEventInput {
 
     /// Microseconds to settle after warping cursor before posting scroll events.
     /// Only used by swipe, which needs the cursor pre-positioned for scroll routing.
-    private static let warpSettleUs: UInt32 = 30_000
+    /// Set to 100ms to allow the window's scroll subsystem to register the cursor
+    /// position and the MayBegin priming event before actual scroll events arrive.
+    private static let warpSettleUs: UInt32 = 100_000
 
     /// Click (tap) at a screen-absolute point.
     static func click(at point: CGPoint, targetPID: pid_t? = nil) -> Bool {
@@ -106,6 +108,15 @@ enum CGEventInput {
 
         let cursorEngaged = engageCursor(targetPID: targetPID, warpTo: midpoint)
         defer { disengageCursor(cursorEngaged) }
+
+        // Post a mouseMoved event at the midpoint to firmly establish the
+        // cursor inside the window. After a focus switch, the warp alone
+        // may not register with the window's event tracking. The mouseMoved
+        // event forces macOS to associate the cursor with this window.
+        if let move = makeMouseEvent(.mouseMoved, at: midpoint) {
+            post(move, targetPID: targetPID)
+            usleep(50_000) // 50ms for window to register cursor presence
+        }
 
         // Send a zero-delta "may begin" scroll event to engage the window's
         // scroll handler. After a focus switch, iPhone Mirroring silently drops
@@ -391,12 +402,16 @@ enum CGEventInput {
     /// routing is based on cursor position.
     private static func engageCursor(targetPID: pid_t?, warpTo point: CGPoint? = nil) -> Bool {
         guard targetPID == nil else { return false }
-        CGDisplayHideCursor(CGMainDisplayID())
+        // Warp BEFORE hiding cursor — hiding first can prevent the warp
+        // from registering for scroll event routing in iPhone Mirroring.
         if let point {
             CGWarpMouseCursorPosition(point)
+        }
+        CGDisplayHideCursor(CGMainDisplayID())
+        CGAssociateMouseAndMouseCursorPosition(0)
+        if point != nil {
             usleep(warpSettleUs)
         }
-        CGAssociateMouseAndMouseCursorPosition(0)
         return true
     }
 

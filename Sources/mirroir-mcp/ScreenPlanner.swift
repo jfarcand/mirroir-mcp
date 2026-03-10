@@ -116,10 +116,12 @@ enum ScreenPlanner {
     ) -> [RankedElement] {
         components
             .compactMap { component -> RankedElement? in
-                // Skip non-explorable components (exploration policy, not just UI truth)
+                // Skip non-explorable components (exploration policy, not just UI truth).
+                // Uses displayLabel for visited check to avoid collisions when multiple
+                // components share the same raw tap target text (e.g. YOLO "icon").
                 guard component.definition.exploration.explorable,
                       let tapTarget = component.tapTarget,
-                      !visitedElements.contains(tapTarget.text) else {
+                      !visitedElements.contains(component.displayLabel) else {
                     return nil
                 }
 
