@@ -119,6 +119,18 @@ extension BFSExplorer {
         DebugLog.log("bfs", "calibration detect: \(componentDefinitions.count) defs, " +
             "\(rawComponents.count) raw → \(components.count) absorbed")
 
+        // Register breadth_navigation labels (e.g. tab bar items) for global tracking.
+        // These will be explored once and skipped on every subsequent screen.
+        let breadthLabels = Set(
+            components
+                .filter { $0.definition.exploration.role == .breadthNavigation }
+                .map { $0.displayLabel }
+        )
+        if !breadthLabels.isEmpty {
+            graph.registerBreadthLabels(breadthLabels)
+            DebugLog.log("bfs", "registered \(breadthLabels.count) breadth labels: \(breadthLabels.sorted())")
+        }
+
         // Stage 3: Validate — check unclassified ratio in content zone
         let validation = CalibrationValidator.validate(
             components: components, screenHeight: windowSize.height

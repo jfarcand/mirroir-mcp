@@ -109,18 +109,16 @@ final class NavigationGraph: @unchecked Sendable {
     private var traversalPhases: [String: TraversalPhase] = [:]
     private var screenPlans: [String: [RankedElement]] = [:]
     private var tapCaches: [String: TapAreaCache] = [:]
+    /// Labels of breadth_navigation components (e.g. tab bar items) registered during calibration.
+    private var breadthLabels: Set<String> = []
+    /// Labels of breadth_navigation components already explored. Shared across all screens
+    /// so tab bars are not re-tapped from every child screen.
+    private var globalVisited: Set<String> = []
     private let lock = NSLock()
 
     // MARK: - Lifecycle
 
-    /// Initialize the graph with the root screen.
-    ///
-    /// - Parameters:
-    ///   - rootElements: OCR elements from the first screen.
-    ///   - icons: Detected icons from the first screen.
-    ///   - hints: Navigation hints from the first screen.
-    ///   - screenshot: Base64-encoded screenshot of the first screen.
-    ///   - screenType: Classified type of the root screen.
+    /// Initialize the graph with the root screen, resetting all state.
     func start(
         rootElements: [TapPoint],
         icons: [IconDetector.DetectedIcon],
@@ -138,6 +136,8 @@ final class NavigationGraph: @unchecked Sendable {
         traversalPhases = [:]
         screenPlans = [:]
         tapCaches = [:]
+        breadthLabels = []
+        globalVisited = []
 
         let fp = StructuralFingerprint.compute(elements: rootElements, icons: icons)
         let title = StructuralFingerprint.extractNavBarTitle(from: rootElements)
@@ -158,20 +158,7 @@ final class NavigationGraph: @unchecked Sendable {
         isStarted = true
     }
 
-    /// Record a navigation transition after performing an action.
-    /// Compares the new screen against all known nodes using structural similarity.
-    ///
-    /// - Parameters:
-    ///   - elements: OCR elements from the new screen.
-    ///   - icons: Detected icons from the new screen.
-    ///   - hints: Navigation hints from the new screen.
-    ///   - screenshot: Base64-encoded screenshot.
-    ///   - actionType: The action that caused navigation (e.g. "tap").
-    ///   - elementText: The raw element text associated with the action (for visited-state matching).
-    ///   - displayLabel: Clean label derived from the component's LabelRule (for skill naming).
-    ///   - screenType: Classified type of the new screen.
-    ///   - edgeType: Classified transition type for backtracking (default `.push`).
-    /// - Returns: A `TransitionResult` indicating what happened.
+    /// Record a navigation transition. Compares new screen against known nodes via similarity.
     func recordTransition(
         elements: [TapPoint],
         icons: [IconDetector.DetectedIcon],
@@ -289,8 +276,7 @@ final class NavigationGraph: @unchecked Sendable {
         return edges.filter { $0.fromFingerprint == fingerprint }
     }
 
-    /// Get the incoming edge that led to a given screen fingerprint.
-    /// Returns the most recent edge pointing to this fingerprint.
+    /// Get the most recent incoming edge that led to a given screen fingerprint.
     func incomingEdge(to fingerprint: String) -> NavigationEdge? {
         lock.lock()
         defer { lock.unlock() }
@@ -304,8 +290,7 @@ final class NavigationGraph: @unchecked Sendable {
         return isStarted
     }
 
-    /// Get unvisited element texts for a given screen.
-    /// Returns elements that have not been marked as visited, sorted by Y position.
+    /// Get unvisited elements for a screen, filtered by the visited set.
     func unvisitedElements(for fingerprint: String) -> [TapPoint] {
         lock.lock()
         defer { lock.unlock() }
@@ -322,13 +307,7 @@ final class NavigationGraph: @unchecked Sendable {
 
     // MARK: - Scroll Support
 
-    /// Merge newly discovered elements (from scrolling) into an existing screen node.
-    /// Deduplicates by element text — only elements with novel text are added.
-    ///
-    /// - Parameters:
-    ///   - fingerprint: The screen to merge elements into.
-    ///   - newElements: Elements from the scrolled viewport.
-    /// - Returns: Number of novel elements added, or 0 if all were duplicates.
+    /// Merge scrolled elements into a screen node, deduplicating by text. Returns novel count.
     func mergeScrolledElements(fingerprint: String, newElements: [TapPoint]) -> Int {
         lock.lock()
         defer { lock.unlock() }
@@ -380,10 +359,7 @@ final class NavigationGraph: @unchecked Sendable {
         return rootFP
     }
 
-    /// Update the current fingerprint to reflect navigation after backtracking.
-    /// Called after Cmd+[ or fast-backtrack to sync graph state with the physical screen.
-    ///
-    /// - Parameter fingerprint: The fingerprint of the screen the explorer landed on.
+    /// Update the current fingerprint after backtracking to sync graph state.
     func setCurrentFingerprint(_ fingerprint: String) {
         lock.lock()
         defer { lock.unlock() }
@@ -401,11 +377,6 @@ final class NavigationGraph: @unchecked Sendable {
     // MARK: - Scout Phase Support
 
     /// Record the result of scouting an element on a screen.
-    ///
-    /// - Parameters:
-    ///   - fingerprint: The screen fingerprint where scouting occurred.
-    ///   - elementText: The text of the element that was scouted.
-    ///   - result: Whether tapping the element caused navigation.
     func recordScoutResult(fingerprint: String, elementText: String, result: ScoutResult) {
         lock.lock()
         defer { lock.unlock() }
@@ -449,16 +420,16 @@ final class NavigationGraph: @unchecked Sendable {
         return screenPlans[fingerprint]
     }
 
-    /// Get the next unvisited element from the screen's exploration plan.
-    /// Returns the highest-scored element whose displayLabel is NOT in the visited set.
-    /// Uses displayLabel (not raw point.text) to avoid collisions when multiple
-    /// components share the same raw text (e.g. YOLO "icon" detections).
+    /// Get the next unvisited plan element, skipping per-screen and global visited sets.
     func nextPlannedElement(for fingerprint: String) -> RankedElement? {
         lock.lock()
         defer { lock.unlock() }
         guard let plan = screenPlans[fingerprint],
               let node = nodes[fingerprint] else { return nil }
-        return plan.first { !node.visitedElements.contains($0.displayLabel) }
+        return plan.first {
+            !node.visitedElements.contains($0.displayLabel) &&
+            !globalVisited.contains($0.displayLabel)
+        }
     }
 
     /// Clear the exploration plan for a screen, forcing a rebuild on next access.
@@ -466,6 +437,29 @@ final class NavigationGraph: @unchecked Sendable {
         lock.lock()
         defer { lock.unlock() }
         screenPlans[fingerprint] = nil
+    }
+
+    // MARK: - Global Component Tracking
+
+    /// Register breadth_navigation labels (e.g. tab bar items) for global tracking.
+    func registerBreadthLabels(_ labels: Set<String>) {
+        lock.lock()
+        defer { lock.unlock() }
+        breadthLabels.formUnion(labels)
+    }
+
+    /// Check if a displayLabel belongs to a breadth_navigation component.
+    func isBreadthLabel(_ label: String) -> Bool {
+        lock.lock()
+        defer { lock.unlock() }
+        return breadthLabels.contains(label)
+    }
+
+    /// Mark a breadth_navigation component as globally visited across all screens.
+    func markGloballyVisited(label: String) {
+        lock.lock()
+        defer { lock.unlock() }
+        globalVisited.insert(label)
     }
 
     // MARK: - Tap Area Cache
@@ -493,10 +487,7 @@ final class NavigationGraph: @unchecked Sendable {
 
     // MARK: - Node Matching
 
-    /// Find an existing node whose structural elements are similar to the given elements.
-    /// Returns the fingerprint of the matching node, or nil if no match found.
-    /// Uses title-aware similarity: screens with different nav bar titles are never matched.
-    /// Used internally for transition recording and externally for backtrack verification.
+    /// Find a node with similar structural elements using title-aware similarity.
     func findMatchingNode(elements: [TapPoint]) -> String? {
         for (fp, node) in nodes {
             let sim = StructuralFingerprint.titleAwareSimilarity(elements, node.elements)

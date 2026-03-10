@@ -251,9 +251,7 @@ final class BFSExplorer: @unchecked Sendable {
 
     // MARK: - Phase: Exploring
 
-    /// Explore one element on the current frontier screen.
-    /// Taps the next unvisited navigation element, records the result,
-    /// and taps back if it navigated to a child screen.
+    /// Explore one element on the current frontier screen, tap back if it navigated.
     private func stepExploring<S: ExplorationStrategy>(
         screen: FrontierScreen,
         describer: ScreenDescribing,
@@ -361,6 +359,13 @@ final class BFSExplorer: @unchecked Sendable {
         // Mark visited using displayLabel (unique per component) to avoid
         // collisions when multiple components share the same raw text (e.g. "icon").
         graph.markElementVisited(fingerprint: currentFP, elementText: label)
+
+        // Mark breadth_navigation components (e.g. tab bar items) as globally visited
+        // so they are not re-tapped from every child screen.
+        if graph.isBreadthLabel(label) {
+            graph.markGloballyVisited(label: label)
+            DebugLog.log("bfs", "globally visited breadth label: \"\(label)\"")
+        }
 
         // Record tap coordinates in cache before tapping
         graph.recordTap(fingerprint: currentFP, x: target.tapX, y: target.tapY)
