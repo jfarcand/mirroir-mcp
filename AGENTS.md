@@ -137,7 +137,7 @@ When creating a new type or file, walk this checklist in order:
   - Examples: `feat: add check_health tool`, `fix(skills): handle YAML block scalars`, `docs: update architecture guide`
   - The `commit-msg` hook in `git-hooks/` enforces this — non-conventional commits are rejected.
 - Always create a branch when adding new features. Bug fixes go directly to main branch.
-- Always run validation after making changes: `swift build` then `swift test`
+- Always run validation after making changes: `swift build` then `swift test --skip IntegrationTests`
 
 ## Security Engineering Rules
 
@@ -177,15 +177,15 @@ Run before creating a commit:
 # 1. Full build
 swift build
 
-# 2. Run all tests
-swift test
+# 2. Run unit tests (integration tests run on CI only)
+swift test --skip IntegrationTests
 ```
 
 #### Tier 3: Full Validation (before merge only)
 Run the full suite when preparing to merge:
 ```bash
 swift build -c release
-swift test
+swift test --skip IntegrationTests
 ```
 
 #### Tier 4: Real-Device Validation (REQUIRED before squash-merge to main)

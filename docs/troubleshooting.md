@@ -40,21 +40,15 @@ mirroir doctor
 
 Use `--json` for machine-readable output or `--no-color` to disable ANSI colors.
 
-## Hot Reload (Development)
+## Development Watch Mode
 
-When building from source, the MCP server detects when its binary is rebuilt and reloads itself automatically via `execv()`. This preserves the process ID and stdin/stdout file descriptors, so the MCP client's pipes stay connected — no `/mcp reconnect` needed.
+During development, use `mirroir-watch.sh` to automatically rebuild and restart the server when source files change:
 
-After each tool response, the server compares the binary's modification time against the startup snapshot. If the binary is newer (i.e., you ran `swift build`), the server replaces its process image with the new binary. The reload is logged to `~/.mirroir-mcp/debug.log`:
-
-```
-[hot-reload] Binary changed on disk, reloading via execv...
-[hot-reload] Reloaded — version: abc1234
+```bash
+./mirroir-watch.sh --debug --dangerously-skip-permissions
 ```
 
-**Notes:**
-- `touch` + `swift build` is not enough if no source changed — SPM skips relinking when object files are identical. An actual code change is needed to produce a new binary.
-- The reload happens after the current tool call completes, so no in-flight work is lost.
-- Debug log history is preserved across reloads (the log is not truncated on hot-reload restart).
+The script uses `fswatch` to monitor `Sources/` for `.swift` file changes, rebuilds via `swift build`, and restarts the server process. Install fswatch with `brew install fswatch` if needed. The MCP client will need to reconnect after each restart.
 
 ## Common Issues
 

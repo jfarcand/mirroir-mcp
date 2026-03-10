@@ -48,22 +48,6 @@ final class MCPServer: Sendable {
                 continue
             }
 
-            // Check for binary update AFTER reading the request but BEFORE
-            // processing it. If the binary changed, reject the request with
-            // a retry error so the client doesn't get stale results, then
-            // reload via execv(). The client retries and hits the new binary.
-            if HotReload.shouldReload() {
-                DebugLog.persist("hot-reload", "Binary changed — rejecting request, reloading")
-                if request.id != nil {
-                    writeError(
-                        id: request.id, code: -32000,
-                        message: "Server binary updated. Retrying in 5 seconds..."
-                    )
-                }
-                HotReload.restartViaExecv()
-                // execv only returns on failure — continue processing if it fails
-            }
-
             guard let response = handleRequest(request) else {
                 continue  // Notifications produce no response per JSON-RPC 2.0
             }
