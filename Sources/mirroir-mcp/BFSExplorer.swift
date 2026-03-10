@@ -31,8 +31,8 @@ final class BFSExplorer: @unchecked Sendable {
     private var phase: BFSPhase = .atRoot
     private var actionsOnCurrentScreen: Int = 0
     private var startTime: Date = Date()
-    /// Whether the root screen has been calibrated (full-page scroll to discover all elements).
-    private var isCalibrated: Bool = false
+    /// Fingerprints of screens that have been calibrated (full-page scroll + component detection).
+    var calibratedScreens: Set<String> = []
     /// Report data: calibration summary, collected during calibration phase.
     var calibrationSummary: ExplorationReportFormatter.CalibrationSummary?
     /// Report data: per-screen action entries, keyed by fingerprint.
@@ -70,8 +70,7 @@ final class BFSExplorer: @unchecked Sendable {
         self.bridge = bridge
     }
 
-    /// Record the exploration start time and seed the frontier with the root screen.
-    /// Call once after the initial screen capture.
+    /// Record start time and seed frontier with the root screen. Call once after initial capture.
     func markStarted() {
         lock.lock()
         defer { lock.unlock() }
@@ -83,14 +82,7 @@ final class BFSExplorer: @unchecked Sendable {
         }
     }
 
-    /// Perform one BFS exploration step.
-    /// Dispatches to the appropriate phase handler based on current state.
-    ///
-    /// - Parameters:
-    ///   - describer: Screen describer for OCR.
-    ///   - input: Input provider for tap/swipe actions.
-    ///   - strategy: Exploration strategy for element classification and ranking.
-    /// - Returns: The result of this step.
+    /// Perform one BFS exploration step. Dispatches to the current phase handler.
     func step<S: ExplorationStrategy>(
         describer: ScreenDescribing,
         input: InputProviding,
@@ -187,14 +179,9 @@ final class BFSExplorer: @unchecked Sendable {
 
         if target.pathFromRoot.isEmpty {
             // Root screen (depth 0) — calibrate by scrolling through the full page
-            // to discover all elements, then scroll back to top before exploring.
+            // to discover all elements, run component detection, build plan, then
+            // scroll back to top before exploring.
             graph.setCurrentFingerprint(target.fingerprint)
-            if !isCalibrated {
-                calibrateRootScreen(
-                    currentFP: target.fingerprint, describer: describer, input: input
-                )
-                isCalibrated = true
-            }
             phase = .exploring(screen: target)
             return stepExploring(
                 screen: target, describer: describer, input: input, strategy: strategy
@@ -284,21 +271,28 @@ final class BFSExplorer: @unchecked Sendable {
 
         if let exit = handleContextEscape(elements: result.elements, input: input, describer: describer) { return exit }
 
+        // Calibrate this screen if not already done (scroll full page + component detect + plan)
+        if !calibratedScreens.contains(currentFP) {
+            let calResult = calibrateScreen(
+                fingerprint: currentFP, describer: describer, input: input
+            )
+            calibratedScreens.insert(currentFP)
+            if case .failed(let reason) = calResult {
+                lock.lock(); isFinished = true; lock.unlock()
+                return .paused(reason: reason)
+            }
+        }
+
         // Log all OCR elements so we can compare with what's visible on screen
         let ocrTexts = result.elements.map { "\($0.text)@(\(Int($0.tapX)),\(Int($0.tapY)))" }
         DebugLog.log("bfs", "OCR elements (\(result.elements.count)): \(ocrTexts.joined(separator: ", "))")
 
-        // Classify elements and build exploration plan
-        let classified = ElementClassifier.classify(
-            result.elements, budget: budget, screenHeight: windowSize.height
-        )
-
-        let navElements = classified.filter { $0.role == .navigation }.map { $0.point.text }
-        let decoElements = classified.filter { $0.role == .decoration }.map { $0.point.text }
-        DebugLog.log("bfs", "classified: nav=\(navElements) deco=\(decoElements)")
-
-        let visitedElements = graph.node(for: currentFP)?.visitedElements ?? []
+        // Build plan from viewport if calibration didn't produce one (e.g. non-scrollable screen)
         if graph.screenPlan(for: currentFP) == nil {
+            let classified = ElementClassifier.classify(
+                result.elements, budget: budget, screenHeight: windowSize.height
+            )
+            let visitedElements = graph.node(for: currentFP)?.visitedElements ?? []
             let plan = buildScreenPlan(
                 classified: classified, visitedElements: visitedElements
             )
@@ -310,9 +304,11 @@ final class BFSExplorer: @unchecked Sendable {
             DebugLog.log("bfs", "plan: \(planTexts)")
         }
 
-        // Get the next unvisited element from the plan
-        let rankedElement: RankedElement? = if let ranked = graph.nextPlannedElement(for: currentFP),
-            !strategy.shouldSkip(elementText: ranked.point.text, budget: budget) { ranked } else { nil }
+        // Resolve next plan item against fresh viewport coordinates
+        let rankedElement = resolveNextPlanItem(
+            currentFP: currentFP, viewportElements: result.elements,
+            describer: describer, input: input, strategy: strategy
+        )
 
         lock.lock()
         let currentActions = actionsOnCurrentScreen

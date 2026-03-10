@@ -351,6 +351,16 @@ public enum TimingConstants {
     /// Maximum wall-clock seconds before stopping exploration.
     public static let explorationMaxTimeSeconds: Int = 300
 
+    // MARK: - Calibration Validation
+
+    /// When true, exploration fails with a diagnostic report if too many elements
+    /// are unclassified after calibration. When false, logs a warning and continues.
+    public static let calibrationStrict: Bool = true
+
+    /// Maximum fraction of content-zone elements that can be unclassified before
+    /// calibration validation fails (0.0–1.0). Only checked when calibrationStrict is true.
+    public static let calibrationUnclassifiedThreshold: Double = 0.5
+
     // MARK: - Compiled Safety
 
     /// Minimum confidence threshold for compiled taps (0.0–1.0).

@@ -317,6 +317,18 @@ extension EnvConfig {
         readBool("verifyTaps", envVar: "MIRROIR_VERIFY_TAPS", default: false)
     }
 
+    // MARK: - Calibration Validation
+
+    /// When true, exploration fails if too many elements are unclassified after calibration.
+    public static var calibrationStrict: Bool {
+        readBool("calibrationStrict", envVar: "MIRROIR_CALIBRATION_STRICT", default: TimingConstants.calibrationStrict)
+    }
+
+    /// Maximum fraction of content-zone elements that can be unclassified (0.0–1.0).
+    public static var calibrationUnclassifiedThreshold: Double {
+        readDouble("calibrationUnclassifiedThreshold", default: TimingConstants.calibrationUnclassifiedThreshold)
+    }
+
     // MARK: - Component Detection
 
     /// Component detection mode for BFS exploration.
