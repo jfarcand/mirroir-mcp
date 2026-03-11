@@ -282,6 +282,38 @@ extension EnvConfig {
         readDouble("scrollDedupProximityPt", default: TimingConstants.scrollDedupProximityPt)
     }
 
+    // MARK: - Scroll Content Matching
+
+    /// Maximum X distance (pt) for matching elements across scroll viewports.
+    public static var scrollContentMatchXTolerance: Double {
+        readDouble("scrollContentMatchXTolerance", default: TimingConstants.scrollContentMatchXTolerance)
+    }
+
+    /// Maximum Y distance (pt) for filtering outlier deltas during scroll offset measurement.
+    public static var scrollContentMatchOutlierThreshold: Double {
+        readDouble("scrollContentMatchOutlierThreshold", default: TimingConstants.scrollContentMatchOutlierThreshold)
+    }
+
+    /// Minimum matching content elements required for content-based scroll offset.
+    public static var scrollContentMatchMinCount: Int {
+        readInt("scrollContentMatchMinCount", default: TimingConstants.scrollContentMatchMinCount)
+    }
+
+    /// X quantization bucket size (pt) for composite dedup key.
+    public static var scrollDedupXBucketSize: Double {
+        readDouble("scrollDedupXBucketSize", default: TimingConstants.scrollDedupXBucketSize)
+    }
+
+    /// Maximum absolute Y distance (pt) for duplicate detection in page-absolute space.
+    public static var scrollDedupPageYTolerance: Double {
+        readDouble("scrollDedupPageYTolerance", default: TimingConstants.scrollDedupPageYTolerance)
+    }
+
+    /// Minimum scroll offset (pt) to accept from anchor or content detection.
+    public static var scrollMinOffsetThreshold: Double {
+        readDouble("scrollMinOffsetThreshold", default: TimingConstants.scrollMinOffsetThreshold)
+    }
+
     // MARK: - Keyboard Layout
 
     /// iPhone keyboard layout name for character substitution.
@@ -315,6 +347,18 @@ extension EnvConfig {
     /// When true, compiled taps are followed by a verification OCR call.
     public static var verifyTaps: Bool {
         readBool("verifyTaps", envVar: "MIRROIR_VERIFY_TAPS", default: false)
+    }
+
+    // MARK: - Calibration Validation
+
+    /// When true, exploration fails if too many elements are unclassified after calibration.
+    public static var calibrationStrict: Bool {
+        readBool("calibrationStrict", envVar: "MIRROIR_CALIBRATION_STRICT", default: TimingConstants.calibrationStrict)
+    }
+
+    /// Maximum fraction of content-zone elements that can be unclassified (0.0–1.0).
+    public static var calibrationUnclassifiedThreshold: Double {
+        readDouble("calibrationUnclassifiedThreshold", default: TimingConstants.calibrationUnclassifiedThreshold)
     }
 
     // MARK: - Component Detection

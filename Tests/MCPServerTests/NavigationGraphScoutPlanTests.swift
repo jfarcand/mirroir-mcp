@@ -362,4 +362,104 @@ final class NavigationGraphScoutPlanTests: XCTestCase {
             XCTFail("Expected .duplicate")
         }
     }
+
+    // MARK: - Global Component Tracking (breadth_navigation)
+
+    func testRegisterBreadthLabelsAndQuery() {
+        let graph = NavigationGraph()
+        graph.start(
+            rootElements: makeElements(["Résumé", "Partage"]),
+            icons: noIcons(), hints: [], screenshot: "img", screenType: .tabRoot
+        )
+
+        XCTAssertFalse(graph.isBreadthLabel("Résumé"))
+
+        graph.registerBreadthLabels(["Résumé", "Partage", "Parcourir"])
+        XCTAssertTrue(graph.isBreadthLabel("Résumé"))
+        XCTAssertTrue(graph.isBreadthLabel("Partage"))
+        XCTAssertTrue(graph.isBreadthLabel("Parcourir"))
+        XCTAssertFalse(graph.isBreadthLabel("Activité"))
+    }
+
+    func testGlobalVisitedSkipsPlannedElement() {
+        let graph = NavigationGraph()
+        let elements = makeElements(["Résumé", "Activité", "Partage"])
+        graph.start(
+            rootElements: elements, icons: noIcons(), hints: [],
+            screenshot: "img", screenType: .tabRoot
+        )
+        let fp = graph.currentFingerprint
+
+        // Build a plan with 3 items
+        let plan = elements.enumerated().map { (i, el) in
+            RankedElement(
+                point: el, score: Double(10 - i),
+                reason: "test", displayLabel: el.text
+            )
+        }
+        graph.setScreenPlan(for: fp, plan: plan)
+
+        // First planned element is "Résumé" (highest score)
+        XCTAssertEqual(graph.nextPlannedElement(for: fp)?.displayLabel, "Résumé")
+
+        // Mark "Résumé" as globally visited (simulating breadth navigation tap)
+        graph.markGloballyVisited(label: "Résumé")
+
+        // Next planned should skip "Résumé" → return "Activité"
+        XCTAssertEqual(graph.nextPlannedElement(for: fp)?.displayLabel, "Activité")
+    }
+
+    func testGlobalVisitedAffectsAllScreens() {
+        let graph = NavigationGraph()
+        let rootElements = makeElements(["Résumé", "Activité"])
+        graph.start(
+            rootElements: rootElements, icons: noIcons(), hints: [],
+            screenshot: "img", screenType: .tabRoot
+        )
+        let rootFP = graph.currentFingerprint
+
+        // Navigate to a child screen with overlapping tab items
+        let childElements = makeElements(["Détails", "Résumé", "Activité"], startY: 200)
+        _ = graph.recordTransition(
+            elements: childElements, icons: noIcons(), hints: [],
+            screenshot: "img2", actionType: "tap",
+            elementText: "Détails", screenType: .detail
+        )
+        let childFP = graph.currentFingerprint
+
+        // Build plans for both screens
+        let rootPlan = rootElements.map {
+            RankedElement(point: $0, score: 5, reason: "test", displayLabel: $0.text)
+        }
+        let childPlan = childElements.map {
+            RankedElement(point: $0, score: 5, reason: "test", displayLabel: $0.text)
+        }
+        graph.setScreenPlan(for: rootFP, plan: rootPlan)
+        graph.setScreenPlan(for: childFP, plan: childPlan)
+
+        // Mark "Résumé" globally visited from root screen
+        graph.markGloballyVisited(label: "Résumé")
+
+        // On child screen, "Résumé" should be skipped too → first result is "Détails"
+        XCTAssertEqual(graph.nextPlannedElement(for: childFP)?.displayLabel, "Détails")
+    }
+
+    func testStartResetsGlobalTracking() {
+        let graph = NavigationGraph()
+        graph.start(
+            rootElements: makeElements(["A"]),
+            icons: noIcons(), hints: [], screenshot: "img", screenType: .tabRoot
+        )
+
+        graph.registerBreadthLabels(["TabItem"])
+        graph.markGloballyVisited(label: "TabItem")
+        XCTAssertTrue(graph.isBreadthLabel("TabItem"))
+
+        // Re-start should clear all global tracking
+        graph.start(
+            rootElements: makeElements(["B"]),
+            icons: noIcons(), hints: [], screenshot: "img2", screenType: .tabRoot
+        )
+        XCTAssertFalse(graph.isBreadthLabel("TabItem"))
+    }
 }

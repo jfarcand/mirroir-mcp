@@ -47,7 +47,7 @@ enum ScrollDeduplicator {
         for element in elements {
             seen[element.text] = element
         }
-        return Array(seen.values).sorted { $0.tapY < $1.tapY }
+        return Array(seen.values).sorted { $0.pageY < $1.pageY }
     }
 
     /// Fuzzy text dedup: groups elements whose text is within `maxDistance` edit distance.
@@ -80,11 +80,12 @@ enum ScrollDeduplicator {
             result.append(bestElement)
         }
 
-        return result.sorted { $0.tapY < $1.tapY }
+        return result.sorted { $0.pageY < $1.pageY }
     }
 
     /// Coordinate proximity dedup: groups elements within `thresholdPt` Euclidean distance.
     /// Keeps the element with the highest confidence from each group.
+    /// Uses page-absolute Y for correct distance after multi-viewport merges.
     static func deduplicateProximity(
         _ elements: [TapPoint],
         thresholdPt: Double
@@ -103,7 +104,7 @@ enum ScrollDeduplicator {
             for j in (i + 1)..<elements.count {
                 if merged[j] { continue }
                 let dx = bestElement.tapX - elements[j].tapX
-                let dy = bestElement.tapY - elements[j].tapY
+                let dy = bestElement.pageY - elements[j].pageY
                 let distSquared = dx * dx + dy * dy
                 if distSquared <= thresholdSquared {
                     merged[j] = true
@@ -115,7 +116,7 @@ enum ScrollDeduplicator {
             result.append(bestElement)
         }
 
-        return result.sorted { $0.tapY < $1.tapY }
+        return result.sorted { $0.pageY < $1.pageY }
     }
 
     /// Classic dynamic programming Levenshtein distance (edit distance) between two strings.

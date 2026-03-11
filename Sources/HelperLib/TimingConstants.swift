@@ -340,6 +340,27 @@ public enum TimingConstants {
     /// Maximum Euclidean distance in points for coordinate proximity dedup.
     public static let scrollDedupProximityPt: Double = 15.0
 
+    /// Maximum X distance (pt) for matching elements across scroll viewports.
+    public static let scrollContentMatchXTolerance: Double = 30.0
+
+    /// Maximum Y distance (pt) for filtering outlier deltas during scroll offset measurement.
+    public static let scrollContentMatchOutlierThreshold: Double = 20.0
+
+    /// Minimum number of matching content elements required for content-based scroll offset.
+    public static let scrollContentMatchMinCount: Int = 2
+
+    /// X quantization bucket size (pt) for composite dedup key. Elements within one bucket
+    /// at the same text are considered the same element.
+    public static let scrollDedupXBucketSize: Double = 20.0
+
+    /// Maximum absolute Y distance (pt) for two elements to be considered duplicates
+    /// in page-absolute coordinate space.
+    public static let scrollDedupPageYTolerance: Double = 30.0
+
+    /// Minimum scroll offset (pt) to accept from anchor or content detection.
+    /// Offsets below this threshold are treated as OCR jitter, not real scrolling.
+    public static let scrollMinOffsetThreshold: Double = 20.0
+
     // MARK: - Exploration Budget
 
     /// Maximum DFS depth before forcing backtrack.
@@ -350,6 +371,16 @@ public enum TimingConstants {
 
     /// Maximum wall-clock seconds before stopping exploration.
     public static let explorationMaxTimeSeconds: Int = 300
+
+    // MARK: - Calibration Validation
+
+    /// When true, exploration fails with a diagnostic report if too many elements
+    /// are unclassified after calibration. When false, logs a warning and continues.
+    public static let calibrationStrict: Bool = true
+
+    /// Maximum fraction of content-zone elements that can be unclassified before
+    /// calibration validation fails (0.0–1.0). Only checked when calibrationStrict is true.
+    public static let calibrationUnclassifiedThreshold: Double = 0.5
 
     // MARK: - Compiled Safety
 

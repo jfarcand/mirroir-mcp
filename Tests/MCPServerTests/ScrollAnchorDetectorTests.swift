@@ -168,4 +168,107 @@ final class ScrollAnchorDetectorTests: XCTestCase {
         // Offsets: [0, 2] → sorted: [0, 2] → median: (0+2)/2 = 1
         XCTAssertEqual(median, 1.0, accuracy: 0.01)
     }
+
+    // MARK: - Content-Based Offset Detection
+
+    func testComputeContentOffsetFromOverlappingElements() throws {
+        // Viewport 0: elements at y=200, 400, 600
+        let previous = [
+            tap("Activité", x: 100, y: 200),
+            tap("Entraînements", x: 100, y: 400),
+            tap("Distance", x: 100, y: 600),
+        ]
+        // Viewport 1: same elements shifted up by 300pt (scrolled 300pt)
+        let current = [
+            tap("Entraînements", x: 100, y: 100),
+            tap("Distance", x: 100, y: 300),
+            tap("Pas", x: 100, y: 500),
+        ]
+
+        let result = ScrollAnchorDetector.computeContentOffset(
+            previous: previous, current: current,
+            xTolerance: 30, outlierThreshold: 20, minMatches: 2
+        )
+
+        let unwrapped = try XCTUnwrap(result)
+        // Entraînements: 400 - 100 = 300, Distance: 600 - 300 = 300 → median = 300
+        XCTAssertEqual(unwrapped.scrollOffset, 300, accuracy: 1.0)
+        XCTAssertEqual(unwrapped.anchorCount, 2)
+    }
+
+    func testComputeContentOffsetFiltersOutliers() throws {
+        let previous = [
+            tap("A", x: 100, y: 200),
+            tap("B", x: 100, y: 400),
+            tap("C", x: 100, y: 600),
+        ]
+        // C has OCR jitter — its Y is off by 50pt from expected
+        let current = [
+            tap("A", x: 100, y: 100),  // delta = 100
+            tap("B", x: 100, y: 300),  // delta = 100
+            tap("C", x: 100, y: 450),  // delta = 150 (outlier)
+        ]
+
+        let result = ScrollAnchorDetector.computeContentOffset(
+            previous: previous, current: current,
+            xTolerance: 30, outlierThreshold: 20, minMatches: 2
+        )
+
+        let unwrapped = try XCTUnwrap(result)
+        // After filtering the outlier (150 is >20 from median 100): median of [100, 100] = 100
+        XCTAssertEqual(unwrapped.scrollOffset, 100, accuracy: 1.0)
+        XCTAssertEqual(unwrapped.anchorCount, 2)
+    }
+
+    func testComputeContentOffsetRequiresMinMatches() {
+        let previous = [tap("A", x: 100, y: 200)]
+        let current = [tap("A", x: 100, y: 100)]
+
+        // Only 1 match, but minMatches = 2
+        let result = ScrollAnchorDetector.computeContentOffset(
+            previous: previous, current: current,
+            xTolerance: 30, outlierThreshold: 20, minMatches: 2
+        )
+
+        XCTAssertNil(result)
+    }
+
+    func testComputeContentOffsetIgnoresDifferentXPositions() {
+        let previous = [
+            tap("icon", x: 50, y: 300),
+            tap("icon", x: 350, y: 300),
+        ]
+        let current = [
+            tap("icon", x: 200, y: 200),  // X too far from both previous icons
+        ]
+
+        let result = ScrollAnchorDetector.computeContentOffset(
+            previous: previous, current: current,
+            xTolerance: 30, outlierThreshold: 20, minMatches: 1
+        )
+
+        // No X-close matches → nil
+        XCTAssertNil(result)
+    }
+
+    func testComputeContentOffsetMatchesClosestX() throws {
+        let previous = [
+            tap("icon", x: 50, y: 300),
+            tap("icon", x: 350, y: 600),
+            tap("Résumé", x: 100, y: 400),
+        ]
+        let current = [
+            tap("icon", x: 52, y: 100),   // close to x=50 previous
+            tap("Résumé", x: 102, y: 200), // close to x=100 previous
+        ]
+
+        let result = ScrollAnchorDetector.computeContentOffset(
+            previous: previous, current: current,
+            xTolerance: 30, outlierThreshold: 20, minMatches: 2
+        )
+
+        let unwrapped = try XCTUnwrap(result)
+        // icon: 300 - 100 = 200, Résumé: 400 - 200 = 200 → median = 200
+        XCTAssertEqual(unwrapped.scrollOffset, 200, accuracy: 1.0)
+    }
 }

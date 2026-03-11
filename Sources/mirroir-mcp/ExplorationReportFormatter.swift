@@ -35,6 +35,28 @@ enum ExplorationReportFormatter {
         let totalElements: Int
         /// Whether CalibrationScroller was used (vs simple scroll fallback).
         let usedCalibrationScroller: Bool
+        /// Number of components detected after calibration (nil if not run).
+        let componentCount: Int?
+        /// Number of unclassified content-zone elements (nil if not run).
+        let unclassifiedCount: Int?
+        /// Whether calibration validation passed (nil if not run).
+        let validationPassed: Bool?
+        /// Calibration validation diagnostic report (nil if not run).
+        let validationReport: String?
+
+        init(scrollCount: Int, newElementCount: Int, totalElements: Int,
+             usedCalibrationScroller: Bool, componentCount: Int? = nil,
+             unclassifiedCount: Int? = nil, validationPassed: Bool? = nil,
+             validationReport: String? = nil) {
+            self.scrollCount = scrollCount
+            self.newElementCount = newElementCount
+            self.totalElements = totalElements
+            self.usedCalibrationScroller = usedCalibrationScroller
+            self.componentCount = componentCount
+            self.unclassifiedCount = unclassifiedCount
+            self.validationPassed = validationPassed
+            self.validationReport = validationReport
+        }
     }
 
     /// Per-screen exploration summary.

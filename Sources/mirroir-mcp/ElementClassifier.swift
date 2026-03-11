@@ -159,12 +159,14 @@ enum ElementClassifier {
     ) -> [[TapPoint]] {
         guard !elements.isEmpty else { return [] }
 
-        let sorted = elements.sorted { $0.tapY < $1.tapY }
+        // Sort and group by page-absolute Y so multi-viewport merged elements
+        // are correctly ordered by their position on the full page.
+        let sorted = elements.sorted { $0.pageY < $1.pageY }
         var rows: [[TapPoint]] = []
         var currentRow: [TapPoint] = [sorted[0]]
 
         for element in sorted.dropFirst() {
-            if let last = currentRow.last, abs(element.tapY - last.tapY) <= tolerance {
+            if let last = currentRow.last, abs(element.pageY - last.pageY) <= tolerance {
                 currentRow.append(element)
             } else {
                 rows.append(currentRow)
