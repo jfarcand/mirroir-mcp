@@ -307,13 +307,19 @@ final class NavigationGraph: @unchecked Sendable {
 
     // MARK: - Scroll Support
 
-    /// Merge scrolled elements into a screen node, deduplicating by text. Returns novel count.
+    /// Merge scrolled elements into a screen node using composite key dedup. Returns novel count.
+    /// Composite key = text + quantized X, preventing false dedup of same-text elements
+    /// at different horizontal positions (e.g., multiple "icon" labels).
     func mergeScrolledElements(fingerprint: String, newElements: [TapPoint]) -> Int {
         lock.lock()
         defer { lock.unlock() }
         guard let node = nodes[fingerprint] else { return 0 }
-        let existingTexts = Set(node.elements.map(\.text))
-        let novel = newElements.filter { !existingTexts.contains($0.text) }
+        // Simple composite key dedup — no pageY proximity check here because
+        // elements arrive without scroll-adjusted pageY. The sophisticated
+        // pageY proximity dedup lives in OverlapDeduplicator.merge() which
+        // CalibrationScroller uses with properly tracked scroll offsets.
+        let existingKeys = Set(node.elements.map { OverlapDeduplicator.compositeKey($0) })
+        let novel = newElements.filter { !existingKeys.contains(OverlapDeduplicator.compositeKey($0)) }
         guard !novel.isEmpty else { return 0 }
         var updatedElements = node.elements
         updatedElements.append(contentsOf: novel)

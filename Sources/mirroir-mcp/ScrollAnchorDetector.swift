@@ -107,7 +107,66 @@ enum ScrollAnchorDetector {
         return offsets[mid]
     }
 
+    // MARK: - Content-Based Offset Detection
+
+    /// Compute scroll offset using content elements visible in both viewports.
+    ///
+    /// Unlike `computeOffset()` which uses fixed anchors (tab/nav bar),
+    /// this matches ALL scrolling content elements by (text, nearX) across
+    /// the full viewport. Robust to OCR jitter via median + outlier filtering.
+    ///
+    /// - Parameters:
+    ///   - previous: Elements from the previous viewport.
+    ///   - current: Elements from the current viewport.
+    ///   - xTolerance: Maximum X distance for a match.
+    ///   - outlierThreshold: Maximum deviation from median to keep a delta.
+    ///   - minMatches: Minimum matches required for a valid result.
+    /// - Returns: The offset result, or nil if too few matches.
+    static func computeContentOffset(
+        previous: [TapPoint], current: [TapPoint],
+        xTolerance: Double = EnvConfig.scrollContentMatchXTolerance,
+        outlierThreshold: Double = EnvConfig.scrollContentMatchOutlierThreshold,
+        minMatches: Int = EnvConfig.scrollContentMatchMinCount
+    ) -> OffsetResult? {
+        // Build a spatial index: text → [(x, y)] for all previous elements
+        var prevIndex: [String: [(x: Double, y: Double)]] = [:]
+        for el in previous {
+            prevIndex[el.text, default: []].append((x: el.tapX, y: el.tapY))
+        }
+
+        // Find matching elements across viewports
+        var deltas: [Double] = []
+        for el in current {
+            guard let candidates = prevIndex[el.text] else { continue }
+            // Find the closest X match
+            if let best = candidates.min(by: { abs($0.x - el.tapX) < abs($1.x - el.tapX) }),
+               abs(best.x - el.tapX) < xTolerance {
+                deltas.append(best.y - el.tapY)
+            }
+        }
+
+        guard deltas.count >= minMatches else { return nil }
+
+        // Robust offset: compute median, filter outliers, recompute median
+        let rawMedian = medianValue(deltas)
+        let filtered = deltas.filter { abs($0 - rawMedian) <= outlierThreshold }
+        guard filtered.count >= minMatches else { return nil }
+
+        let offset = medianValue(filtered)
+        return OffsetResult(scrollOffset: offset, anchorCount: filtered.count)
+    }
+
     // MARK: - Private
+
+    /// Compute the median of a non-empty Double array.
+    private static func medianValue(_ values: [Double]) -> Double {
+        let sorted = values.sorted()
+        let mid = sorted.count / 2
+        if sorted.count.isMultiple(of: 2) {
+            return (sorted[mid - 1] + sorted[mid]) / 2.0
+        }
+        return sorted[mid]
+    }
 
     private static func isInAnchorZone(
         y: Double, topZone: Double, bottomZone: Double

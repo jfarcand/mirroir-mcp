@@ -39,15 +39,20 @@ public struct TapPoint: Sendable {
     public let text: String
     /// X coordinate in points, relative to the mirroring window top-left.
     public let tapX: Double
-    /// Y coordinate in points, relative to the mirroring window top-left.
+    /// Y coordinate in points, relative to the mirroring window top-left (viewport-relative).
     public let tapY: Double
+    /// Page-absolute Y coordinate, incorporating cumulative scroll offset.
+    /// For single-viewport contexts this equals `tapY`. For scroll-collected elements
+    /// this encodes the true vertical position on the full page.
+    public let pageY: Double
     /// Vision confidence score (0.0–1.0).
     public let confidence: Float
 
-    public init(text: String, tapX: Double, tapY: Double, confidence: Float) {
+    public init(text: String, tapX: Double, tapY: Double, confidence: Float, pageY: Double? = nil) {
         self.text = text
         self.tapX = tapX
         self.tapY = tapY
+        self.pageY = pageY ?? tapY
         self.confidence = confidence
     }
 }

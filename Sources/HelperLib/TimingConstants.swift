@@ -340,6 +340,23 @@ public enum TimingConstants {
     /// Maximum Euclidean distance in points for coordinate proximity dedup.
     public static let scrollDedupProximityPt: Double = 15.0
 
+    /// Maximum X distance (pt) for matching elements across scroll viewports.
+    public static let scrollContentMatchXTolerance: Double = 30.0
+
+    /// Maximum Y distance (pt) for filtering outlier deltas during scroll offset measurement.
+    public static let scrollContentMatchOutlierThreshold: Double = 20.0
+
+    /// Minimum number of matching content elements required for content-based scroll offset.
+    public static let scrollContentMatchMinCount: Int = 2
+
+    /// X quantization bucket size (pt) for composite dedup key. Elements within one bucket
+    /// at the same text are considered the same element.
+    public static let scrollDedupXBucketSize: Double = 20.0
+
+    /// Maximum absolute Y distance (pt) for two elements to be considered duplicates
+    /// in page-absolute coordinate space.
+    public static let scrollDedupPageYTolerance: Double = 30.0
+
     // MARK: - Exploration Budget
 
     /// Maximum DFS depth before forcing backtrack.

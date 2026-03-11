@@ -2,32 +2,42 @@
 // Licensed under the Apache License, Version 2.0
 //
 // ABOUTME: Merges new viewport elements into an accumulated page using scroll offset deduplication.
-// ABOUTME: Elements in overlap zones are deduped by text; non-overlapping elements get page-absolute Y.
+// ABOUTME: Uses composite key (text + quantized X) and page-absolute Y for robust overlap detection.
 
 import Foundation
 import HelperLib
 
 /// Merges OCR elements from scrolled viewports into an accumulated list
-/// with page-absolute coordinates. Uses scroll offset to identify overlap
-/// zones and deduplicates elements that appear in both viewports.
+/// with page-absolute coordinates. Uses composite keys (text + X bucket)
+/// and page-absolute Y for accurate overlap detection.
 enum OverlapDeduplicator {
 
-    /// Tolerance in points for matching overlapping elements by Y position.
-    static let overlapYTolerance: Double = 20.0
+    /// Build a composite dedup key from text and quantized X position.
+    /// Elements with the same text at similar X positions are considered the same element,
+    /// while elements with the same text at different X positions are kept separate
+    /// (e.g., "icon" at x=50 and x=350 are distinct elements).
+    static func compositeKey(
+        _ el: TapPoint,
+        bucketSize: Double = EnvConfig.scrollDedupXBucketSize
+    ) -> String {
+        let xBucket = Int(el.tapX / bucketSize) * Int(bucketSize)
+        return "\(el.text)@\(xBucket)"
+    }
 
     /// Merge new viewport elements into the accumulated element list.
     ///
-    /// Elements in the overlap zone (determined by scroll offset) are deduplicated
-    /// by text. Non-overlapping elements are appended with page-absolute Y coordinates.
+    /// Uses composite key (text + quantized X) for primary dedup, then checks
+    /// page-absolute Y proximity for overlap detection. Elements carry both
+    /// viewport-relative `tapY` and page-absolute `pageY`.
     ///
     /// - Parameters:
-    ///   - accumulated: Previously collected elements with page-absolute Y.
-    ///   - newViewport: Elements from the new viewport (viewport-relative Y).
+    ///   - accumulated: Previously collected elements with page-absolute pageY.
+    ///   - newViewport: Elements from the new viewport (viewport-relative coordinates).
     ///   - cumulativeOffset: Total scroll offset accumulated so far.
     ///   - viewportOffset: Scroll offset for this specific viewport transition.
     ///   - windowHeight: Height of the target window.
-    ///   - strategy: Deduplication strategy for text matching.
-    /// - Returns: Merged element list with page-absolute Y coordinates.
+    ///   - strategy: Deduplication strategy for fuzzy matching.
+    /// - Returns: Merged element list sorted by page-absolute Y.
     static func merge(
         accumulated: [TapPoint], newViewport: [TapPoint],
         cumulativeOffset: Double, viewportOffset: Double,
@@ -39,47 +49,54 @@ enum OverlapDeduplicator {
             return newViewport.map { toAbsolute($0, offset: cumulativeOffset) }
         }
 
-        let existingTexts = Set(accumulated.map(\.text))
+        let pageYTolerance = EnvConfig.scrollDedupPageYTolerance
+
+        // Build composite key index with page-absolute Y for existing elements
+        var existingByKey: [String: [Double]] = [:]
+        for el in accumulated {
+            let key = compositeKey(el)
+            existingByKey[key, default: []].append(el.pageY)
+        }
+
         var result = accumulated
 
-        // Compute the overlap zone in page-absolute coordinates.
-        // Elements with viewport-relative Y in [0, windowHeight - viewportOffset]
-        // potentially overlap with previously seen content.
-        let overlapThreshold = windowHeight - abs(viewportOffset)
-
         for el in newViewport {
-            // Skip elements we've already seen (text-based dedup)
-            if existingTexts.contains(el.text) {
-                continue
+            let absoluteY = el.tapY + cumulativeOffset
+            let key = compositeKey(el)
+
+            // Check composite key + pageY proximity for duplicates
+            var isDuplicate = false
+            if let existingYs = existingByKey[key] {
+                isDuplicate = existingYs.contains { abs($0 - absoluteY) < pageYTolerance }
             }
 
-            // Check if element might be in the overlap zone using fuzzy text matching
-            let absoluteY = toAbsoluteY(el.tapY, cumulativeOffset: cumulativeOffset)
-            let isDuplicate: Bool
-            switch strategy {
-            case .exact:
-                isDuplicate = false
-            case .levenshtein:
-                isDuplicate = accumulated.contains { existing in
-                    abs(existing.tapY - absoluteY) < overlapYTolerance
-                    && levenshteinDistance(existing.text, el.text) <= 3
-                }
-            case .proximity:
-                isDuplicate = accumulated.contains { existing in
-                    abs(existing.tapY - absoluteY) < overlapYTolerance
-                    && abs(existing.tapX - el.tapX) < overlapYTolerance
+            // Additional fuzzy checks for non-exact strategies
+            if !isDuplicate {
+                switch strategy {
+                case .exact:
+                    break
+                case .levenshtein:
+                    isDuplicate = accumulated.contains { existing in
+                        abs(existing.pageY - absoluteY) < pageYTolerance
+                        && abs(existing.tapX - el.tapX) < EnvConfig.scrollContentMatchXTolerance
+                        && levenshteinDistance(existing.text, el.text) <= EnvConfig.scrollDedupLevenshteinMax
+                    }
+                case .proximity:
+                    isDuplicate = accumulated.contains { existing in
+                        abs(existing.pageY - absoluteY) < pageYTolerance
+                        && abs(existing.tapX - el.tapX) < EnvConfig.scrollContentMatchXTolerance
+                    }
                 }
             }
 
-            if isDuplicate { continue }
-
-            // Element is in the non-overlapping portion — project to absolute Y
-            if el.tapY >= overlapThreshold || !existingTexts.contains(el.text) {
-                result.append(toAbsolute(el, offset: cumulativeOffset))
+            if !isDuplicate {
+                let projected = toAbsolute(el, offset: cumulativeOffset)
+                result.append(projected)
+                existingByKey[key, default: []].append(absoluteY)
             }
         }
 
-        return result.sorted { $0.tapY < $1.tapY }
+        return result.sorted { $0.pageY < $1.pageY }
     }
 
     /// Convert a viewport-relative Y coordinate to page-absolute Y.
@@ -93,8 +110,9 @@ enum OverlapDeduplicator {
         TapPoint(
             text: el.text,
             tapX: el.tapX,
-            tapY: toAbsoluteY(el.tapY, cumulativeOffset: offset),
-            confidence: el.confidence
+            tapY: el.tapY,
+            confidence: el.confidence,
+            pageY: el.tapY + offset
         )
     }
 

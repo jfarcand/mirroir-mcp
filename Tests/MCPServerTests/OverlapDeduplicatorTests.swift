@@ -45,9 +45,11 @@ final class OverlapDeduplicatorTests: XCTestCase {
         )
 
         XCTAssertEqual(result.count, 2)
-        // First viewport: absolute Y = viewport Y (offset is 0)
+        // First viewport: pageY = tapY (offset is 0)
         XCTAssertEqual(result[0].tapY, 100, accuracy: 0.01)
+        XCTAssertEqual(result[0].pageY, 100, accuracy: 0.01)
         XCTAssertEqual(result[1].tapY, 200, accuracy: 0.01)
+        XCTAssertEqual(result[1].pageY, 200, accuracy: 0.01)
     }
 
     func testMergeDeduplicatesInOverlapZone() {
@@ -128,12 +130,14 @@ final class OverlapDeduplicatorTests: XCTestCase {
         )
 
         XCTAssertEqual(result.count, 2)
-        // Should project to absolute Y
-        XCTAssertEqual(result[0].tapY, 400, accuracy: 0.01)
-        XCTAssertEqual(result[1].tapY, 500, accuracy: 0.01)
+        // tapY stays viewport-relative, pageY is projected to absolute
+        XCTAssertEqual(result[0].tapY, 100, accuracy: 0.01)
+        XCTAssertEqual(result[0].pageY, 400, accuracy: 0.01)
+        XCTAssertEqual(result[1].tapY, 200, accuracy: 0.01)
+        XCTAssertEqual(result[1].pageY, 500, accuracy: 0.01)
     }
 
-    func testMergeResultIsSortedByY() {
+    func testMergeResultIsSortedByPageY() {
         let accumulated = [
             tap("Item C", y: 500),
             tap("Item A", y: 100),
@@ -148,10 +152,104 @@ final class OverlapDeduplicatorTests: XCTestCase {
             windowHeight: windowHeight, strategy: .exact
         )
 
-        // Verify sorted by Y
+        // Verify sorted by pageY
         for i in 1..<result.count {
-            XCTAssertLessThanOrEqual(result[i - 1].tapY, result[i].tapY,
-                "Result should be sorted by Y position")
+            XCTAssertLessThanOrEqual(result[i - 1].pageY, result[i].pageY,
+                "Result should be sorted by page-absolute Y position")
         }
+    }
+
+    // MARK: - Composite Key Dedup
+
+    func testCompositeKeyDifferentXKeepsBothIcons() {
+        let key1 = OverlapDeduplicator.compositeKey(tap("icon", x: 50, y: 300), bucketSize: 20)
+        let key2 = OverlapDeduplicator.compositeKey(tap("icon", x: 350, y: 300), bucketSize: 20)
+
+        XCTAssertNotEqual(key1, key2,
+            "Same text at different X buckets should produce different keys")
+    }
+
+    func testCompositeKeySameXBucketMatches() {
+        let key1 = OverlapDeduplicator.compositeKey(tap("icon", x: 205, y: 300), bucketSize: 20)
+        let key2 = OverlapDeduplicator.compositeKey(tap("icon", x: 210, y: 500), bucketSize: 20)
+
+        XCTAssertEqual(key1, key2,
+            "Same text in same X bucket should produce identical keys")
+    }
+
+    func testMergeSameTextDifferentXNotDeduped() {
+        let accumulated = [
+            TapPoint(text: "icon", tapX: 50, tapY: 300, confidence: 0.9, pageY: 300),
+        ]
+        let newViewport = [
+            tap("icon", x: 350, y: 300),
+        ]
+
+        let result = OverlapDeduplicator.merge(
+            accumulated: accumulated, newViewport: newViewport,
+            cumulativeOffset: 400, viewportOffset: 400,
+            windowHeight: windowHeight, strategy: .exact
+        )
+
+        let iconCount = result.filter { $0.text == "icon" }.count
+        XCTAssertEqual(iconCount, 2,
+            "Icons at different X positions should both survive merge")
+    }
+
+    func testMergeSameTextSameXDeduped() {
+        let accumulated = [
+            TapPoint(text: "19:34", tapX: 336, tapY: 579, confidence: 0.9, pageY: 579),
+        ]
+        let newViewport = [
+            tap("19:34", x: 336, y: 179),  // Same text, same X, after scroll
+        ]
+
+        let result = OverlapDeduplicator.merge(
+            accumulated: accumulated, newViewport: newViewport,
+            cumulativeOffset: 400, viewportOffset: 400,
+            windowHeight: windowHeight, strategy: .exact
+        )
+
+        let count = result.filter { $0.text == "19:34" }.count
+        XCTAssertEqual(count, 1,
+            "Same text at same X across viewports should be deduped")
+    }
+
+    // MARK: - Page-Absolute Y
+
+    func testMergePreservesViewportTapY() {
+        let newViewport = [
+            tap("Item A", y: 200),
+        ]
+
+        let result = OverlapDeduplicator.merge(
+            accumulated: [], newViewport: newViewport,
+            cumulativeOffset: 500, viewportOffset: 500,
+            windowHeight: windowHeight, strategy: .exact
+        )
+
+        // tapY should stay viewport-relative
+        XCTAssertEqual(result[0].tapY, 200, accuracy: 0.01)
+        // pageY should be absolute
+        XCTAssertEqual(result[0].pageY, 700, accuracy: 0.01)
+    }
+
+    func testMergePageYUsedForSorting() {
+        let accumulated = [
+            TapPoint(text: "Header", tapX: 100, tapY: 100, confidence: 0.9, pageY: 100),
+        ]
+        let newViewport = [
+            tap("Footer", x: 100, y: 50),  // low viewport Y but high page Y
+        ]
+
+        let result = OverlapDeduplicator.merge(
+            accumulated: accumulated, newViewport: newViewport,
+            cumulativeOffset: 800, viewportOffset: 800,
+            windowHeight: windowHeight, strategy: .exact
+        )
+
+        // Header pageY=100, Footer pageY=50+800=850
+        XCTAssertEqual(result[0].text, "Header")
+        XCTAssertEqual(result[1].text, "Footer")
     }
 }

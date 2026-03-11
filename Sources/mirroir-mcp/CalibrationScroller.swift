@@ -101,28 +101,32 @@ enum CalibrationScroller {
                 break
             }
 
-            // Try anchor-based offset detection
-            if let offsetResult = ScrollAnchorDetector.computeOffset(
+            // Compute scroll offset using a cascade of strategies:
+            // 1. Fixed anchors (tab/nav bar) — most reliable when present
+            // 2. Content element matching — median of Y deltas from overlapping elements
+            // 3. Swipe distance estimate — fallback when no overlap detected
+            let viewportOffset: Double
+            if let anchorResult = ScrollAnchorDetector.computeOffset(
                 previous: previousElements, current: result.elements,
                 windowHeight: windowHeight, minAnchors: minAnchors
             ) {
-                // Anchor-based: merge with overlap deduplication
-                cumulativeOffset += offsetResult.scrollOffset
-                allElements = OverlapDeduplicator.merge(
-                    accumulated: allElements, newViewport: result.elements,
-                    cumulativeOffset: cumulativeOffset,
-                    viewportOffset: offsetResult.scrollOffset,
-                    windowHeight: windowHeight,
-                    strategy: dedupStrategy
-                )
+                viewportOffset = anchorResult.scrollOffset
+            } else if let contentResult = ScrollAnchorDetector.computeContentOffset(
+                previous: previousElements, current: result.elements
+            ) {
+                viewportOffset = contentResult.scrollOffset
             } else {
-                // Fallback: text-set dedup (original behavior)
-                for element in result.elements {
-                    if !previousTexts.contains(element.text) {
-                        allElements.append(element)
-                    }
-                }
+                viewportOffset = scrollFromY - scrollToY
             }
+
+            cumulativeOffset += viewportOffset
+            allElements = OverlapDeduplicator.merge(
+                accumulated: allElements, newViewport: result.elements,
+                cumulativeOffset: cumulativeOffset,
+                viewportOffset: viewportOffset,
+                windowHeight: windowHeight,
+                strategy: dedupStrategy
+            )
 
             previousElements = result.elements
             previousTexts.formUnion(currentTexts)
