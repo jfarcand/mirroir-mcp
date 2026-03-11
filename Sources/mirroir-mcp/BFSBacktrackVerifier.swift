@@ -164,6 +164,14 @@ extension BFSExplorer {
             graph.setCurrentFingerprint(actualFP)
             DebugLog.log("bfs", "backtrack corrected: expected \(expectedFP.prefix(8)) " +
                 "→ actual \(actualFP.prefix(8))")
+            // If we landed back on the root screen, that's recoverable — the explorer
+            // can continue from root. But if we landed on a non-root screen that isn't
+            // the expected parent, continuing would tap elements on the wrong screen.
+            if actualFP != graph.rootFingerprint && actualFP != expectedFP {
+                DebugLog.log("bfs", "backtrack corrected to non-root screen — stopping")
+                lock.lock(); isFinished = true; lock.unlock()
+                return .finished(bundle: generateBundle())
+            }
             return nil
 
         case .lost:
