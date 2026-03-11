@@ -65,10 +65,16 @@ enum CalibrationScroller {
         let scrollFromY = windowHeight * EnvConfig.scrollSwipeFromYFraction
         let scrollToY = windowHeight * EnvConfig.scrollSwipeToYFraction
         let dedupStrategy = ScrollDedupStrategy(rawValue: EnvConfig.scrollDedupStrategy) ?? .exact
-        let minAnchors = EnvConfig.scrollAnchorMinCount
 
         // Start with first viewport elements (page-absolute Y = viewport Y for first frame)
         var allElements = firstResult.elements
+
+        // Cache the last successfully measured offset so subsequent viewports that
+        // fail both anchor and content matching can reuse it instead of the raw
+        // swipe estimate. iOS scroll physics are consistent for identical gestures,
+        // so a previously measured offset is a much better approximation than the
+        // swipe pixel distance (which doesn't account for scroll wheel → iOS mapping).
+        var lastMeasuredOffset: Double?
 
         for _ in 0..<maxScrolls {
             // Swipe up (scroll content down) using configurable Y positions.
@@ -101,36 +107,32 @@ enum CalibrationScroller {
                 break
             }
 
-            // Compute scroll offset using a cascade of strategies:
-            // 1. Fixed anchors with non-zero offset (e.g. collapsing header)
-            // 2. Content element matching — median of Y deltas from overlapping elements
-            // 3. Swipe distance estimate — fallback when no overlap detected
+            // Compute scroll offset using content element matching.
             //
-            // Anchor offset 0 means pinned elements (tab bar) didn't move, which is
-            // expected — it tells us nothing about how far the content scrolled.
-            // Content matching is the primary strategy for measuring scroll distance.
+            // Anchor-based offset (fixed nav/tab bar elements) is NOT used here because
+            // it measures header collapse distance, not content scroll distance. On apps
+            // with collapsing headers (e.g. Santé), anchor offset can be 31pt when the
+            // actual content scroll is 337pt — a 10x underestimate that breaks dedup.
+            //
+            // Cascade: content match → cached content offset → swipe distance estimate.
             let viewportOffset: Double
-            let anchorResult = ScrollAnchorDetector.computeOffset(
-                previous: previousElements, current: result.elements,
-                windowHeight: windowHeight, minAnchors: minAnchors
-            )
             let contentResult = ScrollAnchorDetector.computeContentOffset(
                 previous: previousElements, current: result.elements,
                 windowHeight: windowHeight
             )
             let swipeEstimate = scrollFromY - scrollToY
-
             let minOffset = EnvConfig.scrollMinOffsetThreshold
 
-            if let anchor = anchorResult, anchor.scrollOffset > minOffset {
-                viewportOffset = anchor.scrollOffset
-                DebugLog.persist("ScrollOffset", "viewport \(scrollCount): anchor=\(Int(anchor.scrollOffset)) anchors=\(anchor.anchorCount)")
-            } else if let content = contentResult, content.scrollOffset > minOffset {
+            if let content = contentResult, content.scrollOffset > minOffset {
                 viewportOffset = content.scrollOffset
+                lastMeasuredOffset = content.scrollOffset
                 DebugLog.persist("ScrollOffset", "viewport \(scrollCount): content=\(Int(content.scrollOffset)) matches=\(content.anchorCount)")
+            } else if let cached = lastMeasuredOffset {
+                viewportOffset = cached
+                DebugLog.persist("ScrollOffset", "viewport \(scrollCount): cached=\(Int(cached)) content=\(contentResult.map { Int($0.scrollOffset) } ?? -1)")
             } else {
                 viewportOffset = swipeEstimate
-                DebugLog.persist("ScrollOffset", "viewport \(scrollCount): fallback=\(Int(swipeEstimate)) anchor=\(anchorResult.map { Int($0.scrollOffset) } ?? -1) content=\(contentResult.map { Int($0.scrollOffset) } ?? -1)")
+                DebugLog.persist("ScrollOffset", "viewport \(scrollCount): fallback=\(Int(swipeEstimate)) content=\(contentResult.map { Int($0.scrollOffset) } ?? -1)")
             }
 
             cumulativeOffset += viewportOffset
@@ -157,10 +159,14 @@ enum CalibrationScroller {
             previousTexts.formUnion(currentTexts)
         }
 
-        // Apply configurable dedup strategy to the final collected set
+        // Two-pass dedup:
+        // 1. Strategy-based dedup (proximity/levenshtein) catches near-misses
+        // 2. Exact-text dedup catches duplicates that survived due to pageY inaccuracy
+        //    (e.g. same text at different estimated page positions from fallback offsets)
         let beforeCount = allElements.count
-        let deduped = ScrollDeduplicator.deduplicate(allElements, strategy: dedupStrategy)
-        DebugLog.persist("ScrollDedup", "strategy=\(dedupStrategy.rawValue) before=\(beforeCount) after=\(deduped.count) removed=\(beforeCount - deduped.count) totalOffset=\(Int(cumulativeOffset))")
+        let strategyDeduped = ScrollDeduplicator.deduplicate(allElements, strategy: dedupStrategy)
+        let deduped = ScrollDeduplicator.deduplicateExact(strategyDeduped)
+        DebugLog.persist("ScrollDedup", "strategy=\(dedupStrategy.rawValue) before=\(beforeCount) after_strategy=\(strategyDeduped.count) after_exact=\(deduped.count) totalOffset=\(Int(cumulativeOffset))")
 
         return ScrollResult(
             elements: deduped,

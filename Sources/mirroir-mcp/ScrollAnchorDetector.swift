@@ -155,7 +155,9 @@ enum ScrollAnchorDetector {
 
         // Find matching content elements across viewports
         var deltas: [Double] = []
+        var currentContentCount = 0
         for el in current where el.tapY > topZone && el.tapY < bottomZone {
+            currentContentCount += 1
             guard let candidates = prevIndex[el.text] else { continue }
             // Find the closest X match
             if let best = candidates.min(by: { abs($0.x - el.tapX) < abs($1.x - el.tapX) }),
@@ -163,6 +165,8 @@ enum ScrollAnchorDetector {
                 deltas.append(best.y - el.tapY)
             }
         }
+
+        DebugLog.persist("ContentMatch", "prev=\(prevIndex.count) curr=\(currentContentCount) deltas=\(deltas.count) values=\(deltas.map { Int($0) })")
 
         guard deltas.count >= minMatches else { return nil }
 
