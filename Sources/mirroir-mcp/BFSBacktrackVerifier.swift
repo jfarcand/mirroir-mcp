@@ -58,10 +58,13 @@ extension BFSExplorer {
             return .verified
         }
 
-        DebugLog.log("bfs", "backtrack-verify: screen mismatch — attempting modal dismiss")
+        let ocrTexts = result.elements.map { "\($0.text)@(\(Int($0.tapX)),\(Int($0.tapY)))" }
+        DebugLog.log("bfs", "backtrack-verify: screen mismatch — " +
+            "\(result.elements.count) elements: \(ocrTexts.joined(separator: ", "))")
 
-        // Recovery 1: Try dismissing a modal (X, Close, Done in top zone)
-        let topZone = windowSize.height * 0.20
+        // Recovery 1: Try dismissing a modal (X, Close, Done in top 30% zone).
+        // App Store modal sheets place the X at ~25% height, so 20% is too narrow.
+        let topZone = windowSize.height * 0.30
         if let dismissButton = result.elements.first(where: { el in
             el.tapY <= topZone
             && Self.modalDismissPatterns.contains(
@@ -75,13 +78,19 @@ extension BFSExplorer {
 
             if let afterDismiss = ExplorerUtilities.dismissAlertIfPresent(
                 describer: describer, input: input
-            ),
-               let expectedNode = graph.node(for: expectedFP),
-               StructuralFingerprint.areEquivalentTitleAware(
-                   expectedNode.elements, afterDismiss.elements
-               ) {
-                DebugLog.log("bfs", "backtrack-verify: modal dismiss recovered to expected screen")
-                return .verified
+            ) {
+                if let expectedNode = graph.node(for: expectedFP),
+                   StructuralFingerprint.areEquivalentTitleAware(
+                       expectedNode.elements, afterDismiss.elements
+                   ) {
+                    DebugLog.log("bfs", "backtrack-verify: modal dismiss recovered to expected screen")
+                    return .verified
+                }
+                // Modal dismissed but landed on a different known screen
+                if let matchedFP = graph.findMatchingNode(elements: afterDismiss.elements) {
+                    DebugLog.log("bfs", "backtrack-verify: modal dismiss → known screen \(matchedFP.prefix(8))")
+                    return .corrected(fingerprint: matchedFP)
+                }
             }
         }
 

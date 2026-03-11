@@ -480,10 +480,7 @@ extension MirroirMCP {
     }
 
     /// Format the final exploration result with stats, skill content, and detailed report.
-    private static func formatExploreResult(
-        bundle: SkillBundle,
-        explorer: BFSExplorer
-    ) -> String {
+    private static func formatExploreResult(bundle: SkillBundle, explorer: BFSExplorer) -> String {
         let stats = explorer.stats
         let statLine = "(\(stats.nodeCount) screens, \(stats.actionCount) actions, \(stats.elapsedSeconds)s)"
         guard !bundle.skills.isEmpty else {
