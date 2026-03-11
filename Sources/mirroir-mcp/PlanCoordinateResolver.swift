@@ -49,11 +49,16 @@ enum PlanCoordinateResolver {
             return .found(freshPoint: match)
         }
 
-        // 3. Containment match (handles OCR truncation or extra whitespace)
+        // 3. Containment match (handles OCR truncation or extra whitespace).
+        // Both sides must be at least 5 characters to prevent short strings like
+        // battery "68" from matching plan labels containing that substring
+        // (e.g. "568 calories par jour au cours des" contains "68").
         let trimmedLabel = label.trimmingCharacters(in: .whitespaces)
-        if trimmedLabel.count >= 3 {
+        let minContainmentLength = 5
+        if trimmedLabel.count >= minContainmentLength {
             if let match = viewportElements.first(where: {
                 let trimmed = $0.text.trimmingCharacters(in: .whitespaces)
+                guard trimmed.count >= minContainmentLength else { return false }
                 return trimmed.contains(trimmedLabel) || trimmedLabel.contains(trimmed)
             }) {
                 return .found(freshPoint: match)
