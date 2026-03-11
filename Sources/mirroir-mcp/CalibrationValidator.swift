@@ -54,8 +54,14 @@ enum CalibrationValidator {
         }
 
         let unclassified = contentComponents.filter { $0.kind == "unclassified" }
-        let totalCount = contentComponents.count
-        let unclassifiedCount = unclassified.count
+        // Lone "icon" elements are OCR artifacts from chart visualizations (sparklines,
+        // activity rings). They aren't real UI components and shouldn't inflate the
+        // unclassified ratio or block calibration.
+        let iconNoiseCount = unclassified.filter { comp in
+            comp.elements.count == 1 && comp.displayLabel == "icon"
+        }.count
+        let totalCount = contentComponents.count - iconNoiseCount
+        let unclassifiedCount = unclassified.count - iconNoiseCount
         let ratio = totalCount > 0 ? Double(unclassifiedCount) / Double(totalCount) : 0.0
 
         let passed = !strict || ratio <= threshold
