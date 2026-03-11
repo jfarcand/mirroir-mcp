@@ -503,4 +503,21 @@ final class NavigationGraph: @unchecked Sendable {
         }
         return nil
     }
+
+    /// Find a node matching the viewport using both Jaccard similarity and containment.
+    /// Containment catches the case where a viewport (~40 elements) is a subset of a
+    /// calibrated full-page set (~90 elements) — Jaccard fails because the union is large.
+    func findMatchingNodeWithContainment(elements: [TapPoint]) -> String? {
+        if let fp = findMatchingNode(elements: elements) {
+            return fp
+        }
+        for (fp, node) in nodes {
+            if StructuralFingerprint.viewportContainedIn(
+                viewport: elements, reference: node.elements
+            ) {
+                return fp
+            }
+        }
+        return nil
+    }
 }

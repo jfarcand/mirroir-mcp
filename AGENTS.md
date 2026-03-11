@@ -16,6 +16,12 @@ iPhone Mirroring only passes through to iOS apps:
 
 ---
 
+## CRITICAL: MCP Restart After Code Changes
+
+After modifying any Swift source files, the running MCP server still uses the **old binary**. You MUST ask the user to run `/mcp` to restart the server before testing with MCP tools (`generate_skill`, `tap`, `describe_screen`, etc.). Without a restart, your code changes have no effect on MCP tool behavior.
+
+---
+
 ## Sibling Repositories
 
 This project has companion repos on the same machine. Reference them when needed:

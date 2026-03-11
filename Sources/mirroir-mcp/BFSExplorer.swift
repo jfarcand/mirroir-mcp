@@ -270,6 +270,7 @@ final class BFSExplorer: @unchecked Sendable {
         if let exit = handleContextEscape(elements: result.elements, input: input, describer: describer) { return exit }
 
         // Calibrate this screen if not already done (scroll full page + component detect + plan)
+        var viewportElements = result.elements
         if !calibratedScreens.contains(currentFP) {
             let calResult = calibrateScreen(
                 fingerprint: currentFP, describer: describer, input: input
@@ -279,16 +280,22 @@ final class BFSExplorer: @unchecked Sendable {
                 lock.lock(); isFinished = true; lock.unlock()
                 return .paused(reason: reason)
             }
+            // Re-OCR after calibration: the scroller scrolls down then back up,
+            // so the viewport may differ from the pre-calibration capture.
+            // Fresh elements ensure the resolver doesn't scroll unnecessarily.
+            if let fresh = describer.describe(skipOCR: false) {
+                viewportElements = fresh.elements
+            }
         }
 
         // Log all OCR elements so we can compare with what's visible on screen
-        let ocrTexts = result.elements.map { "\($0.text)@(\(Int($0.tapX)),\(Int($0.tapY)))" }
-        DebugLog.log("bfs", "OCR elements (\(result.elements.count)): \(ocrTexts.joined(separator: ", "))")
+        let ocrTexts = viewportElements.map { "\($0.text)@(\(Int($0.tapX)),\(Int($0.tapY)))" }
+        DebugLog.log("bfs", "OCR elements (\(viewportElements.count)): \(ocrTexts.joined(separator: ", "))")
 
         // Build plan from viewport if calibration didn't produce one (e.g. non-scrollable screen)
         if graph.screenPlan(for: currentFP) == nil {
             let classified = ElementClassifier.classify(
-                result.elements, budget: budget, screenHeight: windowSize.height
+                viewportElements, budget: budget, screenHeight: windowSize.height
             )
             let visitedElements = graph.node(for: currentFP)?.visitedElements ?? []
             let plan = buildScreenPlan(
@@ -304,7 +311,7 @@ final class BFSExplorer: @unchecked Sendable {
 
         // Resolve next plan item against fresh viewport coordinates
         let rankedElement = resolveNextPlanItem(
-            currentFP: currentFP, viewportElements: result.elements,
+            currentFP: currentFP, viewportElements: viewportElements,
             describer: describer, input: input, strategy: strategy
         )
 

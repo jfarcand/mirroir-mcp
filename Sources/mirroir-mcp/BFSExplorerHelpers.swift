@@ -19,9 +19,21 @@ extension BFSExplorer {
 
     /// Check if the explorer has left the target app and handle accordingly.
     /// Returns an ExploreStepResult to return early, or nil if still in-app.
+    ///
+    /// Short-circuits when the viewport matches a known graph node (via Jaccard or
+    /// containment). This prevents false home-screen positives on root screens like
+    /// Santé's dashboard, which has many short labels in a grid-like layout but no
+    /// back chevron.
     func handleContextEscape(
         elements: [TapPoint], input: InputProviding, describer: ScreenDescribing
     ) -> ExploreStepResult? {
+        // If the viewport matches any known graph node, we're still in the app.
+        // This avoids false home-screen positives on root screens with grid-like layouts
+        // (e.g. Santé dashboard: many short labels, no back chevron).
+        if graph.findMatchingNodeWithContainment(elements: elements) != nil {
+            return nil
+        }
+
         let check = ExplorerUtilities.verifyAppContext(
             elements: elements, screenHeight: windowSize.height,
             appName: appName, input: input, describer: describer)
