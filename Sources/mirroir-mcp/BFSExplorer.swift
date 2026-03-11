@@ -348,6 +348,18 @@ final class BFSExplorer: @unchecked Sendable {
         let target = ranked.point
         let label = ranked.displayLabel
 
+        // Global safe zone stencil: reject taps outside the app content area.
+        // Status bar (y < 80pt) and home indicator zone are never valid tap targets.
+        let safeMinY = LandmarkPicker.statusBarMaxY
+        let safeMaxY = windowSize.height * 0.95
+        if target.tapY < safeMinY || target.tapY > safeMaxY
+            || target.tapX < 0 || target.tapX > windowSize.width {
+            DebugLog.log("bfs", "STENCIL \"\(label)\" at (\(Int(target.tapX)),\(Int(target.tapY))) — " +
+                "outside safe zone (y: \(Int(safeMinY))–\(Int(safeMaxY)))")
+            graph.markElementVisited(fingerprint: currentFP, elementText: label)
+            return .continue(description: "Skipped \"\(label)\" — outside safe zone")
+        }
+
         // Check tap area cache — skip if we already tapped near these coordinates
         if graph.wasAlreadyTapped(fingerprint: currentFP, x: target.tapX, y: target.tapY) {
             DebugLog.log("bfs", "SKIP \"\(label)\" at (\(Int(target.tapX)),\(Int(target.tapY))) — " +
