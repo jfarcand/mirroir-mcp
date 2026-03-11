@@ -436,22 +436,27 @@ final class BFSExplorer: @unchecked Sendable {
                 ))
             }
 
-            // Tap back to return to the frontier screen
-            ExplorerUtilities.tapBackButton(
-                elements: afterResult.elements, input: input, windowSize: windowSize
-            )
-            graph.setCurrentFingerprint(currentFP)
+            // Tap back and verify we returned to the expected screen.
+            // If lost (stuck in modal, wrong screen), finishes exploration gracefully.
+            if let lostResult = tapBackAndVerify(
+                expectedFP: currentFP, afterElements: afterResult.elements,
+                describer: describer, input: input
+            ) {
+                return lostResult
+            }
 
             return .continue(
                 description: "Tapped \"\(label)\" → new screen (\(graph.nodeCount) total)"
             )
 
         case .revisited:
-            // Already-known screen — tap back, don't re-explore
-            ExplorerUtilities.tapBackButton(
-                elements: afterResult.elements, input: input, windowSize: windowSize
-            )
-            graph.setCurrentFingerprint(currentFP)
+            // Already-known screen — tap back, verify, don't re-explore
+            if let lostResult = tapBackAndVerify(
+                expectedFP: currentFP, afterElements: afterResult.elements,
+                describer: describer, input: input
+            ) {
+                return lostResult
+            }
 
             return .continue(description: "Tapped \"\(label)\" → revisited screen")
 
