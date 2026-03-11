@@ -127,7 +127,7 @@ enum ComponentDetector {
                         let belowRow = classifiedRows[belowIndex]
                         guard !belowRow.isEmpty else { continue }
 
-                        let belowTopY = belowRow.map { $0.point.tapY }.min() ?? 0
+                        let belowTopY = belowRow.map { $0.point.pageY }.min() ?? 0
                         guard belowTopY <= maxY else { break }
 
                         let canAbsorb = shouldAbsorb(
@@ -194,15 +194,21 @@ enum ComponentDetector {
         _ row: [ClassifiedElement],
         screenHeight: Double
     ) -> RowProperties {
-        let ys = row.map { $0.point.tapY }
-        let topY = ys.min() ?? 0
-        let bottomY = ys.max() ?? 0
-        let midY = (topY + bottomY) / 2
+        // Page-absolute Y for topY/bottomY — correct ordering and absorption
+        // after multi-viewport merges where elements carry scroll-adjusted pageY.
+        let pageYs = row.map { $0.point.pageY }
+        let topY = pageYs.min() ?? 0
+        let bottomY = pageYs.max() ?? 0
+
+        // Zone detection uses viewport-relative tapY because zones (nav bar top 12%,
+        // tab bar bottom 12%) are defined relative to the viewport, not the full page.
+        let viewportYs = row.map { $0.point.tapY }
+        let viewportMidY = ((viewportYs.min() ?? 0) + (viewportYs.max() ?? 0)) / 2
 
         let zone: ScreenZone
-        if screenHeight > 0 && midY < screenHeight * navBarZoneFraction {
+        if screenHeight > 0 && viewportMidY < screenHeight * navBarZoneFraction {
             zone = .navBar
-        } else if screenHeight > 0 && midY > screenHeight * (1 - tabBarZoneFraction) {
+        } else if screenHeight > 0 && viewportMidY > screenHeight * (1 - tabBarZoneFraction) {
             zone = .tabBar
         } else {
             zone = .content
@@ -316,7 +322,7 @@ enum ComponentDetector {
                 // Rebuild with merged elements for Y range and labeling, but
                 // preserve original tap target — absorbed elements must not
                 // change where the explorer taps.
-                let ys = mergedElements.map { $0.point.tapY }
+                let ys = mergedElements.map { $0.point.pageY }
                 let hasChevron = mergedElements.contains { element in
                     ElementClassifier.chevronCharacters.contains(
                         element.point.text.trimmingCharacters(in: .whitespaces)
@@ -388,7 +394,7 @@ enum ComponentDetector {
         elements: [ClassifiedElement],
         anchorElements: [ClassifiedElement]? = nil
     ) -> ScreenComponent {
-        let ys = elements.map { $0.point.tapY }
+        let ys = elements.map { $0.point.pageY }
         let topY = ys.min() ?? 0
         let bottomY = ys.max() ?? 0
 
@@ -459,8 +465,8 @@ enum ComponentDetector {
             elements: [element],
             tapTarget: isNav ? element.point : nil,
             hasChevron: element.hasChevronContext,
-            topY: element.point.tapY,
-            bottomY: element.point.tapY
+            topY: element.point.pageY,
+            bottomY: element.point.pageY
         )
     }
 
