@@ -52,10 +52,20 @@ extension BFSExplorer {
             return .lost
         }
 
-        // Check if we landed on the expected screen
-        if let expectedNode = graph.node(for: expectedFP),
-           StructuralFingerprint.areEquivalentTitleAware(expectedNode.elements, result.elements) {
-            return .verified
+        // Check if we landed on the expected screen.
+        // Two-tier check: Jaccard similarity first (fast, strict), then viewport containment
+        // (handles scrolled viewports where Jaccard fails because the viewport is a subset
+        // of the full calibrated element set).
+        if let expectedNode = graph.node(for: expectedFP) {
+            if StructuralFingerprint.areEquivalentTitleAware(expectedNode.elements, result.elements) {
+                return .verified
+            }
+            if StructuralFingerprint.viewportContainedIn(
+                viewport: result.elements, reference: expectedNode.elements
+            ) {
+                DebugLog.log("bfs", "backtrack-verify: viewport contained in expected screen (containment match)")
+                return .verified
+            }
         }
 
         let ocrTexts = result.elements.map { "\($0.text)@(\(Int($0.tapX)),\(Int($0.tapY)))" }
@@ -80,9 +90,11 @@ extension BFSExplorer {
                 describer: describer, input: input
             ) {
                 if let expectedNode = graph.node(for: expectedFP),
-                   StructuralFingerprint.areEquivalentTitleAware(
+                   (StructuralFingerprint.areEquivalentTitleAware(
                        expectedNode.elements, afterDismiss.elements
-                   ) {
+                   ) || StructuralFingerprint.viewportContainedIn(
+                       viewport: afterDismiss.elements, reference: expectedNode.elements
+                   )) {
                     DebugLog.log("bfs", "backtrack-verify: modal dismiss recovered to expected screen")
                     return .verified
                 }
@@ -107,9 +119,11 @@ extension BFSExplorer {
         }
 
         if let expectedNode = graph.node(for: expectedFP),
-           StructuralFingerprint.areEquivalentTitleAware(
+           (StructuralFingerprint.areEquivalentTitleAware(
                expectedNode.elements, retryResult.elements
-           ) {
+           ) || StructuralFingerprint.viewportContainedIn(
+               viewport: retryResult.elements, reference: expectedNode.elements
+           )) {
             DebugLog.log("bfs", "backtrack-verify: retry succeeded")
             return .verified
         }

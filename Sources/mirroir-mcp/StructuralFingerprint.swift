@@ -144,6 +144,23 @@ enum StructuralFingerprint {
         titleAwareSimilarity(lhs, rhs) >= similarityThreshold
     }
 
+    // MARK: - Viewport Containment
+
+    /// Check if a viewport's elements are mostly contained within a larger calibrated
+    /// element set. Standard Jaccard fails when comparing a single viewport (~40 elements)
+    /// against a full-page calibrated set (~90 elements) because the viewport is a subset,
+    /// not a match. Containment measures what fraction of the viewport's structural elements
+    /// appear in the reference set.
+    static func viewportContainedIn(
+        viewport: [TapPoint], reference: [TapPoint], threshold: Double = 0.6
+    ) -> Bool {
+        let viewportSet = extractStructural(from: viewport)
+        guard !viewportSet.isEmpty else { return false }
+        let referenceSet = extractStructural(from: reference)
+        let contained = viewportSet.intersection(referenceSet).count
+        return Double(contained) / Double(viewportSet.count) >= threshold
+    }
+
     // MARK: - Filtering
 
     /// Determine if an element is structural (stable across captures).
