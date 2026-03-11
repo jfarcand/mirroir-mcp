@@ -357,6 +357,10 @@ public enum TimingConstants {
     /// in page-absolute coordinate space.
     public static let scrollDedupPageYTolerance: Double = 30.0
 
+    /// Minimum scroll offset (pt) to accept from anchor or content detection.
+    /// Offsets below this threshold are treated as OCR jitter, not real scrolling.
+    public static let scrollMinOffsetThreshold: Double = 20.0
+
     // MARK: - Exploration Budget
 
     /// Maximum DFS depth before forcing backtrack.

@@ -102,26 +102,51 @@ enum CalibrationScroller {
             }
 
             // Compute scroll offset using a cascade of strategies:
-            // 1. Fixed anchors (tab/nav bar) — most reliable when present
+            // 1. Fixed anchors with non-zero offset (e.g. collapsing header)
             // 2. Content element matching — median of Y deltas from overlapping elements
             // 3. Swipe distance estimate — fallback when no overlap detected
+            //
+            // Anchor offset 0 means pinned elements (tab bar) didn't move, which is
+            // expected — it tells us nothing about how far the content scrolled.
+            // Content matching is the primary strategy for measuring scroll distance.
             let viewportOffset: Double
-            if let anchorResult = ScrollAnchorDetector.computeOffset(
+            let anchorResult = ScrollAnchorDetector.computeOffset(
                 previous: previousElements, current: result.elements,
                 windowHeight: windowHeight, minAnchors: minAnchors
-            ) {
-                viewportOffset = anchorResult.scrollOffset
-            } else if let contentResult = ScrollAnchorDetector.computeContentOffset(
-                previous: previousElements, current: result.elements
-            ) {
-                viewportOffset = contentResult.scrollOffset
+            )
+            let contentResult = ScrollAnchorDetector.computeContentOffset(
+                previous: previousElements, current: result.elements,
+                windowHeight: windowHeight
+            )
+            let swipeEstimate = scrollFromY - scrollToY
+
+            let minOffset = EnvConfig.scrollMinOffsetThreshold
+
+            if let anchor = anchorResult, anchor.scrollOffset > minOffset {
+                viewportOffset = anchor.scrollOffset
+                DebugLog.persist("ScrollOffset", "viewport \(scrollCount): anchor=\(Int(anchor.scrollOffset)) anchors=\(anchor.anchorCount)")
+            } else if let content = contentResult, content.scrollOffset > minOffset {
+                viewportOffset = content.scrollOffset
+                DebugLog.persist("ScrollOffset", "viewport \(scrollCount): content=\(Int(content.scrollOffset)) matches=\(content.anchorCount)")
             } else {
-                viewportOffset = scrollFromY - scrollToY
+                viewportOffset = swipeEstimate
+                DebugLog.persist("ScrollOffset", "viewport \(scrollCount): fallback=\(Int(swipeEstimate)) anchor=\(anchorResult.map { Int($0.scrollOffset) } ?? -1) content=\(contentResult.map { Int($0.scrollOffset) } ?? -1)")
             }
 
             cumulativeOffset += viewportOffset
+
+            // Filter stationary elements (status bar, tab bar) from non-first viewports.
+            // Viewport 0 already captured all zones; subsequent viewports only contribute
+            // content-zone elements. Stationary elements get wrong pageY (shifted by
+            // cumulativeOffset) and would survive dedup, creating duplicates.
+            let contentTop = windowHeight * ComponentDetector.navBarZoneFraction
+            let contentBottom = windowHeight * (1 - ComponentDetector.tabBarZoneFraction)
+            let contentElements = result.elements.filter { el in
+                el.tapY > contentTop && el.tapY < contentBottom
+            }
+
             allElements = OverlapDeduplicator.merge(
-                accumulated: allElements, newViewport: result.elements,
+                accumulated: allElements, newViewport: contentElements,
                 cumulativeOffset: cumulativeOffset,
                 viewportOffset: viewportOffset,
                 windowHeight: windowHeight,

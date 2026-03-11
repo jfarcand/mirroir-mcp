@@ -309,6 +309,11 @@ extension EnvConfig {
         readDouble("scrollDedupPageYTolerance", default: TimingConstants.scrollDedupPageYTolerance)
     }
 
+    /// Minimum scroll offset (pt) to accept from anchor or content detection.
+    public static var scrollMinOffsetThreshold: Double {
+        readDouble("scrollMinOffsetThreshold", default: TimingConstants.scrollMinOffsetThreshold)
+    }
+
     // MARK: - Keyboard Layout
 
     /// iPhone keyboard layout name for character substitution.

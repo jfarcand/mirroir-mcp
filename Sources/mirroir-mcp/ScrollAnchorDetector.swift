@@ -64,28 +64,38 @@ enum ScrollAnchorDetector {
     }
 
     /// Find matching anchor elements between two viewports.
-    /// Only considers elements in the top and bottom anchor zones.
+    /// Only considers elements in the top and bottom anchor zones, and matches
+    /// elements within the SAME zone to avoid cross-zone false matches
+    /// (e.g. "Résumé" page title in top zone matching "Résumé" tab bar in bottom zone).
     static func findAnchors(
         previous: [TapPoint], current: [TapPoint], windowHeight: Double
     ) -> [AnchorMatch] {
         let topZone = windowHeight * topAnchorFraction
         let bottomZone = windowHeight * bottomAnchorFraction
 
-        // Build a lookup for current viewport anchors by text
-        var currentByText: [String: TapPoint] = [:]
+        // Build per-zone lookups for current viewport anchors
+        var currentTop: [String: TapPoint] = [:]
+        var currentBottom: [String: TapPoint] = [:]
         for el in current {
-            guard isInAnchorZone(y: el.tapY, topZone: topZone, bottomZone: bottomZone) else {
-                continue
+            if el.tapY <= topZone {
+                currentTop[el.text] = el
+            } else if el.tapY >= bottomZone {
+                currentBottom[el.text] = el
             }
-            currentByText[el.text] = el
         }
 
         var matches: [AnchorMatch] = []
         for el in previous {
-            guard isInAnchorZone(y: el.tapY, topZone: topZone, bottomZone: bottomZone) else {
-                continue
+            // Match within the same zone only
+            let lookup: [String: TapPoint]?
+            if el.tapY <= topZone {
+                lookup = currentTop
+            } else if el.tapY >= bottomZone {
+                lookup = currentBottom
+            } else {
+                lookup = nil
             }
-            if let currentEl = currentByText[el.text] {
+            if let currentEl = lookup?[el.text] {
                 matches.append(AnchorMatch(
                     text: el.text,
                     previousY: el.tapY,
@@ -112,31 +122,40 @@ enum ScrollAnchorDetector {
     /// Compute scroll offset using content elements visible in both viewports.
     ///
     /// Unlike `computeOffset()` which uses fixed anchors (tab/nav bar),
-    /// this matches ALL scrolling content elements by (text, nearX) across
-    /// the full viewport. Robust to OCR jitter via median + outlier filtering.
+    /// this matches mid-screen content elements by (text, nearX). Elements
+    /// in anchor zones (top/bottom of viewport) are excluded because stationary
+    /// elements (tab bar, nav bar) produce zero-delta matches that dominate the
+    /// median and mask the actual content scroll distance.
     ///
     /// - Parameters:
     ///   - previous: Elements from the previous viewport.
     ///   - current: Elements from the current viewport.
+    ///   - windowHeight: Height of the target window for zone filtering.
     ///   - xTolerance: Maximum X distance for a match.
     ///   - outlierThreshold: Maximum deviation from median to keep a delta.
     ///   - minMatches: Minimum matches required for a valid result.
     /// - Returns: The offset result, or nil if too few matches.
     static func computeContentOffset(
         previous: [TapPoint], current: [TapPoint],
+        windowHeight: Double = 0,
         xTolerance: Double = EnvConfig.scrollContentMatchXTolerance,
         outlierThreshold: Double = EnvConfig.scrollContentMatchOutlierThreshold,
         minMatches: Int = EnvConfig.scrollContentMatchMinCount
     ) -> OffsetResult? {
-        // Build a spatial index: text → [(x, y)] for all previous elements
+        // Exclude anchor zones (nav bar top, tab bar bottom) to avoid stationary
+        // elements producing zero-delta matches that overwhelm the median.
+        let topZone = windowHeight > 0 ? windowHeight * topAnchorFraction : 0
+        let bottomZone = windowHeight > 0 ? windowHeight * bottomAnchorFraction : Double.infinity
+
+        // Build a spatial index: text → [(x, y)] for previous content elements
         var prevIndex: [String: [(x: Double, y: Double)]] = [:]
-        for el in previous {
+        for el in previous where el.tapY > topZone && el.tapY < bottomZone {
             prevIndex[el.text, default: []].append((x: el.tapX, y: el.tapY))
         }
 
-        // Find matching elements across viewports
+        // Find matching content elements across viewports
         var deltas: [Double] = []
-        for el in current {
+        for el in current where el.tapY > topZone && el.tapY < bottomZone {
             guard let candidates = prevIndex[el.text] else { continue }
             // Find the closest X match
             if let best = candidates.min(by: { abs($0.x - el.tapX) < abs($1.x - el.tapX) }),
