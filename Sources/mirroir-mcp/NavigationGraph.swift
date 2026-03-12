@@ -461,6 +461,13 @@ final class NavigationGraph: @unchecked Sendable {
         return breadthLabels.contains(label)
     }
 
+    /// The set of labels marked globally visited (breadth_navigation items).
+    var globalVisitedLabels: Set<String> {
+        lock.lock()
+        defer { lock.unlock() }
+        return globalVisited
+    }
+
     /// Mark a breadth_navigation component as globally visited across all screens.
     func markGloballyVisited(label: String) {
         lock.lock()

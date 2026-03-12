@@ -188,8 +188,9 @@ extension BFSExplorer {
     // MARK: - Plan Coordinate Resolution
 
     /// Resolve the next unvisited plan item against the current viewport's OCR elements.
-    /// Uses displayLabel matching to find fresh coordinates. If the item isn't visible,
-    /// scrolls to reveal it. Skips items that can't be found or should be skipped.
+    /// Two-pass approach: first try all items against the viewport (no scrolling),
+    /// then try scrolling to find unresolved items. This prevents high-score below-fold
+    /// items from blocking lower-score viewport-visible items.
     func resolveNextPlanItem<S: ExplorationStrategy>(
         currentFP: String,
         viewportElements: [TapPoint],
@@ -197,53 +198,62 @@ extension BFSExplorer {
         input: InputProviding,
         strategy: S.Type
     ) -> RankedElement? {
+        guard let plan = graph.screenPlan(for: currentFP) else { return nil }
+        let visited = graph.node(for: currentFP)?.visitedElements ?? []
+        let globalVisited = graph.globalVisitedLabels
+
+        // Collect unvisited, non-skipped plan items
+        var candidates: [RankedElement] = []
+        for item in plan {
+            if visited.contains(item.displayLabel) || globalVisited.contains(item.displayLabel) {
+                continue
+            }
+            if strategy.shouldSkip(elementText: item.point.text, budget: budget) {
+                graph.markElementVisited(fingerprint: currentFP, elementText: item.displayLabel)
+                continue
+            }
+            candidates.append(item)
+        }
+
+        // Pass 1: Try each candidate against the current viewport (no scrolling).
+        for candidate in candidates {
+            let resolution = PlanCoordinateResolver.resolve(
+                planItem: candidate, viewportElements: viewportElements
+            )
+            if case .found(let freshPoint) = resolution {
+                return PlanCoordinateResolver.withFreshCoordinates(
+                    planItem: candidate, freshPoint: freshPoint
+                )
+            }
+        }
+
+        // Pass 2: No candidates visible in viewport. Try scrolling to reveal them.
         var scrollAttempts = 0
         let maxScrollAttempts = budget.scrollLimit
 
-        while let ranked = graph.nextPlannedElement(for: currentFP) {
-            if strategy.shouldSkip(elementText: ranked.point.text, budget: budget) {
-                graph.markElementVisited(fingerprint: currentFP, elementText: ranked.displayLabel)
-                continue
+        for candidate in candidates {
+            guard scrollAttempts < maxScrollAttempts else {
+                DebugLog.log("bfs", "resolve: scroll budget exhausted (\(scrollAttempts) attempts), " +
+                    "\(candidates.count - candidates.firstIndex(where: { $0.displayLabel == candidate.displayLabel })!) items deferred")
+                return nil
             }
 
-            // Try resolving against current viewport
-            let resolution = PlanCoordinateResolver.resolve(
-                planItem: ranked, viewportElements: viewportElements
-            )
-
-            switch resolution {
-            case .found(let freshPoint):
-                return PlanCoordinateResolver.withFreshCoordinates(
-                    planItem: ranked, freshPoint: freshPoint
+            if let freshElements = scrollToReveal(input: input, describer: describer) {
+                scrollAttempts += 1
+                let retryResolution = PlanCoordinateResolver.resolve(
+                    planItem: candidate, viewportElements: freshElements
                 )
-
-            case .needsScroll:
-                // Element not in current viewport — try scrolling to reveal it.
-                // When scroll budget is exhausted, stop without consuming the item.
-                // The caller's performScrollIfAvailable will scroll and rebuild the plan,
-                // giving this item another chance once the viewport changes.
-                guard scrollAttempts < maxScrollAttempts else {
-                    DebugLog.log("bfs", "resolve: deferring \"\(ranked.displayLabel)\" — " +
-                        "scroll budget exhausted (\(scrollAttempts) attempts)")
-                    return nil
-                }
-
-                if let freshElements = scrollToReveal(input: input, describer: describer) {
-                    scrollAttempts += 1
-                    let retryResolution = PlanCoordinateResolver.resolve(
-                        planItem: ranked, viewportElements: freshElements
+                if case .found(let freshPoint) = retryResolution {
+                    return PlanCoordinateResolver.withFreshCoordinates(
+                        planItem: candidate, freshPoint: freshPoint
                     )
-                    if case .found(let freshPoint) = retryResolution {
-                        return PlanCoordinateResolver.withFreshCoordinates(
-                            planItem: ranked, freshPoint: freshPoint
-                        )
-                    }
                 }
-                // Still not found after scroll — skip this item, try next
-                DebugLog.log("bfs", "resolve: skip \"\(ranked.displayLabel)\" — not found after scroll")
-                graph.markElementVisited(fingerprint: currentFP, elementText: ranked.displayLabel)
             }
+            // Not found after scroll — mark visited and try next
+            DebugLog.log("bfs", "resolve: skip \"\(candidate.displayLabel)\" — not found after scroll")
+            graph.markElementVisited(fingerprint: currentFP, elementText: candidate.displayLabel)
         }
+
         return nil
     }
 

@@ -24,11 +24,13 @@ final class BFSExplorerTests: XCTestCase {
 
     private func makeBudget(
         maxDepth: Int = 6, maxScreens: Int = 30, maxTime: Int = 300,
-        maxActions: Int = 5, scrollLimit: Int = 0, skipPatterns: [String] = []
+        maxActions: Int = 5, scrollLimit: Int = 0, calibrationScrollLimit: Int = 0,
+        skipPatterns: [String] = []
     ) -> ExplorationBudget {
         ExplorationBudget(
             maxDepth: maxDepth, maxScreens: maxScreens, maxTimeSeconds: maxTime,
             maxActionsPerScreen: maxActions, scrollLimit: scrollLimit,
+            calibrationScrollLimit: calibrationScrollLimit,
             skipPatterns: skipPatterns
         )
     }
