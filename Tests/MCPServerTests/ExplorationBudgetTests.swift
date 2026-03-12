@@ -19,6 +19,7 @@ final class ExplorationBudgetTests: XCTestCase {
         XCTAssertEqual(budget.maxTimeSeconds, 300)
         XCTAssertEqual(budget.maxActionsPerScreen, 5)
         XCTAssertEqual(budget.scrollLimit, 3)
+        XCTAssertEqual(budget.calibrationScrollLimit, 15)
         XCTAssertFalse(budget.skipPatterns.isEmpty, "Default budget includes built-in safety skip patterns")
     }
 
@@ -62,6 +63,38 @@ final class ExplorationBudgetTests: XCTestCase {
         XCTAssertTrue(budget.isExhausted(depth: 3, screenCount: 5, elapsedSeconds: 30))
         XCTAssertTrue(budget.isExhausted(depth: 1, screenCount: 10, elapsedSeconds: 30))
         XCTAssertTrue(budget.isExhausted(depth: 1, screenCount: 5, elapsedSeconds: 60))
+    }
+
+    func testCustomCalibrationScrollLimit() {
+        let budget = ExplorationBudget(
+            maxDepth: 3,
+            maxScreens: 10,
+            maxTimeSeconds: 60,
+            maxActionsPerScreen: 3,
+            scrollLimit: 2,
+            calibrationScrollLimit: 20,
+            skipPatterns: []
+        )
+
+        XCTAssertEqual(budget.scrollLimit, 2)
+        XCTAssertEqual(budget.calibrationScrollLimit, 20)
+    }
+
+    func testCalibrationScrollLimitPassesThroughMerge() {
+        let budget = ExplorationBudget(
+            maxDepth: 3,
+            maxScreens: 10,
+            maxTimeSeconds: 60,
+            maxActionsPerScreen: 3,
+            scrollLimit: 2,
+            calibrationScrollLimit: 25,
+            skipPatterns: []
+        )
+
+        let merged = budget.mergedWith(["extra"])
+        XCTAssertEqual(merged.calibrationScrollLimit, 25,
+            "calibrationScrollLimit should pass through mergedWith()")
+        XCTAssertEqual(merged.scrollLimit, 2)
     }
 
     // MARK: - shouldSkipElement

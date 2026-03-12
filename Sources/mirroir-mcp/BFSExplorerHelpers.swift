@@ -316,7 +316,7 @@ extension BFSExplorer {
         if let bridge = bridge {
             DebugLog.log("bfs", "calibration: using CalibrationScroller")
             guard let scrollResult = describer.describeFullPage(
-                input: input, bridge: bridge, maxScrolls: budget.scrollLimit
+                input: input, bridge: bridge, maxScrolls: budget.calibrationScrollLimit
             ) else {
                 DebugLog.log("bfs", "calibration: CalibrationScroller returned nil")
                 return ScrollCollectionData(
@@ -358,7 +358,7 @@ extension BFSExplorer {
         var scrollsDone = 0
         var totalNovel = 0
 
-        for i in 0..<budget.scrollLimit {
+        for i in 0..<budget.calibrationScrollLimit {
             _ = input.swipe(
                 fromX: centerX, fromY: scrollFromY,
                 toX: centerX, toY: scrollToY, durationMs: 300

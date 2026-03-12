@@ -24,8 +24,13 @@ struct ExplorationBudget: Sendable {
     /// Maximum elements to try tapping on a single screen before moving on.
     let maxActionsPerScreen: Int
 
-    /// Maximum scroll attempts per screen to reveal hidden content.
+    /// Maximum scroll attempts per screen to reveal hidden content during exploration.
     let scrollLimit: Int
+
+    /// Maximum scroll attempts during calibration to discover below-fold content.
+    /// Separate from scrollLimit because calibration needs more scrolls to map the
+    /// full page, while exploration scrolls are just for finding a specific element.
+    let calibrationScrollLimit: Int
 
     /// Maximum scout taps on a single screen before forcing transition to dive phase.
     let maxScoutsPerScreen: Int
@@ -41,6 +46,7 @@ struct ExplorationBudget: Sendable {
         maxTimeSeconds: Int,
         maxActionsPerScreen: Int,
         scrollLimit: Int,
+        calibrationScrollLimit: Int = 15,
         maxScoutsPerScreen: Int = 8,
         skipPatterns: [String]
     ) {
@@ -49,6 +55,7 @@ struct ExplorationBudget: Sendable {
         self.maxTimeSeconds = maxTimeSeconds
         self.maxActionsPerScreen = maxActionsPerScreen
         self.scrollLimit = scrollLimit
+        self.calibrationScrollLimit = calibrationScrollLimit
         self.maxScoutsPerScreen = maxScoutsPerScreen
         self.skipPatterns = skipPatterns
     }
@@ -63,6 +70,7 @@ struct ExplorationBudget: Sendable {
         maxTimeSeconds: EnvConfig.explorationMaxTimeSeconds,
         maxActionsPerScreen: 5,
         scrollLimit: 3,
+        calibrationScrollLimit: 15,
         maxScoutsPerScreen: 8,
         skipPatterns: builtInSkipPatterns
     )
@@ -94,6 +102,7 @@ struct ExplorationBudget: Sendable {
             maxTimeSeconds: maxTimeSeconds,
             maxActionsPerScreen: maxActionsPerScreen,
             scrollLimit: scrollLimit,
+            calibrationScrollLimit: calibrationScrollLimit,
             maxScoutsPerScreen: maxScoutsPerScreen,
             skipPatterns: skipPatterns + additionalPatterns
         )
