@@ -380,4 +380,66 @@ final class BFSExplorerTests: XCTestCase {
         let explorer = BFSExplorer(session: session, budget: makeBudget())
         XCTAssertFalse(explorer.completed, "Explorer should not be completed initially")
     }
+
+    // MARK: - Scroll Budget: Deferred Items
+
+    func testResolveDefersItemsWhenScrollBudgetExhausted() {
+        // When resolveNextPlanItem's scroll budget is exhausted, items that need
+        // scrolling should NOT be marked as visited. They stay in the plan so
+        // performScrollIfAvailable can scroll and make them reachable later.
+        let session = setupSession(rootTexts: ["Visible", "Hidden1", "Hidden2"])
+        let budget = makeBudget(scrollLimit: 0)  // 0 = no resolve scrolls allowed
+        let explorer = makeExplorer(session: session, budget: budget)
+
+        let graph = session.currentGraph
+        let fp = graph.currentFingerprint
+
+        // Set a plan with 3 items: "Visible" at y=120, "Hidden1"/"Hidden2" at y=200/280
+        let plan = [
+            RankedElement(point: TapPoint(text: "Visible", tapX: 205, tapY: 120, confidence: 0.95),
+                          score: 5.0, reason: "test"),
+            RankedElement(point: TapPoint(text: "Hidden1", tapX: 205, tapY: 200, confidence: 0.95),
+                          score: 4.0, reason: "test"),
+            RankedElement(point: TapPoint(text: "Hidden2", tapX: 205, tapY: 280, confidence: 0.95),
+                          score: 3.0, reason: "test"),
+        ]
+        graph.setScreenPlan(for: fp, plan: plan)
+
+        // Viewport only contains "Visible" — "Hidden1"/"Hidden2" are below fold
+        let viewportElements = [
+            TapPoint(text: "Visible", tapX: 205, tapY: 120, confidence: 0.95)
+        ]
+
+        let describer = MockExplorerDescriber(screens: [])
+        let input = MockExplorerInput()
+
+        // First resolve: should find "Visible" (in viewport)
+        let result1 = explorer.resolveNextPlanItem(
+            currentFP: fp, viewportElements: viewportElements,
+            describer: describer, input: input, strategy: MobileAppStrategy.self
+        )
+        XCTAssertEqual(result1?.displayLabel, "Visible", "Should resolve 'Visible' from viewport")
+
+        // Mark "Visible" as visited (simulating what step() does after tapping)
+        graph.markElementVisited(fingerprint: fp, elementText: "Visible")
+
+        // Second resolve: "Hidden1" needs scroll, budget=0 → should return nil without consuming it
+        let result2 = explorer.resolveNextPlanItem(
+            currentFP: fp, viewportElements: viewportElements,
+            describer: describer, input: input, strategy: MobileAppStrategy.self
+        )
+        XCTAssertNil(result2, "Should return nil when next item needs scroll and budget exhausted")
+
+        // Verify "Hidden1" and "Hidden2" are NOT visited — they're still in the plan
+        let visited = graph.node(for: fp)?.visitedElements ?? []
+        XCTAssertFalse(visited.contains("Hidden1"),
+            "Hidden1 should NOT be marked visited when scroll budget exhausted")
+        XCTAssertFalse(visited.contains("Hidden2"),
+            "Hidden2 should NOT be marked visited — it was never even reached")
+
+        // Verify the plan still has unvisited items available
+        let nextItem = graph.nextPlannedElement(for: fp)
+        XCTAssertEqual(nextItem?.displayLabel, "Hidden1",
+            "Hidden1 should still be the next planned element")
+    }
 }

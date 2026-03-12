@@ -218,12 +218,14 @@ extension BFSExplorer {
                 )
 
             case .needsScroll:
-                // Element not in current viewport — try scrolling to reveal it
+                // Element not in current viewport — try scrolling to reveal it.
+                // When scroll budget is exhausted, stop without consuming the item.
+                // The caller's performScrollIfAvailable will scroll and rebuild the plan,
+                // giving this item another chance once the viewport changes.
                 guard scrollAttempts < maxScrollAttempts else {
-                    DebugLog.log("bfs", "resolve: skip \"\(ranked.displayLabel)\" — " +
+                    DebugLog.log("bfs", "resolve: deferring \"\(ranked.displayLabel)\" — " +
                         "scroll budget exhausted (\(scrollAttempts) attempts)")
-                    graph.markElementVisited(fingerprint: currentFP, elementText: ranked.displayLabel)
-                    continue
+                    return nil
                 }
 
                 if let freshElements = scrollToReveal(input: input, describer: describer) {
