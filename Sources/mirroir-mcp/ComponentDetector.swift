@@ -428,12 +428,14 @@ enum ComponentDetector {
     }
 
     /// Build a fallback single-element component when no definition matched.
-    /// Navigation-classified elements remain explorable so they aren't lost
-    /// when the heuristic matcher can't group them into a known component.
+    /// Only navigation elements WITH chevron context remain explorable — these are
+    /// likely real navigation targets that no definition covers yet. Elements without
+    /// chevron context (article fragments, CTAs, app recommendations) become non-explorable
+    /// to prevent wasted taps on noise.
     private static func buildFallbackComponent(
         element: ClassifiedElement
     ) -> ScreenComponent {
-        let isNav = element.role == .navigation
+        let isNav = element.role == .navigation && element.hasChevronContext
         let fallbackDef = ComponentDefinition(
             name: "unclassified",
             platform: "ios",

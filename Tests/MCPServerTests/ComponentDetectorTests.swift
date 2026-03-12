@@ -249,10 +249,10 @@ final class ComponentDetectorTests: XCTestCase {
 
     // MARK: - Fallback Behavior
 
-    func testUnmatchedNavigationElementCreatesFallbackComponent() {
-        // Use empty definitions so no definition can match — forces fallback path
+    func testUnmatchedNavigationWithChevronIsExplorable() {
+        // Navigation element WITH chevron context remains explorable in fallback
         let classified = [
-            classifiedNav("SomeUnusualElement", x: 200, y: 400),
+            classifiedNav("SomeUnusualElement", x: 200, y: 400, hasChevron: true),
         ]
 
         let components = ComponentDetector.detect(
@@ -264,13 +264,30 @@ final class ComponentDetectorTests: XCTestCase {
         XCTAssertFalse(components.isEmpty,
             "Unmatched elements should create fallback components")
         XCTAssertEqual(components[0].kind, "unclassified")
-
-        // Navigation elements preserve their explorability even when unmatched,
-        // preventing the component path from losing elements the legacy path would tap.
         XCTAssertNotNil(components[0].tapTarget,
-            "Unclassified nav fallback should be tappable")
+            "Unclassified nav+chevron fallback should be tappable")
         XCTAssertTrue(components[0].definition.exploration.explorable,
-            "Unclassified nav fallback should be explorable")
+            "Unclassified nav+chevron fallback should be explorable")
+    }
+
+    func testUnmatchedNavigationWithoutChevronNotExplorable() {
+        // Navigation element WITHOUT chevron context becomes non-explorable in fallback.
+        // Prevents article fragments, CTAs, and app recommendations from being tapped.
+        let classified = [
+            classifiedNav("Commencer", x: 200, y: 400, hasChevron: false),
+        ]
+
+        let components = ComponentDetector.detect(
+            classified: classified,
+            definitions: [],
+            screenHeight: screenHeight
+        )
+
+        XCTAssertEqual(components[0].kind, "unclassified")
+        XCTAssertNil(components[0].tapTarget,
+            "Unclassified nav WITHOUT chevron should not be tappable")
+        XCTAssertFalse(components[0].definition.exploration.explorable,
+            "Unclassified nav WITHOUT chevron should not be explorable")
     }
 
     func testUnmatchedInfoElementNotClickable() {
@@ -846,9 +863,9 @@ final class ComponentDetectorTests: XCTestCase {
             "Row without Q/q should not match text_pattern ^[Qq]$")
     }
 
-    func testUnclassifiedNavFallbackIsExplorable() {
-        // Navigation-role elements keep their explorability in fallback,
-        // so the component path doesn't lose elements the legacy path would tap.
+    func testUnclassifiedNavWithChevronFallbackIsExplorable() {
+        // Navigation+chevron elements keep their explorability in fallback,
+        // so the component path doesn't lose real navigation targets.
         let classified = [
             classifiedNav("SomeElement", x: 200, y: 400, hasChevron: true),
         ]
@@ -862,11 +879,11 @@ final class ComponentDetectorTests: XCTestCase {
         XCTAssertEqual(components.count, 1)
         XCTAssertEqual(components[0].kind, "unclassified")
         XCTAssertNotNil(components[0].tapTarget,
-            "Navigation fallback should have a tap target")
+            "Navigation+chevron fallback should have a tap target")
         XCTAssertTrue(components[0].definition.interaction.clickable,
-            "Navigation fallback should be clickable")
+            "Navigation+chevron fallback should be clickable")
         XCTAssertTrue(components[0].definition.exploration.explorable,
-            "Navigation fallback should be explorable")
+            "Navigation+chevron fallback should be explorable")
     }
 
     // MARK: - Post-Processing Absorption
