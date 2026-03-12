@@ -18,12 +18,18 @@ struct RankedElement: Sendable {
     /// Clean label derived from the component's LabelRule, free of OCR artifacts.
     /// Falls back to `point.text` when no component context is available.
     let displayLabel: String
+    /// Whether this element has breadth_navigation role (e.g. tab bar item).
+    /// Used by the BFS explorer to exempt these from safe-zone bottom margin checks,
+    /// since tab bar items sit at the very bottom of the screen by design.
+    let isBreadthNavigation: Bool
 
-    init(point: TapPoint, score: Double, reason: String, displayLabel: String? = nil) {
+    init(point: TapPoint, score: Double, reason: String, displayLabel: String? = nil,
+         isBreadthNavigation: Bool = false) {
         self.point = point
         self.score = score
         self.reason = reason
         self.displayLabel = displayLabel ?? point.text
+        self.isBreadthNavigation = isBreadthNavigation
     }
 }
 
@@ -139,7 +145,8 @@ enum ScreenPlanner {
                     scoutResults: scoutResults,
                     screenHeight: screenHeight
                 )
-                return RankedElement(point: tapTarget, score: score, reason: reason, displayLabel: component.displayLabel)
+                return RankedElement(point: tapTarget, score: score, reason: reason,
+                    displayLabel: component.displayLabel, isBreadthNavigation: isBreadth)
             }
             .sorted { $0.score != $1.score ? $0.score > $1.score : $0.point.tapY < $1.point.tapY }
     }

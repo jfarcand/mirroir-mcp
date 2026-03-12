@@ -82,7 +82,8 @@ enum PlanCoordinateResolver {
             point: freshPoint,
             score: planItem.score,
             reason: planItem.reason,
-            displayLabel: planItem.displayLabel
+            displayLabel: planItem.displayLabel,
+            isBreadthNavigation: planItem.isBreadthNavigation
         )
     }
 }

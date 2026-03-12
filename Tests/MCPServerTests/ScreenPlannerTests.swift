@@ -661,6 +661,62 @@ final class ScreenPlannerTests: XCTestCase {
         XCTAssertEqual(plan.count, 1,
             "breadth_navigation should be exempt from safe Y filter")
         XCTAssertEqual(plan[0].point.text, "Résumé")
+        XCTAssertTrue(plan[0].isBreadthNavigation,
+            "breadth_navigation should be flagged on RankedElement")
+    }
+
+    func testNonBreadthComponentNotFlaggedAsBreadth() {
+        // A normal navigational component should NOT have isBreadthNavigation set.
+        let disclosureDef = ComponentDefinition(
+            name: "table-row-disclosure",
+            platform: "ios",
+            description: "Settings row with chevron.",
+            visualPattern: [],
+            matchRules: ComponentMatchRules(
+                rowHasChevron: nil, chevronMode: .required, minElements: 1, maxElements: 6,
+                maxRowHeightPt: 60, hasNumericValue: nil, hasLongText: nil,
+                hasDismissButton: nil, zone: .content,
+                minConfidence: nil, excludeNumericOnly: nil, textPattern: nil
+            ),
+            interaction: ComponentInteraction(
+                clickable: true, clickTarget: .firstText,
+                clickResult: .pushesScreen, backAfterClick: true,
+                labelRule: .firstText
+            ),
+            exploration: ComponentExploration(
+                explorable: true,
+                role: .depthNavigation,
+                priority: .normal
+            ),
+            grouping: ComponentGrouping(
+                absorbsSameRow: false, absorbsBelowWithinPt: 0,
+                absorbCondition: .any, splitMode: .none
+            )
+        )
+
+        let component = ScreenComponent(
+            kind: "table-row-disclosure",
+            definition: disclosureDef,
+            elements: [
+                ClassifiedElement(
+                    point: TapPoint(text: "General", tapX: 100, tapY: 400, confidence: 0.9),
+                    role: .navigation, hasChevronContext: true
+                ),
+            ],
+            tapTarget: TapPoint(text: "General", tapX: 100, tapY: 400, confidence: 0.9),
+            hasChevron: true, topY: 400, bottomY: 400
+        )
+
+        let plan = ScreenPlanner.buildComponentPlan(
+            components: [component],
+            visitedElements: [],
+            scoutResults: [:],
+            screenHeight: screenHeight
+        )
+
+        XCTAssertEqual(plan.count, 1)
+        XCTAssertFalse(plan[0].isBreadthNavigation,
+            "Non-breadth component should not have isBreadthNavigation set")
     }
 
     func testBuildComponentPlanRespectsScoutResults() {

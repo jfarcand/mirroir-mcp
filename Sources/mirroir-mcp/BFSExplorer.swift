@@ -352,12 +352,16 @@ final class BFSExplorer: @unchecked Sendable {
 
         // Global safe zone stencil: reject taps outside the app content area.
         // Status bar (y < 80pt) and home indicator zone are never valid tap targets.
+        // Breadth navigation items (tab bar) are exempt from the bottom margin because
+        // they are designed to sit at the very bottom of the screen.
         let safeMinY = LandmarkPicker.statusBarMaxY
         let safeMaxY = windowSize.height * 0.95
-        if target.tapY < safeMinY || target.tapY > safeMaxY
+        let outsideBottom = !ranked.isBreadthNavigation && target.tapY > safeMaxY
+        if target.tapY < safeMinY || outsideBottom
             || target.tapX < 0 || target.tapX > windowSize.width {
             DebugLog.log("bfs", "STENCIL \"\(label)\" at (\(Int(target.tapX)),\(Int(target.tapY))) — " +
-                "outside safe zone (y: \(Int(safeMinY))–\(Int(safeMaxY)))")
+                "outside safe zone (y: \(Int(safeMinY))–\(Int(safeMaxY))" +
+                "\(ranked.isBreadthNavigation ? ", breadth-exempt" : ""))")
             graph.markElementVisited(fingerprint: currentFP, elementText: label)
             return .continue(description: "Skipped \"\(label)\" — outside safe zone")
         }
