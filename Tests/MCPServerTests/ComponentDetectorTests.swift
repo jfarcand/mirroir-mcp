@@ -1022,6 +1022,55 @@ final class ComponentDetectorTests: XCTestCase {
             "Info element should be absorbed with infoOrDecorationOnly condition")
     }
 
+    func testNoChevronRowsOnlyAbsorbsInfoRow() {
+        // Disclosure row at y=280 absorbs a non-chevron info row at y=330
+        let parent = makeAbsorbingComponent(
+            kind: "table-row-disclosure",
+            elements: [
+                classifiedNav("Activité", x: 100, y: 280, hasChevron: true),
+                classifiedDeco(">", x: 370, y: 280),
+            ],
+            absorbRange: 80,
+            condition: .noChevronRowsOnly
+        )
+        let child = makeSimpleComponent(
+            kind: "list-item",
+            elements: [classifiedInfo("12,4 km", x: 100, y: 330)]
+        )
+
+        let result = ComponentDetector.applyAbsorption([parent, child])
+
+        XCTAssertEqual(result.count, 1,
+            "Non-chevron row should be absorbed with noChevronRowsOnly condition")
+        XCTAssertEqual(result[0].elements.count, 3,
+            "Merged component should contain parent (2) + child (1) elements")
+    }
+
+    func testNoChevronRowsOnlyRejectsChevronRow() {
+        // Disclosure row at y=280 should NOT absorb another chevron row at y=330
+        let parent = makeAbsorbingComponent(
+            kind: "table-row-disclosure",
+            elements: [
+                classifiedNav("Activité", x: 100, y: 280, hasChevron: true),
+                classifiedDeco(">", x: 370, y: 280),
+            ],
+            absorbRange: 80,
+            condition: .noChevronRowsOnly
+        )
+        let chevronChild = makeSimpleComponent(
+            kind: "table-row-disclosure",
+            elements: [
+                classifiedNav("Bouger", x: 100, y: 330, hasChevron: true),
+                classifiedDeco(">", x: 370, y: 330),
+            ]
+        )
+
+        let result = ComponentDetector.applyAbsorption([parent, chevronChild])
+
+        XCTAssertEqual(result.count, 2,
+            "Chevron row should NOT be absorbed with noChevronRowsOnly condition")
+    }
+
     func testApplyAbsorptionNoAbsorbWhenRangeZero() {
         // Both components have absorbRange=0 — no absorption
         let a = makeSimpleComponent(

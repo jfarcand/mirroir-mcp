@@ -197,6 +197,10 @@ enum ExplorationPriority: String, Sendable {
 enum AbsorbCondition: String, Sendable {
     case any
     case infoOrDecorationOnly = "info_or_decoration_only"
+    /// Absorb only rows that do NOT contain a chevron character.
+    /// Used by table-row-disclosure to absorb sub-label rows (e.g. "12,4 km")
+    /// while keeping adjacent chevron rows as separate navigable components.
+    case noChevronRowsOnly = "no_chevron_rows_only"
 }
 
 /// Parses COMPONENT.md files: YAML front matter + markdown sections with key-value match rules.

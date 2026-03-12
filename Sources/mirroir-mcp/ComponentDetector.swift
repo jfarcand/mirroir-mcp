@@ -346,7 +346,7 @@ enum ComponentDetector {
     }
 
     /// Check whether a row of elements should be absorbed into a multi-row component.
-    private static func shouldAbsorb(
+    static func shouldAbsorb(
         _ row: [ClassifiedElement],
         condition: AbsorbCondition
     ) -> Bool {
@@ -355,6 +355,12 @@ enum ComponentDetector {
             return true
         case .infoOrDecorationOnly:
             return row.allSatisfy { $0.role == .info || $0.role == .decoration }
+        case .noChevronRowsOnly:
+            let hasChevron = row.contains { element in
+                let trimmed = element.point.text.trimmingCharacters(in: .whitespaces)
+                return ElementClassifier.chevronCharacters.contains(where: { trimmed.hasSuffix($0) })
+            }
+            return !hasChevron
         }
     }
 
