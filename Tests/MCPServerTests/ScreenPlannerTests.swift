@@ -230,6 +230,60 @@ final class ScreenPlannerTests: XCTestCase {
         }
     }
 
+    // MARK: - Deterministic Ordering
+
+    func testEqualScoreElementsSortedByYPosition() {
+        // Two elements with identical scoring signals — Y tiebreaker should apply
+        let classified = [
+            navElement("Beta", y: 500, hasChevron: true),
+            navElement("Alpha", y: 300, hasChevron: true),
+        ]
+
+        let plan = ScreenPlanner.buildPlan(
+            classified: classified,
+            visitedElements: [],
+            scoutResults: [:],
+            screenHeight: screenHeight
+        )
+
+        XCTAssertEqual(plan.count, 2)
+        XCTAssertEqual(plan[0].score, plan[1].score,
+            "Both elements should have equal scores for this test to be meaningful")
+        XCTAssertEqual(plan[0].point.text, "Alpha",
+            "Equal-score elements should be ordered by Y position (lower Y first)")
+        XCTAssertLessThan(plan[0].point.tapY, plan[1].point.tapY,
+            "First element should have lower Y than second")
+    }
+
+    func testEqualScoreComponentsSortedByYPosition() {
+        // Two disclosure rows with equal scores at different Y positions
+        let elements = [
+            TapPoint(text: "Beta", tapX: 100, tapY: 500, confidence: 0.9),
+            TapPoint(text: ">", tapX: 370, tapY: 500, confidence: 0.9),
+            TapPoint(text: "Alpha", tapX: 100, tapY: 300, confidence: 0.9),
+            TapPoint(text: ">", tapX: 370, tapY: 300, confidence: 0.9),
+        ]
+
+        let classified = ElementClassifier.classify(elements, screenHeight: screenHeight)
+        let components = ComponentDetector.detect(
+            classified: classified,
+            definitions: ComponentCatalog.definitions,
+            screenHeight: screenHeight
+        )
+        let plan = ScreenPlanner.buildComponentPlan(
+            components: components,
+            visitedElements: [],
+            scoutResults: [:],
+            screenHeight: screenHeight
+        )
+
+        XCTAssertEqual(plan.count, 2)
+        XCTAssertEqual(plan[0].score, plan[1].score,
+            "Both components should have equal scores for this test to be meaningful")
+        XCTAssertEqual(plan[0].point.text, "Alpha",
+            "Equal-score components should be ordered by Y position (lower Y first)")
+    }
+
     // MARK: - Edge Cases
 
     func testEmptyNavigationReturnsEmptyPlan() {

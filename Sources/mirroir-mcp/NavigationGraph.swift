@@ -494,8 +494,9 @@ final class NavigationGraph: @unchecked Sendable {
     // MARK: - Node Matching
 
     /// Find a node with similar structural elements using title-aware similarity.
+    /// Iterates in sorted key order for deterministic matching across runs.
     func findMatchingNode(elements: [TapPoint]) -> String? {
-        for (fp, node) in nodes {
+        for (fp, node) in nodes.sorted(by: { $0.key < $1.key }) {
             let sim = StructuralFingerprint.titleAwareSimilarity(elements, node.elements)
             if sim >= StructuralFingerprint.similarityThreshold {
                 return fp
@@ -507,11 +508,12 @@ final class NavigationGraph: @unchecked Sendable {
     /// Find a node matching the viewport using both Jaccard similarity and containment.
     /// Containment catches the case where a viewport (~40 elements) is a subset of a
     /// calibrated full-page set (~90 elements) — Jaccard fails because the union is large.
+    /// Iterates in sorted key order for deterministic matching across runs.
     func findMatchingNodeWithContainment(elements: [TapPoint]) -> String? {
         if let fp = findMatchingNode(elements: elements) {
             return fp
         }
-        for (fp, node) in nodes {
+        for (fp, node) in nodes.sorted(by: { $0.key < $1.key }) {
             if StructuralFingerprint.viewportContainedIn(
                 viewport: elements, reference: node.elements
             ) {
