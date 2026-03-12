@@ -12,6 +12,10 @@ import HelperLib
 /// and page-absolute Y for accurate overlap detection.
 enum OverlapDeduplicator {
 
+    /// Minimum text length for substring containment dedup. Elements shorter than
+    /// this are too likely to produce false positives (e.g. "On" ⊂ "Notifications").
+    static let substringMinLength = 5
+
     /// Build a composite dedup key from text and quantized X position.
     /// Elements with the same text at similar X positions are considered the same element,
     /// while elements with the same text at different X positions are kept separate
@@ -68,6 +72,20 @@ enum OverlapDeduplicator {
             var isDuplicate = false
             if let existingYs = existingByKey[key] {
                 isDuplicate = existingYs.contains { abs($0 - absoluteY) < pageYTolerance }
+            }
+
+            // Substring containment: if a short element's text appears inside a nearby
+            // longer element, it's a fragment from a different OCR backend or viewport.
+            // Example: YOLO detects "marche" while Vision detects "• Distance (marche et course)".
+            if !isDuplicate {
+                let trimmed = el.text.trimmingCharacters(in: .whitespaces)
+                if trimmed.count >= substringMinLength {
+                    isDuplicate = accumulated.contains { existing in
+                        abs(existing.pageY - absoluteY) < pageYTolerance
+                        && existing.text.count > trimmed.count
+                        && existing.text.localizedCaseInsensitiveContains(trimmed)
+                    }
+                }
             }
 
             // Additional fuzzy checks for non-exact strategies

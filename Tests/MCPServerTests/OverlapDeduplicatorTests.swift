@@ -234,6 +234,67 @@ final class OverlapDeduplicatorTests: XCTestCase {
         XCTAssertEqual(result[0].pageY, 700, accuracy: 0.01)
     }
 
+    // MARK: - Substring Containment Dedup
+
+    func testSubstringFragmentSuppressedByLongerElement() {
+        // "marche" is a substring of "• Distance (marche et course)"
+        // and should be suppressed when nearby in page-absolute Y.
+        let accumulated = [
+            TapPoint(text: "• Distance (marche et course)", tapX: 158, tapY: 565, confidence: 0.9, pageY: 565),
+        ]
+        let newViewport = [
+            tap("marche", x: 158, y: 165),  // Same X, after scroll offset
+        ]
+
+        let result = OverlapDeduplicator.merge(
+            accumulated: accumulated, newViewport: newViewport,
+            cumulativeOffset: 400, viewportOffset: 400,
+            windowHeight: windowHeight, strategy: .exact
+        )
+
+        XCTAssertEqual(result.count, 1,
+            "Substring fragment 'marche' should be suppressed by longer element")
+        XCTAssertEqual(result[0].text, "• Distance (marche et course)")
+    }
+
+    func testShortSubstringNotSuppressed() {
+        // "On" (2 chars) is too short for substring suppression — could match "Notifications"
+        let accumulated = [
+            TapPoint(text: "Notifications", tapX: 100, tapY: 300, confidence: 0.9, pageY: 300),
+        ]
+        let newViewport = [
+            tap("On", x: 350, y: 300),
+        ]
+
+        let result = OverlapDeduplicator.merge(
+            accumulated: accumulated, newViewport: newViewport,
+            cumulativeOffset: 0, viewportOffset: 0,
+            windowHeight: windowHeight, strategy: .exact
+        )
+
+        XCTAssertEqual(result.count, 2,
+            "Short text (< 5 chars) should not be suppressed by substring matching")
+    }
+
+    func testSubstringNotSuppressedWhenFarAway() {
+        // Same text substring but at very different Y positions — not a duplicate
+        let accumulated = [
+            TapPoint(text: "• Distance (marche et course)", tapX: 158, tapY: 100, confidence: 0.9, pageY: 100),
+        ]
+        let newViewport = [
+            tap("marche", x: 158, y: 200),  // pageY = 200 + 800 = 1000, far from 100
+        ]
+
+        let result = OverlapDeduplicator.merge(
+            accumulated: accumulated, newViewport: newViewport,
+            cumulativeOffset: 800, viewportOffset: 800,
+            windowHeight: windowHeight, strategy: .exact
+        )
+
+        XCTAssertEqual(result.count, 2,
+            "Substring at distant Y should not be suppressed")
+    }
+
     func testMergePageYUsedForSorting() {
         let accumulated = [
             TapPoint(text: "Header", tapX: 100, tapY: 100, confidence: 0.9, pageY: 100),
