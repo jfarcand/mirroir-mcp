@@ -60,9 +60,9 @@ final class BFSExplorerTests: XCTestCase {
 
         let root = makeScreen(["General", "Privacy"], img: "img0")
         let describer = MockExplorerDescriber(screens: [
-            root, makeScreen(["Version", "Build"], img: "imgA"),   // step1: tap General
-            root, makeScreen(["Location", "Tracking"], img: "imgB"), // step2: tap Privacy
-            root,                                                    // step3: done
+            root, makeScreen(["Version", "Build"], img: "imgA"), root,      // step1: tap General → backtrack verify
+            root, makeScreen(["Location", "Tracking"], img: "imgB"), root,  // step2: tap Privacy → backtrack verify
+            root,                                                           // step3: done
         ])
         let input = MockExplorerInput()
 
@@ -99,11 +99,10 @@ final class BFSExplorerTests: XCTestCase {
         let screenA = makeScreen(["SubA1"], img: "imgA")
         let screenB = makeScreen(["SubB1"], img: "imgB")
         let describer = MockExplorerDescriber(screens: [
-            root, screenA,                              // step1: tap ItemA
-            root, screenB,                              // step2: tap ItemB
-            root,                                       // step3: done with root
-            screenA,                                    // step4: navigate to ItemA
-            screenA, makeScreen(["DeepA"], img: "imgA1"), // step5: explore screenA
+            root, screenA, root,                          // step1: tap ItemA → backtrack verify
+            root, screenB, root,                          // step2: tap ItemB → backtrack verify
+            root,                                         // step3: done with root
+            screenA,                                      // step4: navigate to ItemA
         ])
         let input = MockExplorerInput()
 
@@ -135,10 +134,10 @@ final class BFSExplorerTests: XCTestCase {
         let childC = makeScreen(["Model"], img: "imgC")
 
         let describer = MockExplorerDescriber(screens: [
-            root, childA,    // step1: tap General
-            root, childB,    // step2: tap Privacy
-            root, childC,    // step3: tap About
-            root,            // step4: no more elements
+            root, childA, root,    // step1: tap General → backtrack verify
+            root, childB, root,    // step2: tap Privacy → backtrack verify
+            root, childC, root,    // step3: tap About → backtrack verify
+            root,                  // step4: no more elements
         ])
         let input = MockExplorerInput()
 
@@ -170,14 +169,14 @@ final class BFSExplorerTests: XCTestCase {
         let gen = makeScreen(["About"], img: "imgG")
         let about = makeScreen(["Model", "Version"], img: "imgA")
         let describer = MockExplorerDescriber(screens: [
-            root, gen,     // step1: root → tap General
-            root,          // step2: root done
-            gen,           // step3: navigate to General
-            gen, about,    // step4: explore General → tap About
-            gen,           // step5: General done
-            gen,           // step6: returning → tap back
-            gen,           // step7: navigate to About: tap General
-            about,         // step8: navigate to About: tap About
+            root, gen, root,      // step1: root → tap General → backtrack verify
+            root,                 // step2: root done
+            gen,                  // step3: navigate to General
+            gen, about, gen,      // step4: explore General → tap About → backtrack verify
+            gen,                  // step5: General done
+            gen,                  // step6: returning → tap back
+            gen,                  // step7: navigate to About: tap General
+            about,                // step8: navigate to About: tap About
         ])
         let input = MockExplorerInput()
 
@@ -199,12 +198,12 @@ final class BFSExplorerTests: XCTestCase {
         let root = makeScreen(["General"], img: "img0")
         let gen = makeScreen(["About"], img: "imgG")
         let describer = MockExplorerDescriber(screens: [
-            root, gen,                               // step1: root → tap General
-            root,                                    // step2: root done
-            gen,                                     // step3: navigate to General
-            gen, makeScreen(["Model"], img: "imgA"), // step4: explore General → tap About
-            gen,                                     // step5: General done
-            gen,                                     // step6: returning → tap back
+            root, gen, root,                                      // step1: root → tap General → backtrack verify
+            root,                                                 // step2: root done
+            gen,                                                  // step3: navigate to General
+            gen, makeScreen(["Model"], img: "imgA"), gen,          // step4: explore General → tap About → backtrack verify
+            gen,                                                  // step5: General done
+            gen,                                                  // step6: returning → tap back
         ])
         let input = MockExplorerInput()
 

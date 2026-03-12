@@ -10,7 +10,10 @@ import HelperLib
 /// Result of a screen calibration attempt.
 enum CalibrationResult {
     /// Calibration succeeded and plan was built.
-    case ok
+    /// `viewportMayHaveShifted` is true when calibration scrolled and discovered
+    /// novel content — the caller should re-OCR to get fresh viewport coordinates
+    /// because the scroll-back may not land at exactly the same position.
+    case ok(viewportMayHaveShifted: Bool)
     /// Calibration validation failed (strict mode, too many unclassified elements).
     case failed(String)
 }
@@ -103,8 +106,10 @@ extension BFSExplorer {
         let allElements = graph.node(for: fingerprint)?.elements ?? []
         guard !allElements.isEmpty else {
             DebugLog.log("bfs", "calibration: no elements after scroll — skipping detection")
-            return .ok
+            return .ok(viewportMayHaveShifted: false)
         }
+
+        let scrolledWithNovelContent = scrollData.scrollCount > 0 && scrollData.novelCount > 0
 
         let classified = ElementClassifier.classify(
             allElements, budget: budget, screenHeight: windowSize.height
@@ -117,7 +122,7 @@ extension BFSExplorer {
                 scoutResults: [:], screenHeight: windowSize.height)
             graph.setScreenPlan(for: fingerprint, plan: plan)
             storeSummary(scrollData: scrollData, fingerprint: fingerprint)
-            return .ok
+            return .ok(viewportMayHaveShifted: scrolledWithNovelContent)
         }
 
         let rawComponents = classifier?.classify(
@@ -177,7 +182,7 @@ extension BFSExplorer {
             unclassifiedCount: validation.unclassifiedCount,
             validationPassed: true, validationReport: validation.report)
 
-        return .ok
+        return .ok(viewportMayHaveShifted: scrolledWithNovelContent)
     }
 
     // MARK: - Plan Coordinate Resolution

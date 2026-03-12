@@ -276,15 +276,17 @@ final class BFSExplorer: @unchecked Sendable {
                 fingerprint: currentFP, describer: describer, input: input
             )
             calibratedScreens.insert(currentFP)
-            if case .failed(let reason) = calResult {
+            switch calResult {
+            case .failed(let reason):
                 lock.lock(); isFinished = true; lock.unlock()
                 return .paused(reason: reason)
-            }
-            // Re-OCR after calibration: the scroller scrolls down then back up,
-            // so the viewport may differ from the pre-calibration capture.
-            // Fresh elements ensure the resolver doesn't scroll unnecessarily.
-            if let fresh = describer.describe(skipOCR: false) {
-                viewportElements = fresh.elements
+            case .ok(let viewportMayHaveShifted):
+                // Re-OCR only when calibration scrolled and found novel content.
+                // The scroll-back may not land at exactly the original position,
+                // so fresh elements prevent the resolver from scrolling unnecessarily.
+                if viewportMayHaveShifted, let fresh = describer.describe(skipOCR: false) {
+                    viewportElements = fresh.elements
+                }
             }
         }
 
