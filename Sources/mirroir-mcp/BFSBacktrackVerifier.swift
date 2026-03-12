@@ -75,11 +75,16 @@ extension BFSExplorer {
         // Recovery 1: Try dismissing a modal (X, Close, Done in top 30% zone).
         // App Store modal sheets place the X at ~25% height, so 20% is too narrow.
         let topZone = windowSize.height * 0.30
+        let rightHalf = windowSize.width * 0.5
         if let dismissButton = result.elements.first(where: { el in
-            el.tapY <= topZone
-            && Self.modalDismissPatterns.contains(
-                el.text.trimmingCharacters(in: .whitespaces).lowercased()
-            )
+            guard el.tapY <= topZone else { return false }
+            let text = el.text.trimmingCharacters(in: .whitespaces).lowercased()
+            // Text-based dismiss patterns (X, Close, Done, etc.)
+            if Self.modalDismissPatterns.contains(text) { return true }
+            // YOLO detects unlabeled icons as "icon". In the top-right of a modal
+            // sheet, this is typically the X dismiss button (e.g. Health article modals).
+            if text == "icon" && el.tapX >= rightHalf { return true }
+            return false
         }) {
             DebugLog.log("bfs", "backtrack-verify: tapping dismiss \"\(dismissButton.text)\" " +
                 "at (\(Int(dismissButton.tapX)),\(Int(dismissButton.tapY)))")

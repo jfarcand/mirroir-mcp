@@ -383,6 +383,80 @@ final class BFSExplorerTests: XCTestCase {
         XCTAssertFalse(explorer.completed, "Explorer should not be completed initially")
     }
 
+    // MARK: - Backtrack: YOLO Icon Dismiss
+
+    func testBacktrackDismissesModalWithYOLOIcon() {
+        // When a modal has no back chevron but has a YOLO "icon" in the top-right
+        // (common in iOS Health article modals), the backtrack verifier should
+        // recognize it as a dismiss button and tap it.
+        let session = setupSession(rootTexts: ["General", "Privacy"])
+        let explorer = makeExplorer(session: session, budget: makeBudget())
+        let rootFP = session.currentGraph.rootFingerprint
+
+        // Modal screen: article with YOLO icon dismiss button at top-right.
+        // "icon" is what YOLO reports for unlabeled UI icons (like X dismiss buttons).
+        let modalElements = [
+            TapPoint(text: "Article sur le sommeil", tapX: 210, tapY: 137, confidence: 0.95),
+            TapPoint(text: "icon", tapX: 350, tapY: 85, confidence: 0.90),
+        ]
+        let modalScreen = ScreenDescriber.DescribeResult(
+            elements: modalElements, screenshotBase64: "modal"
+        )
+
+        // Parent screen after dismiss — must match root fingerprint's elements
+        let parentScreen = makeScreen(["General", "Privacy"], img: "parent")
+
+        // Describer sequence: modal (OCR after back), parent (OCR after dismiss)
+        let describer = MockExplorerDescriber(screens: [modalScreen, parentScreen])
+        let input = MockExplorerInput()
+
+        let result = explorer.verifyBacktrack(
+            expectedFP: rootFP,
+            afterElements: modalElements,
+            describer: describer,
+            input: input
+        )
+
+        if case .verified = result { /* expected */ }
+        else { XCTFail("Expected .verified after YOLO icon dismiss, got \(result)") }
+
+        // Verify the dismiss tap was at the icon's coordinates
+        let hasDismissTap = input.taps.contains { Int($0.x) == 350 && Int($0.y) == 85 }
+        XCTAssertTrue(hasDismissTap, "Should have tapped the icon at (350, 85)")
+    }
+
+    func testBacktrackIgnoresYOLOIconOnLeftSide() {
+        // A YOLO "icon" in the top-LEFT should NOT be treated as a dismiss button.
+        // Only top-RIGHT icons (right half of screen) are candidates for dismiss.
+        let session = setupSession(rootTexts: ["General", "Privacy"])
+        let explorer = makeExplorer(session: session, budget: makeBudget())
+        let rootFP = session.currentGraph.rootFingerprint
+
+        // Modal screen with icon on the LEFT side (x=40 is < 205 = width/2)
+        let modalElements = [
+            TapPoint(text: "Some Title", tapX: 210, tapY: 137, confidence: 0.95),
+            TapPoint(text: "icon", tapX: 40, tapY: 85, confidence: 0.90),
+        ]
+        let modalScreen = ScreenDescriber.DescribeResult(
+            elements: modalElements, screenshotBase64: "modal"
+        )
+
+        // After failed dismiss recovery, verifier retries back button + checks known screens.
+        // Return the modal again (still stuck) so it falls through to .lost.
+        let describer = MockExplorerDescriber(screens: [modalScreen, modalScreen, modalScreen])
+        let input = MockExplorerInput()
+
+        let result = explorer.verifyBacktrack(
+            expectedFP: rootFP,
+            afterElements: modalElements,
+            describer: describer,
+            input: input
+        )
+
+        if case .lost = result { /* expected — icon on left side not treated as dismiss */ }
+        else { XCTFail("Expected .lost when icon is on left side, got \(result)") }
+    }
+
     // MARK: - Scroll Budget: Deferred Items
 
     func testResolveDefersItemsWhenScrollBudgetExhausted() {
