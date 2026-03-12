@@ -435,7 +435,7 @@ enum ComponentDetector {
     private static func buildFallbackComponent(
         element: ClassifiedElement
     ) -> ScreenComponent {
-        let isNav = element.role == .navigation && element.hasChevronContext
+        let isNav = element.role == .navigation
         let fallbackDef = ComponentDefinition(
             name: "unclassified",
             platform: "ios",
