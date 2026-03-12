@@ -207,7 +207,49 @@ enum AbsorbCondition: String, Sendable {
 /// Follows the same pattern as SkillMdParser for front matter extraction.
 enum ComponentSkillParser {
 
+    // MARK: - Known Keys (for validation)
+
+    /// Valid keys per section. Used by `parseValidated` to reject typos.
+    static let knownKeys: [String: Set<String>] = [
+        "Match Rules": [
+            "row_has_chevron", "chevron_mode", "min_elements", "max_elements",
+            "max_row_height_pt", "has_numeric_value", "has_long_text",
+            "has_dismiss_button", "zone", "min_confidence", "exclude_numeric_only",
+            "text_pattern",
+        ],
+        "Interaction": [
+            "clickable", "click_target", "click_result", "back_after_click", "label_rule",
+        ],
+        "Exploration": ["explorable", "role", "priority"],
+        "Grouping": [
+            "absorbs_same_row", "absorbs_below_within_pt", "absorb_condition", "split_mode",
+        ],
+    ]
+
+    /// Parse with validation. Returns nil and logs an error if the definition
+    /// contains unknown keys in any section (catches typos like "has_dismiss_icon").
+    static func parseValidated(content: String, fallbackName: String) -> ComponentDefinition? {
+        let body = extractBody(content: content)
+        let sections = extractSections(from: body)
+        let name = extractValue(from: extractFrontMatter(content: content), key: "name")
+            ?? fallbackName
+
+        for (section, allowed) in knownKeys {
+            guard let text = sections[section] else { continue }
+            let unknown = Set(extractKeyValues(from: text).keys).subtracting(allowed)
+            if !unknown.isEmpty {
+                DebugLog.log("components",
+                    "REJECTED \"\(name)\": unknown keys in \(section): " +
+                    "\(unknown.sorted().joined(separator: ", "))")
+                return nil
+            }
+        }
+
+        return parse(content: content, fallbackName: fallbackName)
+    }
+
     /// Parse a COMPONENT.md file's content into a ComponentDefinition.
+    /// Does NOT validate keys — use `parseValidated` for strict loading.
     ///
     /// - Parameters:
     ///   - content: The raw markdown string content of the file.

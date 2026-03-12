@@ -69,9 +69,11 @@ extension MirroirMCP {
                 }
 
                 let stem = fileURL.deletingPathExtension().lastPathComponent
-                let definition = ComponentSkillParser.parse(
+                guard let definition = ComponentSkillParser.parseValidated(
                     content: content, fallbackName: stem
-                )
+                ) else {
+                    return .error("Component '\(stem)' has invalid keys — check DebugLog for details")
+                }
 
                 // Verify target is running
                 guard bridge.findProcess() != nil else {

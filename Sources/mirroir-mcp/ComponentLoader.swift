@@ -65,7 +65,11 @@ enum ComponentLoader {
                     continue
                 }
 
-                let definition = ComponentSkillParser.parse(content: content, fallbackName: stem)
+                guard let definition = ComponentSkillParser.parseValidated(
+                    content: content, fallbackName: stem
+                ) else {
+                    continue
+                }
                 seen.insert(definition.name)
                 definitions.append(definition)
             }

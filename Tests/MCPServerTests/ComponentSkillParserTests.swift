@@ -603,6 +603,83 @@ final class ComponentSkillParserTests: XCTestCase {
             "Both fields should be parsed independently")
     }
 
+    // MARK: - Unknown Key Validation
+
+    func testParseValidatedRejectsUnknownMatchRuleKeys() {
+        let content = """
+            ---
+            name: bad-component
+            ---
+
+            # Bad Component
+
+            ## Match Rules
+
+            - has_dismiss_icon: true
+            - zone: content
+            """
+
+        let result = ComponentSkillParser.parseValidated(
+            content: content, fallbackName: "bad"
+        )
+
+        XCTAssertNil(result,
+            "parseValidated should reject definitions with unknown keys like 'has_dismiss_icon'")
+    }
+
+    func testParseValidatedRejectsUnknownInteractionKeys() {
+        let content = """
+            ---
+            name: bad-interaction
+            ---
+
+            # Bad Interaction
+
+            ## Interaction
+
+            - clickable: true
+            - auto_dismiss: true
+            """
+
+        let result = ComponentSkillParser.parseValidated(
+            content: content, fallbackName: "bad"
+        )
+
+        XCTAssertNil(result,
+            "parseValidated should reject unknown interaction keys")
+    }
+
+    func testParseValidatedAcceptsValidKeys() {
+        let content = """
+            ---
+            name: valid-component
+            ---
+
+            # Valid Component
+
+            ## Match Rules
+
+            - has_dismiss_button: true
+            - row_has_chevron: false
+            - zone: content
+
+            ## Interaction
+
+            - clickable: true
+            - click_target: first_dismiss_button
+            - click_result: dismisses
+            - back_after_click: false
+            """
+
+        let result = ComponentSkillParser.parseValidated(
+            content: content, fallbackName: "valid"
+        )
+
+        XCTAssertNotNil(result,
+            "parseValidated should accept definitions with all valid keys")
+        XCTAssertEqual(result?.name, "valid-component")
+    }
+
     func testPrecisionRulesDefaultToNil() {
         let content = """
             ---
