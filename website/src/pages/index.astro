@@ -411,14 +411,14 @@ if (!skillsAvailable) {
   <section>
     <h2>From exploration to CI</h2>
     <p>
-      When you need deterministic, repeatable testing, mirroir provides a full pipeline. Point it at any app &mdash; it autonomously discovers every reachable screen using DFS graph traversal (screens are nodes, taps are edges), then outputs a bundle of ready-to-run SKILL.md files. Edit them, test them from the CLI, diagnose failures with <code>--agent</code>.
+      When you need deterministic, repeatable testing, mirroir provides a full pipeline. Point it at any app &mdash; it autonomously discovers every reachable screen using BFS graph traversal (screens are nodes, taps are edges), then outputs a bundle of ready-to-run SKILL.md files. Edit them, test them from the CLI, diagnose failures with <code>--agent</code>.
     </p>
 
     <div class="pipeline-grid">
       <div class="pipeline-step">
         <div class="pipeline-icon">1</div>
         <h3>Generate</h3>
-        <p>A single <code>generate_skill(action: "explore")</code> call runs autonomous DFS traversal &mdash; tapping unvisited elements, backtracking when branches are exhausted, building a navigation graph of the entire app.</p>
+        <p>A single <code>generate_skill(action: "explore")</code> call runs autonomous BFS traversal &mdash; exploring each screen breadth-first, replaying paths to reach child screens, building a navigation graph of the entire app.</p>
         <div class="pipeline-cmd">
           <code>generate_skill(action: "explore", app: "Settings")</code>
         </div>
@@ -642,6 +642,8 @@ if (!skillsAvailable) {
           <li><code>get_orientation</code> <span>Portrait or landscape</span></li>
           <li><code>status</code> <span>Connection and device readiness</span></li>
           <li><code>check_health</code> <span>Full setup diagnostic</span></li>
+          <li><code>calibrate_component</code> <span>Test UI component definitions against live screen</span></li>
+          <li><code>list_targets</code> <span>List configured automation targets</span></li>
         </ul>
       </div>
       <div class="tool-category cat-navigate">
@@ -656,11 +658,12 @@ if (!skillsAvailable) {
           <li><code>reset_app</code> <span>Force-quit app via App Switcher</span></li>
           <li><code>set_network</code> <span>Toggle airplane, Wi-Fi, cellular</span></li>
           <li><code>measure</code> <span>Time screen transitions</span></li>
-          <li><code>generate_skill</code> <span>Autonomous DFS exploration &rarr; navigation graph &rarr; SKILL.md bundle</span></li>
+          <li><code>generate_skill</code> <span>Autonomous BFS exploration &rarr; navigation graph &rarr; SKILL.md bundle</span></li>
           <li><code>list_skills</code> <span>List available skills</span></li>
           <li><code>get_skill</code> <span>Read skill with env substitution + compilation status</span></li>
           <li><code>record_step</code> <span>Record a compiled step during execution</span></li>
           <li><code>save_compiled</code> <span>Save compiled .json for zero-OCR replay</span></li>
+          <li><code>switch_target</code> <span>Switch active automation target</span></li>
         </ul>
       </div>
     </div>
