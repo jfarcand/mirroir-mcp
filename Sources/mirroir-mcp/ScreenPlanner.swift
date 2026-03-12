@@ -125,8 +125,11 @@ enum ScreenPlanner {
                     return nil
                 }
 
-                // Exclude elements in the home gesture zone at the bottom of the screen
-                guard tapTarget.tapY < screenHeight - TimingConstants.safeBottomMarginPt else {
+                // Exclude elements in the home gesture zone at the bottom of the screen.
+                // Breadth navigation (tab bar items) is exempt because they are designed
+                // to sit at the very bottom and are explicitly marked explorable.
+                let isBreadth = component.definition.exploration.role == .breadthNavigation
+                guard isBreadth || tapTarget.tapY < screenHeight - TimingConstants.safeBottomMarginPt else {
                     return nil
                 }
 

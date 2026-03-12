@@ -607,6 +607,62 @@ final class ScreenPlannerTests: XCTestCase {
             "Tab bar item should not be in plan")
     }
 
+    func testBreadthNavigationExemptFromSafeYFilter() {
+        // Tab bar items sit at the very bottom of the screen (y > screenHeight - 62pt).
+        // breadth_navigation role should be exempt from the safe Y filter.
+        let tabDef = ComponentDefinition(
+            name: "tab-bar-item",
+            platform: "ios",
+            description: "Tab bar item.",
+            visualPattern: [],
+            matchRules: ComponentMatchRules(
+                rowHasChevron: nil, chevronMode: nil, minElements: 1, maxElements: 6,
+                maxRowHeightPt: 60, hasNumericValue: nil, hasLongText: nil,
+                hasDismissButton: nil, zone: .tabBar,
+                minConfidence: nil, excludeNumericOnly: nil, textPattern: nil
+            ),
+            interaction: ComponentInteraction(
+                clickable: true, clickTarget: .firstText,
+                clickResult: .switchesContext, backAfterClick: false,
+                labelRule: .firstText
+            ),
+            exploration: ComponentExploration(
+                explorable: true,
+                role: .breadthNavigation,
+                priority: .high
+            ),
+            grouping: ComponentGrouping(
+                absorbsSameRow: false, absorbsBelowWithinPt: 0,
+                absorbCondition: .any, splitMode: .none
+            )
+        )
+
+        // Tab item at y=855 — below safe margin (890 - 62 = 828)
+        let component = ScreenComponent(
+            kind: "tab-bar-item",
+            definition: tabDef,
+            elements: [
+                ClassifiedElement(
+                    point: TapPoint(text: "Résumé", tapX: 100, tapY: 855, confidence: 0.9),
+                    role: .navigation, hasChevronContext: false
+                ),
+            ],
+            tapTarget: TapPoint(text: "Résumé", tapX: 100, tapY: 855, confidence: 0.9),
+            hasChevron: false, topY: 855, bottomY: 855
+        )
+
+        let plan = ScreenPlanner.buildComponentPlan(
+            components: [component],
+            visitedElements: [],
+            scoutResults: [:],
+            screenHeight: screenHeight
+        )
+
+        XCTAssertEqual(plan.count, 1,
+            "breadth_navigation should be exempt from safe Y filter")
+        XCTAssertEqual(plan[0].point.text, "Résumé")
+    }
+
     func testBuildComponentPlanRespectsScoutResults() {
         let elements = [
             TapPoint(text: "Works", tapX: 100, tapY: 300, confidence: 0.9),
