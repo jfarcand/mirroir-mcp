@@ -6,7 +6,7 @@ Skills are files that describe multi-step iPhone automation flows as intents, no
 
 The system has two layers:
 
-1. **This repository** (`mirroir-mcp`) — provides 31 MCP tools for iPhone interaction
+1. **This repository** (`mirroir-mcp`) — provides 32 MCP tools for iPhone interaction
 2. **Skill repositories** (e.g., [jfarcand/mirroir-skills](https://github.com/jfarcand/mirroir-skills)) — provide reusable skill files (SKILL.md or YAML) + plugin discovery
 
 Skills are intentionally simple. Steps like `tap: "Email"` don't specify pixel coordinates — the AI uses `describe_screen` for fuzzy OCR matching and adapts to unexpected dialogs, layout changes, and timing differences.

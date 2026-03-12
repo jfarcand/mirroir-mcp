@@ -7,14 +7,14 @@ All 32 tools exposed by the MCP server. Mutating tools require [permission](perm
 | Tool | Parameters | Description |
 |------|-----------|-------------|
 | `screenshot` | — | Capture the iPhone screen as base64 PNG |
-| `describe_screen` | `skip_ocr`? | OCR the screen and return text elements with tap coordinates plus a grid-overlaid screenshot |
+| `describe_screen` | `skip_ocr`?, `scroll`? | OCR the screen and return text elements with tap coordinates plus a grid-overlaid screenshot. `scroll: true` does a full-page scroll to capture all elements. |
 | `start_recording` | `output_path`? | Start video recording of the mirrored screen |
 | `stop_recording` | — | Stop recording and return the .mov file path |
-| `tap` | `x`, `y` | Tap at coordinates (relative to mirroring window) |
-| `double_tap` | `x`, `y` | Two rapid taps for zoom/text selection |
-| `long_press` | `x`, `y`, `duration_ms`? | Hold tap for context menus (default 500ms) |
-| `swipe` | `from_x`, `from_y`, `to_x`, `to_y`, `duration_ms`? | Swipe between two points (default 300ms) |
-| `drag` | `from_x`, `from_y`, `to_x`, `to_y`, `duration_ms`? | Slow sustained drag for icons, sliders (default 1000ms) |
+| `tap` | `x`, `y`, `cursor_mode`? | Tap at coordinates (relative to mirroring window) |
+| `double_tap` | `x`, `y`, `cursor_mode`? | Two rapid taps for zoom/text selection |
+| `long_press` | `x`, `y`, `duration_ms`?, `cursor_mode`? | Hold tap for context menus (default 500ms) |
+| `swipe` | `from_x`, `from_y`, `to_x`, `to_y`, `duration_ms`?, `cursor_mode`? | Swipe between two points (default 300ms) |
+| `drag` | `from_x`, `from_y`, `to_x`, `to_y`, `duration_ms`?, `cursor_mode`? | Slow sustained drag for icons, sliders (default 1000ms) |
 | `type_text` | `text` | Type text — activates iPhone Mirroring and sends keystrokes |
 | `press_key` | `key`, `modifiers`? | Send a special key (return, escape, tab, delete, space, arrows) with optional modifiers (command, shift, option, control) |
 | `shake` | — | Trigger shake gesture (Ctrl+Cmd+Z) for undo/dev menus |
@@ -32,10 +32,10 @@ All 32 tools exposed by the MCP server. Mutating tools require [permission](perm
 | `check_health` | — | Comprehensive setup diagnostic: mirroring, accessibility, screen capture |
 | `list_skills` | — | List available skills (SKILL.md and YAML) from project-local and global config dirs |
 | `get_skill` | `name` | Read a skill file (SKILL.md or YAML) with ${VAR} env substitution. Appends compilation status. |
-| `generate_skill` | `action`, `app_name`?, `goal`?, `arrived_via`?, `action_type`? | Generate a SKILL.md by exploring an app. Session-based: start → capture → finish |
+| `generate_skill` | `action`, `app_name`?, `goal`?, `goals`?, `arrived_via`?, `action_type`?, `max_depth`?, `max_screens`?, `max_time`?, `strategy`? | Generate a SKILL.md by exploring an app. Session-based: start → capture → finish. `action: "explore"` runs autonomous BFS exploration. |
 | `list_targets` | — | List all configured automation targets with status and window size |
 | `switch_target` | `target` | Switch active target for subsequent tool calls |
-| `calibrate_component` | `component_path`, `target`? | Test a component definition (.md) against the current screen and return a diagnostic report |
+| `calibrate_component` | `component_path`, `target`?, `scroll`? | Test a component definition (.md) against the current screen and return a diagnostic report |
 | `record_step` | `step_index`, `type`, `label`?, `tap_x`?, `tap_y`?, `confidence`?, `match_strategy`?, `elapsed_ms`?, `scroll_count`?, `scroll_direction`? | Record a compiled step during AI-driven skill execution |
 | `save_compiled` | `skill_name` | Save accumulated compiled steps as .compiled.json next to the source skill |
 
@@ -49,6 +49,8 @@ Coordinates are in points relative to the mirroring window's top-left corner. Us
 
 Set `skip_ocr: true` to skip all built-in recognition and return only the grid-overlaid screenshot. This lets MCP clients use their own vision model to analyze the screen instead.
 
+Set `scroll: true` to perform a full-page scroll before returning results. The server scrolls through the entire page, deduplicates elements across viewports, and returns all detected elements — not just those visible in the initial viewport.
+
 ## Typing Workflow
 
 `type_text` and `press_key` route keyboard input through the CGEvent keyboard interface. If iPhone Mirroring isn't already frontmost, the MCP server activates it once (which may trigger a macOS Space switch) and stays there. Subsequent keyboard tool calls reuse the active window without switching again.
@@ -58,9 +60,11 @@ Set `skip_ocr: true` to skip all built-in recognition and return only the grid-o
 
 ## Key Press Workflow
 
-`press_key` sends special keys that `type_text` can't handle — navigation keys, Return to submit forms, Escape to dismiss dialogs, Tab to switch fields, arrows to move through lists. Add modifiers for shortcuts like Cmd+N (new message) or Cmd+Z (undo).
+`press_key` sends special keys that `type_text` can't handle — Return to submit forms, Tab to switch fields, Delete to erase, and arrow keys to move through lists or text.
 
-For navigating within apps, combine `spotlight` + `type_text` + `press_key`. For example: `spotlight` → `type_text "Messages"` → `press_key return` → `press_key {"key":"n","modifiers":["command"]}` to open a new conversation.
+**Important:** Keyboard shortcuts with modifiers (Cmd+N, Cmd+Z, etc.) do **not** work with iOS apps through iPhone Mirroring. iOS apps do not receive modifier-key combinations through the mirroring compositor. The only modifier combination that works is `shake` (Ctrl+Cmd+Z), which is a Mac-level action that iPhone Mirroring translates to a device shake.
+
+For navigating within apps, combine `spotlight` + `type_text` + `press_key`. For example: `spotlight` → `type_text "Messages"` → `press_key return` to launch Messages.
 
 ## Scroll To
 

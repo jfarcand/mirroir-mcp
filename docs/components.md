@@ -195,16 +195,30 @@ Two match rules are typically set through calibration rather than written by han
 
 ## Built-in Components
 
-The [mirroir-skills](https://github.com/jfarcand/mirroir-skills) repo includes iOS component definitions:
+The [mirroir-skills](https://github.com/jfarcand/mirroir-skills) repo includes 20 iOS component definitions:
 
 | Component | Pattern |
 |-----------|---------|
-| `table-row-disclosure` | Settings-style row with chevron (>) |
+| `table-row-disclosure` | Settings-style row with chevron (>) — drill-down navigation |
+| `table-row-detail` | Row with detail text but no chevron — info only |
 | `toggle-row` | Row with On/Off toggle switch |
 | `tab-bar-item` | Bottom tab bar items |
+| `navigation-bar` | Top navigation bar with title and back button |
 | `summary-card` | Multi-row metric cards (Health app) |
 | `modal-sheet` | Modal dialogs with dismiss buttons |
+| `alert-dialog` | System alert modals with dismiss/confirm buttons |
+| `search-bar` | Search input field |
+| `segmented-control` | Segmented picker control |
+| `list-item` | Generic list row |
+| `action-button` | Prominent action buttons |
+| `bottom-navigation-bar` | Bottom navigation bar (alternative to tab bar) |
+| `page-title` | Large page title text |
 | `section-header` | Non-interactive section titles |
+| `section-footer` | Non-interactive section footers |
+| `explanation-text` | Descriptive text blocks |
+| `chart-axis-label` | Chart axis labels (Health/Fitness charts) |
+| `article-modal` | Article-style modal content |
+| `empty-state` | Empty state placeholder views |
 
 ## Writing Custom Components
 

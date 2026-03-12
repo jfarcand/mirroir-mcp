@@ -25,7 +25,7 @@ Every input tool (`tap`, `type_text`, `swipe`, etc.) must make iPhone Mirroring 
 - **Batch interactions** — Run a sequence of phone commands together rather than interleaving with terminal work.
 - **Skills** — Chain multiple steps in a skill (SKILL.md or YAML). Focus is acquired once rather than per-tool-call.
 
-Read-only tools (`screenshot`, `describe_screen`, `start_recording`, `stop_recording`, `status`, `get_orientation`, `check_health`, `list_skills`, `get_skill`) do **not** steal focus.
+Read-only tools (`screenshot`, `describe_screen`, `start_recording`, `stop_recording`, `status`, `get_orientation`, `check_health`, `list_skills`, `get_skill`, `list_targets`, `calibrate_component`) do **not** steal focus.
 
 See [Known Limitations](limitations.md#focus-stealing) for details.
 

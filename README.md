@@ -17,7 +17,7 @@ Give your AI eyes, hands, and a real iPhone. An MCP server that lets any AI agen
 ## What's Changed
 
 - **Icon detection (YOLO CoreML)** — `describe_screen` can now detect non-text UI elements (icons, buttons, toggles, activity rings) alongside Vision OCR text. Drop a CoreML `.mlmodelc` in `~/.mirroir-mcp/models/` and the server auto-detects it at startup. See [Icon Detection](#icon-detection) for details.
-- **Startup config dump** — All effective configuration values are logged at startup in a grouped two-column format. Check `~/.mirroir-mcp/mirroir.log` to see exactly what settings are active.
+- **Startup config dump** — All effective configuration values are logged at startup in a grouped two-column format. Check `~/.mirroir-mcp/debug.log` to see exactly what settings are active.
 - **Component-driven exploration** — The explorer matches screen regions against [component definitions](docs/components.md) (`.md` files describing UI patterns like table rows, toggles, tab bars) instead of guessing from raw OCR. Multi-row elements (Health app summary cards) are absorbed into single tappable components. Calibrate definitions against live screens with `calibrate_component`.
 
 ## Requirements
@@ -267,13 +267,13 @@ Let an AI agent explore an app and produce SKILL.md files automatically:
 Explore the Settings app and generate a skill that checks the iOS version.
 ```
 
-Uses DFS graph traversal — tapping unvisited elements, backtracking when branches are exhausted. Duplicate screens are automatically skipped.
+Uses BFS graph traversal — exploring each screen breadth-first, replaying paths from the root to reach child screens, and backtracking when branches are exhausted. Duplicate screens are automatically skipped via structural fingerprinting.
 
 ## Component Detection
 
 Raw OCR returns a flat list of text elements with no structure. Component definitions teach the explorer what UI patterns look like — a `.md` file per pattern (table rows, toggles, tab bars, summary cards). The explorer matches screen regions against these definitions to decide what to tap, what to skip, and when to backtrack.
 
-18 iOS component definitions are included. Place custom definitions in `~/.mirroir-mcp/components/` or `<cwd>/.mirroir-mcp/components/`.
+20 iOS component definitions are included. Place custom definitions in `~/.mirroir-mcp/components/` or `<cwd>/.mirroir-mcp/components/`.
 
 Test a definition against the current live screen:
 

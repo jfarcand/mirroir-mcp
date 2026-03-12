@@ -4,7 +4,7 @@ The server is **fail-closed by default**. Without a config file, only read-only 
 
 | Always allowed | Requires permission |
 |---------------|-------------------|
-| `screenshot`, `describe_screen`, `start_recording`, `stop_recording`, `get_orientation`, `status`, `check_health`, `list_skills`, `get_skill` | `tap`, `swipe`, `drag`, `type_text`, `press_key`, `long_press`, `double_tap`, `shake`, `launch_app`, `open_url`, `press_home`, `press_app_switcher`, `spotlight`, `scroll_to`, `reset_app`, `measure`, `set_network` |
+| `screenshot`, `describe_screen`, `start_recording`, `stop_recording`, `get_orientation`, `status`, `check_health`, `list_targets`, `list_skills`, `get_skill`, `calibrate_component` | `tap`, `swipe`, `drag`, `type_text`, `press_key`, `long_press`, `double_tap`, `shake`, `launch_app`, `open_url`, `press_home`, `press_app_switcher`, `spotlight`, `scroll_to`, `reset_app`, `measure`, `set_network`, `switch_target`, `record_step`, `save_compiled`, `generate_skill` |
 
 Mutating tools are hidden from `tools/list` entirely — the MCP client never sees them unless you allow them.
 
@@ -23,6 +23,7 @@ Create `~/.mirroir-mcp/permissions.json` (or `<cwd>/.mirroir-mcp/permissions.jso
 - **`allow`** — whitelist of mutating tools to expose (case-insensitive). Use `["*"]` to allow all.
 - **`deny`** — blocklist that overrides allow. A tool in both lists is denied.
 - **`blockedApps`** — app names that `launch_app` refuses to open (case-insensitive).
+- **`skipElements`** — element text patterns the explorer should never tap (case-insensitive containment match). Useful for preventing the explorer from tapping destructive elements like "Delete Account".
 
 ## Examples
 

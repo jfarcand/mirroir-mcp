@@ -1,6 +1,6 @@
 # mirroir-mcp
 
-> Give your AI eyes, hands, and a real iPhone. An MCP server that lets any AI agent see the screen, tap what it needs, and figure the rest out — through macOS iPhone Mirroring. Also supports macOS windows. 31 tools, any MCP client (Claude Code, Cursor, Copilot, ChatGPT, Codex). Written in Swift. Apache 2.0 licensed.
+> Give your AI eyes, hands, and a real iPhone. An MCP server that lets any AI agent see the screen, tap what it needs, and figure the rest out — through macOS iPhone Mirroring. Also supports macOS windows. 32 tools, any MCP client (Claude Code, Cursor, Copilot, ChatGPT, Codex). Written in Swift. Apache 2.0 licensed.
 
 ## Overview
 
@@ -42,11 +42,11 @@ brew tap jfarcand/tap && brew install mirroir-mcp
 
 Requires macOS 15+ and an iPhone connected via iPhone Mirroring.
 
-## MCP Tools (31 total)
+## MCP Tools (32 total)
 
 ### Screen (read-only, always available)
 - `screenshot` — Capture iPhone screen as base64 PNG
-- `describe_screen` — OCR via Apple Vision returning text elements with tap coordinates plus grid-overlaid screenshot. `skip_ocr: true` returns only the screenshot for client-side vision models. Detects unlabeled icons via pixel clustering.
+- `describe_screen` — OCR via Apple Vision returning text elements with tap coordinates plus grid-overlaid screenshot. `skip_ocr: true` returns only the screenshot for client-side vision models. `scroll: true` does full-page scroll and deduplication. Detects unlabeled icons via pixel clustering.
 - `start_recording` / `stop_recording` — Video recording of the mirrored screen
 
 ### Input (mutating, requires permission)
@@ -82,11 +82,14 @@ Requires macOS 15+ and an iPhone connected via iPhone Mirroring.
 - `get_skill` — Read skill file with ${VAR} env substitution
 
 ### Skill Generation & Compilation
-- `generate_skill` — AI explores an app and produces SKILL.md. Session-based: start -> capture -> finish. Also supports autonomous DFS exploration.
+- `generate_skill` — AI explores an app and produces SKILL.md. Session-based: start -> capture -> finish. `action: "explore"` runs autonomous BFS exploration with component-aware planning.
 - `record_step` / `save_compiled` — Record compiled steps during AI-driven skill execution for zero-OCR replay
 
+### Component Detection (read-only)
+- `calibrate_component` — Test a component definition (.md) against the current live screen with a diagnostic report
+
 ### Multi-Target
-- `list_targets` / `switch_target` — Support for multiple windows (iPhone Mirroring + generic macOS windows like emulators, VNC)
+- `list_targets` (read-only) / `switch_target` — Support for multiple windows (iPhone Mirroring + generic macOS windows like emulators, VNC)
 
 Coordinates are in points relative to the mirroring window top-left. Use `describe_screen` for exact tap coordinates.
 
@@ -215,10 +218,16 @@ swift test               # run all tests
 - `Sources/mirroir-mcp/CompiledStepExecutor.swift` — Zero-OCR replay engine
 
 ### Autonomous Exploration
-- `Sources/mirroir-mcp/DFSExplorer.swift` — Graph-based DFS with backtracking
-- `Sources/mirroir-mcp/NavigationGraph.swift` — Directed screen graph (nodes=screens, edges=transitions)
+- `Sources/mirroir-mcp/BFSExplorer.swift` — Breadth-first exploration with frontier queue and path replay (default explorer)
+- `Sources/mirroir-mcp/DFSExplorer.swift` — Depth-first exploration with backtrack stack
+- `Sources/mirroir-mcp/NavigationGraph.swift` — Directed screen graph (nodes=screens, edges=transitions, structural fingerprinting)
 - `Sources/mirroir-mcp/ExplorationSession.swift` — Thread-safe session accumulator
 - `Sources/mirroir-mcp/MobileAppStrategy.swift` — iOS app exploration heuristics
+
+### Component Detection
+- `Sources/mirroir-mcp/ComponentLoader.swift` — Discovers and loads component definition .md files from disk
+- `Sources/mirroir-mcp/ComponentDetector.swift` — Groups OCR elements into UI components using loaded definitions
+- `Sources/mirroir-mcp/ComponentScoring.swift` — Scores component definitions against OCR row properties
 
 ### Shared Library
 - `Sources/HelperLib/MCPProtocol.swift` — JSON-RPC 2.0 types and MCP tool definitions
@@ -256,9 +265,10 @@ Multi-target configuration via `targets.json` for controlling multiple windows s
 ## Documentation Index
 
 - [README](README.md) — Installation, examples, quick start
-- [Tools Reference](docs/tools.md) — All 31 tools with parameters
+- [Tools Reference](docs/tools.md) — All 32 tools with parameters
 - [Security](docs/security.md) — Threat model, kill switch, recommendations
 - [Permissions](docs/permissions.md) — Fail-closed permission model
+- [Component Detection](docs/components.md) — Component definitions, calibration, detection pipeline
 - [Compiled Skills](docs/compiled-skills.md) — Zero-OCR skill replay
 - [Skills Marketplace](docs/skills-marketplace.md) — Skill format and authoring
 - [Testing](docs/testing.md) — FakeMirroring, CI strategy

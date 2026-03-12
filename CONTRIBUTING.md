@@ -14,62 +14,171 @@ Thank you for your interest in contributing! By submitting a contribution, you a
 ```
 mirroir-mcp/
 ├── Sources/
-│   ├── mirroir-mcp/     # MCP server + CLI subcommands (user process)
-│   │   ├── mirroir_mcp.swift  # Entry point (dispatches test/record subcommands)
-│   │   ├── MCPServer.swift           # JSON-RPC 2.0 dispatch
-│   │   ├── ToolHandlers.swift        # Tool registration orchestrator
-│   │   ├── ScreenTools.swift         # screenshot, describe_screen, recording
-│   │   ├── InputTools.swift          # tap, swipe, drag, type, press_key, etc.
-│   │   ├── NavigationTools.swift     # launch_app, open_url, home, spotlight
-│   │   ├── ScrollToTools.swift       # scroll_to — scroll until element visible
-│   │   ├── AppManagementTools.swift  # reset_app — force-quit via App Switcher
-│   │   ├── MeasureTools.swift        # measure — time screen transitions
-│   │   ├── NetworkTools.swift        # set_network — toggle airplane/wifi/cellular
-│   │   ├── InfoTools.swift           # status, get_orientation, check_health
-│   │   ├── SkillTools.swift          # list_skills, get_skill (SKILL.md + YAML)
-│   │   ├── SkillMdParser.swift      # SKILL.md front matter parser
-│   │   ├── MigrateCommand.swift     # mirroir migrate — YAML → SKILL.md conversion
-│   │   ├── Protocols.swift           # DI protocol abstractions
-│   │   ├── MirroringBridge.swift     # AX window discovery + menu actions
-│   │   ├── InputSimulation.swift     # Coordinate mapping + focus management
-│   │   ├── CGEventInput.swift        # CGEvent posting for pointing + keyboard
-│   │   ├── CGKeyMap.swift            # Character → macOS virtual keycode mapping
-│   │   ├── ScreenCapture.swift       # screencapture -l wrapper
-│   │   ├── ScreenRecorder.swift      # Video recording state machine
-│   │   ├── ScreenDescriber.swift     # Vision OCR pipeline
-│   │   ├── DebugLog.swift            # Debug logging to stderr + file
-│   │   ├── TestRunner.swift          # `mirroir test` orchestrator
-│   │   ├── SkillParser.swift         # YAML → structured SkillStep list (used by test runner)
-│   │   ├── StepExecutor.swift        # Runs steps against real subsystems
-│   │   ├── ElementMatcher.swift      # Fuzzy OCR text matching (exact/case/substring)
-│   │   ├── ConsoleReporter.swift     # Terminal output formatting for test runner
-│   │   ├── JUnitReporter.swift       # JUnit XML generation for CI
-│   │   ├── EventRecorder.swift       # `mirroir record` — CGEvent tap monitoring
-│   │   ├── YAMLGenerator.swift       # Recorded events → skill YAML
-│   │   └── RecordCommand.swift       # `mirroir record` CLI entry point
+│   ├── mirroir-mcp/           # MCP server + CLI subcommands (~111 files)
+│   │   │
+│   │   │── # ── Core Infrastructure ──
+│   │   ├── mirroir_mcp.swift        # Entry point, CLI dispatch, target registry init
+│   │   ├── MCPServer.swift          # JSON-RPC 2.0 server (stdin/stdout)
+│   │   ├── ToolHandlers.swift       # Tool registration orchestrator (delegates to *Tools.swift)
+│   │   ├── Protocols.swift          # All DI protocol abstractions (WindowBridging, InputProviding, etc.)
+│   │   ├── DebugLog.swift           # Debug logging to stderr + ~/.mirroir-mcp/debug.log
+│   │   │
+│   │   │── # ── Tool Registration (one file per category, thin handlers) ──
+│   │   ├── ScreenTools.swift        # screenshot, describe_screen, recording
+│   │   ├── InputTools.swift         # tap, swipe, drag, type_text, press_key, long_press, double_tap, shake
+│   │   ├── NavigationTools.swift    # launch_app, open_url, press_home, press_app_switcher, spotlight
+│   │   ├── ScrollToTools.swift      # scroll_to
+│   │   ├── AppManagementTools.swift # reset_app
+│   │   ├── MeasureTools.swift       # measure
+│   │   ├── NetworkTools.swift       # set_network
+│   │   ├── InfoTools.swift          # status, get_orientation, check_health
+│   │   ├── SkillTools.swift         # list_skills, get_skill
+│   │   ├── TargetTools.swift        # list_targets, switch_target
+│   │   ├── GenerateSkillTools.swift # generate_skill (session-based + autonomous BFS)
+│   │   ├── CompilationTools.swift   # record_step, save_compiled
+│   │   ├── ComponentTools.swift     # calibrate_component
+│   │   │
+│   │   │── # ── Window & Target Management ──
+│   │   ├── MirroringBridge.swift    # iPhone Mirroring window: AX discovery + menu actions
+│   │   ├── GenericWindowBridge.swift # Non-iPhone windows (emulators, VNC, etc.)
+│   │   ├── TargetRegistry.swift     # Multi-target registry (active target switching)
+│   │   ├── TargetConfig.swift       # targets.json loader
+│   │   ├── WindowListHelper.swift   # CGWindowList enumeration helper
+│   │   │
+│   │   │── # ── Input (CGEvent-based) ──
+│   │   ├── CGEventInput.swift       # CGEvent posting for pointing + keyboard
+│   │   ├── CGKeyMap.swift           # Character → macOS virtual keycode mapping
+│   │   ├── InputSimulation.swift    # Input facade: coordinate mapping + focus management
+│   │   ├── InputSimulationKeyboard.swift # Keyboard, shake, app-level operations
+│   │   │
+│   │   │── # ── Screen Capture & OCR ──
+│   │   ├── ScreenCapture.swift      # screencapture -l wrapper
+│   │   ├── ScreenDescriber.swift    # OCR orchestration (Vision + optional YOLO)
+│   │   ├── AppleVisionTextRecognizer.swift # Apple Vision OCR backend
+│   │   ├── CompositeTextRecognizer.swift   # Merge Vision + YOLO results
+│   │   ├── CoreMLElementDetector.swift     # YOLO CoreML element detection
+│   │   ├── IconDetector.swift       # Unlabeled icon detection via pixel clustering
+│   │   ├── IconClusterDetector.swift # Cluster nearby icons
+│   │   ├── ScreenRecorder.swift     # Video recording state machine
+│   │   ├── RecordingDescriber.swift # ScreenDescribing decorator that caches OCR results
+│   │   │
+│   │   │── # ── Autonomous Exploration ──
+│   │   ├── BFSExplorer.swift        # Breadth-first exploration (default, frontier queue + path replay)
+│   │   ├── BFSExplorerHelpers.swift # Calibration, plan resolution, scroll support
+│   │   ├── BFSExplorerTypes.swift   # BFS value types (FrontierScreen, PathSegment, Phase)
+│   │   ├── BFSBacktrackVerifier.swift # Post-backtrack verification and modal recovery
+│   │   ├── DFSExplorer.swift        # Depth-first exploration with backtrack stack
+│   │   ├── DFSExplorerBacktrack.swift # DFS backtracking logic
+│   │   ├── NavigationGraph.swift    # Directed screen graph (nodes=screens, edges=transitions)
+│   │   ├── ExplorationSession.swift # Thread-safe session accumulator
+│   │   ├── ExplorationBudget.swift  # Budget tracking (depth, screens, time)
+│   │   ├── ExplorerUtilities.swift  # Shared exploration utilities
+│   │   ├── GraphPathFinder.swift    # Path finding in navigation graph
+│   │   │
+│   │   │── # ── Screen Planning & Navigation ──
+│   │   ├── ScreenPlanner.swift      # Plan next actions from OCR + components
+│   │   ├── PlanCoordinateResolver.swift # Resolve plan items to viewport coordinates
+│   │   ├── FrontierPlanner.swift    # Frontier-based planning
+│   │   ├── ExplorationGuide.swift   # AI-assisted exploration guidance
+│   │   ├── ScoutPhase.swift         # Scout phase for element classification
+│   │   │
+│   │   │── # ── Component Detection ──
+│   │   ├── ComponentLoader.swift    # Discover and load .md component definitions
+│   │   ├── ComponentDetector.swift  # Group OCR elements into UI components
+│   │   ├── ComponentCatalog.swift   # Component definition library
+│   │   ├── ComponentScoring.swift   # Score definitions against OCR row properties
+│   │   ├── ComponentTester.swift    # Test components against live screen
+│   │   ├── ComponentSkillParser.swift # Parse component SKILL.md definitions
+│   │   │
+│   │   │── # ── Detection & Classification ──
+│   │   ├── ElementClassifier.swift  # Classify OCR elements by role (navigation, info, etc.)
+│   │   ├── EdgeClassifier.swift     # Classify navigation edge types (push/pop/replace)
+│   │   ├── AlertDetector.swift      # Detect iOS system alert dialogs
+│   │   ├── AppContextDetector.swift # Detect app context for recovery
+│   │   ├── SpotlightDetector.swift  # Detect Spotlight search state
+│   │   ├── StrategyDetector.swift   # Auto-detect exploration strategy (mobile/social/desktop)
+│   │   ├── StructuralFingerprint.swift # Screen fingerprinting via Jaccard similarity
+│   │   ├── ScrollAnchorDetector.swift  # Detect scroll anchors
+│   │   ├── ScrollDeduplicator.swift    # Deduplicate scrolled content
+│   │   ├── OverlapDeduplicator.swift   # Deduplicate overlapping OCR elements
+│   │   │
+│   │   │── # ── Skill System ──
+│   │   ├── SkillMdParser.swift      # SKILL.md front matter + body parser
+│   │   ├── SkillMdGenerator.swift   # Generate SKILL.md from explored screens
+│   │   ├── SkillParser.swift        # YAML → structured SkillStep list
+│   │   ├── SkillBundleGenerator.swift # Generate multi-skill bundles
+│   │   ├── SkillManifestGenerator.swift # Generate skill manifests
+│   │   ├── ActionStepFormatter.swift # Format action steps for SKILL.md
+│   │   ├── LandmarkPicker.swift     # Pick OCR landmarks for skill steps
+│   │   │
+│   │   │── # ── Compiled Skills (zero-OCR replay) ──
+│   │   ├── CompiledSkill.swift      # Compiled skill data model + SHA-256
+│   │   ├── CompiledStepExecutor.swift # Replay compiled steps (zero OCR)
+│   │   ├── TestRunnerCompiled.swift # Test compiled skills
+│   │   │
+│   │   │── # ── Test Runner & Recording ──
+│   │   ├── TestRunner.swift         # `mirroir test` orchestrator
+│   │   ├── StepExecutor.swift       # Run steps against real subsystems
+│   │   ├── StepExecutorActions.swift # Step action implementations
+│   │   ├── ElementMatcher.swift     # Fuzzy OCR text matching
+│   │   ├── ConsoleReporter.swift    # Terminal output formatting
+│   │   ├── JUnitReporter.swift      # JUnit XML generation
+│   │   ├── EventRecorder.swift      # CGEvent tap monitoring
+│   │   ├── YAMLGenerator.swift      # Recorded events → skill YAML
+│   │   │
+│   │   │── # ── AI Integration ──
+│   │   ├── AIAgentProvider.swift    # AI agent abstraction
+│   │   ├── AnthropicProvider.swift  # Claude API integration
+│   │   ├── OpenAIProvider.swift     # GPT API integration
+│   │   ├── OllamaProvider.swift     # Local Ollama integration
+│   │   ├── EmbacleProvider.swift    # embacle-server integration
+│   │   ├── CommandProvider.swift    # CLI command-based AI provider
+│   │   ├── AgentDiagnostic.swift    # AI-assisted test failure diagnosis
+│   │   │
+│   │   │── # ── CLI Subcommands ──
+│   │   ├── CompileCommand.swift     # mirroir compile
+│   │   ├── RecordCommand.swift      # mirroir record
+│   │   ├── MigrateCommand.swift     # mirroir migrate (YAML → SKILL.md)
+│   │   ├── DoctorCommand.swift      # mirroir doctor
+│   │   ├── ConfigureCommand.swift   # mirroir configure (keyboard layout)
+│   │   │
+│   │   │── # ── App Exploration Strategies ──
+│   │   ├── MobileAppStrategy.swift  # iOS app exploration heuristics
+│   │   ├── DesktopAppStrategy.swift # Desktop app exploration
+│   │   └── SocialAppStrategy.swift  # Social media app exploration
 │   │
-│   └── HelperLib/              # Shared library (linked into main executable + tests)
-│       ├── MCPProtocol.swift         # JSON-RPC + MCP types (JSONValue, tool defs)
-│       ├── PermissionPolicy.swift    # Fail-closed permission engine
-│       ├── KeyName.swift             # Named key normalization
-│       ├── AppleScriptKeyMap.swift   # macOS virtual key codes
-│       ├── LayoutMapper.swift        # Non-US keyboard layout translation
-│       ├── TimingConstants.swift     # Default timing values
-│       ├── EnvConfig.swift           # Environment variable overrides
-│       ├── TapPointCalculator.swift  # Smart OCR tap coordinate offset
-│       ├── GridOverlay.swift         # Coordinate grid overlay on screenshots
-│       ├── ContentBoundsDetector.swift # Detects iPhone content bounds in screenshots
-│       └── ProcessExtensions.swift   # Timeout-aware Process.wait
+│   ├── HelperLib/                   # Shared library (linked into main + tests)
+│   │   ├── MCPProtocol.swift        # JSON-RPC + MCP types (JSONValue, tool defs)
+│   │   ├── PermissionPolicy.swift   # Fail-closed permission engine
+│   │   ├── EnvConfig.swift          # Centralized settings (settings.json + env vars)
+│   │   ├── EnvConfigFeatures.swift  # Feature-specific config properties
+│   │   ├── EnvConfigDump.swift      # Dump effective config at startup
+│   │   ├── TimingConstants.swift    # Default timing values
+│   │   ├── KeyName.swift            # Named key normalization
+│   │   ├── AppleScriptKeyMap.swift  # macOS virtual key codes
+│   │   ├── LayoutMapper.swift       # Non-US keyboard layout translation
+│   │   ├── TapPointCalculator.swift # Smart OCR tap coordinate offset
+│   │   ├── GridOverlay.swift        # Coordinate grid overlay on screenshots
+│   │   ├── ContentBoundsDetector.swift # Detect iPhone content bounds
+│   │   ├── NavigationHintDetector.swift # Detect back chevrons and nav patterns
+│   │   └── ProcessExtensions.swift  # Timeout-aware Process.wait
+│   │
+│   └── FakeMirroring/               # Test double app for CI (not a mock — a real macOS app)
+│       ├── main.swift               # Entry point
+│       ├── FakeScreenDrawing.swift  # Renders OCR-detectable text labels
+│       └── Scenarios.swift          # Screen scenarios for integration tests
 │
 ├── Tests/
-│   ├── MCPServerTests/         # XCTest — server routing + tool handlers
-│   ├── HelperLibTests/         # Swift Testing — shared library utilities
-│   ├── TestRunnerTests/        # Swift Testing — test runner, recorder, skill parser
-│   ├── IntegrationTests/       # XCTest — FakeMirroring integration (requires running app)
-│   └── Fixtures/               # Test skill files (YAML + SKILL.md)
+│   ├── MCPServerTests/        # XCTest — server routing, tool handlers, exploration (71 files)
+│   ├── HelperLibTests/        # Swift Testing — shared library utilities (9 files)
+│   ├── TestRunnerTests/       # Swift Testing — test runner, recorder, skill parser (13 files)
+│   ├── IntegrationTests/      # XCTest — FakeMirroring integration, requires running app (13 files)
+│   └── Fixtures/              # Test skill files (YAML + SKILL.md)
 │
-├── scripts/                    # Install/uninstall scripts
-└── docs/                       # Documentation
+├── docs/                      # User-facing documentation
+├── scripts/                   # Build/install/CI scripts
+├── git-hooks/                 # Git hooks (commit-msg: conventional commit enforcement)
+└── .githooks/                 # Git hooks (pre-commit: license, ABOUTME, build checks)
 ```
 
 ## Build & Test
@@ -96,19 +205,25 @@ swift test --filter <TestClassName>/<testMethodName>
 **Tier 2 — Pre-Commit** (before committing):
 ```bash
 swift build
-swift test
+swift test --skip IntegrationTests
 ```
 
 **Tier 3 — Full Validation** (before merge):
 ```bash
 swift build -c release
-swift test
+swift test --skip IntegrationTests
 ```
 
-### Pre-commit Hooks
+### Git Hooks
 
-The project uses Git hooks (`.githooks/pre-commit`) that enforce:
+The project uses two hook directories:
 
+**`git-hooks/commit-msg`** — enforces commit message format:
+1. **Conventional commit format** — messages must match `type(scope): description` (e.g., `feat: add check_health tool`, `fix(bfs): handle scroll edge case`)
+2. **Max 2 lines** — subject + optional blank line + body
+3. **No AI assistant references** — rejects `Co-Authored-By: Claude` lines
+
+**`.githooks/pre-commit`** — enforces code quality:
 1. **Apache 2.0 license headers** on all Swift files (except `Package.swift`)
 2. **ABOUTME headers** — every non-test Swift file must have a 2-line ABOUTME comment
 3. **No suspicious files** — blocks `.bak`, `.orig`, `.tmp`, `.swp` files
@@ -117,7 +232,7 @@ The project uses Git hooks (`.githooks/pre-commit`) that enforce:
 
 Set up the hooks:
 ```bash
-git config core.hooksPath .githooks
+git config core.hooksPath git-hooks
 ```
 
 ## How to Add a New MCP Tool
@@ -200,11 +315,12 @@ Add tests in `Tests/MCPServerTests/` for tool handler logic and `Tests/HelperLib
 
 ### Test Targets
 
-| Target | Framework | Tests | Purpose |
+| Target | Framework | Files | Purpose |
 |--------|-----------|-------|---------|
-| `MCPServerTests` | XCTest | Server routing, tool handler logic | Verifies JSON-RPC dispatch, tool parameter validation, permission enforcement |
-| `HelperLibTests` | Swift Testing | Shared utilities | Verifies key mapping, permissions, protocol types, OCR coordinates, layout translation |
-| `TestRunnerTests` | Swift Testing | Test runner, recorder, skill parser | Verifies skill parsing, step execution, element matching, event classification, reporters |
+| `MCPServerTests` | XCTest | 71 | Server routing, tool handlers, exploration algorithms, component detection, graph algorithms |
+| `HelperLibTests` | Swift Testing | 9 | Key mapping, permissions, protocol types, OCR coordinates, layout translation |
+| `TestRunnerTests` | Swift Testing | 13 | Skill parsing, step execution, element matching, event classification, reporters |
+| `IntegrationTests` | XCTest | 13 | Full workflows with FakeMirroring app (requires running FakeMirroring, skipped in CI unit tests) |
 
 ### Dependency Injection
 
@@ -316,4 +432,9 @@ Every Swift file must have:
 - **Features:** Create a branch (`feature/my-feature`), squash merge locally to main
 - **Bug fixes:** Commit directly to main
 - **Never create Pull Requests** — all merges happen locally
-- Commit messages: 1-2 lines, no AI assistant references
+- **Commit messages must use conventional commit format:** `type(scope): description`
+  - Types: `feat`, `fix`, `chore`, `docs`, `test`, `refactor`, `ci`, `style`, `perf`, `build`, `revert`
+  - Scope is optional. Multi-scope with `|` is permitted: `fix(module|context): description`
+  - Examples: `feat: add check_health tool`, `fix(skills): handle YAML block scalars`
+  - The `commit-msg` hook in `git-hooks/` enforces this — non-conventional commits are rejected
+- No AI assistant references in commit messages

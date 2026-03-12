@@ -89,7 +89,7 @@ Run without any external dependencies. Three test targets:
 | `MCPServerTests` | JSON-RPC dispatch, tool registration, permission enforcement, protocol negotiation | MCP server behavior using protocol-based test doubles |
 | `TestRunnerTests` | Skill parsing, step execution, element matching, YAML generation, event classification, JUnit/console reporters | Test runner (`mirroir test`) and recorder (`mirroir record`) |
 
-Unit tests use **protocol-based dependency injection** — five protocols (`MirroringBridging`, `InputProviding`, `ScreenCapturing`, `ScreenRecording`, `ScreenDescribing`) have stub implementations for test isolation. See `Tests/MCPServerTests/TestDoubles.swift`.
+Unit tests use **protocol-based dependency injection** — protocols (`WindowBridging`/`MenuActionCapable`, `InputProviding`, `ScreenCapturing`, `ScreenRecording`, `ScreenDescribing`, `ExplorationStrategy`, `ComponentClassifying`) have stub implementations for test isolation. See `Tests/MCPServerTests/TestDoubles.swift`.
 
 ### Integration Tests (`swift test --filter IntegrationTests`)
 
