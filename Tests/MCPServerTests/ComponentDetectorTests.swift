@@ -477,9 +477,13 @@ final class ComponentDetectorTests: XCTestCase {
     // MARK: - Modal Sheet Detection
 
     func testModalSheetDetectedByDismissButton() {
-        // Simulate a "Partager avec" (Share with) modal sheet header
+        // Simulate a "Partager avec" (Share with) modal sheet header.
+        // 4 elements distinguishes modal-sheet (max_elements: 4) from
+        // article-modal (max_elements: 3) which has otherwise identical rules.
         let classified = [
+            classifiedInfo("icon", x: 50, y: 150),
             classifiedNav("Partager avec", x: 150, y: 150),
+            classifiedInfo("Contacts", x: 280, y: 150),
             classifiedDeco("X", x: 370, y: 150),
         ]
 
@@ -530,9 +534,13 @@ final class ComponentDetectorTests: XCTestCase {
     }
 
     func testModalSheetDismissTargetingWithUnicodeX() {
-        // Test with unicode multiplication sign (×), common in iOS
+        // Test with unicode multiplication sign (✕), common in iOS.
+        // 4 elements distinguishes modal-sheet (max_elements: 4) from
+        // article-modal (max_elements: 3) which has otherwise identical rules.
         let classified = [
+            classifiedInfo("icon", x: 50, y: 200),
             classifiedNav("Options", x: 150, y: 200),
+            classifiedInfo("Paramètres", x: 280, y: 200),
             classifiedDeco("✕", x: 370, y: 200),
         ]
 
