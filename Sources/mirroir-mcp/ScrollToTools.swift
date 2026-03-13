@@ -60,7 +60,7 @@ extension MirroirMCP {
                 let maxScrolls = args["max_scrolls"]?.asInt() ?? EnvConfig.defaultScrollMaxAttempts
 
                 // Check if already visible
-                if let describeResult = describer.describe(skipOCR: false),
+                if let describeResult = describer.describe(),
                    ElementMatcher.isVisible(label: label, in: describeResult.elements) {
                     return .text("'\(label)' is already visible on screen")
                 }
@@ -101,7 +101,7 @@ extension MirroirMCP {
 
                     usleep(EnvConfig.toolSettlingDelayUs)
 
-                    if let describeResult = describer.describe(skipOCR: false) {
+                    if let describeResult = describer.describe() {
                         if ElementMatcher.isVisible(label: label, in: describeResult.elements) {
                             return .text("Found '\(label)' after \(attempt + 1) scroll(s)")
                         }

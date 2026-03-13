@@ -358,20 +358,10 @@ final class CompiledStepExecutorTests: XCTestCase {
         XCTAssertNil(recording.lastResult)
         XCTAssertEqual(recording.callCount, 0)
 
-        let result = recording.describe(skipOCR: false)
+        let result = recording.describe()
         XCTAssertEqual(result?.elements.count, 1)
         XCTAssertEqual(recording.lastResult?.elements.count, 1)
         XCTAssertEqual(recording.callCount, 1)
-    }
-
-    func testRecordingDescriberForwardsSkipOCR() {
-        let inner = StubDescriber()
-        inner.describeResult = ScreenDescriber.DescribeResult(elements: [], screenshotBase64: "")
-
-        let recording = RecordingDescriber(wrapping: inner)
-        _ = recording.describe(skipOCR: true)
-
-        XCTAssertTrue(inner.lastSkipOCR)
     }
 
     func testRecordingDescriberHandlesNilResult() {
@@ -379,7 +369,7 @@ final class CompiledStepExecutorTests: XCTestCase {
         inner.describeResult = nil
 
         let recording = RecordingDescriber(wrapping: inner)
-        let result = recording.describe(skipOCR: false)
+        let result = recording.describe()
 
         XCTAssertNil(result)
         XCTAssertNil(recording.lastResult)
@@ -399,10 +389,10 @@ final class CompiledStepExecutorTests: XCTestCase {
         let recording = RecordingDescriber(wrapping: inner)
         XCTAssertNil(recording.firstResult)
 
-        _ = recording.describe(skipOCR: false)
+        _ = recording.describe()
         XCTAssertEqual(recording.firstResult?.elements.first?.text, "First")
 
-        _ = recording.describe(skipOCR: false)
+        _ = recording.describe()
         XCTAssertEqual(recording.firstResult?.elements.first?.text, "First",
             "firstResult should not change after first capture")
         XCTAssertEqual(recording.lastResult?.elements.first?.text, "Second")

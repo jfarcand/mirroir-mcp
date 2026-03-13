@@ -32,7 +32,7 @@ final class AssertIntegrityTests: XCTestCase {
         let describer = ScreenDescriber(bridge: bridge, capture: capture)
 
         // Get the current screen elements to build an assertion skill
-        guard let initialScreen = describer.describe(skipOCR: false) else {
+        guard let initialScreen = describer.describe() else {
             throw IntegrationTestError.describeReturnedNil
         }
 

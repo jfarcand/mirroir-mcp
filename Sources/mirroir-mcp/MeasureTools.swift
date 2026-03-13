@@ -77,7 +77,7 @@ extension MirroirMCP {
 
                 let maxPolls = Int(timeout * 2)
                 for _ in 0..<maxPolls {
-                    if let describeResult = describer.describe(skipOCR: false),
+                    if let describeResult = describer.describe(),
                        ElementMatcher.isVisible(label: until, in: describeResult.elements) {
                         let measured = CFAbsoluteTimeGetCurrent() - measureStart
                         if let max = maxSeconds, measured > max {
@@ -117,7 +117,7 @@ extension MirroirMCP {
 
         switch actionType {
         case "tap":
-            guard let describeResult = describer.describe(skipOCR: false) else {
+            guard let describeResult = describer.describe() else {
                 return "Failed to capture screen for OCR"
             }
             guard let match = ElementMatcher.findMatch(label: actionValue,

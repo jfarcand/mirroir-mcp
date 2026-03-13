@@ -308,7 +308,7 @@ final class ComponentE2ETests: XCTestCase {
 
     private func describeWithRetry() -> ScreenDescriber.DescribeResult? {
         for attempt in 1...3 {
-            if let result = describer.describe(skipOCR: false) { return result }
+            if let result = describer.describe() { return result }
             if attempt < 3 { usleep(500_000) }
         }
         return nil

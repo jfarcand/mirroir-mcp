@@ -177,7 +177,7 @@ extension MirroirMCP {
         session.setStrategy(strategyChoice.rawValue)
 
         // OCR first screen
-        guard let result = ctx.describer.describe(skipOCR: false) else {
+        guard let result = ctx.describer.describe() else {
             return .error(
                 "Failed to capture/analyze screen after launching '\(appName)'. " +
                 "Is the target window visible?")
@@ -242,7 +242,7 @@ extension MirroirMCP {
         guard let ctx else { return err! }
 
         // OCR current screen
-        guard let result = ctx.describer.describe(skipOCR: false) else {
+        guard let result = ctx.describer.describe() else {
             return .error("Failed to capture/analyze screen. Is the target window visible?")
         }
 

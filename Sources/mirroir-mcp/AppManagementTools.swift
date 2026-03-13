@@ -64,7 +64,7 @@ extension MirroirMCP {
                 // the just-launched app is guaranteed to be the centered card.
                 let describer = ctx.describer
                 let windowSize = ctx.bridge.getWindowInfo()?.size
-                guard let ocrResult = describer.describe(skipOCR: false) else {
+                guard let ocrResult = describer.describe() else {
                     _ = menuBridge.triggerMenuAction(menu: "View", item: "Home Screen")
                     return .error("Failed to capture App Switcher screen for verification")
                 }

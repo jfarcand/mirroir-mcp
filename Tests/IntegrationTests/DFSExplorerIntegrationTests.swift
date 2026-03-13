@@ -39,7 +39,7 @@ final class DFSExplorerIntegrationTests: XCTestCase {
     // MARK: - Graph Population
 
     func testGraphPopulatedFromRealOCR() {
-        guard let result = describer.describe(skipOCR: false) else {
+        guard let result = describer.describe() else {
             XCTFail("describe() returned nil — cannot test DFS explorer")
             return
         }
@@ -64,7 +64,7 @@ final class DFSExplorerIntegrationTests: XCTestCase {
     }
 
     func testExplorerInitializesWithRealOCR() {
-        guard let result = describer.describe(skipOCR: false) else {
+        guard let result = describer.describe() else {
             XCTFail("describe() returned nil")
             return
         }
@@ -97,7 +97,7 @@ final class DFSExplorerIntegrationTests: XCTestCase {
     // MARK: - Strategy-Based Guidance with Real OCR
 
     func testStrategyGuidanceFromRealElements() {
-        guard let result = describer.describe(skipOCR: false) else {
+        guard let result = describer.describe() else {
             XCTFail("describe() returned nil")
             return
         }
@@ -131,12 +131,12 @@ final class DFSExplorerIntegrationTests: XCTestCase {
     // MARK: - Structural Fingerprint Stability
 
     func testFingerprintStableAcrossOCRPasses() {
-        guard let result1 = describer.describe(skipOCR: false) else {
+        guard let result1 = describer.describe() else {
             XCTFail("First describe() returned nil")
             return
         }
 
-        guard let result2 = describer.describe(skipOCR: false) else {
+        guard let result2 = describer.describe() else {
             XCTFail("Second describe() returned nil")
             return
         }

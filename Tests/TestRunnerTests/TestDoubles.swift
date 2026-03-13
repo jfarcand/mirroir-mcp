@@ -133,10 +133,8 @@ final class StubDescriber: ScreenDescribing, @unchecked Sendable {
     /// Sequential results returned one per call. When exhausted, repeats the last one.
     var describeResults: [ScreenDescriber.DescribeResult?] = []
     private var callCount = 0
-    var lastSkipOCR: Bool = false
 
-    func describe(skipOCR: Bool) -> ScreenDescriber.DescribeResult? {
-        lastSkipOCR = skipOCR
+    func describe() -> ScreenDescriber.DescribeResult? {
         if !describeResults.isEmpty {
             let result = describeResults[min(callCount, describeResults.count - 1)]
             callCount += 1

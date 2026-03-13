@@ -103,7 +103,7 @@ extension MirroirMCP {
                     elements = scrollResult.elements
                     screenshotBase64 = scrollResult.screenshotBase64
                 } else {
-                    guard let result = describer.describe(skipOCR: false) else {
+                    guard let result = describer.describe() else {
                         return .error(
                             "Failed to capture/analyze screen. Is the '\(ctx.name)' window visible?")
                     }

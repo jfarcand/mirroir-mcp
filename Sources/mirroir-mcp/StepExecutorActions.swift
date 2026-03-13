@@ -17,7 +17,7 @@ extension StepExecutor {
                                           maxScrolls: maxScrolls)
 
         // Check if already visible
-        if let describeResult = describer.describe(skipOCR: false),
+        if let describeResult = describer.describe(),
            ElementMatcher.isVisible(label: label, in: describeResult.elements) {
             return StepResult(step: step, status: .passed,
                               message: "already visible",
@@ -49,7 +49,7 @@ extension StepExecutor {
             usleep(config.settlingDelayMs * 1000)
 
             // Check for element
-            if let describeResult = describer.describe(skipOCR: false) {
+            if let describeResult = describer.describe() {
                 if ElementMatcher.isVisible(label: label, in: describeResult.elements) {
                     return StepResult(step: step, status: .passed,
                                       message: "found after \(attempt + 1) scroll(s)",
@@ -78,7 +78,7 @@ extension StepExecutor {
                            startTime: CFAbsoluteTime) -> StepResult {
         let step = SkillStep.longPress(label: label, durationMs: durationMs)
 
-        guard let describeResult = describer.describe(skipOCR: false) else {
+        guard let describeResult = describer.describe() else {
             return StepResult(step: step, status: .failed,
                               message: "Failed to capture screen for OCR",
                               durationSeconds: elapsed(startTime))
@@ -109,7 +109,7 @@ extension StepExecutor {
                       startTime: CFAbsoluteTime) -> StepResult {
         let step = SkillStep.drag(fromLabel: fromLabel, toLabel: toLabel)
 
-        guard let describeResult = describer.describe(skipOCR: false) else {
+        guard let describeResult = describer.describe() else {
             return StepResult(step: step, status: .failed,
                               message: "Failed to capture screen for OCR",
                               durationSeconds: elapsed(startTime))
@@ -172,7 +172,7 @@ extension StepExecutor {
         // We don't match the app name because Spotlight already
         // resolved localization (e.g. "Settings" → "Réglages") and
         // the just-launched app is guaranteed to be the centered card.
-        guard let ocrResult = describer.describe(skipOCR: false) else {
+        guard let ocrResult = describer.describe() else {
             _ = menuBridge.triggerMenuAction(menu: "View", item: "Home Screen")
             return StepResult(step: step, status: .failed,
                               message: "Failed to capture App Switcher screen for verification",
@@ -247,7 +247,7 @@ extension StepExecutor {
         }
 
         // Find and tap the setting row
-        guard let describeResult = describer.describe(skipOCR: false) else {
+        guard let describeResult = describer.describe() else {
             _ = menuBridge.triggerMenuAction(menu: "View", item: "Home Screen")
             return StepResult(step: step, status: .failed,
                               message: "Failed to capture Settings screen",
@@ -303,7 +303,7 @@ extension StepExecutor {
 
         let maxPolls = Int(timeout * 2)  // 2 polls per second
         for _ in 0..<maxPolls {
-            if let describeResult = describer.describe(skipOCR: false),
+            if let describeResult = describer.describe(),
                ElementMatcher.isVisible(label: until, in: describeResult.elements) {
                 let measuredSeconds = CFAbsoluteTimeGetCurrent() - measureStart
                 if let max = maxSeconds, measuredSeconds > max {

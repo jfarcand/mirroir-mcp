@@ -284,7 +284,7 @@ final class BFSExplorer: @unchecked Sendable {
                 // Re-OCR only when calibration scrolled and found novel content.
                 // The scroll-back may not land at exactly the original position,
                 // so fresh elements prevent the resolver from scrolling unnecessarily.
-                if viewportMayHaveShifted, let fresh = describer.describe(skipOCR: false) {
+                if viewportMayHaveShifted, let fresh = describer.describe() {
                     viewportElements = fresh.elements
                 }
             }

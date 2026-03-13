@@ -76,7 +76,7 @@ extension MirroirMCP {
                 }
 
                 // Find and tap the setting row
-                guard let describeResult = describer.describe(skipOCR: false) else {
+                guard let describeResult = describer.describe() else {
                     _ = menuBridge.triggerMenuAction(menu: "View", item: "Home Screen")
                     return .error("Failed to capture Settings screen")
                 }

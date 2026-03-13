@@ -73,7 +73,7 @@ struct ScreenDescriberInjectionTests {
             textRecognizer: stubRecognizer
         )
 
-        let result = describer.describe(skipOCR: false)
+        let result = describer.describe()
 
         #expect(result != nil)
         guard let result else { return }
@@ -89,40 +89,6 @@ struct ScreenDescriberInjectionTests {
         #expect(!result.screenshotBase64.isEmpty)
     }
 
-    @Test("skipOCR bypasses text recognizer entirely")
-    func testSkipOCRBypassesTextRecognizer() {
-        let bridge = StubBridge()
-        let capture = StubCapture()
-        let stubRecognizer = StubTextRecognizer()
-
-        let pngData = makePNGData(width: 820, height: 1796)
-        capture.captureResult = pngData.base64EncodedString()
-
-        // Even with elements configured, skipOCR should return empty
-        stubRecognizer.elements = [
-            RawTextElement(
-                text: "ShouldNotAppear",
-                tapX: 100.0,
-                textTopY: 100.0,
-                textBottomY: 120.0,
-                bboxWidth: 80.0,
-                confidence: 0.99
-            ),
-        ]
-
-        let describer = ScreenDescriber(
-            bridge: bridge,
-            capture: capture,
-            textRecognizer: stubRecognizer
-        )
-
-        let result = describer.describe(skipOCR: true)
-
-        #expect(result != nil)
-        #expect(result?.elements.isEmpty == true)
-        #expect(result?.screenshotBase64.isEmpty == false)
-    }
-
     @Test("Default initializer uses AppleVisionTextRecognizer")
     func testDefaultInitializerUsesAppleVision() {
         let bridge = StubBridge()
@@ -132,7 +98,7 @@ struct ScreenDescriberInjectionTests {
         let describer = ScreenDescriber(bridge: bridge, capture: capture)
 
         // No capture data → returns nil
-        let result = describer.describe(skipOCR: false)
+        let result = describer.describe()
         #expect(result == nil)
     }
 }

@@ -143,15 +143,13 @@ final class StubTextRecognizer: TextRecognizing, @unchecked Sendable {
 
 final class StubDescriber: ScreenDescribing, @unchecked Sendable {
     var describeResult: ScreenDescriber.DescribeResult?
-    var lastSkipOCR: Bool = false
 
     /// Sequential results returned by successive describe() calls.
     /// When set, each call returns the next result (falling back to the last).
     var describeResults: [ScreenDescriber.DescribeResult?] = []
     private var describeIndex = 0
 
-    func describe(skipOCR: Bool) -> ScreenDescriber.DescribeResult? {
-        lastSkipOCR = skipOCR
+    func describe() -> ScreenDescriber.DescribeResult? {
         if !describeResults.isEmpty {
             let result = describeResults[min(describeIndex, describeResults.count - 1)]
             describeIndex += 1

@@ -182,7 +182,7 @@ final class StepExecutor {
     private func executeTap(label: String, startTime: CFAbsoluteTime) -> StepResult {
         let step = SkillStep.tap(label: label)
 
-        guard let describeResult = describer.describe(skipOCR: false) else {
+        guard let describeResult = describer.describe() else {
             return StepResult(step: step, status: .failed,
                               message: "Failed to capture screen for OCR",
                               durationSeconds: elapsed(startTime))
@@ -267,7 +267,7 @@ final class StepExecutor {
         var currentPollUs = initialPollUs
 
         while CFAbsoluteTimeGetCurrent() < deadline {
-            if let describeResult = describer.describe(skipOCR: false),
+            if let describeResult = describer.describe(),
                ElementMatcher.isVisible(label: label, in: describeResult.elements) {
                 return StepResult(step: step, status: .passed, message: nil,
                                   durationSeconds: elapsed(startTime))
@@ -277,7 +277,7 @@ final class StepExecutor {
         }
 
         // Final check after deadline
-        if let describeResult = describer.describe(skipOCR: false),
+        if let describeResult = describer.describe(),
            ElementMatcher.isVisible(label: label, in: describeResult.elements) {
             return StepResult(step: step, status: .passed, message: nil,
                               durationSeconds: elapsed(startTime))
@@ -291,7 +291,7 @@ final class StepExecutor {
     private func executeAssertVisible(label: String, startTime: CFAbsoluteTime) -> StepResult {
         let step = SkillStep.assertVisible(label: label)
 
-        guard let describeResult = describer.describe(skipOCR: false) else {
+        guard let describeResult = describer.describe() else {
             return StepResult(step: step, status: .failed,
                               message: "Failed to capture screen for OCR",
                               durationSeconds: elapsed(startTime))
@@ -311,7 +311,7 @@ final class StepExecutor {
     private func executeAssertNotVisible(label: String, startTime: CFAbsoluteTime) -> StepResult {
         let step = SkillStep.assertNotVisible(label: label)
 
-        guard let describeResult = describer.describe(skipOCR: false) else {
+        guard let describeResult = describer.describe() else {
             // If we can't describe the screen, we can't confirm visibility either way
             return StepResult(step: step, status: .failed,
                               message: "Failed to capture screen for OCR",

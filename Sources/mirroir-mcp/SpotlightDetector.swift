@@ -42,7 +42,7 @@ enum SpotlightDetector {
     ) -> ScreenDescriber.DescribeResult? {
         for _ in 0..<maxRetries {
             usleep(retryDelayMs * 1000)
-            guard let result = describer.describe(skipOCR: false) else { continue }
+            guard let result = describer.describe() else { continue }
             if !isSpotlightVisible(elements: result.elements) {
                 return result
             }

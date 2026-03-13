@@ -215,7 +215,7 @@ extension MirroirMCP {
 
                 // Capture screen fingerprint via 1 OCR call for content drift detection
                 let fingerprint: ScreenFingerprint?
-                if let describeResult = target.describer.describe(skipOCR: false) {
+                if let describeResult = target.describer.describe() {
                     fingerprint = StructuralFingerprint.buildScreenFingerprint(
                         elements: describeResult.elements,
                         icons: describeResult.icons)

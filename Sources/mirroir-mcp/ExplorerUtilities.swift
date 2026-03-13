@@ -33,7 +33,7 @@ enum ExplorerUtilities {
         describer: ScreenDescribing,
         input: InputProviding
     ) -> ScreenDescriber.DescribeResult? {
-        guard var result = describer.describe(skipOCR: false) else { return nil }
+        guard var result = describer.describe() else { return nil }
 
         for _ in 0..<AlertDetector.maxDismissAttempts {
             guard let alert = AlertDetector.detectAlert(elements: result.elements) else {
@@ -43,7 +43,7 @@ enum ExplorerUtilities {
             _ = input.tap(x: alert.dismissTarget.tapX, y: alert.dismissTarget.tapY)
             usleep(EnvConfig.stepSettlingDelayMs * 1000)
             // Re-OCR to get clean screen
-            guard let cleanResult = describer.describe(skipOCR: false) else { return nil }
+            guard let cleanResult = describer.describe() else { return nil }
             result = cleanResult
         }
 

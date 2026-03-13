@@ -30,7 +30,7 @@ final class DiagnosisValueTests: XCTestCase {
         let describer = ScreenDescriber(bridge: bridge, capture: capture)
 
         // Get current screen to find a real element
-        guard let screen = describer.describe(skipOCR: false) else {
+        guard let screen = describer.describe() else {
             throw IntegrationTestError.describeReturnedNil
         }
 

@@ -157,7 +157,7 @@ extension DFSExplorer {
         input: InputProviding,
         describer: ScreenDescribing
     ) -> String {
-        guard let afterResult = describer.describe(skipOCR: false) else {
+        guard let afterResult = describer.describe() else {
             // OCR failed — trust the expected parent as fallback
             return expectedFP
         }
@@ -171,7 +171,7 @@ extension DFSExplorer {
         // Mismatch: retry the back tap once with fresh OCR elements
         _ = tapBackButton(elements: afterResult.elements, input: input)
 
-        guard let retryResult = describer.describe(skipOCR: false) else {
+        guard let retryResult = describer.describe() else {
             return expectedFP
         }
 
@@ -239,7 +239,7 @@ extension DFSExplorer {
         var currentElements = elements
         for _ in 0..<stepsBack {
             guard tapBackButton(elements: currentElements, input: input) else { break }
-            if let result = describer.describe(skipOCR: false) {
+            if let result = describer.describe() {
                 currentElements = result.elements
             }
         }

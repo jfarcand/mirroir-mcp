@@ -383,7 +383,7 @@ final class CompiledSkillIntegrationTests: XCTestCase {
         XCTAssertEqual(recordingDescriber.callCount, 0)
 
         // First call
-        let result1 = recordingDescriber.describe(skipOCR: false)
+        let result1 = recordingDescriber.describe()
         XCTAssertNotNil(result1, "First describe() should return a result")
         XCTAssertNotNil(recordingDescriber.firstResult, "firstResult should be set after first call")
         XCTAssertEqual(recordingDescriber.callCount, 1)
@@ -393,7 +393,7 @@ final class CompiledSkillIntegrationTests: XCTestCase {
                       "First result should contain 'Settings' from FakeMirroring")
 
         // Second call
-        let result2 = recordingDescriber.describe(skipOCR: false)
+        let result2 = recordingDescriber.describe()
         XCTAssertNotNil(result2, "Second describe() should return a result")
         XCTAssertEqual(recordingDescriber.callCount, 2)
 

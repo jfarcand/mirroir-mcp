@@ -30,17 +30,9 @@ final class VisionScreenDescriber: @unchecked Sendable {
         self.targetImageWidth = targetImageWidth
     }
 
-    func describe(skipOCR: Bool = false) -> ScreenDescriber.DescribeResult? {
+    func describe() -> ScreenDescriber.DescribeResult? {
         guard let info = bridge.getWindowInfo(), info.windowID != 0 else { return nil }
         guard let data = capture.captureData() else { return nil }
-
-        // When skipOCR, return only the grid-overlaid screenshot (same as ScreenDescriber)
-        if skipOCR {
-            let griddedData = GridOverlay.addOverlay(to: data, windowSize: info.size) ?? data
-            return ScreenDescriber.DescribeResult(
-                elements: [], hints: [], screenshotBase64: griddedData.base64EncodedString()
-            )
-        }
 
         // Resize for the vision API (Retina PNGs are too large)
         guard let resized = ImageResizer.resize(

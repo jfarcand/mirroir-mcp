@@ -60,19 +60,12 @@ extension MirroirMCP {
                 positions from screenshots. Returns both a structured text list of elements \
                 and the screenshot image. Coordinates are in the same point system as the \
                 tap tool (0,0 = top-left of mirroring window). \
-                Set skip_ocr to true to skip Vision OCR and return only the grid-overlaid \
-                screenshot, letting the MCP client use its own vision model. \
                 Set scroll to true to scroll through the full page and collect all elements \
                 with page-absolute Y coordinates.
                 """,
             inputSchema: [
                 "type": .string("object"),
                 "properties": .object([
-                    "skip_ocr": .object([
-                        "type": .string("boolean"),
-                        "description": .string(
-                            "Skip Vision OCR and return only the grid-overlaid screenshot (default: false)"),
-                    ]),
                     "scroll": .object([
                         "type": .string("boolean"),
                         "description": .string(
@@ -97,11 +90,10 @@ extension MirroirMCP {
                     }
                 }
 
-                let skipOCR = args["skip_ocr"]?.asBool() ?? false
                 let scrollEnabled = args["scroll"]?.asBool() ?? false
 
                 // Full-page scroll mode: collect all elements across viewports
-                if scrollEnabled && !skipOCR {
+                if scrollEnabled {
                     let input = ctx.input
                     guard let scrollResult = describer.describeFullPage(
                         input: input, bridge: bridge
@@ -130,19 +122,9 @@ extension MirroirMCP {
                     )
                 }
 
-                guard let result = describer.describe(skipOCR: skipOCR) else {
+                guard let result = describer.describe() else {
                     return .error(
                         "Failed to capture/analyze screen. Is the '\(ctx.name)' window visible?")
-                }
-
-                if skipOCR {
-                    return MCPToolResult(
-                        content: [
-                            .text("Screenshot captured with grid overlay (OCR skipped). Use your vision model to analyze the image."),
-                            .image(result.screenshotBase64, mimeType: "image/png"),
-                        ],
-                        isError: false
-                    )
                 }
 
                 var lines = ["Screen elements (tap coordinates in points):"]
@@ -154,7 +136,7 @@ extension MirroirMCP {
                 }
                 if !result.icons.isEmpty {
                     lines.append("")
-                    lines.append("Unlabeled icons (estimated positions — use describe_screen with skip_ocr=true to identify):")
+                    lines.append("Unlabeled icons (estimated positions):")
                     for icon in result.icons.sorted(by: { $0.tapX < $1.tapX }) {
                         lines.append("- Icon at (\(Int(icon.tapX)), \(Int(icon.tapY))), ~\(Int(icon.estimatedSize))x\(Int(icon.estimatedSize))pt")
                     }

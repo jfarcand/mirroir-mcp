@@ -270,7 +270,7 @@ final class EventRecorder {
     /// Run OCR and cache the element positions for tap label lookup.
     private func refreshOCRCache() {
         guard let describer = describer,
-              let result = describer.describe(skipOCR: false)
+              let result = describer.describe()
         else { return }
         cachedElements = result.elements
     }

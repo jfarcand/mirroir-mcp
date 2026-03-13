@@ -41,7 +41,7 @@ enum CalibrationScroller {
         maxScrolls: Int = EnvConfig.defaultScrollMaxAttempts
     ) -> ScrollResult? {
         // Start with the current viewport
-        guard let firstResult = describer.describe(skipOCR: false) else {
+        guard let firstResult = describer.describe() else {
             return nil
         }
 
@@ -94,7 +94,7 @@ enum CalibrationScroller {
             usleep(EnvConfig.toolSettlingDelayUs)
             scrollCount += 1
 
-            guard let result = describer.describe(skipOCR: false) else {
+            guard let result = describer.describe() else {
                 break
             }
 

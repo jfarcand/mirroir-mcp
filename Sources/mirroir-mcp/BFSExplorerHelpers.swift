@@ -268,7 +268,7 @@ extension BFSExplorer {
         let toY = windowSize.height * EnvConfig.scrollSwipeToYFraction
         _ = input.swipe(fromX: centerX, fromY: fromY, toX: centerX, toY: toY, durationMs: 300)
         usleep(EnvConfig.stepSettlingDelayMs * 1000)
-        return describer.describe(skipOCR: false)?.elements
+        return describer.describe()?.elements
     }
 
     /// Attempt to scroll the current screen to reveal hidden elements.
@@ -289,7 +289,7 @@ extension BFSExplorer {
 
         usleep(EnvConfig.stepSettlingDelayMs * 1000)
 
-        guard let afterResult = describer.describe(skipOCR: false) else { return nil }
+        guard let afterResult = describer.describe() else { return nil }
 
         let novelCount = graph.mergeScrolledElements(
             fingerprint: currentFP, newElements: afterResult.elements
@@ -378,7 +378,7 @@ extension BFSExplorer {
             usleep(EnvConfig.stepSettlingDelayMs * 1000)
             scrollsDone += 1
 
-            guard let result = describer.describe(skipOCR: false) else { break }
+            guard let result = describer.describe() else { break }
             let novelCount = graph.mergeScrolledElements(
                 fingerprint: fingerprint, newElements: result.elements
             )

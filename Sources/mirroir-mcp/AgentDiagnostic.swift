@@ -40,7 +40,7 @@ enum AgentDiagnostic {
         guard let hints = compiledStep.hints else { return nil }
 
         // Run one OCR call to see the actual screen
-        guard let screen = describer.describe(skipOCR: false) else {
+        guard let screen = describer.describe() else {
             return Recommendation(
                 stepIndex: compiledStep.index,
                 stepType: compiledStep.type,

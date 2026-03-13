@@ -25,8 +25,8 @@ final class RecordingDescriber: ScreenDescribing, @unchecked Sendable {
         self.wrapped = describer
     }
 
-    func describe(skipOCR: Bool) -> ScreenDescriber.DescribeResult? {
-        let result = wrapped.describe(skipOCR: skipOCR)
+    func describe() -> ScreenDescriber.DescribeResult? {
+        let result = wrapped.describe()
         lastResult = result
         if firstResult == nil && result != nil {
             firstResult = result

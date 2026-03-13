@@ -29,7 +29,7 @@ final class ExplorationCoverageTests: XCTestCase {
         let describer = ScreenDescriber(bridge: bridge, capture: capture)
 
         // Get the initial screen
-        guard let initialScreen = describer.describe(skipOCR: false) else {
+        guard let initialScreen = describer.describe() else {
             throw IntegrationTestError.describeReturnedNil
         }
 

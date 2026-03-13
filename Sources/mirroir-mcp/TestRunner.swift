@@ -105,7 +105,7 @@ enum TestRunner {
                 (try? CompiledSkillIO.load(for: skill.filePath))?.screenFingerprint != nil
             }
             let liveFingerprint: ScreenFingerprint?
-            if anyHasFingerprint, let describeResult = describer.describe(skipOCR: false) {
+            if anyHasFingerprint, let describeResult = describer.describe() {
                 liveFingerprint = StructuralFingerprint.buildScreenFingerprint(
                     elements: describeResult.elements,
                     icons: describeResult.icons)

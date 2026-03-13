@@ -99,7 +99,7 @@ final class CompiledStepExecutor {
 
         // Optional post-tap verification via OCR
         if EnvConfig.verifyTaps {
-            if let screen = describer.describe(skipOCR: false) {
+            if let screen = describer.describe() {
                 if let label = step.labelValue,
                    let match = ElementMatcher.findMatch(label: label, in: screen.elements) {
                     let dx = abs(match.element.tapX - x)
@@ -196,7 +196,7 @@ final class CompiledStepExecutor {
 
         // Post-scroll OCR verification: check if the target label is visible
         if case .scrollTo(let label, _, _) = step {
-            if let screen = describer.describe(skipOCR: false),
+            if let screen = describer.describe(),
                ElementMatcher.isVisible(label: label, in: screen.elements) {
                 return StepResult(step: step, status: .passed,
                                   message: "compiled \(count) scroll(s) \(direction), target verified",
@@ -222,7 +222,7 @@ final class CompiledStepExecutor {
                                  toX: toX, toY: toY, durationMs: EnvConfig.defaultSwipeDurationMs)
                 usleep(config.settlingDelayMs * 1000)
 
-                if let screen = describer.describe(skipOCR: false),
+                if let screen = describer.describe(),
                    ElementMatcher.isVisible(label: label, in: screen.elements) {
                     return StepResult(step: step, status: .passed,
                                       message: "compiled \(count + 1) scroll(s) \(direction), target verified after extra scroll",

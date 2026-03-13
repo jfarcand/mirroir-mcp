@@ -104,7 +104,7 @@ protocol TextRecognizing: Sendable {
 
 /// Abstracts OCR-based screen element detection.
 protocol ScreenDescribing: Sendable {
-    func describe(skipOCR: Bool) -> ScreenDescriber.DescribeResult?
+    func describe() -> ScreenDescriber.DescribeResult?
 
     /// Describe the full page by scrolling through all viewports.
     /// Delegates to `CalibrationScroller.collectFullPage()` for element collection.

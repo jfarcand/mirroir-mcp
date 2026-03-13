@@ -36,7 +36,7 @@ final class CoordinateStabilityTests: XCTestCase {
         var duplicateLabels: Set<String> = []
 
         for i in 0..<sampleCount {
-            guard let result = describer.describe(skipOCR: false) else {
+            guard let result = describer.describe() else {
                 XCTFail("describe() returned nil on iteration \(i)")
                 return
             }

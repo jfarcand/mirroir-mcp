@@ -7,7 +7,7 @@ All 32 tools exposed by the MCP server. Mutating tools require [permission](perm
 | Tool | Parameters | Description |
 |------|-----------|-------------|
 | `screenshot` | — | Capture the iPhone screen as base64 PNG |
-| `describe_screen` | `skip_ocr`?, `scroll`? | OCR the screen and return text elements with tap coordinates plus a grid-overlaid screenshot. `scroll: true` does a full-page scroll to capture all elements. |
+| `describe_screen` | `scroll`? | OCR the screen and return text elements with tap coordinates plus a grid-overlaid screenshot. `scroll: true` does a full-page scroll to capture all elements. |
 | `start_recording` | `output_path`? | Start video recording of the mirrored screen |
 | `stop_recording` | — | Stop recording and return the .mov file path |
 | `tap` | `x`, `y`, `cursor_mode`? | Tap at coordinates (relative to mirroring window) |
@@ -46,8 +46,6 @@ Coordinates are in points relative to the mirroring window's top-left corner. Us
 ## Describe Screen
 
 `describe_screen` returns detected elements with their tap coordinates, plus a grid-overlaid screenshot for visual context. By default it runs Apple Vision OCR for text recognition. If a YOLO CoreML model is installed in `~/.mirroir-mcp/models/`, the server auto-detects it and merges icon detections — giving the AI tap targets for non-text elements (buttons, toggles, icons) that text-only OCR misses. See [Icon Detection](../README.md#icon-detection) for setup.
-
-Set `skip_ocr: true` to skip all built-in recognition and return only the grid-overlaid screenshot. This lets MCP clients use their own vision model to analyze the screen instead.
 
 Set `scroll: true` to perform a full-page scroll before returning results. The server scrolls through the entire page, deduplicates elements across viewports, and returns all detected elements — not just those visible in the initial viewport.
 

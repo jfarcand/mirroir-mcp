@@ -26,7 +26,7 @@ final class MockExplorerDescriber: ScreenDescribing, @unchecked Sendable {
         self.screens = screens
     }
 
-    func describe(skipOCR: Bool) -> ScreenDescriber.DescribeResult? {
+    func describe() -> ScreenDescriber.DescribeResult? {
         lock.lock()
         defer { lock.unlock() }
         guard index < screens.count else {
