@@ -1,0 +1,5 @@
+module CEmbacle {
+    header "include/embacle.h"
+    link "embacle"
+    export *
+}

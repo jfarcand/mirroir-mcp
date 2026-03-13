@@ -376,6 +376,15 @@ extension EnvConfig {
                    default: "llm_first_screen")
     }
 
+    // MARK: - Agent Transport
+
+    /// Agent transport mode: "auto" (default) or "http".
+    /// When "auto", uses embedded Rust FFI if linked, otherwise falls back to HTTP.
+    /// Set to "http" to force HTTP even when the embedded runtime is available.
+    public static var agentTransport: String {
+        readString("agentTransport", envVar: "MIRROIR_AGENT_TRANSPORT", default: "auto")
+    }
+
     // MARK: - Screen Describer
 
     /// Screen describer mode: "ocr" (default) or "vision".

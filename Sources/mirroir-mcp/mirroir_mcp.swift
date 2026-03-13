@@ -89,6 +89,20 @@ struct MirroirMCP {
         // Log full effective configuration
         DebugLog.persist("config", "Effective configuration:\n\(EnvConfig.formattedConfigDump())")
 
+        // Auto-initialize embedded embacle when the Rust FFI is linked.
+        // Set agentTransport to "http" in settings.json to force HTTP even when linked.
+        if EmbacleFFI.isAvailable && EnvConfig.agentTransport != "http" {
+            guard EmbacleFFI.initialize() else {
+                fputs("Error: Failed to initialize embedded embacle runtime\n", stderr)
+                Darwin.exit(1)
+            }
+            DebugLog.persist("startup", "Agent transport: embedded (Rust FFI)")
+        } else if EmbacleFFI.isAvailable {
+            DebugLog.persist("startup", "Agent transport: HTTP (embedded available but overridden)")
+        } else {
+            DebugLog.persist("startup", "Agent transport: HTTP")
+        }
+
         let registry = buildTargetRegistry()
         let server = MCPServer(policy: policy)
 
@@ -100,6 +114,11 @@ struct MirroirMCP {
 
         // Start the MCP server loop
         server.run()
+
+        // Shutdown embedded embacle runtime if it was initialized
+        if EmbacleFFI.isAvailable && EnvConfig.agentTransport != "http" {
+            EmbacleFFI.shutdown()
+        }
     }
 
     /// Build a TargetRegistry from targets.json or fall back to a single iPhone target.

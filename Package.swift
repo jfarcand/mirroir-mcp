@@ -18,9 +18,16 @@ let package = Package(
                 .linkedFramework("CoreText"),
             ]
         ),
+        // C header + modulemap for the embacle Rust FFI (libembacle.a).
+        // Requires: `make install` in the embacle repo to place libembacle.a in /usr/local/lib/.
+        // Without it, #if canImport(CEmbacle) selects a no-op stub and the build still succeeds.
+        .systemLibrary(
+            name: "CEmbacle",
+            path: "Sources/CEmbacle"
+        ),
         .executableTarget(
             name: "mirroir-mcp",
-            dependencies: ["HelperLib"],
+            dependencies: ["HelperLib", "CEmbacle"],
             linkerSettings: [
                 .linkedFramework("ApplicationServices"),
                 .linkedFramework("CoreGraphics"),

@@ -278,6 +278,11 @@ enum AIAgentRegistry {
 func sendAgentHTTPRequest(
     url: URL, headers: [String: String], body: Data, timeoutSeconds: Int
 ) -> Data? {
+    // Embedded transport: bypass HTTP, call Rust FFI directly when available
+    if EmbacleFFI.isAvailable && EnvConfig.agentTransport != "http" {
+        return EmbacleFFI.chatCompletion(requestJSON: body, timeoutSeconds: timeoutSeconds)
+    }
+
     var request = URLRequest(url: url)
     request.httpMethod = "POST"
     request.httpBody = body

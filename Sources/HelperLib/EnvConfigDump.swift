@@ -152,6 +152,7 @@ extension EnvConfig {
                 ("screenDescriberMode", screenDescriberMode),
                 ("visionImageWidth", "\(visionImageWidth)"),
                 ("agent", agent.isEmpty ? "(none)" : agent),
+                ("agentTransport", agentTransport),
             ]),
             ("Compiled Safety", [
                 ("compiledTapMinConfidence", "\(compiledTapMinConfidence)"),
