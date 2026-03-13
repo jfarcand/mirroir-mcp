@@ -18,6 +18,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Install embacle
+        run: |
+          brew tap dravr-ai/tap
+          brew install embacle
+          echo "LIBRARY_PATH=$(brew --prefix)/lib" >> "$GITHUB_ENV"
+
       # --- Build ---
 
       - name: Build release binaries

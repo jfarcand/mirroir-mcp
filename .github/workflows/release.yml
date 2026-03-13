@@ -27,6 +27,12 @@ jobs:
         with:
           token: ${{ secrets.RELEASE_PAT }}
 
+      - name: Install embacle
+        run: |
+          brew tap dravr-ai/tap
+          brew install embacle
+          echo "LIBRARY_PATH=$(brew --prefix)/lib" >> "$GITHUB_ENV"
+
       - name: Determine current version
         id: current
         run: |
