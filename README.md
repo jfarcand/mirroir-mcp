@@ -217,11 +217,37 @@ git clone https://github.com/jfarcand/mirroir-skills ~/.mirroir-mcp/skills
 
 ## From Exploration to CI
 
-Point mirroir at any app — it autonomously discovers every reachable screen using BFS graph traversal (screens are nodes, taps are edges), then outputs ready-to-run SKILL.md files.
+The `generate_skill` tool lets an AI agent explore an app and produce SKILL.md files. It uses [breadth-first search](https://en.wikipedia.org/wiki/Breadth-first_search) (BFS) to traverse the app as a navigation graph — screens are nodes, tappable elements are edges. The explorer OCRs each screen, matches elements against [component definitions](#component-detection) to decide what to tap, visits child screens, and backtracks via the back chevron. Duplicate screens are skipped via structural fingerprinting.
+
+Exploration is bounded — it does not discover every reachable screen in large apps. Depth, screen count, and time limits keep runs practical. For targeted flows, provide a `goal` to focus the traversal.
 
 ### Generate
 
-A single `generate_skill(action: "explore")` call runs autonomous BFS traversal — exploring each screen breadth-first, replaying paths to reach child screens, building a navigation graph of the entire app.
+Two modes: **autonomous exploration** (BFS) and **guided session** (manual step-by-step).
+
+**Autonomous BFS exploration** — the agent explores on its own:
+
+```
+Explore the Settings app and generate a skill that checks the iOS version.
+```
+
+This calls `generate_skill(action: "explore", app_name: "Settings", goal: "check iOS version")` under the hood. The explorer launches the app, runs BFS from the root screen, and outputs a SKILL.md for the discovered path.
+
+| Parameter | Default | Description |
+|-----------|---------|-------------|
+| `app_name` | required | App to explore |
+| `goal` | none | Focus exploration toward a specific flow (e.g. "check software version") |
+| `goals` | none | Array of goals — one SKILL.md per goal |
+| `max_depth` | 6 | Maximum BFS depth |
+| `max_screens` | 30 | Maximum screens to visit |
+| `max_time` | 300 | Maximum seconds before stopping |
+| `strategy` | auto | `"mobile"` (default), `"social"` (Reddit, Instagram), or `"desktop"` (macOS windows) |
+
+**Guided session** — the AI navigates manually, capturing each screen:
+
+1. `generate_skill(action: "start", app_name: "MyApp")` — launch app, OCR first screen
+2. Use `tap`/`swipe`/`type_text` to navigate, then `generate_skill(action: "capture")` to record each screen
+3. `generate_skill(action: "finish")` — assemble captured screens into a SKILL.md
 
 ### Test
 
