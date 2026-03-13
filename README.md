@@ -15,12 +15,6 @@
 
 Give your AI eyes, hands, and a real iPhone. An MCP server that lets any AI agent see the screen, tap what it needs, and figure the rest out — through macOS iPhone Mirroring. Experimental support for macOS windows. [32 tools](docs/tools.md), any MCP client.
 
-## What's Changed
-
-- **Icon detection (YOLO CoreML)** — `describe_screen` can now detect non-text UI elements (icons, buttons, toggles, activity rings) alongside Vision OCR text. Drop a CoreML `.mlmodelc` in `~/.mirroir-mcp/models/` and the server auto-detects it at startup. See [Icon Detection](#icon-detection) for details.
-- **Startup config dump** — All effective configuration values are logged at startup in a grouped two-column format. Check `~/.mirroir-mcp/debug.log` to see exactly what settings are active.
-- **Component-driven exploration** — The explorer matches screen regions against [component definitions](docs/components.md) (`.md` files describing UI patterns like table rows, toggles, tab bars) instead of guessing from raw OCR. Multi-row elements (Health app summary cards) are absorbed into single tappable components. Calibrate definitions against live screens with `calibrate_component`.
-
 ## Requirements
 
 - macOS 15+
@@ -140,6 +134,55 @@ test@example.com / password123. Screenshot after each step.
 Start recording, open Settings, scroll to General > About, stop recording.
 ```
 
+## Screen Intelligence
+
+`describe_screen` is the AI's eyes. Three backends work together to give the agent a complete picture of what's on screen — text, icons, and semantic UI structure.
+
+### Apple Vision OCR (default)
+
+The default backend uses Apple's Vision framework to detect every text element on screen and return exact tap coordinates. This is fast, local, and requires no API keys or external services.
+
+### Icon Detection (YOLO CoreML)
+
+Text-only OCR misses non-text UI elements — buttons, toggles, tab bar icons, activity rings. Drop a YOLO CoreML model (`.mlmodelc`) in `~/.mirroir-mcp/models/` and the server auto-detects it at startup, merging icon detection results with OCR text. The AI gets tap targets for elements that text-only OCR cannot see.
+
+| Mode | `ocrBackend` setting | Behavior |
+|------|---------------------|----------|
+| Auto-detect (default) | `"auto"` | Uses Vision + YOLO if a model is installed, Vision only otherwise |
+| Vision only | `"vision"` | Apple Vision OCR text only |
+| YOLO only | `"yolo"` | CoreML element detection only |
+| Both | `"both"` | Always merge both backends (falls back to Vision if no model) |
+
+### AI Vision Mode (embacle)
+
+Instead of local OCR, `describe_screen` can send the screenshot to an AI vision model that identifies UI elements semantically — cards, tabs, buttons, icons, navigation structure — not just raw text. This produces richer context for the agent, especially on screens with complex layouts.
+
+The [embacle](https://github.com/dravr-ai/dravr-embacle) runtime is embedded directly into the mirroir-mcp binary via Rust FFI. When vision mode is enabled, `describe_screen` calls the embedded runtime in-process — no separate server, no network round-trip, no additional setup. The FFI layer (`EmbacleFFI.swift` → `libembacle.a`) handles initialization, chat completion requests, and memory management across the Swift/Rust boundary.
+
+embacle routes vision requests through already-authenticated CLI tools (GitHub Copilot, Claude Code) so there is no separate API key to manage. If you have a Copilot or Claude Code subscription, you already have access.
+
+```json
+// .mirroir-mcp/settings.json
+{
+  "agent": "embacle",
+  "screenDescriberMode": "vision"
+}
+```
+
+Or via environment variables:
+
+```bash
+MIRROIR_AGENT=embacle MIRROIR_SCREEN_DESCRIBER_MODE=vision
+```
+
+| Setting | Default | Description |
+|---------|---------|-------------|
+| `screenDescriberMode` | `"ocr"` | `"ocr"` for local Vision OCR + YOLO, `"vision"` for AI vision model |
+| `agent` | `""` | Agent name for vision mode (e.g. `"embacle"`) |
+| `visionImageWidth` | `500` | Target image width in pixels for vision API calls |
+
+When `screenDescriberMode` is `"ocr"` (default), nothing changes — the server uses Apple Vision OCR as before.
+
 ## Skills
 
 When you find yourself repeating the same agent workflow, capture it as a skill. Skills are SKILL.md files — numbered steps the AI follows, adapting to layout changes and unexpected dialogs. Steps like `Tap "Email"` use OCR — no hardcoded coordinates.
@@ -184,9 +227,17 @@ Install ready-to-use skills from [jfarcand/mirroir-skills](https://github.com/jf
 git clone https://github.com/jfarcand/mirroir-skills ~/.mirroir-mcp/skills
 ```
 
-## Test Runner
+## From Exploration to CI
 
-Run skills deterministically from the CLI — no AI in the loop. Designed for CI and regression testing.
+Point mirroir at any app — it autonomously discovers every reachable screen using BFS graph traversal (screens are nodes, taps are edges), then outputs ready-to-run SKILL.md files.
+
+### Generate
+
+A single `generate_skill(action: "explore")` call runs autonomous BFS traversal — exploring each screen breadth-first, replaying paths to reach child screens, building a navigation graph of the entire app.
+
+### Test
+
+Run skills deterministically from the CLI — no AI in the loop:
 
 ```bash
 mirroir test apps/settings/check-about
@@ -207,7 +258,7 @@ Exit code `0` = all pass, `1` = any failure.
 
 ### Compiled Skills
 
-Compile a skill once to capture coordinates and timing. Replay with zero OCR.
+Compile a skill once to capture coordinates and timing. Replay with zero OCR — a 10-step skill drops from 5+ seconds of OCR to under a second.
 
 ```bash
 mirroir compile apps/settings/check-about        # compile
@@ -240,35 +291,16 @@ Built-in agents:
 Custom agents can be defined as YAML profiles in `~/.mirroir-mcp/agents/`.
 
 <details>
-<summary>No API key? Use embacle-server</summary>
+<summary>No API key? Use embacle</summary>
 
-[embacle-server](https://github.com/dravr-ai/dravr-embacle) wraps already-authenticated CLI tools (GitHub Copilot, Claude Code, etc.) behind an OpenAI-compatible API. If you have a Copilot or Claude Code subscription, you already have access — no separate API key needed:
+[embacle](https://github.com/dravr-ai/dravr-embacle) routes requests through already-authenticated CLI tools (GitHub Copilot, Claude Code, etc.) — no separate API key needed:
 
 ```bash
-cargo install embacle-server
-embacle-server --port 3000 --provider copilot   # or: --provider claude_code
+brew tap dravr-ai/tap && brew install embacle
 mirroir test --agent embacle my-skill
 ```
 
 </details>
-
-## Recorder
-
-Record interactions as a skill file:
-
-```bash
-mirroir record -o login-flow.yaml -n "Login Flow" --app "MyApp"
-```
-
-## Generate Skill
-
-Let an AI agent explore an app and produce SKILL.md files automatically:
-
-```
-Explore the Settings app and generate a skill that checks the iOS version.
-```
-
-Uses BFS graph traversal — exploring each screen breadth-first, replaying paths from the root to reach child screens, and backtracking when branches are exhausted. Duplicate screens are automatically skipped via structural fingerprinting.
 
 ## Component Detection
 
@@ -284,7 +316,37 @@ Use calibrate_component with my-component.md to check how it matches.
 
 See [Component Detection](docs/components.md) for the definition format, match rules, and the detection pipeline.
 
-## Doctor
+## Security
+
+Giving an AI access to your phone demands defense in depth. mirroir-mcp is **fail-closed** at every layer.
+
+- **Tool permissions** — Without a config file, only read-only tools (`screenshot`, `describe_screen`) are exposed. Mutating tools are hidden from the MCP client entirely — it never sees them.
+- **App blocking** — `blockedApps` in `permissions.json` prevents the AI from interacting with sensitive apps like Wallet or Banking, even if mutating tools are allowed.
+- **No root required** — Runs as a regular user process using the macOS CGEvent API. No daemons, no kernel extensions, no root privileges — just Accessibility permissions.
+- **Kill switch** — Close iPhone Mirroring to kill all input instantly.
+
+```json
+// ~/.mirroir-mcp/permissions.json
+{
+  "allow": ["tap", "swipe", "type_text", "press_key", "launch_app"],
+  "deny": [],
+  "blockedApps": ["Wallet", "Banking"]
+}
+```
+
+See [Permissions](docs/permissions.md) and [Security](docs/security.md) for the full threat model.
+
+## CLI Tools
+
+### Recorder
+
+Record interactions as a skill file:
+
+```bash
+mirroir record -o login-flow.yaml -n "Login Flow" --app "MyApp"
+```
+
+### Doctor
 
 Verify your setup:
 
@@ -293,7 +355,7 @@ mirroir doctor
 mirroir doctor --json    # machine-readable output
 ```
 
-## Configure
+### Configure
 
 Set up your keyboard layout for non-US keyboards:
 
@@ -326,49 +388,6 @@ brew uninstall mirroir-mcp
 # From source
 ./uninstall-mirroir.sh
 ```
-
-## Icon Detection
-
-By default, `describe_screen` uses Apple Vision OCR to detect text on screen. If a YOLO CoreML model (`.mlmodelc`) is present in `~/.mirroir-mcp/models/`, the server auto-detects it and merges icon detection results with OCR text — giving the AI tap targets for non-text elements like buttons, toggles, and tab bar icons that text-only OCR misses.
-
-| Mode | `ocrBackend` setting | Behavior |
-|------|---------------------|----------|
-| Auto-detect (default) | `"auto"` | Uses Vision + YOLO if a model is installed, Vision only otherwise |
-| Vision only | `"vision"` | Apple Vision OCR text only |
-| YOLO only | `"yolo"` | CoreML element detection only |
-| Both | `"both"` | Always merge both backends (fails gracefully to Vision if no model) |
-
-### Installing a model
-
-Place a compiled CoreML model (`.mlmodelc`) in `~/.mirroir-mcp/models/`. The server will find and load it automatically. You can also point to a specific path via the `yoloModelPath` setting or `MIRROIR_YOLO_MODEL_PATH` environment variable.
-
-The `yoloConfidenceThreshold` setting (default: `0.3`) controls the minimum detection confidence — lower values detect more elements but may introduce noise.
-
-## AI Vision Mode
-
-Instead of local OCR, `describe_screen` can use an AI vision model to identify UI elements. This gives the AI semantic understanding of the screen — cards, tabs, buttons, icons — not just raw text. Requires [embacle-server](https://github.com/dravr-ai/dravr-embacle) running locally.
-
-```json
-// .mirroir-mcp/settings.json
-{
-  "agent": "embacle",
-  "screenDescriberMode": "vision"
-}
-```
-
-Or via environment variables:
-
-```bash
-MIRROIR_AGENT=embacle MIRROIR_SCREEN_DESCRIBER_MODE=vision
-```
-
-| Setting | Default | Description |
-|---------|---------|-------------|
-| `screenDescriberMode` | `"ocr"` | `"ocr"` for local Vision OCR + YOLO, `"vision"` for AI vision model |
-| `agent` | `""` | Agent name for vision mode (e.g. `"embacle"`) |
-| `visionImageWidth` | `500` | Target image width in pixels for vision API calls |
-
-When `screenDescriberMode` is `"ocr"` (default), nothing changes — the server uses Apple Vision OCR as before.
 
 ## Configuration
 
