@@ -344,6 +344,32 @@ Place a compiled CoreML model (`.mlmodelc`) in `~/.mirroir-mcp/models/`. The ser
 
 The `yoloConfidenceThreshold` setting (default: `0.3`) controls the minimum detection confidence — lower values detect more elements but may introduce noise.
 
+## AI Vision Mode
+
+Instead of local OCR, `describe_screen` can use an AI vision model to identify UI elements. This gives the AI semantic understanding of the screen — cards, tabs, buttons, icons — not just raw text. Requires [embacle-server](https://github.com/dravr-ai/dravr-embacle) running locally.
+
+```json
+// .mirroir-mcp/settings.json
+{
+  "agent": "embacle",
+  "screenDescriberMode": "vision"
+}
+```
+
+Or via environment variables:
+
+```bash
+MIRROIR_AGENT=embacle MIRROIR_SCREEN_DESCRIBER_MODE=vision
+```
+
+| Setting | Default | Description |
+|---------|---------|-------------|
+| `screenDescriberMode` | `"ocr"` | `"ocr"` for local Vision OCR + YOLO, `"vision"` for AI vision model |
+| `agent` | `""` | Agent name for vision mode (e.g. `"embacle"`) |
+| `visionImageWidth` | `500` | Target image width in pixels for vision API calls |
+
+When `screenDescriberMode` is `"ocr"` (default), nothing changes — the server uses Apple Vision OCR as before.
+
 ## Configuration
 
 Override timing defaults via `settings.json`:
