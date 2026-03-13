@@ -24,7 +24,10 @@ jobs:
         run: |
           brew tap dravr-ai/tap
           brew install embacle
-          echo "LIBRARY_PATH=$(brew --prefix)/lib" >> "$GITHUB_ENV"
+          sudo mkdir -p /usr/local/lib
+          for f in "$(brew --prefix embacle)/lib/"libembacle*; do
+            [ -f "$f" ] && sudo ln -sf "$f" /usr/local/lib/
+          done
 
       - name: Run mirroir.sh
         run: ./mirroir.sh
@@ -92,7 +95,10 @@ jobs:
         run: |
           brew tap dravr-ai/tap
           brew install embacle
-          echo "LIBRARY_PATH=$(brew --prefix)/lib" >> "$GITHUB_ENV"
+          sudo mkdir -p /usr/local/lib
+          for f in "$(brew --prefix embacle)/lib/"libembacle*; do
+            [ -f "$f" ] && sudo ln -sf "$f" /usr/local/lib/
+          done
 
       - name: Create source tarball
         run: |
@@ -203,7 +209,10 @@ jobs:
         run: |
           brew tap dravr-ai/tap
           brew install embacle
-          echo "LIBRARY_PATH=$(brew --prefix)/lib" >> "$GITHUB_ENV"
+          sudo mkdir -p /usr/local/lib
+          for f in "$(brew --prefix embacle)/lib/"libembacle*; do
+            [ -f "$f" ] && sudo ln -sf "$f" /usr/local/lib/
+          done
 
       - name: Build release binaries
         run: swift build -c release

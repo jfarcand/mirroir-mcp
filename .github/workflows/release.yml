@@ -31,7 +31,10 @@ jobs:
         run: |
           brew tap dravr-ai/tap
           brew install embacle
-          echo "LIBRARY_PATH=$(brew --prefix)/lib" >> "$GITHUB_ENV"
+          sudo mkdir -p /usr/local/lib
+          for f in "$(brew --prefix embacle)/lib/"libembacle*; do
+            [ -f "$f" ] && sudo ln -sf "$f" /usr/local/lib/
+          done
 
       - name: Determine current version
         id: current
