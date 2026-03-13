@@ -397,7 +397,7 @@ final class BFSExplorerTests: XCTestCase {
         // "icon" is what YOLO reports for unlabeled UI icons (like X dismiss buttons).
         let modalElements = [
             TapPoint(text: "Article sur le sommeil", tapX: 210, tapY: 137, confidence: 0.95),
-            TapPoint(text: "icon", tapX: 350, tapY: 85, confidence: 0.90),
+            TapPoint(text: "icon", tapX: 350, tapY: 137, confidence: 0.90),
         ]
         let modalScreen = ScreenDescriber.DescribeResult(
             elements: modalElements, screenshotBase64: "modal"
@@ -421,8 +421,8 @@ final class BFSExplorerTests: XCTestCase {
         else { XCTFail("Expected .verified after YOLO icon dismiss, got \(result)") }
 
         // Verify the dismiss tap was at the icon's coordinates
-        let hasDismissTap = input.taps.contains { Int($0.x) == 350 && Int($0.y) == 85 }
-        XCTAssertTrue(hasDismissTap, "Should have tapped the icon at (350, 85)")
+        let hasDismissTap = input.taps.contains { Int($0.x) == 350 && Int($0.y) == 137 }
+        XCTAssertTrue(hasDismissTap, "Should have tapped the icon at (350, 137)")
     }
 
     func testBacktrackIgnoresYOLOIconOnLeftSide() {
@@ -435,7 +435,7 @@ final class BFSExplorerTests: XCTestCase {
         // Modal screen with icon on the LEFT side (x=40 is < 205 = width/2)
         let modalElements = [
             TapPoint(text: "Some Title", tapX: 210, tapY: 137, confidence: 0.95),
-            TapPoint(text: "icon", tapX: 40, tapY: 85, confidence: 0.90),
+            TapPoint(text: "icon", tapX: 40, tapY: 137, confidence: 0.90),
         ]
         let modalScreen = ScreenDescriber.DescribeResult(
             elements: modalElements, screenshotBase64: "modal"
