@@ -123,7 +123,9 @@ jobs:
             depends_on "dravr-ai/tap/embacle-ffi"
 
             def install
-              system "swift", "build", "-c", "release", "--disable-sandbox"
+              embacle_lib = Formula["embacle-ffi"].opt_lib
+              system "swift", "build", "-c", "release", "--disable-sandbox",
+                "-Xlinker", "-L#{embacle_lib}"
               bin.install ".build/release/mirroir-mcp"
               bin.install_symlink "mirroir-mcp" => "mirroir"
             end
