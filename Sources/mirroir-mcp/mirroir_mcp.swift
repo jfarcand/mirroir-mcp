@@ -112,7 +112,7 @@ struct MirroirMCP {
         // Single-target mode: identical behavior to pre-multi-target code
         let bridge = MirroringBridge()
         let capture = ScreenCapture(bridge: bridge)
-        let textRecognizer = buildTextRecognizer()
+        let describer = buildDescriber(bridge: bridge, capture: capture, isMobile: true)
         let ctx = TargetContext(
             name: "iphone",
             targetType: "iphone-mirroring",
@@ -120,8 +120,7 @@ struct MirroirMCP {
             bridge: bridge,
             input: InputSimulation(bridge: bridge),
             capture: capture,
-            describer: ScreenDescriber(bridge: bridge, capture: capture,
-                                       textRecognizer: textRecognizer),
+            describer: describer,
             recorder: ScreenRecorder(bridge: bridge),
             capabilities: iphoneMirroringCapabilities
         )
@@ -158,7 +157,7 @@ struct MirroirMCP {
             let cursorMode: CursorMode = config.type == "iphone-mirroring"
                 ? .direct : .preserving
             let capture = ScreenCapture(bridge: bridge)
-            let textRecognizer = buildTextRecognizer()
+            let isMobile = config.type == "iphone-mirroring"
             targets[name] = TargetContext(
                 name: name,
                 targetType: config.type,
@@ -166,9 +165,7 @@ struct MirroirMCP {
                 bridge: bridge,
                 input: InputSimulation(bridge: bridge, cursorMode: cursorMode),
                 capture: capture,
-                describer: ScreenDescriber(bridge: bridge, capture: capture,
-                                           textRecognizer: textRecognizer,
-                                           isMobile: config.type == "iphone-mirroring"),
+                describer: buildDescriber(bridge: bridge, capture: capture, isMobile: isMobile),
                 recorder: ScreenRecorder(bridge: bridge),
                 capabilities: capabilities
             )
@@ -246,6 +243,32 @@ struct MirroirMCP {
         default:
             return AppleVisionTextRecognizer()
         }
+    }
+
+    /// Build the appropriate ScreenDescribing implementation based on configuration.
+    /// When `screenDescriberMode` is "vision" and an agent is configured, uses
+    /// VisionScreenDescriber (AI vision model). Otherwise falls back to OCR + YOLO.
+    private static func buildDescriber(
+        bridge: any WindowBridging,
+        capture: any ScreenCapturing,
+        isMobile: Bool
+    ) -> any ScreenDescribing {
+        if EnvConfig.screenDescriberMode == "vision" {
+            let agentName = EnvConfig.agent.isEmpty ? "embacle" : EnvConfig.agent
+            if let agentConfig = AIAgentRegistry.resolve(name: agentName) {
+                DebugLog.persist("startup", "Screen describer: vision (agent=\(agentName))")
+                return VisionScreenDescriber(
+                    bridge: bridge, capture: capture, agentConfig: agentConfig
+                )
+            }
+            DebugLog.persist("startup",
+                "Screen describer: vision requested but agent '\(agentName)' not found, falling back to OCR")
+        }
+        let textRecognizer = buildTextRecognizer()
+        return ScreenDescriber(
+            bridge: bridge, capture: capture,
+            textRecognizer: textRecognizer, isMobile: isMobile
+        )
     }
 }
 

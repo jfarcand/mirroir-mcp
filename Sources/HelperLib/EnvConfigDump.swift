@@ -148,6 +148,11 @@ extension EnvConfig {
                 ("explorationMaxScreens", "\(explorationMaxScreens)"),
                 ("explorationMaxTimeSeconds", "\(explorationMaxTimeSeconds)"),
             ]),
+            ("Screen Describer", [
+                ("screenDescriberMode", screenDescriberMode),
+                ("visionImageWidth", "\(visionImageWidth)"),
+                ("agent", agent.isEmpty ? "(none)" : agent),
+            ]),
             ("Compiled Safety", [
                 ("compiledTapMinConfidence", "\(compiledTapMinConfidence)"),
                 ("verifyTaps", "\(verifyTaps)"),

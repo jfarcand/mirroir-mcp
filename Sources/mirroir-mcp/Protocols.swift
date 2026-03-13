@@ -208,3 +208,5 @@ extension CoreMLElementDetector: TextRecognizing {}
 extension CompositeTextRecognizer: TextRecognizing {}
 
 extension ScreenDescriber: ScreenDescribing {}
+
+extension VisionScreenDescriber: ScreenDescribing {}
