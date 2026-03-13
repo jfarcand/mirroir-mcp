@@ -74,18 +74,26 @@ extension BFSExplorer {
 
         // Recovery 1: Try dismissing a modal (X, Close, Done in top 30% zone).
         // App Store modal sheets place the X at ~25% height, so 20% is too narrow.
+        // Two-pass: prefer explicit text matches ("x", "close", "done") over generic
+        // YOLO "icon" labels, which can collide with status bar icons.
         let topZone = windowSize.height * 0.30
         let rightHalf = windowSize.width * 0.5
-        if let dismissButton = result.elements.first(where: { el in
-            guard el.tapY <= topZone else { return false }
-            let text = el.text.trimmingCharacters(in: .whitespaces).lowercased()
-            // Text-based dismiss patterns (X, Close, Done, etc.)
-            if Self.modalDismissPatterns.contains(text) { return true }
-            // YOLO detects unlabeled icons as "icon". In the top-right of a modal
-            // sheet, this is typically the X dismiss button (e.g. Health article modals).
-            if text == "icon" && el.tapX >= rightHalf { return true }
-            return false
-        }) {
+        let statusBarCutoff = windowSize.height * 0.12
+        let dismissButton: TapPoint? = {
+            // Pass 1: explicit dismiss text (highest confidence)
+            if let textMatch = result.elements.first(where: { el in
+                guard el.tapY <= topZone else { return false }
+                let text = el.text.trimmingCharacters(in: .whitespaces).lowercased()
+                return Self.modalDismissPatterns.contains(text)
+            }) { return textMatch }
+            // Pass 2: YOLO "icon" in top-right, below the status bar
+            return result.elements.first(where: { el in
+                guard el.tapY <= topZone && el.tapY >= statusBarCutoff else { return false }
+                let text = el.text.trimmingCharacters(in: .whitespaces).lowercased()
+                return text == "icon" && el.tapX >= rightHalf
+            })
+        }()
+        if let dismissButton {
             DebugLog.log("bfs", "backtrack-verify: tapping dismiss \"\(dismissButton.text)\" " +
                 "at (\(Int(dismissButton.tapX)),\(Int(dismissButton.tapY)))")
             _ = input.tap(x: dismissButton.tapX, y: dismissButton.tapY)

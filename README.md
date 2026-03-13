@@ -11,6 +11,7 @@
 [![MCP Compliance](https://github.com/jfarcand/mirroir-mcp/actions/workflows/mcp-compliance.yml/badge.svg)](https://github.com/jfarcand/mirroir-mcp/actions/workflows/mcp-compliance.yml)
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue)](LICENSE)
 [![macOS 15+](https://img.shields.io/badge/macOS-15%2B-black?logo=apple)](https://support.apple.com/en-us/105071)
+[![Discord](https://img.shields.io/discord/1481795325953048627?logo=discord&label=Discord)](https://discord.gg/jVDBbMjPMf)
 
 Give your AI eyes, hands, and a real iPhone. An MCP server that lets any AI agent see the screen, tap what it needs, and figure the rest out — through macOS iPhone Mirroring. Experimental support for macOS windows. [32 tools](docs/tools.md), any MCP client.
 
@@ -372,6 +373,10 @@ Environment variables also work: `MIRROIR_KEYSTROKE_DELAY_US`. See [`TimingConst
 | [Troubleshooting](docs/troubleshooting.md) | Debug mode and common issues |
 | [Contributing](CONTRIBUTING.md) | How to add tools, commands, and tests |
 | [Skills Marketplace](docs/skills-marketplace.md) | Skill format, plugin discovery, and authoring |
+
+## Community
+
+Join the [Discord server](https://discord.gg/jVDBbMjPMf) to ask questions, share skills, and discuss ideas.
 
 ## Contributing
 
