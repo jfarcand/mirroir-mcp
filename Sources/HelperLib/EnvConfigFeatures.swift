@@ -376,6 +376,28 @@ extension EnvConfig {
                    default: "llm_first_screen")
     }
 
+    // MARK: - Screen Describer
+
+    /// Screen describer mode: "ocr" (default) or "vision".
+    /// When "vision", uses an AI vision model (via configured agent) to describe screens
+    /// instead of local OCR + YOLO. Requires a configured agent (e.g. embacle).
+    public static var screenDescriberMode: String {
+        readString("screenDescriberMode", envVar: "MIRROIR_SCREEN_DESCRIBER_MODE",
+                   default: "ocr")
+    }
+
+    /// Target image width (in pixels) for vision API calls. Screenshots are resized
+    /// to this width before sending to the vision model to stay within payload limits.
+    public static var visionImageWidth: Int {
+        readInt("visionImageWidth", default: 500)
+    }
+
+    /// AI agent name for vision screen description and diagnosis.
+    /// Resolved via AIAgentRegistry. Empty string means no agent configured.
+    public static var agent: String {
+        readString("agent", envVar: "MIRROIR_AGENT", default: "")
+    }
+
     // MARK: - App Identity
 
     public static var mirroringBundleID: String {
