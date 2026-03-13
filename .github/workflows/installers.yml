@@ -23,11 +23,9 @@ jobs:
       - name: Install embacle
         run: |
           brew tap dravr-ai/tap
-          brew install embacle
+          brew install embacle-ffi
           sudo mkdir -p /usr/local/lib
-          for f in "$(brew --prefix embacle)/lib/"libembacle*; do
-            [ -f "$f" ] && sudo ln -sf "$f" /usr/local/lib/
-          done
+          sudo ln -sf "$(brew --prefix embacle-ffi)/lib/libembacle.a" /usr/local/lib/
 
       - name: Run mirroir.sh
         run: ./mirroir.sh
@@ -94,11 +92,9 @@ jobs:
       - name: Install embacle
         run: |
           brew tap dravr-ai/tap
-          brew install embacle
+          brew install embacle-ffi
           sudo mkdir -p /usr/local/lib
-          for f in "$(brew --prefix embacle)/lib/"libembacle*; do
-            [ -f "$f" ] && sudo ln -sf "$f" /usr/local/lib/
-          done
+          sudo ln -sf "$(brew --prefix embacle-ffi)/lib/libembacle.a" /usr/local/lib/
 
       - name: Create source tarball
         run: |
@@ -124,7 +120,7 @@ jobs:
 
             depends_on :macos
             depends_on xcode: ["15.0", :build]
-            depends_on "dravr-ai/tap/embacle"
+            depends_on "dravr-ai/tap/embacle-ffi"
 
             def install
               system "swift", "build", "-c", "release", "--disable-sandbox"
@@ -208,11 +204,9 @@ jobs:
       - name: Install embacle
         run: |
           brew tap dravr-ai/tap
-          brew install embacle
+          brew install embacle-ffi
           sudo mkdir -p /usr/local/lib
-          for f in "$(brew --prefix embacle)/lib/"libembacle*; do
-            [ -f "$f" ] && sudo ln -sf "$f" /usr/local/lib/
-          done
+          sudo ln -sf "$(brew --prefix embacle-ffi)/lib/libembacle.a" /usr/local/lib/
 
       - name: Build release binaries
         run: swift build -c release

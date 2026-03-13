@@ -16,14 +16,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install embacle
+      - name: Install embacle FFI
         run: |
           brew tap dravr-ai/tap
-          brew install embacle
+          brew install embacle-ffi
           sudo mkdir -p /usr/local/lib
-          for f in "$(brew --prefix embacle)/lib/"libembacle*; do
-            [ -f "$f" ] && sudo ln -sf "$f" /usr/local/lib/
-          done
+          sudo ln -sf "$(brew --prefix embacle-ffi)/lib/libembacle.a" /usr/local/lib/
 
       - name: Clone skills repo
         run: |
