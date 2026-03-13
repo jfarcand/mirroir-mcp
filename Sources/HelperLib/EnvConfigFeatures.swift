@@ -387,12 +387,14 @@ extension EnvConfig {
 
     // MARK: - Screen Describer
 
-    /// Screen describer mode: "ocr" (default) or "vision".
-    /// When "vision", uses an AI vision model (via configured agent) to describe screens
+    /// Screen describer mode: "auto" (default), "ocr", or "vision".
+    /// "auto" resolves to "vision" when the embacle FFI is linked, "ocr" otherwise.
+    /// "vision" uses an AI vision model (via configured agent) to describe screens
     /// instead of local OCR + YOLO. Requires a configured agent (e.g. embacle).
+    /// "ocr" forces local Vision OCR + YOLO regardless of embacle availability.
     public static var screenDescriberMode: String {
         readString("screenDescriberMode", envVar: "MIRROIR_SCREEN_DESCRIBER_MODE",
-                   default: "ocr")
+                   default: "auto")
     }
 
     /// Target image width (in pixels) for vision API calls. Screenshots are resized

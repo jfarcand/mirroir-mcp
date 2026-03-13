@@ -157,19 +157,42 @@ Text-only OCR misses non-text UI elements — buttons, toggles, tab bar icons, a
 
 Instead of local OCR, `describe_screen` can send the screenshot to an AI vision model that identifies UI elements semantically — cards, tabs, buttons, icons, navigation structure — not just raw text. This produces richer context for the agent, especially on screens with complex layouts.
 
-The [embacle](https://github.com/dravr-ai/dravr-embacle) runtime is embedded directly into the mirroir-mcp binary via Rust FFI. When vision mode is enabled, `describe_screen` calls the embedded runtime in-process — no separate server, no network round-trip, no additional setup. The FFI layer (`EmbacleFFI.swift` → `libembacle.a`) handles initialization, chat completion requests, and memory management across the Swift/Rust boundary.
+The [embacle](https://github.com/dravr-ai/dravr-embacle) runtime is embedded directly into the mirroir-mcp binary via Rust FFI. `describe_screen` calls the embedded runtime in-process — no separate server, no network round-trip, no additional setup. The FFI layer (`EmbacleFFI.swift` → `libembacle.a`) handles initialization, chat completion requests, and memory management across the Swift/Rust boundary.
 
 embacle routes vision requests through already-authenticated CLI tools (GitHub Copilot, Claude Code) so there is no separate API key to manage. If you have a Copilot or Claude Code subscription, you already have access.
 
+#### Install
+
+```bash
+brew tap dravr-ai/tap
+brew install embacle          # CLI tools (embacle-server, embacle-mcp)
+brew install embacle-ffi      # Rust FFI static library (libembacle.a)
+```
+
+Then rebuild mirroir-mcp from source (or reinstall via Homebrew) so the binary links against `libembacle.a`:
+
+```bash
+# From source
+swift build -c release
+
+# Or via Homebrew (rebuilds automatically)
+brew reinstall mirroir-mcp
+```
+
+#### Zero-config activation
+
+When the embacle FFI is linked into the binary, `screenDescriberMode` defaults to `"auto"` which automatically resolves to vision mode. No settings change required — install embacle-ffi, rebuild, and `describe_screen` starts using AI vision.
+
+To force local OCR even when embacle is available, explicitly set `"ocr"`:
+
 ```json
-// .mirroir-mcp/settings.json (project-local) or ~/.mirroir-mcp/settings.json (global)
+// .mirroir-mcp/settings.json
 {
-  "agent": "embacle",
-  "screenDescriberMode": "vision"
+  "screenDescriberMode": "ocr"
 }
 ```
 
-When `screenDescriberMode` is `"ocr"` (default), nothing changes — the server uses Apple Vision OCR as before. See [Configuration](#configuration) for all available settings.
+See [Configuration](#configuration) for all available settings.
 
 ## Skills
 
@@ -410,7 +433,7 @@ All settings live in `settings.json` — project-local (`.mirroir-mcp/settings.j
 
 ```json
 {
-  "screenDescriberMode": "vision",
+  "screenDescriberMode": "auto",
   "agent": "embacle",
   "visionImageWidth": 500,
   "ocrBackend": "auto",
@@ -421,7 +444,7 @@ All settings live in `settings.json` — project-local (`.mirroir-mcp/settings.j
 
 | Setting | Default | Description |
 |---------|---------|-------------|
-| `screenDescriberMode` | `"ocr"` | `"ocr"` for local Vision OCR + YOLO, `"vision"` for AI vision model |
+| `screenDescriberMode` | `"auto"` | `"auto"` uses vision when embacle FFI is linked, OCR otherwise. `"vision"` forces AI vision, `"ocr"` forces local OCR + YOLO |
 | `agent` | `""` | Agent name for vision mode (e.g. `"embacle"`) |
 | `visionImageWidth` | `500` | Target image width in pixels for vision API calls |
 | `ocrBackend` | `"auto"` | OCR backend: `"auto"`, `"vision"`, `"yolo"`, or `"both"` |

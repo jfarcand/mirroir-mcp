@@ -265,23 +265,37 @@ struct MirroirMCP {
     }
 
     /// Build the appropriate ScreenDescribing implementation based on configuration.
-    /// When `screenDescriberMode` is "vision" and an agent is configured, uses
-    /// VisionScreenDescriber (AI vision model). Otherwise falls back to OCR + YOLO.
+    /// "auto" (default) resolves to "vision" when embacle FFI is linked, "ocr" otherwise.
+    /// "vision" uses VisionScreenDescriber (AI vision model via configured agent).
+    /// "ocr" forces local Vision OCR + YOLO regardless of embacle availability.
     private static func buildDescriber(
         bridge: any WindowBridging,
         capture: any ScreenCapturing,
         isMobile: Bool
     ) -> any ScreenDescribing {
-        if EnvConfig.screenDescriberMode == "vision" {
+        let mode = EnvConfig.screenDescriberMode
+        let useVision: Bool
+        switch mode {
+        case "vision":
+            useVision = true
+        case "auto":
+            useVision = EmbacleFFI.isAvailable
+        default:
+            useVision = false
+        }
+
+        if useVision {
             let agentName = EnvConfig.agent.isEmpty ? "embacle" : EnvConfig.agent
             if let agentConfig = AIAgentRegistry.resolve(name: agentName) {
-                DebugLog.persist("startup", "Screen describer: vision (agent=\(agentName))")
+                let resolvedFrom = mode == "auto" ? "auto->vision" : "vision"
+                DebugLog.persist("startup",
+                    "Screen describer: \(resolvedFrom) (agent=\(agentName))")
                 return VisionScreenDescriber(
                     bridge: bridge, capture: capture, agentConfig: agentConfig
                 )
             }
             DebugLog.persist("startup",
-                "Screen describer: vision requested but agent '\(agentName)' not found, falling back to OCR")
+                "Screen describer: vision requested but agent '\(EnvConfig.agent.isEmpty ? "embacle" : EnvConfig.agent)' not found, falling back to OCR")
         }
         let textRecognizer = buildTextRecognizer()
         return ScreenDescriber(
