@@ -162,26 +162,14 @@ The [embacle](https://github.com/dravr-ai/dravr-embacle) runtime is embedded dir
 embacle routes vision requests through already-authenticated CLI tools (GitHub Copilot, Claude Code) so there is no separate API key to manage. If you have a Copilot or Claude Code subscription, you already have access.
 
 ```json
-// .mirroir-mcp/settings.json
+// .mirroir-mcp/settings.json (project-local) or ~/.mirroir-mcp/settings.json (global)
 {
   "agent": "embacle",
   "screenDescriberMode": "vision"
 }
 ```
 
-Or via environment variables:
-
-```bash
-MIRROIR_AGENT=embacle MIRROIR_SCREEN_DESCRIBER_MODE=vision
-```
-
-| Setting | Default | Description |
-|---------|---------|-------------|
-| `screenDescriberMode` | `"ocr"` | `"ocr"` for local Vision OCR + YOLO, `"vision"` for AI vision model |
-| `agent` | `""` | Agent name for vision mode (e.g. `"embacle"`) |
-| `visionImageWidth` | `500` | Target image width in pixels for vision API calls |
-
-When `screenDescriberMode` is `"ocr"` (default), nothing changes — the server uses Apple Vision OCR as before.
+When `screenDescriberMode` is `"ocr"` (default), nothing changes — the server uses Apple Vision OCR as before. See [Configuration](#configuration) for all available settings.
 
 ## Skills
 
@@ -304,17 +292,18 @@ mirroir test --agent embacle my-skill
 
 ## Component Detection
 
-Raw OCR returns a flat list of text elements with no structure. Component definitions teach the explorer what UI patterns look like — a `.md` file per pattern (table rows, toggles, tab bars, summary cards). The explorer matches screen regions against these definitions to decide what to tap, what to skip, and when to backtrack.
+Raw OCR returns a flat list of text elements with no structure — `General` and `>` are two unrelated strings. Component definitions bridge this gap: each definition is a `.md` file that describes a UI pattern (table rows, toggles, tab bars, summary cards) with match rules, interaction behavior, and grouping logic.
 
-20 iOS component definitions are included. Place custom definitions in `~/.mirroir-mcp/components/` or `<cwd>/.mirroir-mcp/components/`.
+The detection pipeline groups OCR elements into rows, evaluates each row against all loaded definitions using hard constraints (zone, element count, chevron presence) and soft scoring signals, then selects the highest-scoring match. Multi-row elements (e.g. Health app summary cards with title + subtitle + value) are absorbed into a single tappable component via the grouping rules.
 
-Test a definition against the current live screen:
+Each definition specifies:
+- **Match Rules** — zone (nav bar / content / tab bar), element count range, chevron/numeric/text patterns, minimum OCR confidence
+- **Interaction** — whether to tap, which element to target (`first_navigation_element`, `centered_element`, etc.), expected result (`navigates`, `toggles`, `dismisses`), and whether to backtrack after
+- **Grouping** — how many points below the anchor row to absorb, and under what conditions
 
-```
-Use calibrate_component with my-component.md to check how it matches.
-```
+20 iOS component definitions ship built-in. Place custom definitions in `~/.mirroir-mcp/components/` or `<cwd>/.mirroir-mcp/components/`. Test a definition against the current live screen with `calibrate_component`.
 
-See [Component Detection](docs/components.md) for the definition format, match rules, and the detection pipeline.
+See [Component Detection](docs/components.md) for the full definition format, match rule reference, and the detection pipeline.
 
 ## Security
 
@@ -391,17 +380,29 @@ brew uninstall mirroir-mcp
 
 ## Configuration
 
-Override timing defaults via `settings.json`:
+All settings live in `settings.json` — project-local (`.mirroir-mcp/settings.json`) or global (`~/.mirroir-mcp/settings.json`). Project-local settings override global ones.
 
 ```json
-// .mirroir-mcp/settings.json (project-local) or ~/.mirroir-mcp/settings.json (global)
 {
+  "screenDescriberMode": "vision",
+  "agent": "embacle",
+  "visionImageWidth": 500,
+  "ocrBackend": "auto",
   "keystrokeDelayUs": 20000,
   "clickHoldUs": 100000
 }
 ```
 
-Environment variables also work: `MIRROIR_KEYSTROKE_DELAY_US`. See [`TimingConstants.swift`](Sources/HelperLib/TimingConstants.swift) for all keys.
+| Setting | Default | Description |
+|---------|---------|-------------|
+| `screenDescriberMode` | `"ocr"` | `"ocr"` for local Vision OCR + YOLO, `"vision"` for AI vision model |
+| `agent` | `""` | Agent name for vision mode (e.g. `"embacle"`) |
+| `visionImageWidth` | `500` | Target image width in pixels for vision API calls |
+| `ocrBackend` | `"auto"` | OCR backend: `"auto"`, `"vision"`, `"yolo"`, or `"both"` |
+| `keystrokeDelayUs` | `12000` | Delay between keystrokes in microseconds |
+| `clickHoldUs` | `100000` | Click hold duration in microseconds |
+
+Every setting has a corresponding environment variable (e.g. `MIRROIR_SCREEN_DESCRIBER_MODE`, `MIRROIR_KEYSTROKE_DELAY_US`). See [`TimingConstants.swift`](Sources/HelperLib/TimingConstants.swift) for the full list.
 
 ## Documentation
 
