@@ -94,7 +94,7 @@ final class VisionScreenDescriber: @unchecked Sendable {
         // Build multipart content with image for OpenAI-compatible vision API.
         // This format works with embacle (copilot_headless), OpenAI, and compatible providers.
         let userContent: [[String: Any]] = [
-            ["type": "text", "text": "Analyze this iPhone screenshot and list all tappable UI elements."],
+            ["type": "text", "text": "Return a JSON array of all tappable UI elements in this screenshot. ONLY output the JSON array, nothing else."],
             ["type": "image_url", "image_url": [
                 "url": "data:image/png;base64,\(imageBase64)",
             ]],
