@@ -240,7 +240,7 @@ git clone https://github.com/jfarcand/mirroir-skills ~/.mirroir-mcp/skills
 
 ## From Exploration to CI
 
-The `generate_skill` tool lets an AI agent explore an app and produce SKILL.md files. It uses [breadth-first search](https://en.wikipedia.org/wiki/Breadth-first_search) (BFS) to traverse the app as a navigation graph — screens are nodes, tappable elements are edges. The explorer OCRs each screen, matches elements against [component definitions](#component-detection) to decide what to tap, visits child screens, and backtracks via the back chevron. Duplicate screens are skipped via structural fingerprinting.
+The `generate_skill` tool lets an AI agent explore an app and produce SKILL.md files. It uses [breadth-first search](https://en.wikipedia.org/wiki/Breadth-first_search) (BFS) to traverse the app as a navigation graph — screens are nodes, tappable elements are edges. The explorer OCRs each screen, matches elements against [component definitions](#component-detection) to decide what to tap, visits child screens, and backtracks via the back chevron. Duplicate screens are skipped via structural fingerprinting. See [Component Detection](#component-detection) below for how the explorer interprets raw OCR into structured UI elements.
 
 Exploration is bounded — it does not discover every reachable screen in large apps. Depth, screen count, and time limits keep runs practical. For targeted flows, provide a `goal` to focus the traversal.
 
@@ -339,9 +339,9 @@ mirroir test --agent embacle my-skill
 
 </details>
 
-## Component Detection
+### Component Detection
 
-Raw OCR returns a flat list of text elements with no structure — `General` and `>` are two unrelated strings. Component definitions bridge this gap: each definition is a `.md` file that describes a UI pattern (table rows, toggles, tab bars, summary cards) with match rules, interaction behavior, and grouping logic.
+The explorer doesn't guess from raw OCR — it matches screen regions against component definitions. Raw OCR returns a flat list of text elements with no structure (`General` and `>` are two unrelated strings). Component definitions bridge this gap: each definition is a `.md` file that describes a UI pattern (table rows, toggles, tab bars, summary cards) with match rules, interaction behavior, and grouping logic.
 
 The detection pipeline groups OCR elements into rows, evaluates each row against all loaded definitions using hard constraints (zone, element count, chevron presence) and soft scoring signals, then selects the highest-scoring match. Multi-row elements (e.g. Health app summary cards with title + subtitle + value) are absorbed into a single tappable component via the grouping rules.
 
