@@ -20,6 +20,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Install embacle
+        run: |
+          brew tap dravr-ai/tap
+          brew install embacle
+          echo "LIBRARY_PATH=$(brew --prefix)/lib" >> "$GITHUB_ENV"
+
       - name: Run mirroir.sh
         run: ./mirroir.sh
 
@@ -29,6 +35,9 @@ jobs:
           # Verify mirroir CLI symlink was created (Homebrew bin dir)
           test -L /opt/homebrew/bin/mirroir || test -L /usr/local/bin/mirroir
           mirroir record --help 2>&1 | grep -q "Record user interactions"
+
+      - name: Verify embacle FFI linked
+        run: nm .build/release/mirroir-mcp | grep -q embacle_init
 
       - name: Build and package FakeMirroring
         run: |
@@ -79,6 +88,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Install embacle
+        run: |
+          brew tap dravr-ai/tap
+          brew install embacle
+          echo "LIBRARY_PATH=$(brew --prefix)/lib" >> "$GITHUB_ENV"
+
       - name: Create source tarball
         run: |
           TAR_PATH="/tmp/mirroir-mcp-local.tar.gz"
@@ -103,6 +118,7 @@ jobs:
 
             depends_on :macos
             depends_on xcode: ["15.0", :build]
+            depends_on "dravr-ai/tap/embacle"
 
             def install
               system "swift", "build", "-c", "release", "--disable-sandbox"
@@ -125,6 +141,9 @@ jobs:
           which mirroir
           # Verify mirroir CLI works (symlink to mirroir-mcp)
           mirroir test --help 2>&1 | grep -q "mirroir-mcp test"
+
+      - name: Verify embacle FFI linked
+        run: nm "$(brew --prefix)/bin/mirroir-mcp" | grep -q embacle_init
 
       - name: Build and package FakeMirroring
         run: |
@@ -180,8 +199,17 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Install embacle
+        run: |
+          brew tap dravr-ai/tap
+          brew install embacle
+          echo "LIBRARY_PATH=$(brew --prefix)/lib" >> "$GITHUB_ENV"
+
       - name: Build release binaries
         run: swift build -c release
+
+      - name: Verify embacle FFI linked
+        run: nm .build/release/mirroir-mcp | grep -q embacle_init
 
       - name: Stage binaries into npm/bin/ (simulates install.js postinstall)
         run: |
