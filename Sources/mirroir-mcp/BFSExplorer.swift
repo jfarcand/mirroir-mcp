@@ -36,17 +36,10 @@ final class BFSExplorer: @unchecked Sendable {
     var cacheHitsPerScreen: [String: Int] = [:]
     var actionCount: Int = 0
     var isFinished: Bool = false
+    /// Coverage monitor tracking discovery rate for plateau detection.
+    let coverageMonitor = CoverageMonitor()
     let lock = NSLock()
 
-    /// Initialize the BFS explorer.
-    ///
-    /// - Parameters:
-    ///   - session: The exploration session tracking screens and graph state.
-    ///   - budget: Exploration budget limits.
-    ///   - windowSize: Size of the target window for coordinate computation.
-    ///   - componentDefinitions: Component definitions for grouping OCR elements.
-    ///   - classifier: Component classifier to use. nil falls back to legacy per-element planning.
-    ///   - bridge: Window bridge for CalibrationScroller. nil falls back to simple scroll calibration.
     init(
         session: ExplorationSession,
         budget: ExplorationBudget,
@@ -70,6 +63,7 @@ final class BFSExplorer: @unchecked Sendable {
         lock.lock()
         defer { lock.unlock() }
         startTime = Date()
+        coverageMonitor.start()
         if graph.started {
             let rootFP = graph.rootFingerprint
             frontier = [FrontierScreen(fingerprint: rootFP, pathFromRoot: [], depth: 0)]
@@ -101,6 +95,12 @@ final class BFSExplorer: @unchecked Sendable {
             return .finished(bundle: generateBundle())
         }
 
+        // Coverage exhaustion — stop if no new screens for extended period
+        if coverageMonitor.currentPhase == .exhaustion {
+            lock.lock(); isFinished = true; lock.unlock()
+            return .finished(bundle: generateBundle())
+        }
+
         switch phase {
         case .atRoot:
             return stepAtRoot(describer: describer, input: input, strategy: strategy)
@@ -127,16 +127,9 @@ final class BFSExplorer: @unchecked Sendable {
         return isFinished
     }
 
-    /// Current exploration statistics.
     var stats: (nodeCount: Int, edgeCount: Int, actionCount: Int, elapsedSeconds: Int) {
-        lock.lock()
-        defer { lock.unlock() }
-        return (
-            nodeCount: graph.nodeCount,
-            edgeCount: graph.edgeCount,
-            actionCount: actionCount,
-            elapsedSeconds: Int(Date().timeIntervalSince(startTime))
-        )
+        lock.lock(); defer { lock.unlock() }
+        return (graph.nodeCount, graph.edgeCount, actionCount, Int(Date().timeIntervalSince(startTime)))
     }
 
     func generateBundle() -> SkillBundle {
@@ -451,7 +444,7 @@ final class BFSExplorer: @unchecked Sendable {
 
         switch transition {
         case .newScreen(let fp):
-            // Add child to frontier for later exploration
+            coverageMonitor.recordDiscovery()
             let childDepth = screen.depth + 1
             if childDepth < budget.maxDepth && graph.nodeCount < budget.maxScreens {
                 let newPath = screen.pathFromRoot + [PathSegment(
