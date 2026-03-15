@@ -192,4 +192,39 @@ extension BFSExplorer {
             return .finished(bundle: generateBundle())
         }
     }
+
+    // MARK: - Phase: Returning
+
+    /// Tap back one level toward root. Each step reduces depth by one.
+    func stepReturning(
+        depthRemaining: Int,
+        describer: ScreenDescribing,
+        input: InputProviding
+    ) -> ExploreStepResult {
+        // Get current screen elements for back button detection
+        let elements: [TapPoint]
+        if let result = ExplorerUtilities.dismissAlertIfPresent(
+            describer: describer, input: input
+        ) {
+            elements = result.elements
+        } else {
+            elements = []
+        }
+
+        ExplorerUtilities.tapBackButton(
+            elements: elements, input: input, windowSize: windowSize
+        )
+
+        let remaining = depthRemaining - 1
+        if remaining > 0 {
+            phase = .returning(depthRemaining: remaining)
+        } else {
+            phase = .atRoot
+            graph.setCurrentFingerprint(graph.rootFingerprint)
+        }
+
+        return .continue(
+            description: "Returning to root (\(remaining) level\(remaining == 1 ? "" : "s") remaining)"
+        )
+    }
 }

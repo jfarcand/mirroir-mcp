@@ -43,9 +43,19 @@ extension BFSExplorer {
         switch check {
         case .ok: return nil
         case .recovered:
+            graph.appendRecoveryEvent(PostActionVerifier.buildEvent(
+                category: .appRelaunched,
+                screenFingerprint: graph.currentFingerprint,
+                description: "App escaped during BFS exploration, relaunched"
+            ))
             lock.lock(); isFinished = true; lock.unlock()
             return .finished(bundle: generateBundle())
         case .failed(let reason):
+            graph.appendRecoveryEvent(PostActionVerifier.buildEvent(
+                category: .appEscape,
+                screenFingerprint: graph.currentFingerprint,
+                description: "App escaped during BFS exploration: \(reason)"
+            ))
             lock.lock(); isFinished = true; lock.unlock()
             return .paused(reason: "Left app: \(reason)")
         }

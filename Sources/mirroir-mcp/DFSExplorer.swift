@@ -240,9 +240,19 @@ final class DFSExplorer: @unchecked Sendable {
         ) {
         case .ok: break
         case .recovered:
+            graph.appendRecoveryEvent(PostActionVerifier.buildEvent(
+                category: .appRelaunched,
+                screenFingerprint: currentFP,
+                description: "App escaped after tapping \"\(displayLabel)\", relaunched"
+            ))
             lock.lock(); isFinished = true; lock.unlock()
             return .finished(bundle: generateBundle())
         case .failed(let reason):
+            graph.appendRecoveryEvent(PostActionVerifier.buildEvent(
+                category: .appEscape,
+                screenFingerprint: currentFP,
+                description: "App escaped after tapping \"\(displayLabel)\": \(reason)"
+            ))
             lock.lock(); isFinished = true; lock.unlock()
             return .paused(reason: "Left app: \(reason)")
         }
@@ -302,10 +312,18 @@ final class DFSExplorer: @unchecked Sendable {
             return .continue(description: "Tapped \"\(displayLabel)\" → revisited screen")
 
         case .duplicate:
+            // Mark this edge as dead so future exploration plans skip it
+            graph.markEdgeDead(fromFingerprint: currentFP, elementText: target.text)
+            graph.appendRecoveryEvent(PostActionVerifier.buildEvent(
+                category: .deadTap,
+                screenFingerprint: currentFP,
+                description: "Tapped \"\(displayLabel)\" but screen did not change"
+            ))
+            DebugLog.log("dfs", "dead tap: \"\(displayLabel)\" on \(currentFP.prefix(8))")
             lock.lock()
             actionsOnCurrentScreen += 1
             lock.unlock()
-            return .continue(description: "Tapped \"\(displayLabel)\" → no screen change")
+            return .continue(description: "Tapped \"\(displayLabel)\" → dead tap (marked)")
         }
     }
 
@@ -455,28 +473,12 @@ final class DFSExplorer: @unchecked Sendable {
     }
 
     /// OCR the screen and dismiss any detected iOS alert before returning the result.
-    /// If no alert is detected, the initial OCR result is returned directly (zero overhead).
-    /// Retries up to `AlertDetector.maxDismissAttempts` times for persistent alerts.
+    /// Delegates to ExplorerUtilities which owns the shared alert-dismissal implementation.
     private func dismissAlertIfPresent(
         describer: ScreenDescribing,
         input: InputProviding
     ) -> ScreenDescriber.DescribeResult? {
-        guard var result = describer.describe() else { return nil }
-
-        for _ in 0..<AlertDetector.maxDismissAttempts {
-            guard let alert = AlertDetector.detectAlert(elements: result.elements) else {
-                return result
-            }
-            // Tap the dismiss target
-            _ = input.tap(x: alert.dismissTarget.tapX, y: alert.dismissTarget.tapY)
-            usleep(EnvConfig.stepSettlingDelayMs * 1000)
-            // Re-OCR to get clean screen
-            guard let cleanResult = describer.describe() else { return nil }
-            result = cleanResult
-        }
-
-        // After max attempts, return whatever we have
-        return result
+        ExplorerUtilities.dismissAlertIfPresent(describer: describer, input: input)
     }
 
     func generateBundle() -> SkillBundle {

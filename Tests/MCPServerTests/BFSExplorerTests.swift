@@ -292,7 +292,7 @@ final class BFSExplorerTests: XCTestCase {
         guard case .continue(let d1) = step1 else {
             return XCTFail("Expected .continue for step 1, got \(step1)")
         }
-        XCTAssertTrue(d1.contains("no navigation") || d1.contains("new screen"), "Got: \(d1)")
+        XCTAssertTrue(d1.contains("dead tap") || d1.contains("no navigation") || d1.contains("new screen"), "Got: \(d1)")
         XCTAssertFalse(explorer.completed, "Should continue after non-navigating tap")
     }
 

@@ -1,0 +1,133 @@
+// Copyright 2026 jfarcand@apache.org
+// Licensed under the Apache License, Version 2.0
+//
+// ABOUTME: Scroll support, dead edge tracking, recovery event logging, and node matching for NavigationGraph.
+// ABOUTME: Extracted from NavigationGraph.swift to keep files under the 500-line limit.
+
+import Foundation
+import HelperLib
+
+extension NavigationGraph {
+
+    // MARK: - Scroll Support
+
+    /// Merge scrolled elements into a screen node using composite key dedup. Returns novel count.
+    /// Composite key = text + quantized X, preventing false dedup of same-text elements
+    /// at different horizontal positions (e.g., multiple "icon" labels).
+    func mergeScrolledElements(fingerprint: String, newElements: [TapPoint]) -> Int {
+        lock.lock()
+        defer { lock.unlock() }
+        guard let node = nodes[fingerprint] else { return 0 }
+        // Simple composite key dedup — no pageY proximity check here because
+        // elements arrive without scroll-adjusted pageY. The sophisticated
+        // pageY proximity dedup lives in OverlapDeduplicator.merge() which
+        // CalibrationScroller uses with properly tracked scroll offsets.
+        let existingKeys = Set(node.elements.map { OverlapDeduplicator.compositeKey($0) })
+        let novel = newElements.filter { !existingKeys.contains(OverlapDeduplicator.compositeKey($0)) }
+        guard !novel.isEmpty else { return 0 }
+        var updatedElements = node.elements
+        updatedElements.append(contentsOf: novel)
+        nodes[fingerprint] = ScreenNode(
+            fingerprint: node.fingerprint,
+            elements: updatedElements,
+            icons: node.icons,
+            hints: node.hints,
+            depth: node.depth,
+            screenType: node.screenType,
+            screenshotBase64: node.screenshotBase64,
+            visitedElements: node.visitedElements,
+            navBarTitle: node.navBarTitle
+        )
+        return novel.count
+    }
+
+    /// Get the number of scroll actions performed on a screen.
+    func scrollCount(for fingerprint: String) -> Int {
+        lock.lock()
+        defer { lock.unlock() }
+        return scrollCounts[fingerprint, default: 0]
+    }
+
+    /// Increment the scroll count for a screen.
+    func incrementScrollCount(for fingerprint: String) {
+        lock.lock()
+        defer { lock.unlock() }
+        scrollCounts[fingerprint, default: 0] += 1
+    }
+
+    // MARK: - Dead Edge Tracking
+
+    /// Mark an edge as dead (tap had no effect on the screen).
+    /// Dead edges are excluded from future exploration plans.
+    ///
+    /// - Parameters:
+    ///   - fromFingerprint: The screen where the dead tap occurred.
+    ///   - elementText: The element text that was tapped.
+    func markEdgeDead(fromFingerprint: String, elementText: String) {
+        lock.lock()
+        defer { lock.unlock() }
+        deadEdges.insert("\(fromFingerprint):\(elementText)")
+    }
+
+    /// Check if an edge has been marked as dead.
+    func isEdgeDead(fromFingerprint: String, elementText: String) -> Bool {
+        lock.lock()
+        defer { lock.unlock() }
+        return deadEdges.contains("\(fromFingerprint):\(elementText)")
+    }
+
+    /// Number of dead edges recorded.
+    var deadEdgeCount: Int {
+        lock.lock()
+        defer { lock.unlock() }
+        return deadEdges.count
+    }
+
+    // MARK: - Recovery Event Logging
+
+    /// Append a recovery event for post-hoc diagnosis.
+    func appendRecoveryEvent(_ event: RecoveryEvent) {
+        lock.lock()
+        defer { lock.unlock() }
+        recoveryEvents.append(event)
+    }
+
+    /// Get all recovery events logged during exploration.
+    var allRecoveryEvents: [RecoveryEvent] {
+        lock.lock()
+        defer { lock.unlock() }
+        return recoveryEvents
+    }
+
+    // MARK: - Node Matching
+
+    /// Find a node with similar structural elements using title-aware similarity.
+    /// Iterates in sorted key order for deterministic matching across runs.
+    func findMatchingNode(elements: [TapPoint]) -> String? {
+        for (fp, node) in nodes.sorted(by: { $0.key < $1.key }) {
+            let sim = StructuralFingerprint.titleAwareSimilarity(elements, node.elements)
+            if sim >= StructuralFingerprint.similarityThreshold {
+                return fp
+            }
+        }
+        return nil
+    }
+
+    /// Find a node matching the viewport using both Jaccard similarity and containment.
+    /// Containment catches the case where a viewport (~40 elements) is a subset of a
+    /// calibrated full-page set (~90 elements) — Jaccard fails because the union is large.
+    /// Iterates in sorted key order for deterministic matching across runs.
+    func findMatchingNodeWithContainment(elements: [TapPoint]) -> String? {
+        if let fp = findMatchingNode(elements: elements) {
+            return fp
+        }
+        for (fp, node) in nodes.sorted(by: { $0.key < $1.key }) {
+            if StructuralFingerprint.viewportContainedIn(
+                viewport: elements, reference: node.elements
+            ) {
+                return fp
+            }
+        }
+        return nil
+    }
+}

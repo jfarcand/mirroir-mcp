@@ -28,7 +28,7 @@ final class BFSExplorer: @unchecked Sendable {
 
     private var frontier: [FrontierScreen] = []
     private var frontierIndex: Int = 0
-    private var phase: BFSPhase = .atRoot
+    var phase: BFSPhase = .atRoot
     private var actionsOnCurrentScreen: Int = 0
     private var startTime: Date = Date()
     /// Fingerprints of screens that have been calibrated (full-page scroll + component detection).
@@ -486,44 +486,15 @@ final class BFSExplorer: @unchecked Sendable {
             return .continue(description: "Tapped \"\(label)\" → revisited screen")
 
         case .duplicate:
-            // Didn't navigate — stay on current screen, no back-tap needed
-            return .continue(description: "Tapped \"\(label)\" → no navigation")
+            // Mark this edge as dead so future exploration plans skip it
+            graph.markEdgeDead(fromFingerprint: currentFP, elementText: label)
+            graph.appendRecoveryEvent(PostActionVerifier.buildEvent(
+                category: .deadTap,
+                screenFingerprint: currentFP,
+                description: "Tapped \"\(label)\" but screen did not change"
+            ))
+            DebugLog.log("bfs", "dead tap: \"\(label)\" on \(currentFP.prefix(8))")
+            return .continue(description: "Tapped \"\(label)\" → dead tap (marked)")
         }
     }
-
-    // MARK: - Phase: Returning
-
-    /// Tap back one level toward root. Each step reduces depth by one.
-    private func stepReturning(
-        depthRemaining: Int,
-        describer: ScreenDescribing,
-        input: InputProviding
-    ) -> ExploreStepResult {
-        // Get current screen elements for back button detection
-        let elements: [TapPoint]
-        if let result = ExplorerUtilities.dismissAlertIfPresent(
-            describer: describer, input: input
-        ) {
-            elements = result.elements
-        } else {
-            elements = []
-        }
-
-        ExplorerUtilities.tapBackButton(
-            elements: elements, input: input, windowSize: windowSize
-        )
-
-        let remaining = depthRemaining - 1
-        if remaining > 0 {
-            phase = .returning(depthRemaining: remaining)
-        } else {
-            phase = .atRoot
-            graph.setCurrentFingerprint(graph.rootFingerprint)
-        }
-
-        return .continue(
-            description: "Returning to root (\(remaining) level\(remaining == 1 ? "" : "s") remaining)"
-        )
-    }
-
 }

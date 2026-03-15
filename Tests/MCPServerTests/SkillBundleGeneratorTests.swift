@@ -115,7 +115,7 @@ final class SkillBundleGeneratorTests: XCTestCase {
     // MARK: - Empty Graph Fallback
 
     func testEmptyGraphFallsBackToFlatScreens() {
-        let snapshot = GraphSnapshot(nodes: [:], edges: [], rootFingerprint: "")
+        let snapshot = GraphSnapshot(nodes: [:], edges: [], rootFingerprint: "", deadEdges: [], recoveryEvents: [])
         let screens = makeFlatScreens()
 
         let bundle = SkillBundleGenerator.generate(
