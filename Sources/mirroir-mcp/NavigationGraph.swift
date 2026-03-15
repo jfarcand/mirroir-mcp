@@ -65,6 +65,11 @@ struct ScreenNode: Sendable {
     var visitedElements: Set<String>
     /// Extracted nav bar title for fast screen identity comparison.
     let navBarTitle: String?
+    /// Whether this screen has infinite scroll (every scroll reveals new content).
+    /// Set during calibration when scrolling never exhausts.
+    var isInfiniteScroll: Bool = false
+    /// Whether scroll exhaustion was reached (no new elements after scrolling).
+    var scrollExhausted: Bool = false
 }
 
 /// A directed edge in the navigation graph representing a navigation action.

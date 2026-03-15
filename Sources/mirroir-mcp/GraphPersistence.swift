@@ -52,6 +52,8 @@ struct SerializableScreenNode: Codable, Sendable {
     let screenType: String
     let visitedElements: [String]
     let navBarTitle: String?
+    let isInfiniteScroll: Bool
+    let scrollExhausted: Bool
 
     init(from node: ScreenNode) {
         self.fingerprint = node.fingerprint
@@ -62,6 +64,8 @@ struct SerializableScreenNode: Codable, Sendable {
         self.screenType = node.screenType.rawValue
         self.visitedElements = Array(node.visitedElements)
         self.navBarTitle = node.navBarTitle
+        self.isInfiniteScroll = node.isInfiniteScroll
+        self.scrollExhausted = node.scrollExhausted
     }
 
     func toScreenNode() -> ScreenNode {
@@ -74,7 +78,9 @@ struct SerializableScreenNode: Codable, Sendable {
             screenType: ScreenType(rawValue: screenType) ?? .unknown,
             screenshotBase64: "",
             visitedElements: Set(visitedElements),
-            navBarTitle: navBarTitle
+            navBarTitle: navBarTitle,
+            isInfiniteScroll: isInfiniteScroll,
+            scrollExhausted: scrollExhausted
         )
     }
 }

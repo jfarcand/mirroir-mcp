@@ -289,7 +289,10 @@ extension BFSExplorer {
         input: InputProviding,
         describer: ScreenDescribing
     ) -> ExploreStepResult? {
-        guard graph.scrollCount(for: currentFP) < budget.scrollLimit else { return nil }
+        // Skip scrolling if content was already fully revealed or is infinite scroll
+        guard graph.scrollCount(for: currentFP) < budget.scrollLimit,
+              !graph.isScrollExhausted(fingerprint: currentFP),
+              !graph.isInfiniteScroll(fingerprint: currentFP) else { return nil }
 
         let centerX = windowSize.width / 2
         let fromY = windowSize.height * EnvConfig.scrollSwipeFromYFraction
@@ -351,6 +354,14 @@ extension BFSExplorer {
                 fingerprint: fingerprint, newElements: scrollResult.elements
             )
 
+            // Propagate scroll state to graph node
+            if scrollResult.isInfiniteScroll {
+                graph.markInfiniteScroll(fingerprint: fingerprint)
+            }
+            if scrollResult.scrollExhausted {
+                graph.markScrollExhausted(fingerprint: fingerprint)
+            }
+
             // Scroll back to top
             let centerX = windowSize.width / 2
             let scrollFromY = windowSize.height * fromFraction
@@ -365,7 +376,9 @@ extension BFSExplorer {
 
             let totalElements = graph.node(for: fingerprint)?.elements.count ?? 0
             DebugLog.log("bfs", "calibration scroll done: " +
-                "\(scrollResult.scrollCount) scrolls, \(novelCount) new, \(totalElements) total")
+                "\(scrollResult.scrollCount) scrolls, \(novelCount) new, \(totalElements) total" +
+                (scrollResult.isInfiniteScroll ? " [infinite]" : "") +
+                (scrollResult.scrollExhausted ? " [exhausted]" : ""))
 
             return ScrollCollectionData(
                 scrollCount: scrollResult.scrollCount, novelCount: novelCount,

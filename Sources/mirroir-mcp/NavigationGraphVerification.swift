@@ -55,6 +55,34 @@ extension NavigationGraph {
         scrollCounts[fingerprint, default: 0] += 1
     }
 
+    /// Mark a screen as having infinite scroll (content never exhausts).
+    func markInfiniteScroll(fingerprint: String) {
+        lock.lock()
+        defer { lock.unlock() }
+        nodes[fingerprint]?.isInfiniteScroll = true
+    }
+
+    /// Mark a screen as scroll-exhausted (all content has been revealed).
+    func markScrollExhausted(fingerprint: String) {
+        lock.lock()
+        defer { lock.unlock() }
+        nodes[fingerprint]?.scrollExhausted = true
+    }
+
+    /// Check if a screen has been marked as having infinite scroll.
+    func isInfiniteScroll(fingerprint: String) -> Bool {
+        lock.lock()
+        defer { lock.unlock() }
+        return nodes[fingerprint]?.isInfiniteScroll ?? false
+    }
+
+    /// Check if a screen has been marked as scroll-exhausted.
+    func isScrollExhausted(fingerprint: String) -> Bool {
+        lock.lock()
+        defer { lock.unlock() }
+        return nodes[fingerprint]?.scrollExhausted ?? false
+    }
+
     // MARK: - Dead Edge Tracking
 
     /// Mark an edge as dead (tap had no effect on the screen).

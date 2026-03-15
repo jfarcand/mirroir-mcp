@@ -21,7 +21,16 @@ enum CalibrationScroller {
         let screenshotBase64: String
         /// Total cumulative scroll offset in points (sum of all viewport offsets).
         let totalScrollOffset: Double
+        /// Whether scrolling exhausted all content (novelty dropped below threshold).
+        let scrollExhausted: Bool
+        /// Whether the screen appears to have infinite scroll (every scroll revealed
+        /// substantial new content and we hit the max scroll limit).
+        let isInfiniteScroll: Bool
     }
+
+    /// Minimum novelty ratio (new elements / total current elements) to continue scrolling.
+    /// Below this threshold, the page is considered fully revealed.
+    static let exhaustionThreshold: Double = 0.10
 
     /// Scroll through a full page collecting OCR elements from each viewport.
     ///
@@ -56,7 +65,9 @@ enum CalibrationScroller {
                 elements: firstResult.elements,
                 scrollCount: 0,
                 screenshotBase64: lastScreenshot,
-                totalScrollOffset: 0.0
+                totalScrollOffset: 0.0,
+                scrollExhausted: true,
+                isInfiniteScroll: false
             )
         }
 
@@ -68,6 +79,11 @@ enum CalibrationScroller {
 
         // Start with first viewport elements (page-absolute Y = viewport Y for first frame)
         var allElements = firstResult.elements
+
+        // Track scroll exhaustion: true when novelty drops below threshold
+        var exhaustionReached = false
+        // Track consecutive high-novelty scrolls for infinite scroll detection
+        var highNoveltyScrolls = 0
 
         // Cache the last successfully measured offset so subsequent viewports that
         // fail both anchor and content matching can reuse it instead of the raw
@@ -100,11 +116,25 @@ enum CalibrationScroller {
 
             lastScreenshot = result.screenshotBase64
 
-            // Check scroll exhaustion: if no new texts appeared, stop
+            // Check scroll exhaustion via novelty ratio.
+            // If new elements are less than 10% of current viewport, the page is fully revealed.
             let currentTexts = Set(result.elements.map(\.text))
             let newTexts = currentTexts.subtracting(previousTexts)
             if newTexts.isEmpty {
+                exhaustionReached = true
                 break
+            }
+            let noveltyRatio = currentTexts.isEmpty ? 0.0
+                : Double(newTexts.count) / Double(currentTexts.count)
+            if noveltyRatio < exhaustionThreshold {
+                exhaustionReached = true
+                DebugLog.persist("ScrollExhaustion", "novelty=\(Int(noveltyRatio * 100))% " +
+                    "(\(newTexts.count)/\(currentTexts.count)) — exhausted")
+                break
+            }
+            // Track high-novelty scrolls for infinite scroll detection
+            if noveltyRatio >= 0.5 {
+                highNoveltyScrolls += 1
             }
 
             // Compute scroll offset using content element matching.
@@ -168,11 +198,17 @@ enum CalibrationScroller {
         let deduped = ScrollDeduplicator.deduplicateExact(strategyDeduped)
         DebugLog.persist("ScrollDedup", "strategy=\(dedupStrategy.rawValue) before=\(beforeCount) after_strategy=\(strategyDeduped.count) after_exact=\(deduped.count) totalOffset=\(Int(cumulativeOffset))")
 
+        // Infinite scroll: hit max scrolls AND most scrolls had high novelty (> 50% each time)
+        let hitMaxScrolls = scrollCount >= maxScrolls
+        let infiniteScroll = hitMaxScrolls && highNoveltyScrolls > maxScrolls / 2
+
         return ScrollResult(
             elements: deduped,
             scrollCount: scrollCount,
             screenshotBase64: lastScreenshot,
-            totalScrollOffset: cumulativeOffset
+            totalScrollOffset: cumulativeOffset,
+            scrollExhausted: exhaustionReached,
+            isInfiniteScroll: infiniteScroll
         )
     }
 
