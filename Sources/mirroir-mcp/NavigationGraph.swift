@@ -102,6 +102,8 @@ struct GraphSnapshot: Sendable {
     let deadEdges: Set<String>
     /// Recovery events logged during exploration.
     let recoveryEvents: [RecoveryEvent]
+    /// CEGAR refinement levels per fingerprint.
+    var refinementLevels: [String: StateAbstraction.RefinementLevel] = [:]
 }
 
 /// Thread-safe directed graph tracking screen navigation during app exploration.
@@ -127,6 +129,8 @@ final class NavigationGraph: @unchecked Sendable {
     var deadEdges: Set<String> = []
     /// Recovery events logged during exploration for post-hoc diagnosis.
     var recoveryEvents: [RecoveryEvent] = []
+    /// Refinement levels per fingerprint for CEGAR-style adaptive abstraction.
+    var refinementLevels: [String: StateAbstraction.RefinementLevel] = [:]
     let lock = NSLock()
 
     // MARK: - Lifecycle
@@ -153,6 +157,7 @@ final class NavigationGraph: @unchecked Sendable {
         globalVisited = []
         deadEdges = []
         recoveryEvents = []
+        refinementLevels = [:]
 
         let fp = StructuralFingerprint.compute(elements: rootElements, icons: icons)
         let title = StructuralFingerprint.extractNavBarTitle(from: rootElements)
@@ -206,11 +211,32 @@ final class NavigationGraph: @unchecked Sendable {
         }
 
         // Check if this screen matches any known node (by similarity, not just hash)
-        let matchingFP = findMatchingNode(elements: elements)
+        var matchingFP = findMatchingNode(elements: elements)
 
+        // CEGAR refinement: if the match is behaviorally different, refine the fingerprint
+        if let existingFP = matchingFP, let existingNode = nodes[existingFP],
+           !StateAbstraction.areBehaviorallyEquivalent(
+               existingElements: existingNode.elements, newElements: elements
+           ) {
+            if let level = StateAbstraction.findDistinguishingLevel(
+                existingElements: existingNode.elements, newElements: elements
+            ) {
+                let refinedFP = StateAbstraction.computeRefinedFingerprint(
+                    elements: elements, icons: icons, level: level
+                )
+                if nodes[refinedFP] == nil {
+                    DebugLog.log("graph", "CEGAR refine: \(existingFP.prefix(8)) → " +
+                        "\(refinedFP.prefix(8)) at level \(level)")
+                    refinementLevels[refinedFP] = level
+                    matchingFP = nil // treat as new screen with refined fingerprint
+                }
+            }
+        }
+
+        let targetFP = matchingFP ?? newFP
         let edge = NavigationEdge(
             fromFingerprint: currentFP,
-            toFingerprint: matchingFP ?? newFP,
+            toFingerprint: targetFP,
             actionType: actionType,
             elementText: elementText,
             displayLabel: displayLabel ?? elementText,
@@ -223,11 +249,12 @@ final class NavigationGraph: @unchecked Sendable {
             return .revisited(fingerprint: existingFP)
         }
 
-        // New screen: add node
+        // New screen: use refined fingerprint if CEGAR refinement occurred
+        let effectiveFP = refinementLevels[targetFP] != nil ? targetFP : newFP
         let currentDepth = nodes[currentFP]?.depth ?? 0
         let title = StructuralFingerprint.extractNavBarTitle(from: elements)
         let node = ScreenNode(
-            fingerprint: newFP,
+            fingerprint: effectiveFP,
             elements: elements,
             icons: icons,
             hints: hints,
@@ -237,10 +264,10 @@ final class NavigationGraph: @unchecked Sendable {
             visitedElements: [],
             navBarTitle: title
         )
-        nodes[newFP] = node
-        currentFP = newFP
+        nodes[effectiveFP] = node
+        currentFP = effectiveFP
 
-        return .newScreen(fingerprint: newFP)
+        return .newScreen(fingerprint: effectiveFP)
     }
 
     /// Mark an element as visited on the specified screen.
@@ -259,7 +286,8 @@ final class NavigationGraph: @unchecked Sendable {
             edges: edges,
             rootFingerprint: rootFP,
             deadEdges: deadEdges,
-            recoveryEvents: recoveryEvents
+            recoveryEvents: recoveryEvents,
+            refinementLevels: refinementLevels
         )
     }
 

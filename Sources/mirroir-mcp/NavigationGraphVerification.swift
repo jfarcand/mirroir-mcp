@@ -141,6 +141,52 @@ extension NavigationGraph {
         return nil
     }
 
+    // MARK: - CEGAR Coarsening
+
+    /// Merge redundant nodes when state count exceeds the coarsening threshold.
+    /// Two nodes are mergeable when they have identical outgoing edge targets
+    /// and pass structural similarity. The second node is removed and all edges
+    /// pointing to it are redirected to the first.
+    func coarsenIfNeeded() {
+        lock.lock()
+        guard nodes.count > StateAbstraction.coarseningThreshold else {
+            lock.unlock()
+            return
+        }
+        let currentNodes = nodes
+        let currentEdges = edges
+        lock.unlock()
+
+        let pairs = StateAbstraction.findMergeablePairs(
+            nodes: currentNodes, edges: currentEdges
+        )
+        guard !pairs.isEmpty else { return }
+
+        lock.lock()
+        defer { lock.unlock() }
+        for pair in pairs {
+            guard nodes[pair.merge] != nil else { continue }
+            nodes.removeValue(forKey: pair.merge)
+            // Redirect edges pointing to the merged node
+            edges = edges.map { edge in
+                var e = edge
+                if edge.toFingerprint == pair.merge {
+                    e = NavigationEdge(
+                        fromFingerprint: edge.fromFingerprint,
+                        toFingerprint: pair.keep,
+                        actionType: edge.actionType,
+                        elementText: edge.elementText,
+                        displayLabel: edge.displayLabel,
+                        edgeType: edge.edgeType
+                    )
+                }
+                return e
+            }
+            if currentFP == pair.merge { currentFP = pair.keep }
+            DebugLog.log("graph", "CEGAR coarsen: merged \(pair.merge.prefix(8)) → \(pair.keep.prefix(8))")
+        }
+    }
+
     /// Find a node matching the viewport using both Jaccard similarity and containment.
     /// Containment catches the case where a viewport (~40 elements) is a subset of a
     /// calibrated full-page set (~90 elements) — Jaccard fails because the union is large.

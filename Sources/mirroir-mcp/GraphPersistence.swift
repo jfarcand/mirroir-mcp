@@ -123,6 +123,8 @@ struct SerializableGraph: Codable, Sendable {
     let nodes: [SerializableScreenNode]
     let edges: [SerializableEdge]
     let deadEdges: [String]
+    /// CEGAR refinement levels per fingerprint (optional for backward compatibility).
+    let refinementLevels: [String: StateAbstraction.RefinementLevel]?
 
     /// Current format version. Bump when the schema changes.
     static let currentVersion = 1
@@ -154,7 +156,8 @@ enum GraphPersistence {
             rootFingerprint: snapshot.rootFingerprint,
             nodes: snapshot.nodes.values.map { SerializableScreenNode(from: $0) },
             edges: snapshot.edges.map { SerializableEdge(from: $0) },
-            deadEdges: Array(snapshot.deadEdges)
+            deadEdges: Array(snapshot.deadEdges),
+            refinementLevels: snapshot.refinementLevels.isEmpty ? nil : snapshot.refinementLevels
         )
 
         do {
@@ -210,7 +213,8 @@ enum GraphPersistence {
                 edges: serializable.edges.map { $0.toNavigationEdge() },
                 rootFingerprint: serializable.rootFingerprint,
                 deadEdges: Set(serializable.deadEdges),
-                recoveryEvents: []
+                recoveryEvents: [],
+                refinementLevels: serializable.refinementLevels ?? [:]
             )
 
             DebugLog.log("persistence", "Loaded graph for \(bundleID): " +
