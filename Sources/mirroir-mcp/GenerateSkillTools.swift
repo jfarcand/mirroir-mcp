@@ -18,20 +18,13 @@ extension MirroirMCP {
             name: "generate_skill",
             description: """
                 Generate a SKILL.md by exploring an app. Session-based workflow: \
-                (1) action="start" \u{2014} launch app, OCR first screen, begin session. \
-                (2) Use tap/swipe/type_text to navigate, then action="capture" to OCR each screen. \
-                (3) action="finish" \u{2014} assemble captured screens into a SKILL.md and return it. \
-                Alternatively, use action="explore" for autonomous BFS exploration. \
-                \
-                WARNING: During exploration, the Mac keyboard focus is stolen. \
-                iPhone Mirroring requires global HID event posting, which steals \
-                keyboard focus. The cursor is hidden during operations but still \
-                moves to the target window. The user cannot use their Mac until \
-                exploration completes. Per-process event injection (postToPid) \
-                does not work for iPhone Mirroring. \
-                SECURITY: Exploration may navigate into sensitive screens (accounts, \
-                passwords, payment). Do not run unattended on devices with sensitive \
-                data visible in the target app.
+                (1) action="start" \u{2014} launch app + OCR. \
+                (2) Navigate with tap/swipe/type_text, then action="capture" per screen. \
+                (3) action="finish" \u{2014} emit SKILL.md. \
+                Use action="explore" for autonomous BFS exploration. \
+                Set fresh=true to discard persisted graph and explore from scratch. \
+                WARNING: Exploration steals Mac keyboard focus (global HID events). \
+                SECURITY: May navigate into sensitive screens. Do not run unattended.
                 """,
             inputSchema: [
                 "type": .string("object"),
@@ -108,6 +101,12 @@ extension MirroirMCP {
                             .string("social"),
                             .string("desktop"),
                         ]),
+                    ]),
+                    "fresh": .object([
+                        "type": .string("boolean"),
+                        "description": .string(
+                            "When true, discard any persisted navigation graph and " +
+                            "explore from scratch. Default: false (incremental exploration)."),
                     ]),
                 ]),
                 "required": .array([.string("action")]),
@@ -326,7 +325,7 @@ extension MirroirMCP {
             allScreens: data.screens
         )
 
-        var text = formatBundle(bundle, preamble: "Generated \(bundle.skills.count) skills from exploration:")
+        var text = ExplorationResultFormatter.formatBundle(bundle, preamble: "Generated \(bundle.skills.count) skills from exploration:")
         if !remaining.isEmpty {
             text += "\n\n---\nGoal \(goalNum)/\(totalGoals) complete. "
             text += "Next goal: \"\(remaining[0])\". "
@@ -388,6 +387,7 @@ extension MirroirMCP {
         )
 
         let goal = args["goal"]?.asString() ?? ""
+        let fresh = args["fresh"]?.asBool() ?? false
         let explicitStrategy = args["strategy"]?.asString()
         let strategyChoice = StrategyDetector.detect(
             targetType: ctx.targetType,
@@ -395,6 +395,15 @@ extension MirroirMCP {
             appName: appName,
             explicitStrategy: explicitStrategy
         )
+
+        // Handle graph persistence: delete on fresh, log if existing
+        if fresh {
+            GraphPersistence.delete(bundleID: appName)
+        } else if let existing = GraphPersistence.load(bundleID: appName) {
+            DebugLog.log("explore", "Loaded persisted graph: \(existing.nodes.count) nodes, " +
+                "\(existing.edges.count) edges, \(existing.deadEdges.count) dead edges")
+        }
+
         session.start(appName: appName, goal: goal)
         session.setStrategy(strategyChoice.rawValue)
 
@@ -453,43 +462,22 @@ extension MirroirMCP {
                 let stats = explorer.stats
                 let summary = stepResults.joined(separator: "\n")
                 let report = explorer.generateReport()
+                // Persist partial graph for future incremental runs
+                let snapshot = explorer.graph.finalize()
+                GraphPersistence.save(snapshot: snapshot, bundleID: appName)
                 return .text(
                     "\(summary)\n\nExploration paused after \(stats.actionCount) actions, " +
                     "\(stats.nodeCount) screens in \(stats.elapsedSeconds)s.\n\n\(report)")
             case .finished(let bundle):
-                return .text(formatExploreResult(bundle: bundle, explorer: explorer))
+                // Persist the completed graph for future incremental runs
+                let snapshot = explorer.graph.finalize()
+                GraphPersistence.save(snapshot: snapshot, bundleID: appName)
+                return .text(ExplorationResultFormatter.formatExploreResult(bundle: bundle, explorer: explorer))
             }
         }
 
         // Should not reach here, but just in case
         return .text(stepResults.joined(separator: "\n"))
-    }
-
-    /// Format a skill bundle into display text.
-    private static func formatBundle(_ bundle: SkillBundle, preamble: String) -> String {
-        if bundle.skills.count > 1 {
-            var text = preamble + "\n\n"
-            if let manifest = bundle.manifest { text += manifest + "\n" }
-            for (i, skill) in bundle.skills.enumerated() {
-                text += "--- Skill \(i + 1): \(skill.name) ---\n\n" + skill.content
-                if i < bundle.skills.count - 1 { text += "\n\n" }
-            }
-            return text
-        }
-        return bundle.skills.first?.content ?? ""
-    }
-
-    /// Format the final exploration result with stats, skill content, and detailed report.
-    private static func formatExploreResult(bundle: SkillBundle, explorer: BFSExplorer) -> String {
-        let stats = explorer.stats
-        let statLine = "(\(stats.nodeCount) screens, \(stats.actionCount) actions, \(stats.elapsedSeconds)s)"
-        guard !bundle.skills.isEmpty else {
-            return "Exploration finished but no skills were generated.\n\n" + explorer.generateReport()
-        }
-        let preamble = bundle.skills.count > 1
-            ? "Exploration complete! Generated \(bundle.skills.count) skills \(statLine):"
-            : "Exploration complete \(statLine):"
-        return formatBundle(bundle, preamble: preamble) + "\n\n" + explorer.generateReport()
     }
 
 }
