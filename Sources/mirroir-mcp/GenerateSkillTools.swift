@@ -169,7 +169,6 @@ extension MirroirMCP {
         let explicitStrategy = args["strategy"]?.asString()
         let strategyChoice = StrategyDetector.detect(
             targetType: ctx.targetType,
-            bundleID: ctx.bundleID,
             appName: appName,
             explicitStrategy: explicitStrategy
         )
@@ -391,7 +390,6 @@ extension MirroirMCP {
         let explicitStrategy = args["strategy"]?.asString()
         let strategyChoice = StrategyDetector.detect(
             targetType: ctx.targetType,
-            bundleID: ctx.bundleID,
             appName: appName,
             explicitStrategy: explicitStrategy
         )
