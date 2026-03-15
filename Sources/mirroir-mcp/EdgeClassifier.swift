@@ -19,6 +19,10 @@ enum EdgeType: String, Sendable {
     case same
     /// Unreachable or destructive transition — recovery requires pressing Home.
     case dead
+    /// Same screen with state change (toggle, switch) — no backtrack needed.
+    case toggle
+    /// Left the app entirely (Safari, App Store, etc.) — requires relaunching.
+    case external
 }
 
 /// Classifies navigation transitions for intelligent backtracking.
@@ -38,8 +42,10 @@ enum EdgeClassifier {
     /// 1. **tab**: source is `.tabRoot` AND tapped element is in the bottom zone
     /// 2. **modal**: destination has dismiss button in top zone AND no back chevron
     /// 3. **push**: destination hints contain back chevron (most iOS navigations)
-    /// 4. **dead**: no recognizable navigation pattern (fallback for external/destructive)
-    /// 5. **Fallback**: `.push` — safe default for most iOS navigations
+    /// 4. **Fallback**: `.push` — safe default for most iOS navigations
+    ///
+    /// Note: `toggle` and `external` are not detected here — they are set by the
+    /// explorer when the graph reports `.duplicate` (toggle) or context escape (external).
     ///
     /// - Parameters:
     ///   - sourceNode: The screen node the action originated from.

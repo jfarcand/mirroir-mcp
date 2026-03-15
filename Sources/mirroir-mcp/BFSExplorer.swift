@@ -7,11 +7,9 @@
 import Foundation
 import HelperLib
 
-/// BFS explorer that systematically traverses app screens layer by layer.
-/// Explores all elements at the current depth before moving deeper.
-/// Each call to `step()` performs one exploration action: navigate a path segment,
-/// tap an element and record the result, or tap back toward root.
-/// Follows the Session Accumulator pattern with NSLock protection.
+/// BFS explorer: traverses app screens layer by layer. Each `step()` call
+/// performs one action (navigate, tap, or return to root).
+/// Session Accumulator pattern with NSLock protection.
 final class BFSExplorer: @unchecked Sendable {
 
     let graph: NavigationGraph
@@ -19,11 +17,8 @@ final class BFSExplorer: @unchecked Sendable {
     let budget: ExplorationBudget
     let windowSize: CGSize
     let appName: String
-    /// Loaded component definitions for grouping OCR elements into UI components.
     let componentDefinitions: [ComponentDefinition]
-    /// Classifier for grouping OCR elements into components. nil uses legacy element-level planning.
     let classifier: (any ComponentClassifying)?
-    /// Window bridge for calibration scroll (CalibrationScroller needs window info).
     let bridge: (any WindowBridging)?
 
     private var frontier: [FrontierScreen] = []
@@ -412,12 +407,18 @@ final class BFSExplorer: @unchecked Sendable {
             elements: afterResult.elements, hints: afterResult.hints
         )
 
-        // Record transition in graph (raw text for visited-state, displayLabel for naming)
+        // Classify edge type for intelligent backtracking, then record transition
+        let edgeType = graph.node(for: currentFP).map { sourceNode in
+            EdgeClassifier.classify(
+                sourceNode: sourceNode, destinationElements: afterResult.elements,
+                destinationHints: afterResult.hints, tappedElement: target,
+                screenHeight: windowSize.height)
+        } ?? .push
         let transition = graph.recordTransition(
             elements: afterResult.elements, icons: afterResult.icons,
             hints: afterResult.hints, screenshot: afterResult.screenshotBase64,
             actionType: "tap", elementText: target.text, displayLabel: label,
-            screenType: screenType
+            screenType: screenType, edgeType: edgeType
         )
 
         // Record in session for flat screen list

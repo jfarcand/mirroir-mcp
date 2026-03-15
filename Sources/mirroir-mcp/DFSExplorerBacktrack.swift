@@ -83,10 +83,13 @@ extension DFSExplorer {
                     }
                 }
                 return false
-            case .dead:
-                // Dead end: press Home to escape
+            case .dead, .external:
+                // Dead end or left the app: press Home to escape, relaunch will happen on next step
                 _ = input.pressKey(keyName: "h", modifiers: ["command", "shift"])
                 usleep(EnvConfig.stepSettlingDelayMs * 1000)
+                return true
+            case .toggle:
+                // Toggle (same screen, state changed): no backtrack needed, just pop the stack
                 return true
             case .push, .same:
                 return false

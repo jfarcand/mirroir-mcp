@@ -211,9 +211,49 @@ extension BFSExplorer {
             elements = []
         }
 
-        ExplorerUtilities.tapBackButton(
-            elements: elements, input: input, windowSize: windowSize
-        )
+        // Use edge-type-aware backtracking: check what kind of edge
+        // brought us to this screen and reverse accordingly.
+        let currentFP = graph.currentFingerprint
+        let incomingEdge = graph.incomingEdge(to: currentFP)
+        var handled = false
+
+        if let edge = incomingEdge {
+            switch edge.edgeType {
+            case .modal:
+                if let dismiss = EdgeClassifier.findDismissTarget(
+                    elements: elements, screenHeight: windowSize.height
+                ) {
+                    _ = input.tap(x: dismiss.tapX, y: dismiss.tapY)
+                    usleep(EnvConfig.stepSettlingDelayMs * 1000)
+                    handled = true
+                }
+            case .tab:
+                // For tabs, find the source screen's tab element
+                if let sourceNode = graph.node(for: edge.fromFingerprint) {
+                    let tabBarZone = windowSize.height * EdgeClassifier.tabBarZoneFraction
+                    if let tabElement = sourceNode.elements.first(where: { $0.tapY >= tabBarZone }) {
+                        _ = input.tap(x: tabElement.tapX, y: tabElement.tapY)
+                        usleep(EnvConfig.stepSettlingDelayMs * 1000)
+                        handled = true
+                    }
+                }
+            case .toggle:
+                // Toggle doesn't need backtrack action, just proceed
+                handled = true
+            case .external, .dead:
+                _ = input.pressKey(keyName: "h", modifiers: ["command", "shift"])
+                usleep(EnvConfig.stepSettlingDelayMs * 1000)
+                handled = true
+            case .push, .same:
+                break
+            }
+        }
+
+        if !handled {
+            ExplorerUtilities.tapBackButton(
+                elements: elements, input: input, windowSize: windowSize
+            )
+        }
 
         let remaining = depthRemaining - 1
         if remaining > 0 {

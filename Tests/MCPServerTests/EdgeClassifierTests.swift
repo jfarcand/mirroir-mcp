@@ -185,6 +185,26 @@ final class EdgeClassifierTests: XCTestCase {
         XCTAssertEqual(result, .modal)
     }
 
+    // MARK: - Edge Type Enum Values
+
+    func testEdgeTypeToggleRawValue() {
+        XCTAssertEqual(EdgeType.toggle.rawValue, "toggle")
+    }
+
+    func testEdgeTypeExternalRawValue() {
+        XCTAssertEqual(EdgeType.external.rawValue, "external")
+    }
+
+    func testEdgeTypeRoundtripAllCases() {
+        // Verify all edge types survive raw value round-trip (persistence)
+        let allCases: [EdgeType] = [.push, .modal, .tab, .same, .dead, .toggle, .external]
+        for edgeType in allCases {
+            let roundtripped = EdgeType(rawValue: edgeType.rawValue)
+            XCTAssertEqual(roundtripped, edgeType,
+                "EdgeType.\(edgeType.rawValue) should survive raw value round-trip")
+        }
+    }
+
     // MARK: - Dismiss Target
 
     func testFindDismissTargetCloseButton() {
