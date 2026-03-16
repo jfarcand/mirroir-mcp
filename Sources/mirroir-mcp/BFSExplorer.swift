@@ -36,8 +36,9 @@ final class BFSExplorer: @unchecked Sendable {
     var cacheHitsPerScreen: [String: Int] = [:]
     var actionCount: Int = 0
     var isFinished: Bool = false
-    /// Coverage monitor tracking discovery rate for plateau detection.
     let coverageMonitor = CoverageMonitor()
+    /// Seeded PRNG for deterministic exploration ordering. nil = system random.
+    let rng: ExplorationRNG
     let lock = NSLock()
 
     init(
@@ -46,7 +47,8 @@ final class BFSExplorer: @unchecked Sendable {
         windowSize: CGSize = CGSize(width: 410, height: 890),
         componentDefinitions: [ComponentDefinition] = [],
         classifier: (any ComponentClassifying)? = nil,
-        bridge: (any WindowBridging)? = nil
+        bridge: (any WindowBridging)? = nil,
+        seed: UInt64? = nil
     ) {
         self.session = session
         self.graph = session.currentGraph
@@ -56,6 +58,7 @@ final class BFSExplorer: @unchecked Sendable {
         self.componentDefinitions = componentDefinitions
         self.classifier = classifier
         self.bridge = bridge
+        self.rng = seed.map { ExplorationRNG(seed: $0) } ?? ExplorationRNG()
     }
 
     /// Record start time and seed frontier with the root screen. Call once after initial capture.
@@ -284,8 +287,9 @@ final class BFSExplorer: @unchecked Sendable {
 
         // Build plan from viewport if calibration didn't produce one (e.g. non-scrollable screen)
         if graph.screenPlan(for: currentFP) == nil {
+            let canonicalElements = ExplorationRNG.canonicalOrder(viewportElements)
             let classified = ElementClassifier.classify(
-                viewportElements, budget: budget, screenHeight: windowSize.height
+                canonicalElements, budget: budget, screenHeight: windowSize.height
             )
             let visitedElements = graph.node(for: currentFP)?.visitedElements ?? []
             let plan = buildScreenPlan(

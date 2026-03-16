@@ -108,6 +108,12 @@ extension MirroirMCP {
                             "When true, discard any persisted navigation graph and " +
                             "explore from scratch. Default: false (incremental exploration)."),
                     ]),
+                    "seed": .object([
+                        "type": .string("integer"),
+                        "description": .string(
+                            "Seed for deterministic exploration ordering. " +
+                            "Same seed produces identical exploration sequences."),
+                    ]),
                 ]),
                 "required": .array([.string("action")]),
             ],
@@ -387,6 +393,7 @@ extension MirroirMCP {
 
         let goal = args["goal"]?.asString() ?? ""
         let fresh = args["fresh"]?.asBool() ?? false
+        let seed = args["seed"]?.asInt().map { UInt64($0) }
         let explicitStrategy = args["strategy"]?.asString()
         let strategyChoice = StrategyDetector.detect(
             targetType: ctx.targetType,
@@ -421,7 +428,8 @@ extension MirroirMCP {
             session: session, budget: budget, windowSize: windowSize,
             componentDefinitions: componentDefinitions,
             classifier: classifier,
-            bridge: ctx.bridge
+            bridge: ctx.bridge,
+            seed: seed
         )
         explorer.markStarted()
 

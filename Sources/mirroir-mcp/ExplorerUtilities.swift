@@ -191,4 +191,38 @@ enum ExplorerUtilities {
             return .failed(reason: "Still on system screen (\(desc)) after relaunch")
         }
     }
+
+    // MARK: - OCR Stabilization
+
+    /// Capture the screen repeatedly until OCR produces N consecutive identical
+    /// structural element sets, or maxAttempts is reached. Returns the first stable result.
+    /// This ensures the screen has fully settled (animations complete, content loaded)
+    /// before the explorer acts on the OCR output.
+    static func stabilizedDescribe(
+        describer: ScreenDescribing,
+        requiredConsecutive: Int = 2,
+        maxAttempts: Int = 4
+    ) -> ScreenDescriber.DescribeResult? {
+        guard let first = describer.describe() else { return nil }
+        guard requiredConsecutive > 1 else { return first }
+
+        var lastTexts = Set(first.elements.map { $0.text })
+        var lastResult = first
+        var consecutiveCount = 1
+
+        for _ in 1 ..< maxAttempts {
+            usleep(50_000) // 50ms between captures
+            guard let result = describer.describe() else { continue }
+            let texts = Set(result.elements.map { $0.text })
+            if texts == lastTexts {
+                consecutiveCount += 1
+                if consecutiveCount >= requiredConsecutive { return result }
+            } else {
+                consecutiveCount = 1
+                lastTexts = texts
+                lastResult = result
+            }
+        }
+        return lastResult
+    }
 }
