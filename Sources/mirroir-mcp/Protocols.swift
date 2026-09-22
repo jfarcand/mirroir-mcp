@@ -19,6 +19,19 @@ protocol WindowBridging: Sendable {
     func getOrientation() -> DeviceOrientation?
     /// Bring the target window to the front so it receives input.
     func activate()
+    /// Whether the target owns the frontmost window right now, so keyboard
+    /// events posted to the HID tap reach it rather than another Mac app.
+    func isFrontmost() -> Bool
+}
+
+extension WindowBridging {
+    /// Default: the target's process owns the frontmost normal-layer window,
+    /// asked of the window server on every call rather than NSWorkspace's
+    /// snapshot, which freezes in the server (see `RunningAppLocator`).
+    func isFrontmost() -> Bool {
+        guard let pid = findProcess()?.processIdentifier else { return false }
+        return WindowListHelper.frontmostWindowOwnerPID() == pid
+    }
 }
 
 /// Extends WindowBridging with menu bar actions available on iPhone Mirroring.
@@ -40,6 +53,28 @@ extension MenuActionCapable {
 
 /// Backward-compatible alias for code that references the old protocol name.
 typealias MirroringBridging = MenuActionCapable
+
+/// Live reads of the iPhone Mirroring process and window from macOS: Launch
+/// Services for the process, Accessibility for the main window, the window
+/// server for authoritative bounds. Every call answers from current system
+/// state — implementations never cache — because the window moves and resizes
+/// when the iPhone rotates or Mirroring is resized, and the process gets a new
+/// PID when Mirroring restarts.
+protocol MirroringSystemProbing: Sendable {
+    /// PID of the running app with `bundleID`, or nil when it is not running.
+    func processID(bundleID: String) -> pid_t?
+    /// Snapshot of the app's AX main window, or nil when it exposes none.
+    func mainWindow(pid: pid_t) -> MirroringAXWindow?
+    /// The window server's current window list.
+    func windowList() -> [WindowListEntry]
+    /// Press the resume control of the paused overlay in the main window of
+    /// `pid`: a button `MirroringWindowResolver.isResumeControl` accepts,
+    /// directly under the hosting view. Returns whether a press succeeded.
+    func pressResumeControl(pid: pid_t) -> Bool
+    /// Screen centre of a resume or dismiss control anywhere in the main
+    /// window of `pid`, or nil when no interruption overlay shows one.
+    func dismissControlPoint(pid: pid_t) -> CGPoint?
+}
 
 /// A pluggable strategy for clearing a target interruption that blocks input —
 /// for ANY target, not just iPhone Mirroring. Examples: a suspended iPhone
@@ -77,6 +112,92 @@ protocol InputProviding: Sendable {
     func pressKey(keyName: String, modifiers: [String]) -> TypeResult
     func launchApp(name: String) -> String?
     func openURL(_ url: String) -> String?
+    /// Drive the single persistent touch contact that spans calls (begin,
+    /// move, end, cancel). While it is held, every other pointing operation
+    /// refuses. Coordinates are window-relative, like `tap`.
+    func touch(_ command: TouchCommand) -> Result<TouchOutcome, TouchSessionError>
+    /// Perform a validated two-finger pinch or rotate centred at the request's
+    /// window-relative point. Returns nil on success, or an error message.
+    func gesture(_ request: GestureRequest) -> String?
+    /// Hold the request's keys for its duration, re-posting key downs as
+    /// auto-repeat, optionally dragging a mouse button over the same time,
+    /// then release everything in reverse order. Returns nil on success, or
+    /// an error message.
+    func holdKeys(_ request: HeldKeysRequest) -> String?
+}
+
+/// Hides the cursor and detaches it from the physical mouse while synthetic
+/// pointing input holds a button or runs a gesture, so the user's own mouse
+/// movement cannot drag the held contact elsewhere.
+protocol PointerEngaging: Sendable {
+    /// Engage the pointer for input going to `targetPID` (nil: the HID tap).
+    /// Returns whether it did (false in cursor-free mode).
+    func engagePointer(targetPID: pid_t?) -> Bool
+    /// Undo `engagePointer` when it returned true.
+    func disengagePointer(_ engaged: Bool)
+}
+
+/// The live pointer engagement through `CGEventInput`, shared by every live
+/// CGEvent poster so there is one implementation of it.
+protocol CGEventPointerEngaging: PointerEngaging {}
+
+extension CGEventPointerEngaging {
+    func engagePointer(targetPID: pid_t?) -> Bool {
+        CGEventInput.engageCursor(targetPID: targetPID)
+    }
+
+    func disengagePointer(_ engaged: Bool) {
+        CGEventInput.disengageCursor(engaged)
+    }
+}
+
+/// Posts the keyboard and mouse events of one hold_keys call. Mouse points are
+/// screen-absolute; `targetPID` routes button events to one process
+/// (cursor-free mode) instead of the HID event tap.
+protocol HeldInputPosting: PointerEngaging {
+    /// Post one key, modifier or button event. Returns false when the event
+    /// could not be created.
+    func post(_ event: HeldInputEvent, targetPID: pid_t?) -> Bool
+    /// Wait between events.
+    func pause(microseconds: UInt32)
+}
+
+/// Posts the CGEvents of a two-finger trackpad gesture (pinch, rotate) that
+/// iPhone Mirroring forwards to iOS as a UIKit two-finger gesture. Points are
+/// screen-absolute; `targetPID` routes events to one process (cursor-free
+/// mode) instead of the HID event tap.
+protocol GestureEventPosting: PointerEngaging {
+    /// Post one gesture event at `centre`, stamped with the trackpad `senderID`.
+    /// Returns false when the event could not be created.
+    func post(_ event: GestureEvent, at centre: CGPoint, senderID: UInt64, targetPID: pid_t?) -> Bool
+    /// Wait between gesture frames.
+    func pause(microseconds: UInt32)
+}
+
+/// Finds the multitouch trackpad whose HID service a gesture event must name
+/// as its sender: iPhone Mirroring ignores a gesture event whose sender is not
+/// a real multitouch trackpad.
+protocol MultitouchSenderResolving: Sendable {
+    /// IORegistry entry ID of the Mac's multitouch trackpad (built-in first,
+    /// then a Magic Trackpad), or nil when the Mac has none.
+    func multitouchSenderID() -> UInt64?
+}
+
+/// Posts the CGEvent primitives of one persistent touch contact: a held left
+/// button is one real iOS touch, and it stays down across calls until released.
+/// All points are screen-absolute. `targetPID` routes events to one process
+/// (cursor-free mode) instead of the HID event tap.
+protocol TouchContactPosting: PointerEngaging {
+    /// Press the left button at `point` (touch down).
+    func press(at point: CGPoint, targetPID: pid_t?) -> Bool
+    /// Move the held button from `start` to `end` over `durationMs`.
+    func move(from start: CGPoint, to end: CGPoint, durationMs: Int, targetPID: pid_t?) -> Bool
+    /// Release the left button at `point` (touch up).
+    func release(at point: CGPoint, targetPID: pid_t?) -> Bool
+    /// Where the system pointer is right now.
+    func pointerLocation() -> CGPoint
+    /// Put the system pointer back at `point`.
+    func warpPointer(to point: CGPoint)
 }
 
 /// Default nil cursorMode for backward compatibility.

@@ -162,7 +162,7 @@ enum DoctorCommand {
             if let info = bridge.getWindowInfo() {
                 let w = Int(info.size.width)
                 let h = Int(info.size.height)
-                let orientation = h > w ? "portrait" : "landscape"
+                let orientation = info.orientation.rawValue
                 return DoctorCheck(
                     name: "Mirroring connected",
                     status: .passed,

@@ -97,6 +97,11 @@ final class StubInput: InputProviding, @unchecked Sendable {
         return launchAppResult
     }
     func openURL(_ url: String) -> String? { openURLResult }
+    func touch(_ command: TouchCommand) -> Result<TouchOutcome, TouchSessionError> {
+        .failure(.rejected("StubInput does not hold touches"))
+    }
+    func gesture(_ request: GestureRequest) -> String? { nil }
+    func holdKeys(_ request: HeldKeysRequest) -> String? { nil }
 }
 
 // MARK: - StubCapture

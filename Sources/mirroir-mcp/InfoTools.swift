@@ -30,18 +30,17 @@ extension MirroirMCP {
                 guard let ctx else { return err! }
                 let bridge = ctx.bridge
 
-                guard let orientation = bridge.getOrientation() else {
+                // One live read: orientation and size come from the same
+                // window snapshot, so a rotation between two reads cannot
+                // pair one orientation with the other orientation's size.
+                guard let info = bridge.getWindowInfo() else {
                     return .error(
                         "Cannot determine orientation. Is target '\(ctx.name)' running?")
                 }
-
-                let info = bridge.getWindowInfo()
-                let sizeDesc = info.map {
-                    "\(Int($0.size.width))x\(Int($0.size.height))"
-                } ?? "unknown"
+                let sizeDesc = "\(Int(info.size.width))x\(Int(info.size.height))"
 
                 return .text(
-                    "Orientation: \(orientation.rawValue) (window: \(sizeDesc))")
+                    "Orientation: \(info.orientation.rawValue) (window: \(sizeDesc))")
             }
         ))
 
@@ -153,7 +152,7 @@ extension MirroirMCP {
                         info.map { "\(Int($0.size.width))x\(Int($0.size.height))" } ?? "unknown"
                     let posDesc =
                         info.map { "pos=(\(Int($0.position.x)),\(Int($0.position.y)))" } ?? "pos=unknown"
-                    let orientDesc = bridge.getOrientation()?.rawValue ?? "unknown"
+                    let orientDesc = info?.orientation.rawValue ?? "unknown"
                     mirroringStatus = "Connected — mirroring active (window: \(sizeDesc), \(posDesc), \(orientDesc))"
                 case .paused:
                     mirroringStatus = "Paused — connection paused, can resume"

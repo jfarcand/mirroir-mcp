@@ -48,7 +48,7 @@ enum CGEventInput {
 
     /// Clamp a caller-supplied gesture duration into the safe range so the
     /// downstream microsecond conversions can never trap or overflow.
-    private static func safeDurationMs(_ durationMs: Int) -> Int {
+    static func safeDurationMs(_ durationMs: Int) -> Int {
         min(max(durationMs, minGestureDurationMs), maxGestureDurationMs)
     }
 
@@ -76,11 +76,14 @@ enum CGEventInput {
             return false
         }
 
+        // Registered so a shutdown mid-press lifts the button before exiting.
+        guard PlaybackInterruption.shared.begin() else { return false }
+        defer { PlaybackInterruption.shared.end() }
         let cursorEngaged = engageCursor(targetPID: targetPID)
         defer { disengageCursor(cursorEngaged) }
 
         post(down, targetPID: targetPID)
-        usleep(UInt32(durationMs) * 1000)
+        PlaybackInterruption.shared.sleep(microseconds: UInt32(durationMs) * 1000)
         post(up, targetPID: targetPID)
         return true
     }
@@ -271,26 +274,14 @@ enum CGEventInput {
             return false
         }
 
+        // Registered so a shutdown mid-drag lifts the button before exiting.
+        guard PlaybackInterruption.shared.begin() else { return false }
+        defer { PlaybackInterruption.shared.end() }
         let cursorEngaged = engageCursor(targetPID: targetPID)
         defer { disengageCursor(cursorEngaged) }
 
         post(down, targetPID: targetPID)
-
-        // Interpolate drag movement
-        let steps = max(10, durationMs / 16) // ~60fps
-        let stepDelay = UInt32(durationMs) * 1000 / UInt32(steps)
-
-        for i in 1...steps {
-            let t = CGFloat(i) / CGFloat(steps)
-            let x = start.x + (end.x - start.x) * t
-            let y = start.y + (end.y - start.y) * t
-            let point = CGPoint(x: x, y: y)
-
-            guard let dragEvent = makeMouseEvent(.leftMouseDragged, at: point) else { continue }
-            post(dragEvent, targetPID: targetPID)
-            usleep(stepDelay)
-        }
-
+        postDragPath(from: start, to: end, durationMs: durationMs, targetPID: targetPID)
         post(up, targetPID: targetPID)
         return true
     }
@@ -310,7 +301,7 @@ enum CGEventInput {
 
     /// Modifier virtual keycodes (Carbon kVK_*). Order: press in this order,
     /// release in reverse.
-    private static let modifierKeys: [(flag: CGEventFlags, keycode: UInt16)] = [
+    static let modifierKeys: [(flag: CGEventFlags, keycode: UInt16)] = [
         (.maskControl, 0x3B),   // kVK_Control
         (.maskAlternate, 0x3A), // kVK_Option
         (.maskShift, 0x38),     // kVK_Shift
@@ -411,7 +402,7 @@ enum CGEventInput {
     // MARK: - Private
 
     /// Create a CGEvent for the given mouse event type at the specified position.
-    private static func makeMouseEvent(
+    static func makeMouseEvent(
         _ type: CGEventType, at point: CGPoint
     ) -> CGEvent? {
         CGEvent(
@@ -423,7 +414,7 @@ enum CGEventInput {
     }
 
     /// Post an event either to the HID event tap (system-wide) or directly to a PID.
-    private static func post(_ event: CGEvent, targetPID: pid_t?) {
+    static func post(_ event: CGEvent, targetPID: pid_t?) {
         if let pid = targetPID {
             event.postToPid(pid)
         } else {
@@ -439,7 +430,7 @@ enum CGEventInput {
     /// to the event's coordinates automatically — no warp needed. For scroll
     /// events (swipe), pass `warpTo:` to pre-position the cursor since scroll
     /// routing is based on cursor position.
-    private static func engageCursor(targetPID: pid_t?, warpTo point: CGPoint? = nil) -> Bool {
+    static func engageCursor(targetPID: pid_t?, warpTo point: CGPoint? = nil) -> Bool {
         guard targetPID == nil else { return false }
         // Warp BEFORE hiding cursor — hiding first can prevent the warp
         // from registering for scroll event routing in iPhone Mirroring.
@@ -455,7 +446,7 @@ enum CGEventInput {
     }
 
     /// Re-associate mouse tracking and show cursor if it was engaged.
-    private static func disengageCursor(_ engaged: Bool) {
+    static func disengageCursor(_ engaged: Bool) {
         if engaged {
             CGAssociateMouseAndMouseCursorPosition(1)
             CGDisplayShowCursor(CGMainDisplayID())

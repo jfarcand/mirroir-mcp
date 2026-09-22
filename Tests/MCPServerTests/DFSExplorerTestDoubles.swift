@@ -117,6 +117,11 @@ final class MockExplorerInput: InputProviding, @unchecked Sendable {
         return nil
     }
     func openURL(_ url: String) -> String? { nil }
+    func touch(_ command: TouchCommand) -> Result<TouchOutcome, TouchSessionError> {
+        .failure(.rejected("MockExplorerInput does not hold touches"))
+    }
+    func gesture(_ request: GestureRequest) -> String? { nil }
+    func holdKeys(_ request: HeldKeysRequest) -> String? { nil }
 
     var taps: [(x: Double, y: Double)] {
         lock.lock()

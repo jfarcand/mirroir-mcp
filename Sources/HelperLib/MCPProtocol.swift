@@ -146,9 +146,12 @@ extension JSONValue {
         return nil
     }
 
+    /// The number truncated toward zero, or nil when it is not a number or
+    /// has no `Int` value (NaN, infinity, or outside `Int`'s range). Never
+    /// traps, so a hostile argument becomes a missing one instead of a crash.
     public func asInt() -> Int? {
-        if case .number(let n) = self { return Int(n) }
-        return nil
+        guard case .number(let n) = self else { return nil }
+        return Int(exactly: n.rounded(.towardZero))
     }
 
     public func asStringArray() -> [String]? {

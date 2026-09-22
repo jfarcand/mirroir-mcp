@@ -112,8 +112,16 @@ struct MirroirMCP {
 
         registerTools(server: server, registry: registry, policy: policy)
 
+        // A touch, key, button or gesture left held would break input for the
+        // whole Mac, so every way out of the server releases it.
+        HeldInputReleaseOnExit.install()
+
         // Start the MCP server loop
         server.run()
+
+        // stdin closed: the client is gone and nothing can end a held input.
+        HeldInputReleaseOnExit.releaseAll(reason: "client disconnected", session: .shared,
+                                          interruption: .shared)
 
         // Shutdown embedded embacle runtime if it was initialized
         if EmbacleFFI.isAvailable && EnvConfig.agentTransport != "http" {

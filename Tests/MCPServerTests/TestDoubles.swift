@@ -30,6 +30,8 @@ final class StubBridge: MenuActionCapable, @unchecked Sendable {
     var connectOnResume = false
     /// Screen point returned for the paused-overlay dismiss button (nil = none).
     var pausedButtonPoint: CGPoint?
+    /// Whether the target reports owning the frontmost window.
+    var frontmost = true
     /// Records menu action calls for verification.
     var menuActionCalls: [(menu: String, item: String)] = []
 
@@ -50,6 +52,10 @@ final class StubBridge: MenuActionCapable, @unchecked Sendable {
     }
 
     func activate() {}
+
+    func isFrontmost() -> Bool {
+        frontmost
+    }
 
     func triggerMenuAction(menu: String, item: String) -> Bool {
         menuActionCalls.append((menu: menu, item: item))
@@ -119,6 +125,42 @@ final class StubInput: InputProviding, @unchecked Sendable {
         return launchAppResult
     }
     func openURL(_ url: String) -> String? { openURLResult }
+
+    /// Result returned by touch(); nil answers with the outcome the command implies.
+    var touchResult: Result<TouchOutcome, TouchSessionError>?
+    /// Records every touch() invocation.
+    var touchCalls: [TouchCommand] = []
+
+    func touch(_ command: TouchCommand) -> Result<TouchOutcome, TouchSessionError> {
+        touchCalls.append(command)
+        if let touchResult { return touchResult }
+        switch command {
+        case .begin(let x, let y): return .success(.began(at: CGPoint(x: x, y: y)))
+        case .move(let x, let y, _): return .success(.moved(to: CGPoint(x: x, y: y)))
+        case .end: return .success(.ended(at: .zero))
+        case .cancel: return .success(.cancelled(releasedAt: nil))
+        }
+    }
+
+    /// Result returned by gesture().
+    var gestureResult: String?
+    /// Records every gesture() invocation.
+    var gestureCalls: [GestureRequest] = []
+
+    func gesture(_ request: GestureRequest) -> String? {
+        gestureCalls.append(request)
+        return gestureResult
+    }
+
+    /// Result returned by holdKeys().
+    var holdKeysResult: String?
+    /// Records every holdKeys() invocation.
+    var holdKeysCalls: [HeldKeysRequest] = []
+
+    func holdKeys(_ request: HeldKeysRequest) -> String? {
+        holdKeysCalls.append(request)
+        return holdKeysResult
+    }
 }
 
 // MARK: - StubCapture

@@ -62,6 +62,11 @@ private final class TapRecordingInput: InputProviding, @unchecked Sendable {
     }
     func launchApp(name: String) -> String? { base.launchApp(name: name) }
     func openURL(_ url: String) -> String? { base.openURL(url) }
+    func touch(_ command: TouchCommand) -> Result<TouchOutcome, TouchSessionError> {
+        base.touch(command)
+    }
+    func gesture(_ request: GestureRequest) -> String? { base.gesture(request) }
+    func holdKeys(_ request: HeldKeysRequest) -> String? { base.holdKeys(request) }
 }
 
 /// Everything the tests need from the Instagram pack, resolved from data files

@@ -13,7 +13,7 @@
 [![macOS 15+](https://img.shields.io/badge/macOS-15%2B-black?logo=apple)](https://support.apple.com/en-us/105071)
 [![Discord](https://img.shields.io/discord/1481795325953048627?logo=discord&label=Discord)](https://discord.gg/jVDBbMjPMf)
 
-Give your AI eyes, hands, and a real iPhone. An MCP server that lets any AI agent see the screen, tap what it needs, and figure the rest out — through macOS iPhone Mirroring. Experimental support for macOS windows. [33 tools](docs/tools.md), any MCP client.
+Give your AI eyes, hands, and a real iPhone. An MCP server that lets any AI agent see the screen, tap what it needs, and figure the rest out — through macOS iPhone Mirroring. Experimental support for macOS windows. [38 tools](docs/tools.md), any MCP client.
 
 ## Requirements
 
@@ -113,7 +113,7 @@ Use the full path to the binary in your `.mcp.json`: `<repo>/.build/release/mirr
 
 Every interaction follows the same loop: **observe, reason, act**. `describe_screen` gives the AI every text element with tap coordinates (eyes). The LLM decides what to do next (brain). `tap`, `type_text`, `swipe` execute the action (hands) — then it loops back to observe. No scripts, no coordinates, just intent.
 
-Beyond the basics, the server exposes higher-level navigation and lifecycle tools: `press_back` navigates back by OCR-tapping the "<" chevron (with a canonical-position fallback), `press_home`/`press_app_switcher`/`spotlight` drive system gestures, `scroll_to` scrolls until a target text becomes visible, `reset_app` force-quits an app via the App Switcher, `set_network` toggles connectivity through Settings, and `measure` times how long an action takes to surface a target element. Multi-target setups use `list_targets`/`switch_target` to move between window automation endpoints. Skill authoring is served by `record_step` and `save_compiled` (compiled replay) and `calibrate_component` (test a component definition against the live screen). See the [Tools Reference](docs/tools.md) for all 33 tools.
+Beyond the basics, the server exposes higher-level navigation and lifecycle tools: `press_back` navigates back by OCR-tapping the "<" chevron (with a canonical-position fallback), `press_home`/`press_app_switcher`/`spotlight` drive system gestures, `scroll_to` scrolls until a target text becomes visible, `reset_app` force-quits an app via the App Switcher, `set_network` toggles connectivity through Settings, and `measure` times how long an action takes to surface a target element. Multi-target setups use `list_targets`/`switch_target` to move between window automation endpoints. Skill authoring is served by `record_step` and `save_compiled` (compiled replay) and `calibrate_component` (test a component definition against the live screen). See the [Tools Reference](docs/tools.md) for all 38 tools.
 
 ## Describe Your App
 
@@ -627,7 +627,7 @@ See [Configuration Reference](docs/configuration.md) for all 40+ settings coveri
 
 | | |
 |---|---|
-| [Tools Reference](docs/tools.md) | All 33 tools, parameters, and input workflows |
+| [Tools Reference](docs/tools.md) | All 38 tools, parameters, and input workflows |
 | [Configuration](docs/configuration.md) | All settings: screen intelligence, input timing, exploration, AI providers |
 | [FAQ](docs/faq.md) | Security, focus stealing, keyboard layouts, embacle/vision mode |
 | [Security](docs/security.md) | Threat model, kill switch, and recommendations |

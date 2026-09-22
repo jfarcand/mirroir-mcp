@@ -45,6 +45,13 @@ final class InputSimulation: Sendable {
     /// keyboard layout found on the Mac. CGEvent keycodes are physical keys
     /// (layout-independent), same as HID — substitution is still needed.
     let layoutSubstitution: [Character: Character]
+    /// The persistent touch contact shared by every target; while it is held,
+    /// pointing operations refuse and no escape click is posted.
+    let touchSession: TouchSession
+    /// The trackpad gesture poster and sender lookup behind pinch and rotate.
+    let gestureDevice: GestureDevice
+    /// The key and button poster behind hold_keys.
+    let heldInputPoster: any HeldInputPosting
     /// The target's PID right now, or nil when the target is not running.
     ///
     /// Resolved on every read rather than captured at init: the target can
@@ -63,9 +70,15 @@ final class InputSimulation: Sendable {
     }
 
     init(bridge: any WindowBridging, cursorMode: CursorMode = .direct,
-         layoutSubstitution override: [Character: Character]? = nil) {
+         layoutSubstitution override: [Character: Character]? = nil,
+         touchSession: TouchSession = .shared,
+         gestureDevice: GestureDevice = .live,
+         heldInputPoster: any HeldInputPosting = CGEventHeldInputPoster()) {
         self.bridge = bridge
         self.cursorMode = cursorMode
+        self.touchSession = touchSession
+        self.gestureDevice = gestureDevice
+        self.heldInputPoster = heldInputPoster
 
         // Build layout substitution table when the iPhone's hardware keyboard
         // layout differs from US QWERTY. Option-modified keycodes go through
@@ -142,7 +155,9 @@ final class InputSimulation: Sendable {
     /// connected (possibly after freeing), or the state error when it still
     /// cannot accept input.
     func ensureConnected(tag: String) -> String? {
-        if bridge.getState() == .paused {
+        // An escape plugin frees the session with a real click, which would
+        // lift a held touch, so a held touch leaves the paused state alone.
+        if !touchSession.isHeld, bridge.getState() == .paused {
             _ = freePausedSession(tag: tag)
         }
         return checkMirroringConnected(tag: tag)
@@ -150,6 +165,8 @@ final class InputSimulation: Sendable {
 
     /// Common preamble for pointing operations (tap, swipe, drag, long press, double tap).
     /// Validates that the target is connected, the window exists, and coordinates are in bounds.
+    /// Refuses first while a persistent touch is held (`TouchSession.heldRefusal`), so
+    /// every pointing operation shares one refusal and no click can lift the contact.
     /// All pointing operations use CGEvent — no external dependencies.
     /// Returns `(info, focusChanged, nil)` on success, or `(nil, false, errorMessage)` on failure.
     ///
@@ -158,7 +175,11 @@ final class InputSimulation: Sendable {
     /// stage-manager move). Stale `info.position` then sends CGEvent clicks to
     /// the old location, missing the actual window. The post-activate re-query
     /// ensures every pointing operation uses the window's *current* coordinates.
-    private func preparePointingInput(tag: String, x: Double, y: Double) -> (info: WindowInfo?, focusChanged: Bool, error: String?) {
+    func preparePointingInput(tag: String, x: Double, y: Double) -> (info: WindowInfo?, focusChanged: Bool, error: String?) {
+        if let refusal = touchSession.heldRefusal(tool: tag) {
+            DebugLog.log(tag, "REJECTED: touch held")
+            return (nil, false, refusal)
+        }
         if let stateError = ensureConnected(tag: tag) {
             return (nil, false, stateError)
         }
@@ -201,13 +222,13 @@ final class InputSimulation: Sendable {
 
     /// Save the current cursor position if the effective cursor mode requires it.
     /// Per-call override takes precedence over the instance default.
-    private func saveCursor(mode: CursorMode? = nil) -> CGPoint? {
+    func saveCursor(mode: CursorMode? = nil) -> CGPoint? {
         guard (mode ?? cursorMode) == .preserving else { return nil }
         return CGEvent(source: nil)?.location
     }
 
     /// Restore the cursor to a previously saved position.
-    private func restoreCursor(_ savedPosition: CGPoint?) {
+    func restoreCursor(_ savedPosition: CGPoint?) {
         guard let pos = savedPosition else { return }
         CGWarpMouseCursorPosition(pos)
     }

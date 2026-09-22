@@ -1,6 +1,6 @@
 # mirroir-mcp
 
-> Give your AI eyes, hands, and a real iPhone. An MCP server that lets any AI agent see the screen, tap what it needs, and figure the rest out — through macOS iPhone Mirroring. Also supports macOS windows. 33 tools, any MCP client (Claude Code, Cursor, Copilot, ChatGPT, Codex). Written in Swift. Apache 2.0 licensed.
+> Give your AI eyes, hands, and a real iPhone. An MCP server that lets any AI agent see the screen, tap what it needs, and figure the rest out — through macOS iPhone Mirroring. Also supports macOS windows. 38 tools, any MCP client (Claude Code, Cursor, Copilot, ChatGPT, Codex). Written in Swift. Apache 2.0 licensed.
 
 ## Overview
 
@@ -55,6 +55,10 @@ Requires macOS 15+ and an iPhone connected via iPhone Mirroring.
 - `long_press` — Hold tap for context menus (default 500ms)
 - `swipe` — Swipe between two points (scroll wheel events = iOS scroll)
 - `drag` — Slow sustained drag for icons, sliders (touch events, not scroll)
+- `touch` — Persistent single finger across calls: `begin`/`move`/`end`/`cancel`; moves up to 5000ms each, placed against the live window (released if the window changes size); other pointing tools refuse while held; auto-released after 30s idle
+- `pinch` — Two-finger pinch at (x, y): `scale` > 1 zooms in, < 1 zooms out (0.1-10, default 500ms); reaches iOS as a UIKit two-finger gesture (Maps, Photos), games may ignore it; needs a built-in or Magic Trackpad
+- `rotate` — Two-finger rotation at (x, y) by `degrees` (positive counter-clockwise, up to 360); UIKit two-finger gesture, games may ignore it; needs a built-in or Magic Trackpad
+- `hold_keys` — Hold 1-6 keys (`w`, `shift`, `space`, arrows) for `duration_ms` with auto-repeat, optionally while dragging the left or right mouse button; for games with mouse/keyboard controls (Roblox), touch-only games ignore keys; refused while a touch is held or when the mirroring window is not frontmost
 - `type_text` — Type text via CGEvent key events. Supports non-US layouts via UCKeyTranslate. Accented characters via dead-key sequences.
 - `press_key` — Special keys (return, escape, tab, delete, arrows) with optional modifiers (command, shift, option, control)
 - `shake` — Trigger shake gesture (Ctrl+Cmd+Z) for undo/dev menus
@@ -340,7 +344,7 @@ Multi-target configuration via `targets.json` for controlling multiple windows s
 ## Documentation Index
 
 - [README](README.md) — Installation, examples, quick start
-- [Tools Reference](docs/tools.md) — All 33 tools with parameters
+- [Tools Reference](docs/tools.md) — All 38 tools with parameters
 - [Security](docs/security.md) — Threat model, kill switch, recommendations
 - [Permissions](docs/permissions.md) — Fail-closed permission model
 - [Component Detection](docs/components.md) — Component definitions, calibration, detection pipeline

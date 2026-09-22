@@ -167,6 +167,21 @@ struct JSONValueTests {
         let value: JSONValue = .object(["name": .string("tap")])
         #expect(value.getToolName() == "tap")
     }
+
+    @Test("asInt truncates toward zero")
+    func asIntTruncates() {
+        #expect(JSONValue.number(42.9).asInt() == 42)
+        #expect(JSONValue.number(-3.7).asInt() == -3)
+        #expect(JSONValue.string("42").asInt() == nil)
+    }
+
+    @Test("asInt returns nil instead of trapping on numbers with no Int value")
+    func asIntRejectsUnrepresentable() {
+        #expect(JSONValue.number(1e20).asInt() == nil)
+        #expect(JSONValue.number(-1e20).asInt() == nil)
+        #expect(JSONValue.number(.infinity).asInt() == nil)
+        #expect(JSONValue.number(.nan).asInt() == nil)
+    }
 }
 
 @Suite("JSONRPCRequest")

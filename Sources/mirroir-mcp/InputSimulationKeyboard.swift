@@ -306,16 +306,12 @@ extension InputSimulation {
         // Map modifier strings to CGEventFlags
         var flags = CGEventFlags()
         for mod in modifiers {
-            switch mod.lowercased() {
-            case "shift": flags.insert(.maskShift)
-            case "command": flags.insert(.maskCommand)
-            case "option": flags.insert(.maskAlternate)
-            case "control": flags.insert(.maskControl)
-            default:
+            guard let flag = CGEventInput.modifierFlag(named: mod.lowercased()) else {
                 return TypeResult(
                     success: false, warning: nil,
-                    error: "Unknown modifier '\(mod)'. Supported: shift, command, option, control.")
+                    error: "Unknown modifier '\(mod)'. Supported: \(CGEventInput.modifierNames.joined(separator: ", ")).")
             }
+            flags.insert(flag)
         }
 
         let result = CGEventInput.postKey(keycode: keycode, flags: flags)

@@ -76,7 +76,7 @@ final class InfoToolHandlerTests: XCTestCase {
     }
 
     func testGetOrientationUnavailable() {
-        bridge.orientation = nil
+        bridge.windowInfo = nil
         let response = callTool("get_orientation")
         XCTAssertTrue(isError(response))
         let text = extractText(response)
@@ -92,6 +92,20 @@ final class InfoToolHandlerTests: XCTestCase {
         let text = extractText(response)
         XCTAssertTrue(text?.contains("Connected") ?? false)
         XCTAssertTrue(text?.contains("410x898") ?? false) // window size
+    }
+
+    func testStatusDerivesOrientationFromTheSameWindowRead() {
+        // The stub's separate orientation answer disagrees with its window
+        // size; status must report the orientation of the size it prints.
+        bridge.state = .connected
+        bridge.orientation = .portrait
+        bridge.windowInfo = WindowInfo(
+            windowID: 1, position: CGPoint(x: 1040, y: 347),
+            size: CGSize(width: 868, height: 440), pid: 1)
+        let text = extractText(callTool("status")) ?? ""
+        XCTAssertTrue(text.contains("868x440"), text)
+        XCTAssertTrue(text.contains("pos=(1040,347)"), text)
+        XCTAssertTrue(text.contains("landscape"), text)
     }
 
     func testStatusNotRunning() {
