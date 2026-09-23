@@ -4,6 +4,7 @@
 // ABOUTME: Formats a linear iOS exploration capture into a mirroir-run SkillStep scenario (YAML).
 // ABOUTME: Pure transformation — emits target/launch/tap/... steps + a cross-surface baseline; no side effects.
 
+import Foundation
 import HelperLib
 
 /// Renders a linear exploration capture into a `mirroir-run` SkillStep scenario
@@ -16,16 +17,33 @@ import HelperLib
 /// `cross_surface:`.
 enum ScenarioStepFormatter {
 
+    /// Errors raised when a capture cannot be rendered faithfully.
+    enum FormatError: LocalizedError, Equatable {
+        /// The capture recorded an action type the scenario grammar has no step for.
+        case unsupportedAction(String)
+
+        var errorDescription: String? {
+            switch self {
+            case .unsupportedAction(let action):
+                return "captured action_type \"\(action)\" has no scenario step; " +
+                    "refusing to record it as a different action"
+            }
+        }
+    }
+
     /// Build the full `<flow>.ios.yaml` scenario document for `screens`.
     /// The first screen is the launch; each subsequent screen contributes the
     /// action that reached it. A destination landmark assertion is appended.
-    static func scenarioYAML(name: String, appName: String, screens: [ExploredScreen]) -> String {
+    ///
+    /// - Throws: `FormatError.unsupportedAction` when a screen was reached by an
+    ///   action the scenario grammar cannot express.
+    static func scenarioYAML(name: String, appName: String, screens: [ExploredScreen]) throws -> String {
         var steps: [String] = [
             "  - target: { kind: ios, app: \(yamlScalar(appName)) }",
             "  - launch: \(yamlScalar(appName))",
         ]
         for screen in screens.dropFirst() {
-            if let line = stepLine(screen: screen) {
+            if let line = try stepLine(screen: screen) {
                 steps.append(line)
             }
         }
@@ -65,28 +83,47 @@ enum ScenarioStepFormatter {
 
     // MARK: - Private
 
+    /// Actions whose value names an on-screen element. The recorded label came
+    /// from OCR, so it is cleaned, checked against the exclusion list, and
+    /// matched to the element's exact casing on the screen it acted on.
+    private static let elementActions: Set<String> = [
+        "tap", "long_press", "scroll_to", "assert_visible",
+    ]
+
+    /// Actions whose value is carried verbatim: typed text, a key, a swipe
+    /// direction, a URL, a note, a screenshot name, or a label asserted ABSENT
+    /// (which by definition is not on the screen to be matched against).
+    private static let literalActions: Set<String> = [
+        "type", "press_key", "swipe", "open_url", "remember", "screenshot",
+        "assert_not_visible",
+    ]
+
     /// Map one explored screen's action into a single SkillStep YAML node.
-    /// Returns nil when the label is empty or excluded (skipped, not invented).
-    private static func stepLine(screen: ExploredScreen) -> String? {
-        guard let rawLabel = screen.displayLabel ?? screen.arrivedVia, !rawLabel.isEmpty else {
-            return screen.actionType == "press_home" ? "  - home:" : nil
+    /// Returns nil when the recorded value is empty or excluded (skipped, not
+    /// invented).
+    ///
+    /// - Throws: `FormatError.unsupportedAction` for an action type the
+    ///   scenario grammar has no step for — writing it as some other verb would
+    ///   record a walk that never happened.
+    private static func stepLine(screen: ExploredScreen) throws -> String? {
+        let action = screen.actionType ?? "tap"
+        if action == "press_home" {
+            return "  - home:"
         }
-        let clean = ActionStepFormatter.cleanLabel(rawLabel)
-        guard !clean.isEmpty, !ActionStepFormatter.isExcludedLabel(clean) else { return nil }
-        let value = yamlScalar(ActionStepFormatter.resolveLabel(arrivedVia: clean, elements: screen.elements))
-        switch screen.actionType {
-        case "tap", nil: return "  - tap: \(value)"
-        case "type": return "  - type: \(value)"
-        case "press_key": return "  - press_key: \(value)"
-        case "scroll_to": return "  - scroll_to: \(value)"
-        case "swipe": return "  - swipe: \(value)"
-        case "long_press": return "  - long_press: \(value)"
-        case "open_url": return "  - open_url: \(value)"
-        case "remember": return "  - remember: \(value)"
-        case "screenshot": return "  - screenshot: \(value)"
-        case "press_home": return "  - home:"
-        default: return "  - tap: \(value)"
+        if elementActions.contains(action) {
+            guard let rawLabel = screen.displayLabel ?? screen.arrivedVia, !rawLabel.isEmpty else {
+                return nil
+            }
+            let clean = ActionStepFormatter.cleanLabel(rawLabel)
+            guard !clean.isEmpty, !ActionStepFormatter.isExcludedLabel(clean) else { return nil }
+            let label = ActionStepFormatter.resolveLabel(arrivedVia: clean, elements: screen.elements)
+            return "  - \(action): \(yamlScalar(label))"
         }
+        if literalActions.contains(action) {
+            guard let value = screen.arrivedVia, !value.isEmpty else { return nil }
+            return "  - \(action): \(yamlScalar(value))"
+        }
+        throw FormatError.unsupportedAction(action)
     }
 
     /// Pick the destination landmark to assert: the longest non-excluded label

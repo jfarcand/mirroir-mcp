@@ -43,7 +43,9 @@ enum MirroirAppTreeEmitter {
 
     /// Emit the iOS oracle leg for `appName` / `goal` from its linear `screens`.
     ///
-    /// - Throws: a file-system error if a directory or file cannot be written.
+    /// - Throws: a file-system error if a directory or file cannot be written, or
+    ///   `ScenarioStepFormatter.FormatError` when the walk holds an action the
+    ///   scenario grammar cannot express.
     static func emit(
         appName: String,
         flow: String,

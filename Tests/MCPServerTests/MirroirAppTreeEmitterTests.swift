@@ -99,8 +99,8 @@ final class MirroirAppTreeEmitterTests: XCTestCase {
         XCTAssertEqual(MirroirAppTreeEmitter.slugify("!!!"), "app")
     }
 
-    func testScenarioYAMLEmitsValidatedVerbShapes() {
-        let yaml = ScenarioStepFormatter.scenarioYAML(
+    func testScenarioYAMLEmitsValidatedVerbShapes() throws {
+        let yaml = try ScenarioStepFormatter.scenarioYAML(
             name: "verb-coverage", appName: "TestApp", screens: [
                 screen(index: 0, action: nil, via: nil, elements: ["Start"]),
                 screen(index: 1, action: "type", via: "Email", elements: ["Field"]),
@@ -109,6 +109,68 @@ final class MirroirAppTreeEmitterTests: XCTestCase {
         XCTAssertTrue(yaml.contains("- target: { kind: ios, app: \"TestApp\" }"))
         XCTAssertTrue(yaml.contains("- type: \"Email\""))
         XCTAssertTrue(yaml.contains("- scroll_to: \"Bottom\""))
+    }
+
+    /// Assertions keep their verb. The formatter used to rewrite any action
+    /// type it had no case for — `assert_visible` included — into `- tap:`,
+    /// recording a walk that tapped where the capture only looked.
+    func testAssertionsKeepTheirVerb() throws {
+        let yaml = try ScenarioStepFormatter.scenarioYAML(
+            name: "asserts", appName: "TestApp", screens: [
+                screen(index: 0, action: nil, via: nil, elements: ["Start"]),
+                screen(index: 1, action: "assert_visible", via: "inbox", elements: ["Inbox"]),
+                screen(index: 2, action: "assert_not_visible", via: "Error", elements: ["Inbox"]),
+            ])
+        XCTAssertTrue(yaml.contains("- assert_visible: \"Inbox\""))
+        XCTAssertTrue(yaml.contains("- assert_not_visible: \"Error\""))
+        XCTAssertFalse(yaml.contains("- tap:"))
+    }
+
+    /// Typed text, a swipe direction, or a URL is the action's own value, not
+    /// an on-screen label. Fuzzy-matching it against the screen used to swap
+    /// `type: "hello"` for a visible "hello world" and `swipe: "up"` for a
+    /// visible "Update".
+    func testLiteralValuesAreNotMatchedAgainstTheScreen() throws {
+        let yaml = try ScenarioStepFormatter.scenarioYAML(
+            name: "literals", appName: "TestApp", screens: [
+                screen(index: 0, action: nil, via: nil, elements: ["Start"]),
+                screen(index: 1, action: "type", via: "hello", elements: ["hello world"]),
+                screen(index: 2, action: "swipe", via: "up", elements: ["Software Update"]),
+                screen(index: 3, action: "open_url", via: "https://example.com", elements: ["example"]),
+            ])
+        XCTAssertTrue(yaml.contains("- type: \"hello\""))
+        XCTAssertTrue(yaml.contains("- swipe: \"up\""))
+        XCTAssertTrue(yaml.contains("- open_url: \"https://example.com\""))
+    }
+
+    /// Element-targeting actions still resolve to the element's exact casing.
+    func testElementActionsResolveToTheOnScreenLabel() throws {
+        let yaml = try ScenarioStepFormatter.scenarioYAML(
+            name: "elements", appName: "TestApp", screens: [
+                screen(index: 0, action: nil, via: nil, elements: ["Start"]),
+                screen(index: 1, action: "tap", via: "general", elements: ["General"]),
+                screen(index: 2, action: "long_press", via: "photo", elements: ["Photo"]),
+            ])
+        XCTAssertTrue(yaml.contains("- tap: \"General\""))
+        XCTAssertTrue(yaml.contains("- long_press: \"Photo\""))
+    }
+
+    /// An action the scenario grammar cannot express is refused, not recorded
+    /// as a tap — and the refusal reaches the emitter's caller.
+    func testUnsupportedActionIsRefused() throws {
+        let screens = [
+            screen(index: 0, action: nil, via: nil, elements: ["Start"]),
+            screen(index: 1, action: "pinch", via: "Map", elements: ["Map"]),
+        ]
+        XCTAssertThrowsError(try ScenarioStepFormatter.scenarioYAML(
+            name: "pinch", appName: "Maps", screens: screens)) { error in
+            XCTAssertEqual(error as? ScenarioStepFormatter.FormatError, .unsupportedAction("pinch"))
+        }
+
+        let root = tmpRoot()
+        defer { try? FileManager.default.removeItem(at: root.deletingLastPathComponent()) }
+        XCTAssertThrowsError(try MirroirAppTreeEmitter.emit(
+            appName: "Maps", flow: "zoom", screens: screens, root: root))
     }
 
     func testEmitRoutesToOutputDir() throws {
