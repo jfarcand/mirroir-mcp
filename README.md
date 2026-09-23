@@ -167,6 +167,10 @@ test@example.com / password123. Screenshot after each step.
 Start recording, open Settings, scroll to General > About, stop recording.
 ```
 
+## Games
+
+Games get three controls through iPhone Mirroring: `touch` holds a finger across calls for virtual joysticks and press-and-hold (`begin`, `move`, `end`); `hold_keys` holds keys such as `w` while dragging the right mouse button, for games that switch to keyboard and mouse controls like Roblox; `pinch` and `rotate` drive two-finger zoom and rotation in gesture-recognizer UIs. Mirroring exposes a single pointer touch to apps, so a touch-only game cannot receive two independent fingers — see [Games and Multi-Touch](docs/tools.md#games-and-multi-touch) for what was measured.
+
 ## Screen Intelligence
 
 `describe_screen` is the AI's eyes. Three backends work together to give the agent a complete picture of what's on screen — text, icons, and semantic UI structure.

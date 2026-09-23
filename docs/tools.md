@@ -74,6 +74,24 @@ Set `omit_screenshot: true` to return only the text description without the base
 
 For navigating within apps, combine `spotlight` + `type_text` + `press_key`. For example: `spotlight` → `type_text "Messages"` → `press_key return` to launch Messages.
 
+## Games and Multi-Touch
+
+iPhone Mirroring gives an app **one pointer touch**: every mouse and trackpad on the Mac merges into it, and a second button or a second mouse only moves that same touch. Three tools cover what games need within that limit, each measured on a real iPhone:
+
+| Game control | Tool | Example |
+|---|---|---|
+| Virtual joystick, press-and-hold, sustained drag | `touch` | `touch(action:"begin", x:132, y:340)`, then `touch(action:"move", x:132, y:290)` keeps the character walking; `touch(action:"end")` lifts the finger |
+| Keyboard and mouse controls (games that switch to them, e.g. Roblox) | `hold_keys` | `hold_keys(keys:["w"], duration_ms:3000, drag:{from_x:430, from_y:150, to_x:650, to_y:150, button:"right"})` walks forward while the camera turns |
+| Zoom and rotate gestures in maps, photos, and other gesture-recognizer UIs | `pinch`, `rotate` | `pinch(x:200, y:400, scale:2.5)` |
+
+What does not work, and why:
+
+- **Two independent fingers in a touch-only game.** `pinch` and `rotate` do produce two touches, but they reach iOS as a trackpad gesture. UIKit gesture recognizers accept them; game engines that read raw finger touches (Brawl Stars, measured) ignore them.
+- **A second touch while one is held.** A click during a pinch is dropped, a pinch during a held click is ignored, and the right button or a second mouse only moves the held touch.
+- **A two-finger trackpad slide** arrives on the phone as scroll, which iOS turns into a single pan touch.
+
+True independent multi-touch would need a virtual touchscreen HID device on the Mac, which requires Apple's `com.apple.developer.hid.virtual.device` entitlement; whether iPhone Mirroring forwards such a device is unmeasured.
+
 ## Scroll To
 
 `scroll_to` scrolls in a direction until a target text element becomes visible via OCR. It checks if the element is already on screen before scrolling, and detects scroll exhaustion (when the screen content stops changing, meaning the list has reached its end).
