@@ -28,6 +28,11 @@ enum LaunchAppConfirmation {
             return .text("Launched '\(appName)' via Spotlight")
         case .unreadable:
             return .text("Launched '\(appName)' via Spotlight (screen unreadable, launch not confirmed)")
+        case .stillOnHomeScreen:
+            return .error("""
+                The home screen is still showing after launching '\(appName)': Spotlight did not open \
+                or closed without launching. Call launch_app again.
+                """)
         case .spotlightStillVisible:
             return .error("""
                 Spotlight is still open after searching '\(appName)', so no app launched. \

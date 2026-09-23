@@ -58,6 +58,18 @@ final class LaunchAppConfirmationTests: XCTestCase {
         XCTAssertFalse(SpotlightDetector.isQueryEchoedInSearchField(elements: elements, query: "Maps", windowHeight: height))
     }
 
+    func testAppTabLabelWithoutGlyphIsNotAnEcho() {
+        // Device capture: launching "Horloge" opens Clock, whose tab bar shows "Horloges".
+        let elements = [point("Horloges", y: 892)]
+        XCTAssertFalse(SpotlightDetector.isQueryEchoedInSearchField(
+            elements: elements, query: "Horloge", windowHeight: height))
+    }
+
+    func testHomeScreenSearchPillIsDetected() {
+        let elements = [point("Horloge", y: 290), point("Q Rechercher", y: 783)]
+        XCTAssertTrue(SpotlightDetector.isHomeScreenVisible(elements: elements, windowHeight: height))
+    }
+
     func testSingleGlyphNeverCountsAsEcho() {
         let elements = [point("Q", y: 830)]
         XCTAssertFalse(SpotlightDetector.isQueryEchoedInSearchField(elements: elements, query: "Maps", windowHeight: height))
@@ -83,6 +95,20 @@ final class LaunchAppConfirmationTests: XCTestCase {
         let open = screen([point("Photos", y: 120)])
         let result = outcome([stuck, stuck, open], name: "Photos")
         XCTAssertFalse(result.isError)
+    }
+
+    func testLaunchedAppWithMatchingTabLabelReportsLaunched() {
+        let clock = screen([point("Horloges", y: 150), point("Horloges", y: 892), point("Alarmes", y: 892)])
+        let result = outcome([clock], name: "Horloge")
+        XCTAssertFalse(result.isError)
+        XCTAssertEqual(text(result), "Launched 'Horloge' via Spotlight")
+    }
+
+    func testStillOnHomeScreenReportsError() {
+        let home = screen([point("Horloge", y: 290), point("Q Rechercher", y: 783)])
+        let result = outcome([home], name: "Horloge")
+        XCTAssertTrue(result.isError)
+        XCTAssertTrue(text(result).contains("home screen is still showing"))
     }
 
     func testUnreadableScreenIsNotClaimedAsConfirmed() {

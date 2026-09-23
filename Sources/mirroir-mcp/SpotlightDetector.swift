@@ -46,9 +46,11 @@ enum SpotlightDetector {
     /// Check whether Spotlight's search field still echoes `query`.
     ///
     /// When Spotlight finds nothing, it shows no "Top Hit" label — only a blurred
-    /// background and the search field (OCR'd as e.g. "Q Maps"). OCR may drop the
-    /// magnifier glyph or truncate the text, so the field's text and the query only
-    /// need to be prefixes of one another once normalized.
+    /// background and the search field, which OCR reads with the magnifier glyph
+    /// first ("Q Maps"). The glyph is required: an app's own bottom text (a
+    /// "Horloges" tab after launching Horloge) must not count. OCR may truncate
+    /// the text, so the field's text and the query only need to be prefixes of
+    /// one another once normalized.
     static func isQueryEchoedInSearchField(
         elements: [TapPoint], query: String, windowHeight: Double
     ) -> Bool {
@@ -56,10 +58,23 @@ enum SpotlightDetector {
         guard target.count >= minEchoLength else { return false }
         let bandTop = windowHeight * searchFieldBandStart
         return elements.contains { el in
-            guard el.tapY >= bandTop else { return false }
-            let text = normalize(stripSearchGlyph(el.text))
+            guard el.tapY >= bandTop, let field = searchFieldText(el.text) else { return false }
+            let text = normalize(field)
             guard text.count >= minEchoLength else { return false }
             return target.hasPrefix(text) || text.hasPrefix(target)
+        }
+    }
+
+    /// Labels of the home screen's search pill, which OCR reads as "Q Rechercher".
+    /// Seeing it after a launch means the home screen is still showing.
+    static let homeSearchPillLabels: [String] = ["search", "rechercher", "buscar", "suchen"]
+
+    /// Whether the home screen's search pill is showing, i.e. no app is in front.
+    static func isHomeScreenVisible(elements: [TapPoint], windowHeight: Double) -> Bool {
+        let bandTop = windowHeight * searchFieldBandStart
+        return elements.contains { el in
+            guard el.tapY >= bandTop, let field = searchFieldText(el.text) else { return false }
+            return homeSearchPillLabels.contains(field.lowercased())
         }
     }
 
@@ -78,6 +93,9 @@ enum SpotlightDetector {
         case launched
         /// Spotlight is still on screen after every poll.
         case spotlightStillVisible
+        /// The home screen is still showing: Spotlight never opened or closed
+        /// without launching anything.
+        case stillOnHomeScreen
         /// The screen could not be read, so the launch is unconfirmed.
         case unreadable
     }
@@ -87,24 +105,31 @@ enum SpotlightDetector {
         describer: ScreenDescribing, query: String, windowHeight: Double,
         retryDelayUs: UInt32 = retryDelayMs * 1000
     ) -> LaunchVerification {
-        var sawScreen = false
+        var last: LaunchVerification = .unreadable
         for attempt in 0..<maxRetries {
             if attempt > 0 { usleep(retryDelayUs) }
             guard let result = describer.describe() else { continue }
-            sawScreen = true
-            if !isSpotlightVisible(elements: result.elements, query: query, windowHeight: windowHeight) {
+            if isSpotlightVisible(elements: result.elements, query: query, windowHeight: windowHeight) {
+                last = .spotlightStillVisible
+            } else if isHomeScreenVisible(elements: result.elements, windowHeight: windowHeight) {
+                last = .stillOnHomeScreen
+            } else {
                 return .launched
             }
         }
-        return sawScreen ? .spotlightStillVisible : .unreadable
+        return last
     }
 
-    private static func stripSearchGlyph(_ text: String) -> String {
+    /// Prefixes OCR produces for the magnifier glyph in iOS search fields.
+    static let searchGlyphPrefixes: [String] = ["Q ", "🔍"]
+
+    /// The text after the magnifier glyph, or nil when `text` does not start with it.
+    private static func searchFieldText(_ text: String) -> String? {
         let trimmed = text.trimmingCharacters(in: .whitespaces)
-        for glyph in ["Q ", "q ", "🔍"] where trimmed.hasPrefix(glyph) {
-            return String(trimmed.dropFirst(glyph.count))
+        for glyph in searchGlyphPrefixes where trimmed.hasPrefix(glyph) {
+            return String(trimmed.dropFirst(glyph.count)).trimmingCharacters(in: .whitespaces)
         }
-        return trimmed
+        return nil
     }
 
     private static func normalize(_ text: String) -> String {
