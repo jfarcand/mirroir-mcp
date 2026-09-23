@@ -91,6 +91,9 @@ final class NavigationToolHandlerTests: XCTestCase {
 
     func testLaunchAppSuccess() {
         input.launchAppResult = nil
+        describer.describeResult = ScreenDescriber.DescribeResult(
+            elements: [TapPoint(text: "Favorites", tapX: 200, tapY: 120, confidence: 0.9)],
+            screenshotBase64: "img")
         let response = callTool("launch_app", args: ["name": .string("Safari")])
         XCTAssertFalse(isError(response))
         XCTAssertEqual(extractText(response), "Launched 'Safari' via Spotlight")

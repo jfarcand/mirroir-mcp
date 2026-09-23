@@ -20,6 +20,10 @@ public enum TimingConstants {
     /// Delay for Spotlight search results to populate (microseconds).
     public static let searchResultsPopulateUs: UInt32 = 1_000_000
 
+    /// Delay after pressing Return in Spotlight before launch_app reads the
+    /// screen to confirm Spotlight closed (microseconds).
+    public static let launchVerifySettleUs: UInt32 = 1_200_000
+
     /// Delay for Safari to fully load after launch (microseconds).
     public static let safariLoadUs: UInt32 = 1_500_000
 

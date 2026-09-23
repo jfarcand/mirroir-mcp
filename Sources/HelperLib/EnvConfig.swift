@@ -87,6 +87,10 @@ public enum EnvConfig {
         readUInt32("searchResultsPopulateUs", default: TimingConstants.searchResultsPopulateUs)
     }
 
+    public static var launchVerifySettleUs: UInt32 {
+        readUInt32("launchVerifySettleUs", default: TimingConstants.launchVerifySettleUs)
+    }
+
     public static var safariLoadUs: UInt32 {
         readUInt32("safariLoadUs", default: TimingConstants.safariLoadUs)
     }

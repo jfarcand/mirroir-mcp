@@ -50,7 +50,10 @@ extension MirroirMCP {
                 if let error = input.launchApp(name: appName) {
                     return .error(error)
                 }
-                return .text("Launched '\(appName)' via Spotlight")
+                return LaunchAppConfirmation.outcome(
+                    appName: appName, describer: ctx.describer,
+                    windowHeight: ctx.bridge.getWindowInfo().map { Double($0.size.height) }
+                )
             }
         ))
 
