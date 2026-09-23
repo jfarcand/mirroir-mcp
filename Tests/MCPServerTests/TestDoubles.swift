@@ -43,8 +43,13 @@ final class StubBridge: MenuActionCapable, @unchecked Sendable {
         windowInfo
     }
 
+    /// When set, `getState()` reports `.connected` from this instant on
+    /// (simulates an overlay that fades a moment after the session resumed).
+    var connectsAt: Date?
+
     func getState() -> WindowState {
-        state
+        if let connectsAt, Date() >= connectsAt { state = .connected }
+        return state
     }
 
     func getOrientation() -> DeviceOrientation? {
@@ -62,8 +67,12 @@ final class StubBridge: MenuActionCapable, @unchecked Sendable {
         return menuActionResult
     }
 
+    /// Successive `pressResume()` results; when empty, `pressResumeResult` answers.
+    var pressResumeResults: [Bool] = []
+
     func pressResume() -> Bool {
         if connectOnResume { state = .connected }
+        if !pressResumeResults.isEmpty { return pressResumeResults.removeFirst() }
         return pressResumeResult
     }
 

@@ -33,6 +33,21 @@ final class PausedSessionRecoveryTests: XCTestCase {
         XCTAssertEqual(bridge.state, .connected)
     }
 
+    func testFreePausedSessionWaitsForAnEarlierClickBeforeGivingUp() {
+        // Device capture (iPhone XR): the first escape freed the session, the
+        // overlay was gone by the second attempt so no plugin applied, and the
+        // state only read connected a moment later.
+        let bridge = StubBridge()
+        bridge.state = .paused
+        bridge.pausedButtonPoint = nil
+        bridge.pressResumeResults = [true, false]
+        // Connected after the first attempt's settle check but within the second
+        // attempt's settle time.
+        let settle = TimeInterval(EnvConfig.resumeFromPausedUs) / 1_000_000
+        bridge.connectsAt = Date().addingTimeInterval(settle * 1.5)
+        XCTAssertTrue(makeInput(bridge).freePausedSession(tag: "test"))
+    }
+
     // MARK: - ensureConnected
 
     func testEnsureConnectedNilWhenConnected() {

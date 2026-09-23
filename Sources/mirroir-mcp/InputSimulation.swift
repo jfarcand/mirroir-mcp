@@ -139,6 +139,10 @@ final class InputSimulation: Sendable {
             guard SessionEscapeRegistry.attemptEscape(
                 bridge: bridge, click: click, tag: tag) else {
                 // No plugin recognized this interruption — nothing more to try.
+                // A previous attempt's click can still be taking effect (the
+                // overlay fades after the session resumes), so give it the
+                // resume settle time before reporting the session as paused.
+                if attempt > 0 { usleep(EnvConfig.resumeFromPausedUs) }
                 return bridge.getState() == .connected
             }
             usleep(EnvConfig.resumeFromPausedUs)
