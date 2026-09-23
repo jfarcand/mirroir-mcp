@@ -1,7 +1,7 @@
 // Copyright 2026 jfarcand@apache.org
 // Licensed under the Apache License, Version 2.0
 //
-// ABOUTME: Tests for ConsoleReporter: status formatting and summary counts.
+// ABOUTME: Tests for ConsoleReporter: status formatting, summary counts, and the skill verdict.
 // ABOUTME: Verifies formatting consistency across pass, fail, and skip statuses.
 
 import XCTest
@@ -79,10 +79,60 @@ final class ConsoleReporterTests: XCTestCase {
             durationSeconds: 0.2)
 
         let results = [allPass, withFail]
-        let passedSkills = results.filter { skillResult in
-            !skillResult.stepResults.contains { $0.status == .failed }
-        }.count
+        XCTAssertEqual(results.filter(\.passed).count, 1)
+    }
 
-        XCTAssertEqual(passedSkills, 1)
+    // MARK: - Skill Verdict
+
+    /// A skill whose every step was skipped evaluated nothing. It used to
+    /// report PASS and exit 0 — including for a scenario whose only steps were
+    /// verbs the parser did not recognize.
+    func testAllSkippedSkillIsNotAPass() {
+        let result = ConsoleReporter.SkillResult(
+            name: "Skipped", filePath: "s.yaml",
+            stepResults: [
+                StepResult(step: .skipped(stepType: "cross_surface", reason: "Unknown step type"),
+                           status: .skipped, message: "Unknown step type", durationSeconds: 0),
+                StepResult(step: .skipped(stepType: "remember", reason: "AI-only"),
+                           status: .skipped, message: "AI-only", durationSeconds: 0),
+            ],
+            durationSeconds: 0.1)
+
+        XCTAssertFalse(result.passed)
+        XCTAssertEqual(result.failureReasons, ["no step executed: every step was skipped"])
+    }
+
+    func testSkillWithNoStepsIsNotAPass() {
+        let result = ConsoleReporter.SkillResult(
+            name: "Empty", filePath: "e.yaml", stepResults: [], durationSeconds: 0)
+
+        XCTAssertFalse(result.passed)
+    }
+
+    /// The companion: skipped AI-only steps beside a step that ran and passed
+    /// are still a pass, so the fix does not fail every skill with a skip.
+    func testSkippedStepsBesideAPassedStepStillPass() {
+        let result = ConsoleReporter.SkillResult(
+            name: "Mixed", filePath: "m.yaml",
+            stepResults: [
+                StepResult(step: .home, status: .passed, message: nil, durationSeconds: 0.1),
+                StepResult(step: .skipped(stepType: "remember", reason: "AI-only"),
+                           status: .skipped, message: "AI-only", durationSeconds: 0),
+            ],
+            durationSeconds: 0.2)
+
+        XCTAssertTrue(result.passed)
+    }
+
+    func testFailureReasonsNameTheFailedStep() {
+        let result = ConsoleReporter.SkillResult(
+            name: "Fail", filePath: "f.yaml",
+            stepResults: [StepResult(step: .tap(label: "X"), status: .failed,
+                                     message: "not found", durationSeconds: 0.1)],
+            durationSeconds: 0.2)
+
+        XCTAssertFalse(result.passed)
+        XCTAssertEqual(result.failureReasons.count, 1)
+        XCTAssertTrue(result.failureReasons[0].hasSuffix("not found"))
     }
 }

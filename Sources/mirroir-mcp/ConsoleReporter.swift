@@ -15,6 +15,23 @@ enum ConsoleReporter {
         let filePath: String
         let stepResults: [StepResult]
         let durationSeconds: Double
+
+        /// A skill passes only when no step failed AND at least one step
+        /// actually passed. A skill whose every step was skipped evaluated
+        /// nothing, so it is not a pass.
+        var passed: Bool {
+            !stepResults.contains { $0.status == .failed }
+                && stepResults.contains { $0.status == .passed }
+        }
+
+        /// Why a skill that did not pass failed, for the summary listing.
+        var failureReasons: [String] {
+            let failedSteps = stepResults.filter { $0.status == .failed }
+            if failedSteps.isEmpty {
+                return ["no step executed: every step was skipped"]
+            }
+            return failedSteps.map { "\($0.step.displayName): \($0.message ?? "unknown error")" }
+        }
     }
 
     /// Print a single step result during execution.
@@ -45,12 +62,7 @@ enum ConsoleReporter {
         let skipped = result.stepResults.filter { $0.status == .skipped }.count
         let duration = String(format: "%.1fs", result.durationSeconds)
 
-        let overallStatus: String
-        if failed > 0 {
-            overallStatus = "FAIL"
-        } else {
-            overallStatus = "PASS"
-        }
+        let overallStatus = result.passed ? "PASS" : "FAIL"
 
         fputs("  Result: \(overallStatus) (\(duration)) — \(passed) passed, \(failed) failed, \(skipped) skipped\n", stderr)
     }
@@ -58,9 +70,7 @@ enum ConsoleReporter {
     /// Print a final summary across all skills.
     static func reportSummary(results: [SkillResult]) {
         let totalSkills = results.count
-        let passedSkills = results.filter { skillResult in
-            !skillResult.stepResults.contains { $0.status == .failed }
-        }.count
+        let passedSkills = results.filter(\.passed).count
         let failedSkills = totalSkills - passedSkills
 
         let totalSteps = results.flatMap { $0.stepResults }.count
@@ -75,10 +85,10 @@ enum ConsoleReporter {
 
         if failedSkills > 0 {
             fputs("\nFailed skills:\n", stderr)
-            for result in results where result.stepResults.contains(where: { $0.status == .failed }) {
+            for result in results where !result.passed {
                 fputs("  - \(result.name)\n", stderr)
-                for stepResult in result.stepResults where stepResult.status == .failed {
-                    fputs("    \(stepResult.step.displayName): \(stepResult.message ?? "unknown error")\n", stderr)
+                for reason in result.failureReasons {
+                    fputs("    \(reason)\n", stderr)
                 }
             }
         }

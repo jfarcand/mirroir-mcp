@@ -204,10 +204,7 @@ enum TestRunner {
         }
 
         // Exit code
-        let anyFailed = allResults.contains { result in
-            result.stepResults.contains { $0.status == .failed }
-        }
-        return anyFailed ? 1 : 0
+        return allResults.allSatisfy(\.passed) ? 0 : 1
     }
 
     /// Execute a single skill and return results.
