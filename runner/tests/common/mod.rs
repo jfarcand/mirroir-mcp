@@ -6,6 +6,7 @@
 #![allow(dead_code)]
 
 use std::fs;
+use std::net::TcpListener;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
@@ -14,6 +15,7 @@ use tempfile::TempDir;
 pub mod full_loop;
 pub mod loop_tree;
 pub mod oracle_stub;
+pub mod parity_tree;
 
 /// One `mirroir-run` invocation's outcome.
 pub struct Run {
@@ -281,4 +283,47 @@ pub fn fixture_summary_text(page: &str) -> Result<String, String> {
         .find('\'')
         .ok_or_else(|| format!("{page}: unterminated confirmation text"))?;
     Ok(rest[open + 1..open + 1 + close].to_owned())
+}
+
+/// Reserve a loopback port by binding and releasing it.
+///
+/// # Errors
+///
+/// Returns the failure text when loopback cannot be bound, or when the bound
+/// listener will not report its own address.
+pub fn free_port() -> Result<u16, String> {
+    let listener =
+        TcpListener::bind("127.0.0.1:0").map_err(|e| format!("reserve a fixture port: {e}"))?;
+    listener
+        .local_addr()
+        .map(|addr| addr.port())
+        .map_err(|e| format!("read the reserved port: {e}"))
+}
+
+/// Drop every ANSI escape sequence from `raw`.
+///
+/// The runner's `tracing` subscriber colorizes its output, which splices escape
+/// codes between a field's name and its value — `id=fixture` reaches a pipe as
+/// `\x1b[3mid\x1b[0m\x1b[2m=\x1b[0mfixture`. Assertions read the plain text, and
+/// so does a human reading a failure dump.
+#[must_use]
+pub fn strip_ansi(raw: &str) -> String {
+    let mut out = String::with_capacity(raw.len());
+    let mut chars = raw.chars();
+    while let Some(c) = chars.next() {
+        if c != '\u{1b}' {
+            out.push(c);
+            continue;
+        }
+        // CSI sequences run until a byte in 0x40..=0x7E; anything else after
+        // ESC is a two-character sequence whose second character we drop.
+        if chars.next() == Some('[') {
+            for terminator in chars.by_ref() {
+                if ('\u{40}'..='\u{7e}').contains(&terminator) {
+                    break;
+                }
+            }
+        }
+    }
+    out
 }

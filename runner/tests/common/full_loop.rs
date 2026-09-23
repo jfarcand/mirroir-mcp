@@ -4,14 +4,13 @@
 use std::env;
 use std::fs;
 use std::io::{self, Write as _};
-use std::net::TcpListener;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::time::Duration;
 
 use super::loop_tree::{plant_archetype, plant_plan};
 use super::oracle_stub::stub_oracle;
-use super::{Run, Sandbox, repo_path};
+use super::{Run, Sandbox, free_port, repo_path, strip_ansi};
 
 /// SHA-256 of the runner's built-in judge prompt template, the value every
 /// `judge:` step pins. Kept in step with `oracle::judge::user_prompt_template_hash`
@@ -338,16 +337,6 @@ impl<'a> LoopFixture<'a> {
     }
 }
 
-/// Reserve a loopback port by binding and releasing it.
-fn free_port() -> Result<u16, String> {
-    let listener =
-        TcpListener::bind("127.0.0.1:0").map_err(|e| format!("reserve a fixture port: {e}"))?;
-    listener
-        .local_addr()
-        .map(|addr| addr.port())
-        .map_err(|e| format!("read the reserved port: {e}"))
-}
-
 /// Copy every page of `samples/web-fixture/public/` into `<sandbox>/site/`.
 ///
 /// The suite rewords and breaks pages as it goes; a copy keeps those mutations
@@ -416,31 +405,4 @@ fn make_executable(path: &Path) -> Result<(), String> {
 #[cfg(not(unix))]
 fn make_executable(_path: &Path) -> Result<(), String> {
     Ok(())
-}
-
-/// Drop every ANSI escape sequence from `raw`.
-///
-/// The runner's `tracing` subscriber colorizes its output, which splices escape
-/// codes between a field's name and its value — `id=fixture` reaches a pipe as
-/// `\x1b[3mid\x1b[0m\x1b[2m=\x1b[0mfixture`. Assertions read the plain text, and
-/// so does a human reading a failure dump.
-fn strip_ansi(raw: &str) -> String {
-    let mut out = String::with_capacity(raw.len());
-    let mut chars = raw.chars();
-    while let Some(c) = chars.next() {
-        if c != '\u{1b}' {
-            out.push(c);
-            continue;
-        }
-        // CSI sequences run until a byte in 0x40..=0x7E; anything else after
-        // ESC is a two-character sequence whose second character we drop.
-        if chars.next() == Some('[') {
-            for terminator in chars.by_ref() {
-                if ('\u{40}'..='\u{7e}').contains(&terminator) {
-                    break;
-                }
-            }
-        }
-    }
-    out
 }

@@ -18,6 +18,8 @@ The pages exist to give the web leg the shapes real apps hand it:
 | `console-error.html` | throws an uncaught error on load — a dirty console with a clean-looking DOM |
 | `summary.html` | an order confirmation in prose — the baseline wording a judge scores |
 | `summary-reworded.html` | the identical page whose confirmation is worded differently — the DRIFT case |
+| `parity.html` | a delivery panel whose text is one half of a cross-surface parity gate |
+| `parity-reworded.html` | the identical page whose panel says the same thing in other words — the parity break |
 
 `obstacle.js` implements the obstacle concept in plain HTML + JS: a page declares
 its obstacles in a `<script type="application/json" id="obstacles">` block with
@@ -41,6 +43,7 @@ session:
   scenarios:
     must_pass:
       - scenarios/login.yaml
+      - scenarios/parity.yaml
     nice_to_pass:
       # Needs a judge endpoint (the `byte-stable` profile targets a local
       # Ollama daemon), so it stays out of must_pass — a lane without one
@@ -87,3 +90,30 @@ baseline, then point it at the other: every assertion still passes, the judge
 still scores it above threshold, and `response_levenshtein_pct` moves past its
 ceiling. That is the DRIFT verdict — exit code 65, a candidate row in
 `.harness/drift-log.md`, and the baseline left alone for a human to review.
+
+## The parity pair
+
+`parity.html` and `parity-reworded.html` are the same page for the drift pair's
+reason, and `scenarios/parity.yaml` is the cross-surface gate in the shape that
+produces its own web half: a `cross_surface:` step at the end of a real web
+block, whose `capture:` scrapes the live panel into `baselines/parity.web.txt` —
+one of the two files the same step compares.
+
+`baselines/parity.ios.txt` is the other half: the same screen as an iPhone's OCR
+reads it, whitespace-joined visible labels including the `Back` / `Orders` chrome
+the web page has no equivalent of. It is committed rather than produced, standing
+in for what `mirroir-mcp`'s `generate_skill` writes from a connected device.
+
+The two token sets score **0.875**; against `parity-reworded.html` they score
+**0.125**. `min_similarity: 0.5` bisects that gap. `parity.web.txt` is written by
+every run and is not committed.
+
+A pair below the threshold is a **failure** — exit 1, no `.harness/drift-log.md`
+row — not the DRIFT verdict the drift pair above produces. Drift is one surface
+moving against its own recorded baseline; this is two live surfaces disagreeing.
+
+`mirroir-run accept` re-records `parity.web.txt` from the live page and warns
+that it left `parity.ios.txt` alone — so accepting a reworded page does **not**
+close the gate. The next ordinary run refuses again, and the only thing that
+closes it is re-capturing the iOS surface on a device. `tests/cross_surface_gate.rs`
+pins that sequence.

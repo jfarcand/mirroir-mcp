@@ -21,8 +21,6 @@ enum MirroirAppTreeEmitter {
         let appDir: URL
         let scenarioPath: URL
         let baselinePath: URL
-        /// The cross-surface parity gate pairing the iOS baseline with a web baseline.
-        let parityPath: URL
         /// Human-readable note: the plan was created/updated, or a copy-paste snippet.
         let planNote: String
     }
@@ -68,13 +66,10 @@ enum MirroirAppTreeEmitter {
 
         let scenarioPath = scenariosDir.appendingPathComponent("\(flowSlug).ios.yaml")
         let baselinePath = baselinesDir.appendingPathComponent("\(flowSlug).ios.txt")
-        let parityPath = scenariosDir.appendingPathComponent("\(flowSlug).parity.yaml")
         try ScenarioStepFormatter.scenarioYAML(name: flowSlug, appName: appName, screens: screens)
             .write(to: scenarioPath, atomically: true, encoding: .utf8)
         try ScenarioStepFormatter.baseline(screens: screens)
             .write(to: baselinePath, atomically: true, encoding: .utf8)
-        try ScenarioStepFormatter.crossSurfaceYAML(name: flowSlug, flow: flowSlug)
-            .write(to: parityPath, atomically: true, encoding: .utf8)
 
         // APP.md is the shared contract's human doc — the web leg owns the canonical
         // one, so only seed a banner when the dir doesn't already have it.
@@ -86,7 +81,7 @@ enum MirroirAppTreeEmitter {
         let planNote = try upsertPlan(mirroirRoot: mirroirRoot, slug: slug)
         return EmitResult(
             appDir: appDir, scenarioPath: scenarioPath, baselinePath: baselinePath,
-            parityPath: parityPath, planNote: planNote
+            planNote: planNote
         )
     }
 
@@ -121,9 +116,11 @@ enum MirroirAppTreeEmitter {
         a capture artifact and the parity gate's anchor, not a runner scenario.
 
         The **web leg** (real DOM selectors, runnable on `mirroir-run`) is authored
-        separately. Cross-surface parity pairs `baselines/<flow>.ios.txt` (emitted
-        here) with a web capture via a `cross_surface:` step, which fails closed
-        until the web capture exists.
+        separately, and it owns the parity gate: its scenario ends in a
+        `cross_surface:` step whose `capture:` scrapes the live page into
+        `baselines/<flow>.web.txt` and compares that against
+        `baselines/<flow>.ios.txt` (emitted here). The gate fails closed until the
+        web leg exists to run it.
 
         This `.mirroir/` directory is the runner's consumer dotfile, distinct from
         the Swift MCP's `~/.mirroir-mcp/` home.

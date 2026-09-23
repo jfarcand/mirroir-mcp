@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Delivery — mirroir web fixture</title>
+<link rel="stylesheet" href="fixture.css">
+</head>
+<body>
+<h1 data-test="page-title">Delivery</h1>
+
+<!-- parity.html and parity-reworded.html render the same DOM: the same panel,
+     the same data-test attributes, the same six lines. Only the prose differs.
+     That pair is what makes the cross-surface gate testable — the panel's text
+     is what a `cross_surface.capture` scrapes into baselines/parity.web.txt,
+     and baselines/parity.ios.txt is the same screen as an iPhone's OCR reads
+     it. A run against the variant keeps every assertion green and moves the
+     two surfaces apart. -->
+<main class="result" data-test="parity-panel">
+  <p>Delivery confirmed</p>
+  <p>Order 4182</p>
+  <p>Two widgets</p>
+  <p>Arrives Tuesday</p>
+  <p>Total 38 dollars</p>
+  <p>Track this package</p>
+</main>
+</body>
+</html>

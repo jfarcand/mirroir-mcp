@@ -2,13 +2,13 @@ version: 1
 name: cross-surface equivalence — web capture vs iOS capture
 description: |
   Treats two pre-captured surface outputs as the equivalence target. In a
-  production run, surface-web.txt is written by the Playwright spec via
-  `page.locator(...).textContent()` and surface-ios.txt by mirroir-mcp's
+  production run, surface.web.txt is written by the Playwright spec via
+  `page.locator(...).textContent()` and surface.ios.txt by mirroir-mcp's
   iOS executor. Here we ship them as fixtures so the cross-surface
   primitive can be exercised on CI without an iOS simulator.
 steps:
   - cross_surface:
       response_files:
-        - "${MIRROIR_SAMPLE_DIR}/baselines/surface-web.txt"
-        - "${MIRROIR_SAMPLE_DIR}/baselines/surface-ios.txt"
+        - "${MIRROIR_SAMPLE_DIR}/baselines/surface.web.txt"
+        - "${MIRROIR_SAMPLE_DIR}/baselines/surface.ios.txt"
       min_similarity: 0.5

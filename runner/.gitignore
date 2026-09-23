@@ -7,3 +7,8 @@
 # cross-run drift detection commits its own .harness/ — see
 # docs/drift-and-accept.md.
 /.harness/
+# The web half of the cross-surface parity gate: `scenarios/parity.yaml` writes
+# it from the live page on every run, so it is an output, not a fixture. Its
+# counterpart `baselines/parity.ios.txt` IS committed — that surface has no
+# producer here.
+/samples/web-fixture/baselines/parity.web.txt

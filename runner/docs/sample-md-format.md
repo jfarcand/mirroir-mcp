@@ -100,6 +100,30 @@ in parallel don't observe the change). Example:
     drift_baseline_file: "${MIRROIR_SAMPLE_DIR}/baselines/judge.txt"
 ```
 
+## `baselines/*.ios.txt` must be compared by a declared scenario
+
+An iOS baseline is captured by mirroir-mcp's `generate_skill` against a
+connected iPhone; `mirroir-run` drives no executor for that surface and can
+only read the file. The single thing that gives one an effect is a
+`cross_surface:` step naming it in `response_files`, so a `.ios.txt` no
+scenario names is read by nothing and the sample reports green with the parity
+gate it was captured for absent.
+
+`--sample` refuses such a sample before the session boots, naming the file. The
+scenarios that count are the ones this `SAMPLE.md` declares, in either tier: a
+capture no declared scenario compares is an orphan, and no invocation can make
+it otherwise. The remedy is to name it from a scenario, or to delete a capture
+nothing checks.
+
+A baseline a declared scenario *does* name, on a run whose `--scenarios` set
+leaves that scenario out, is a different thing: the sample checks the gate and
+this run does not. That is the tier the invocation chose — the run logs a
+warning naming the baseline and proceeds, so `--scenarios nice-to-pass` stays
+runnable against a sample whose parity scenario is `must_pass`.
+
+The name is the contract: `<flow>.ios.txt`, flat under `baselines/`. A capture
+spelled any other way, or filed in a subdirectory, is not accounted for.
+
 ## CLI control
 
 ```bash

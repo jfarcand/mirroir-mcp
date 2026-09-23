@@ -13,8 +13,8 @@ import HelperLib
 /// The emitted YAML is written in the shared step grammar, but it declares
 /// `target: { kind: ios }` — a surface mirroir-run has no executor for, so the
 /// runner refuses it by name rather than planning it. It is a faithful record of
-/// the captured walk and the anchor a paired web capture is compared against via
-/// `cross_surface:`.
+/// the captured walk; the baseline beside it is the anchor the web leg's own
+/// `cross_surface:` step compares its live scrape against.
 enum ScenarioStepFormatter {
 
     /// Errors raised when a capture cannot be rendered faithfully.
@@ -60,25 +60,6 @@ enum ScenarioStepFormatter {
             .map(\.text)
             .filter { !$0.isEmpty }
         return tokens.joined(separator: " ") + "\n"
-    }
-
-    /// Build the `<flow>.parity.yaml` cross-surface gate: pairs the iOS baseline
-    /// (emitted here) with a web baseline (produced by the web leg). The runner
-    /// compares the two files by Jaccard similarity; the step fails closed until
-    /// the web capture exists. This gate declares no `target:`, so unlike the iOS
-    /// walk it does validate with `mirroir-run --validate`.
-    static func crossSurfaceYAML(name: String, flow: String) -> String {
-        let lines = [
-            "version: 1",
-            "name: \(yamlScalar(name + " — cross-surface parity"))",
-            "steps:",
-            "  - cross_surface:",
-            "      response_files:",
-            "        - \"${MIRROIR_SAMPLE_DIR}/baselines/\(flow).web.txt\"",
-            "        - \"${MIRROIR_SAMPLE_DIR}/baselines/\(flow).ios.txt\"",
-            "      min_similarity: 0.5",
-        ]
-        return lines.joined(separator: "\n") + "\n"
     }
 
     // MARK: - Private

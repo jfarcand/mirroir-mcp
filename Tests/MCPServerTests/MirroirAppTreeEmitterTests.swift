@@ -50,15 +50,16 @@ final class MirroirAppTreeEmitterTests: XCTestCase {
         let fm = FileManager.default
         XCTAssertTrue(fm.fileExists(atPath: result.scenarioPath.path))
         XCTAssertTrue(fm.fileExists(atPath: result.baselinePath.path))
-        XCTAssertTrue(fm.fileExists(atPath: result.parityPath.path))
         XCTAssertTrue(fm.fileExists(atPath: result.appDir.appendingPathComponent("APP.md").path))
         XCTAssertTrue(fm.fileExists(atPath: root.appendingPathComponent("mirroir.yaml").path))
 
-        // Cross-surface parity gate pairs the iOS baseline with a web baseline.
-        let parity = try String(contentsOf: result.parityPath, encoding: .utf8)
-        XCTAssertTrue(parity.contains("- cross_surface:"))
-        XCTAssertTrue(parity.contains("baselines/check-software-version.ios.txt"))
-        XCTAssertTrue(parity.contains("baselines/check-software-version.web.txt"))
+        // The parity gate belongs to the web leg's own scenario, whose `capture:`
+        // scrapes the live page. A gate emitted here would name a `.web.txt` with
+        // no web block to produce it, so the emitter writes no scenario but the
+        // captured walk.
+        let scenarios = try fm.contentsOfDirectory(
+            atPath: result.scenarioPath.deletingLastPathComponent().path)
+        XCTAssertEqual(scenarios, ["check-software-version.ios.yaml"])
 
         // Scenario carries the iOS target, launch, the taps, and is well-formed.
         let scenario = try String(contentsOf: result.scenarioPath, encoding: .utf8)

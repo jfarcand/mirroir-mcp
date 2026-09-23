@@ -134,12 +134,11 @@ enum ExplorationLoopRunner {
         do {
             let result = try MirroirAppTreeEmitter.emit(
                 appName: appName, flow: flow, screens: screens, outputDir: outputDir)
-            return "\n\n---\nEmitted .mirroir/ iOS leg (validate with " +
-                "`mirroir-run --validate`):\n" +
-                "  scenario: \(result.scenarioPath.path)\n" +
-                "  baseline: \(result.baselinePath.path)\n" +
-                "  parity:   \(result.parityPath.path) " +
-                "(fails closed until the web baseline exists)\n" +
+            return "\n\n---\nEmitted .mirroir/ iOS leg:\n" +
+                "  scenario: \(result.scenarioPath.path) " +
+                "(the captured walk; it names an ios surface mirroir-run does not drive)\n" +
+                "  baseline: \(result.baselinePath.path) " +
+                "(the web leg's cross_surface: step compares its scrape against this)\n" +
                 "  plan: \(result.planNote)"
         } catch {
             return "\n\n(emit skipped: \(error.localizedDescription))"

@@ -213,6 +213,8 @@ Any hit → fix that scenario now:
   strict-mode. Disambiguate.
 - `assert_visible` on text that repeats per-card/per-row → strict-mode. Use a
   unique-on-page string or `>> nth=0`.
+- A flow that already has a `baselines/<flow>.ios.txt` and whose scenario has no
+  `cross_surface:` step → the parity gate has no web half. Add it (Phase 5).
 - `mirroir.yaml` omits "complementary" + the existing spec count → fix.
 - Any scenario name is a project concept leaking nowhere it shouldn't — fine
   *inside* the consumer's `.mirroir/` (the consumer describing itself), but
@@ -229,6 +231,9 @@ Any hit → fix that scenario now:
     ├── SAMPLE.md         # session.boot (command, cwd, ports, timeout), scenarios list
     ├── APP.md            # routes, selector style, usable test users + gate notes
     ├── SKILL.md          # the canonical flows + why each was chosen
+    ├── baselines/        # cross-surface oracles, shared with the iOS leg:
+    │                     #   <flow>.ios.txt (device capture, committed)
+    │                     #   <flow>.web.txt (scraped by the run, gitignored)
     └── scenarios/<flow>.yaml × N
 ```
 
@@ -241,7 +246,51 @@ SAMPLE.md `boot`:
 
 Scenario URLs use `http://localhost:PORT/` (Phase 0.3). Add to consumer
 `.gitignore`: `.mirroir/.build/`, `.mirroir/mirroir.local.yaml`,
-`mirroir-run-report.json`.
+`mirroir-run-report.json`, `.mirroir/apps/*/baselines/*.web.txt`.
+
+### 5a. Pairing a flow with an iOS capture
+
+`baselines/` is the one directory the web leg shares with the iOS leg.
+`generate_skill … emit=true` writes `baselines/<flow>.ios.txt` there:
+whitespace-joined OCR text of the iPhone screen at the flow's equivalence point.
+When a flow you authored has one, your scenario owes the other half — and it
+produces that half itself. End the flow's **own** web block with a
+`cross_surface:` step whose `capture:` scrapes the same screen:
+
+```yaml
+  # …the primary action and its state-change assertion (Phase 3)…
+  - cross_surface:
+      capture:
+        # Resolved by the same helper as Phase 2's labels: raw CSS, role=,
+        # text=, or a bare label.
+        selector: "[data-test=order-summary]"
+        to: "${MIRROIR_SAMPLE_DIR}/baselines/<flow>.web.txt"
+      response_files:
+        - "${MIRROIR_SAMPLE_DIR}/baselines/<flow>.web.txt"
+        - "${MIRROIR_SAMPLE_DIR}/baselines/<flow>.ios.txt"
+      min_similarity: 0.5
+```
+
+Rules that bite:
+
+- The step belongs **inside the flow's own scenario, after its web block**. A
+  `cross_surface:` alone in a file of its own has no page to scrape, so the
+  `.web.txt` is never written and that gate can only ever fail.
+- `capture.to` must be one of `response_files` — the runner refuses the step
+  otherwise, because the scrape would go unread and a stale file compared instead.
+- `min_similarity` is required; there is no default. `0.5` suits iOS↔web phrasing
+  divergence — the iOS side carries chrome (back chevron, nav title) the web page
+  has no equivalent of. Raise it for high-entropy screens; be careful on
+  low-vocabulary ones, where a generic token set clears a low bar by coincidence.
+- Scrape the **equivalence point**, not `body`. Whole-page text drags in nav and
+  footers with no iOS counterpart and drops the score for no reason.
+- A pair below threshold is a **failure** (exit 1), not drift, and files no
+  drift-log row. `mirroir-run accept` re-records the `.web.txt` only; the
+  `.ios.txt` closes on a device re-capture, which is the point of the gate.
+
+No `.ios.txt` for a flow → no `cross_surface:` step for it. Never hand-write one:
+a baseline you typed is not a device observation, and the gate it feeds proves
+nothing.
 
 ---
 
@@ -290,7 +339,9 @@ unprompted.
 ## Scope limits
 
 - **Web only.** iOS surface generation is the separate
-  `mcp__mirroir__generate_skill` MCP tool (CGEvent + OCR on a real iPhone).
+  `mcp__mirroir__generate_skill` MCP tool (CGEvent + OCR on a real iPhone). You
+  *consume* the `baselines/<flow>.ios.txt` it writes (Phase 5a); you never
+  author one.
 - **`local:` samples only.** Promoting a flow to a shared **archetype** (so the
   next app of the same shape — auth + sidebar + chat-console, etc. — inherits
   coverage by declaring the archetype + a few selectors) is the cross-app

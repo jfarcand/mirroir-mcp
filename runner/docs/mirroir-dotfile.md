@@ -372,43 +372,55 @@ assert they stay equivalent:
   `mirroir-run` plans; its shape is pinned by the emitter's own tests in
   `mirroir-mcp`.
 
-The two meet in a `scenarios/<flow>.parity.yaml` gate (also emitted) that compares
-the iOS baseline against a web baseline by Jaccard similarity:
-
-```yaml
-version: 1
-name: <flow> — cross-surface parity
-steps:
-  - cross_surface:
-      response_files:
-        - "${MIRROIR_SAMPLE_DIR}/baselines/<flow>.web.txt"
-        - "${MIRROIR_SAMPLE_DIR}/baselines/<flow>.ios.txt"
-      min_similarity: 0.5
-```
-
-The runner can **produce** the web baseline itself: give `cross_surface` a
-`capture: { selector, to }` and the compiled spec scrapes that selector's text
-into the `mirroir-captures` attachment (the same Playwright mechanism `judge:`
-uses), which the post-hook writes to `to` — no hand-authored Playwright spec
-needed:
+The two meet in a `cross_surface:` step at the **end of the web leg's own
+scenario**. Its `capture: { selector, to }` scrapes that selector's text into the
+`mirroir-captures` attachment (the same Playwright mechanism `judge:` uses), the
+post-hook writes it to `to`, and `to` is one of the files the same step then
+compares by Jaccard similarity. The run that checks the gate is therefore the run
+that produces its web half — no hand-authored Playwright spec needed:
 
 ```yaml
   - target: { kind: web, url: "http://localhost:3000/" }
   # …navigate to the equivalence point…
+  - assert_visible: "summary"
   - cross_surface:
-      capture: { selector: "main", to: "${MIRROIR_SAMPLE_DIR}/baselines/<flow>.web.txt" }
+      capture:
+        selector: "[data-test=summary]"
+        to: "${MIRROIR_SAMPLE_DIR}/baselines/<flow>.web.txt"
       response_files:
         - "${MIRROIR_SAMPLE_DIR}/baselines/<flow>.web.txt"
         - "${MIRROIR_SAMPLE_DIR}/baselines/<flow>.ios.txt"
       min_similarity: 0.5
 ```
 
-Without `capture` the runner only **compares** pre-existing files — write
-`baselines/<flow>.web.txt` yourself from the web leg. Either way, until the web
-baseline exists the parity step **fails closed** — a missing file is an error,
-never a silent pass, and so is a file with no text in it: two blank surfaces
-score a perfect match, which is exactly what a screen that yielded no OCR
-elements would leave behind.
+`capture.selector` is resolved by the compiled spec's `_by` helper, so a raw CSS
+selector (anything opening `[`, `#`, `.`, `:`, `>` or `*`) passes straight
+through and a bare word is looked up as a label. `capture.to` must be one of
+`response_files`, or the scrape goes unread and a stale file is compared in its
+place — the runner refuses that outright.
+
+`samples/web-fixture/scenarios/parity.yaml` is this shape end to end, and
+`runner/tests/cross_surface_gate.rs` pins the sequence it produces: agree,
+reword and refuse, accept, refuse again.
+
+Without `capture` the step only **compares** files that already exist, so both
+surfaces have to arrive from somewhere else. That is sound when both really do —
+`samples/mega-sample/scenarios/cross-surface.yaml` is a lone `cross_surface:`
+step comparing two committed fixtures, and neither file needs producing. It is
+the shape to avoid when one surface is expected to be *scraped*: a step written
+with no web block around it has no page to scrape, so a `<flow>.web.txt` it
+names has no producer at all, and adding a `capture:` to it only moves the
+failure to `CrossSurfaceNotCaptured`.
+
+Either way, until the web baseline exists the parity step **fails closed** — a
+missing file is an error, never a silent pass, and so is a file with no text in
+it: two blank surfaces score a perfect match, which is exactly what a screen that
+yielded no OCR elements would leave behind.
+
+A pair below `min_similarity` is a **failure**: exit 1, with no
+`.harness/drift-log.md` row. It is not the DRIFT verdict at exit 65 that a moved
+judge response produces — drift is one surface's output changing against its own
+recorded baseline, and this is two live surfaces disagreeing with each other.
 
 `min_similarity` is **required** — a gate whose threshold depends on whether you
 remembered to type it is not a gate. `0.5` suits iOS↔web phrasing divergence;

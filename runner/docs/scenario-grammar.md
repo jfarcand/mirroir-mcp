@@ -451,12 +451,12 @@ surface). Uses Jaccard fingerprint similarity over normalized token sets.
 ```yaml
 - cross_surface:
     response_files:
-      - "${MIRROIR_SAMPLE_DIR}/baselines/surface-web.txt"
-      - "${MIRROIR_SAMPLE_DIR}/baselines/surface-ios.txt"
+      - "${MIRROIR_SAMPLE_DIR}/baselines/surface.web.txt"
+      - "${MIRROIR_SAMPLE_DIR}/baselines/surface.ios.txt"
     min_similarity: 0.5                              # required
     capture:                                         # optional: produce the web baseline
-      selector: "main"                               #   scrape this selector's textContent()
-      to: "${MIRROIR_SAMPLE_DIR}/baselines/surface-web.txt"  #   into this file (one of response_files)
+      selector: "[data-test=surface]"                #   scrape this selector's innerText()
+      to: "${MIRROIR_SAMPLE_DIR}/baselines/surface.web.txt"  #   into this file (one of response_files)
 ```
 
 With `capture`, the compiled spec scrapes `selector`'s text at the step's own
@@ -466,6 +466,12 @@ is produced at run time rather than hand-authored. Without `capture`, all
 `response_files` must already exist. A declared capture that the attachment
 never carried fails the step (`CrossSurfaceNotCaptured`) rather than comparing
 a stale file.
+
+`capture.selector` goes through the compiled spec's `_by` helper, the same one
+every locator step uses: anything opening `[`, `#`, `.`, `:`, `>` or `*` reaches
+`page.locator` as raw CSS, and a bare word is looked up as a role / label /
+placeholder / `data-test` / visible text. A bare element name like `main` is not
+a label, matches none of those, and resolves to nothing.
 
 `to` **must** be one of the `response_files`, and the step fails when it is not:
 a capture aimed elsewhere writes text nothing reads, leaving the comparison to
@@ -477,6 +483,13 @@ that never declared one holds the run to nothing. A listed file that
 fingerprints to no tokens (blank, whitespace, or punctuation only) is refused
 before any pair is scored: two empty surfaces score a perfect match, so a check
 over them would pass without evidence.
+
+A surface this runner drives no executor for is named `<flow>.ios.txt`, flat
+under the sample's `baselines/`. That spelling is the contract, not a
+convention: `--sample` accounts for every `baselines/*.ios.txt` and refuses a
+sample committing one no scenario compares — see
+[sample-md-format.md](sample-md-format.md). A capture spelled any other way is
+outside that guard, so an orphan of it rides along green.
 
 Errors: `CrossSurfaceTooFewFiles`, `CrossSurfaceCaptureTargetNotListed`,
 `CrossSurfaceNotCaptured`, `CrossSurfaceEmptySurface`, `CrossSurfaceMismatch`.

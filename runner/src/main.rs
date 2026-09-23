@@ -21,6 +21,7 @@ use tracing::{error, info};
 use tracing_subscriber::{EnvFilter, fmt};
 
 mod accept;
+mod baseline_coverage;
 mod compile;
 mod error;
 mod mirroir;

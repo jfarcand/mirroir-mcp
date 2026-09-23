@@ -167,8 +167,8 @@ fn judge_response_arrives_through_the_playwright_attachment() -> Result<(), Stri
 fn cross_surface_baseline_arrives_through_the_playwright_attachment() -> Result<(), String> {
     let sandbox = Sandbox::new()?;
     sandbox.stub_npx(CROSS_SURFACE_REPORT)?;
-    let ios = sandbox.write("surface-ios.txt", "the shared answer text")?;
-    let web = sandbox.path().join("surface-web.txt");
+    let ios = sandbox.write("surface.ios.txt", "the shared answer text")?;
+    let web = sandbox.path().join("surface.web.txt");
     let web_path = web.display().to_string();
     let scenario = sandbox.scenario(
         "cross.yaml",
@@ -220,8 +220,8 @@ fn a_declared_capture_missing_from_the_attachment_fails_the_run() -> Result<(), 
     sandbox.stub_npx(
         r#"{"suites":[{"title":"s","specs":[{"title":"t","tests":[{"results":[{"status":"passed"}]}]}],"suites":[]}]}"#,
     )?;
-    let ios = sandbox.write("surface-ios.txt", "the shared answer text")?;
-    let web = sandbox.write("surface-web.txt", "a stale baseline nobody refreshed")?;
+    let ios = sandbox.write("surface.ios.txt", "the shared answer text")?;
+    let web = sandbox.write("surface.web.txt", "a stale baseline nobody refreshed")?;
     let scenario = sandbox.scenario(
         "cross-missing.yaml",
         &format!(
@@ -272,8 +272,8 @@ fn a_declared_capture_missing_from_the_attachment_fails_the_run() -> Result<(), 
 #[test]
 fn cross_surface_without_min_similarity_is_a_parse_error() -> Result<(), String> {
     let sandbox = Sandbox::new()?;
-    let ios = sandbox.write("surface-ios.txt", "the shared answer text")?;
-    let web = sandbox.write("surface-web.txt", "the shared answer text")?;
+    let ios = sandbox.write("surface.ios.txt", "the shared answer text")?;
+    let web = sandbox.write("surface.web.txt", "the shared answer text")?;
     let scenario = sandbox.scenario(
         "cross-no-threshold.yaml",
         &format!(
@@ -316,8 +316,8 @@ fn cross_surface_without_min_similarity_is_a_parse_error() -> Result<(), String>
 #[test]
 fn cross_surface_with_an_empty_surface_fails() -> Result<(), String> {
     let sandbox = Sandbox::new()?;
-    let ios = sandbox.write("surface-ios.txt", "\n")?;
-    let web = sandbox.write("surface-web.txt", "\n")?;
+    let ios = sandbox.write("surface.ios.txt", "\n")?;
+    let web = sandbox.write("surface.web.txt", "\n")?;
     let scenario = sandbox.scenario(
         "cross-empty.yaml",
         &format!(

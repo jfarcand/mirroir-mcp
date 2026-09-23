@@ -6,6 +6,7 @@ use std::path::Path;
 
 use tracing::{error, info};
 
+use crate::baseline_coverage::ensure_ios_baselines_are_referenced;
 use crate::error::{Result, RunnerError};
 use crate::parser::sample::SampleManifest;
 use crate::parser::step::{KillArgs, PortState, SpawnArgs, WaitPortArgs};
@@ -29,6 +30,10 @@ use crate::verdict::RunVerdict;
 /// * Anything [`select_scenarios`] returns — a set that drives none of the
 ///   sample's scenarios is refused here rather than replayed as a pass over
 ///   nothing.
+/// * Anything [`ensure_ios_baselines_are_referenced`] returns — a captured
+///   surface committed under `baselines/` that no declared scenario compares
+///   is refused before the session boots, and so is a selected scenario that
+///   will not parse, since the guard reads it to answer that question.
 /// * [`RunnerError::SampleScenarioFailures`] when one or more scenarios failed.
 pub async fn run_sample(
     sample_dir: &Path,
@@ -47,6 +52,7 @@ pub async fn run_sample(
     );
 
     let selected = select_scenarios(sample_dir, &manifest, set)?;
+    ensure_ios_baselines_are_referenced(sample_dir, &manifest, set, &selected)?;
     let context = SampleContext {
         sample_dir,
         manifest: &manifest,

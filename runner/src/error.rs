@@ -291,6 +291,26 @@ pub enum RunnerError {
         sample_dir: PathBuf,
     },
 
+    /// A `baselines/*.ios.txt` the sample commits that no scenario its
+    /// `SAMPLE.md` declares names in `cross_surface.response_files`. That
+    /// suffix marks a capture from a surface this binary drives no executor
+    /// for, so the only thing that ever reads one is the step comparing it:
+    /// unnamed, it is read by nothing and the sample reports green with the
+    /// parity gate it was captured for absent. A baseline a declared scenario
+    /// names, on a run whose scenario set left that scenario out, is logged
+    /// rather than refused — the tier is the invocation's choice.
+    #[error(
+        "sample `{sample_dir}`: `{baseline}` is compared by none of the {scenarios} scenario(s) `SAMPLE.md` declares; a captured surface no scenario names is read by nothing"
+    )]
+    SampleBaselineUnreferenced {
+        /// Directory whose `baselines/` holds the file.
+        sample_dir: PathBuf,
+        /// The unreferenced baseline, as `baselines/<file>`.
+        baseline: String,
+        /// How many scenarios the manifest declares across both tiers.
+        scenarios: usize,
+    },
+
     /// A scenario's web steps are split by a runner-side step. Every scenario
     /// compiles to exactly one Playwright invocation, so a second run of web
     /// steps would execute out of the order the file reads.

@@ -1,0 +1,41 @@
+version: 1
+name: web-fixture — the delivery panel matches its iOS capture
+description: |
+  The cross-surface parity gate in the shape that can actually produce both of
+  its halves: ONE contiguous web block that opens the page, asserts the panel
+  rendered, and ends in a `cross_surface:` step whose `capture:` scrapes the
+  live panel into `baselines/parity.web.txt`. That file is one of the two
+  surfaces the same step then compares, so the web half is written by the run
+  that checks it. The other half, `baselines/parity.ios.txt`, is a committed
+  stand-in for a `generate_skill` device capture — a surface this binary drives
+  no executor for, which is why `mirroir-run accept` re-records the web file and
+  names the iOS one instead of overwriting it.
+
+  Point the `url:` at `parity-reworded.html` and every assertion still holds
+  while the panel's token set falls away from the iOS capture: that is the
+  failure only this gate can see.
+
+  No judge, no oracle endpoint — Jaccard over two token sets is arithmetic —
+  so this belongs in `must_pass`.
+
+  Process lifecycle is the sample's: `SAMPLE.md` boots the static server once.
+tags: ["web-fixture", "cross-surface", "parity"]
+steps:
+  - target:
+      kind: web
+      browsers: [chrome]
+      url: "http://127.0.0.1:18902/parity.html"
+  - assert_visible: "page-title"
+  - assert_visible: "parity-panel"
+  - cross_surface:
+      capture:
+        selector: "[data-test=parity-panel]"
+        to: "${MIRROIR_SAMPLE_DIR}/baselines/parity.web.txt"
+      response_files:
+        - "${MIRROIR_SAMPLE_DIR}/baselines/parity.web.txt"
+        - "${MIRROIR_SAMPLE_DIR}/baselines/parity.ios.txt"
+      # parity.ios.txt scores 0.875 against parity.html's panel and 0.125
+      # against parity-reworded.html's. 0.5 bisects that gap — the widest
+      # margin either way — and stays high enough that a low-entropy token bag
+      # cannot clear it by coincidence.
+      min_similarity: 0.5

@@ -1,7 +1,8 @@
 # CI for runner/ (mirroir-run Rust binary). Four per-push lanes:
 #   - runner-fast      : fmt + clippy + test + diff-text smoke on linux + macos.
 #   - runner-smoke     : process + http + web + cross_surface end-to-end (no Ollama).
-#   - runner-full-loop : the thirteen-phase acceptance test for the whole loop.
+#   - runner-full-loop : the thirteen-phase acceptance test for the whole loop,
+#                        plus the four-phase cross-surface parity gate.
 #   - runner-e2e       : full pipeline — Playwright (chromium) + real Ollama judge + mega-sample.
 # Plus runner-e2e-allbrowsers on a Sunday cron, and the deny / publish audits.
 
@@ -277,7 +278,8 @@ jobs:
   # runner-side hooks, PASS, an idempotent rerun, DRIFT, accept, green again,
   # a real break, the artifacts it leaves, and the lockfile gate. The suite
   # lives in runner/tests/e2e_full_loop.rs and needs a browser, which is why it
-  # runs here rather than in runner-fast.
+  # runs here rather than in runner-fast. The cross-surface parity gate rides
+  # along for the same reason: it drives a real chromium too.
   runner-full-loop:
     name: e2e — the whole loop (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
@@ -326,6 +328,20 @@ jobs:
           cargo test --test e2e_full_loop -- --nocapture 2>&1 | tee /tmp/full-loop.log
           if ! grep -q 'FULL LOOP: 13/13 phases observed' /tmp/full-loop.log; then
             echo "::error::the full-loop suite did not observe all thirteen phases"
+            exit 1
+          fi
+
+      # The parity gate's fourth phase — accept moved the web surface and the
+      # next run still refuses — is the only thing stopping a later change from
+      # "fixing" accept into a comparison of the web capture with itself. It has
+      # to run somewhere, and this is the lane with a browser.
+      - name: The cross-surface parity gate
+        working-directory: runner
+        run: |
+          set -euo pipefail
+          cargo test --test cross_surface_gate -- --nocapture 2>&1 | tee /tmp/parity.log
+          if ! grep -q 'PARITY GATE: 4/4 phases observed' /tmp/parity.log; then
+            echo "::error::the parity gate did not observe all four phases"
             exit 1
           fi
 
