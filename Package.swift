@@ -79,6 +79,14 @@ let package = Package(
                 .linkedFramework("CoreML"),
             ] + embacleLinkerSettings
         ),
+        .target(
+            name: "MirroirCoreDevice",
+            path: "Sources/MirroirCoreDevice",
+            linkerSettings: [
+                .linkedFramework("Network"),
+                .linkedLibrary("z"),
+            ]
+        ),
         .executableTarget(
             name: "FakeMirroring",
             dependencies: ["HelperLib"],
@@ -90,6 +98,13 @@ let package = Package(
         .testTarget(
             name: "HelperLibTests",
             dependencies: ["HelperLib"]
+        ),
+        .testTarget(
+            name: "MirroirCoreDeviceTests",
+            dependencies: ["MirroirCoreDevice"],
+            resources: [
+                .copy("Fixtures"),
+            ]
         ),
         .testTarget(
             name: "MCPServerTests",
