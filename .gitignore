@@ -31,6 +31,10 @@ scratch/
 # (agent + chrome-devtools-mcp records; mirroir-run replays). Shipped artifacts
 # reference it by name, so it belongs in the repo.
 !.claude/skills/mirroir-onboard/
+# carnet works the private register and bilan measures a session's completion;
+# the hooks in .claude/settings.json run their scripts, so both ship with the repo.
+!.claude/skills/carnet/
+!.claude/skills/bilan/
 mirroir-test-results/
 integrations/
 scripts/test-vd*

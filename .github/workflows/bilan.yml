@@ -1,0 +1,53 @@
+# ABOUTME: Runs the bilan skill's suite and shellcheck on Linux — the platform no developer uses
+# ABOUTME: Path-scoped to the skill, so a push that does not change it starts no job
+name: "Guard: bilan skill"
+
+on:
+  # registre.toml and the .registre submodule decide which files the register scans, and bilan asks the gate for
+  # exactly that set — so a change to either changes what bilan credits.
+  push:
+    paths:
+      - '.claude/skills/bilan/**'
+      - '.github/workflows/bilan.yml'
+      - 'registre.toml'
+      - '.registre'
+  pull_request:
+    paths:
+      - '.claude/skills/bilan/**'
+      - '.github/workflows/bilan.yml'
+      - 'registre.toml'
+      - '.registre'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.ref }}-${{ github.ref == 'refs/heads/main' && github.sha || 'shared' }}
+  cancel-in-progress: false
+
+jobs:
+  suite:
+    name: the caps, the hooks, and the two spellings that differ on Linux
+    # ubuntu, and that is the whole point. bilan gates every completion number this repo
+    # reports, and until this lane existed it had only ever run on a developer's mac: three
+    # BSD-only spellings survived in it, one of which (`stat -f %m`) does not fail on GNU but
+    # SUCCEEDS with different output, so no exit status anywhere would have caught it. Its
+    # sibling carnet.yml has run on ubuntu since it was written, and carnet.sh stayed portable.
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # The suite runs the real llm-registre gate (.registre): bilan asks it
+          # which files the register scans, and a stubbed scope would test against a register
+          # that does not exist. llm-registre is public, so no token.
+          submodules: recursive
+      - name: Install ripgrep
+        run: sudo apt-get update && sudo apt-get install -y ripgrep
+      # test.sh is linted too, unlike carnet.yml's equivalent: its own empty-path bug is what
+      # once made the suite commit to the real checkout, and shellcheck names that shape.
+      - name: shellcheck
+        run: shellcheck -S warning .claude/skills/bilan/bilan.sh .claude/skills/bilan/test.sh .claude/skills/bilan/hooks/*.sh
+      - name: suite
+        run: bash .claude/skills/bilan/test.sh

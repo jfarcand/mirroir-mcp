@@ -40,7 +40,7 @@ grep tracker registre.toml
 |---|---|
 | Tracker | whatever `registre.toml` says |
 | Labels | `limitation` + this repo's name (`iphone-mirroir-mcp`) |
-| Title | `[mirroir-mcp] <short statement of the gap>` — always project-prefixed |
+| Title | `[mirroir-mcp] <short statement of the gap>` — always project-prefixed (`registre.toml` → `project`) |
 
 **Never file on the code repo itself.** It is PUBLIC, and a limitation issue states precisely
 where a capability or defence is incomplete — a roadmap when the code is open. Issue bodies may
@@ -48,14 +48,22 @@ hold reasoning and residual risk; the code comment stays thin.
 
 ## Step 1 — file the issue
 
-```bash
-TRACKER=$(sed -n 's/^tracker[[:space:]]*=[[:space:]]*"\(.*\)"/\1/p' registre.toml)
+File it through the `carnet` skill's script — the one path into the register. It reads the
+tracker from `registre.toml`, refuses a public tracker, prefixes the title `[<project>] `, and
+adds the project label. Pass `--label limitation` because a marker will point at this issue.
 
-gh issue create -R "$TRACKER" \
-  --title "[mirroir-mcp] Short statement of the gap" \
-  --label limitation --label iphone-mirroir-mcp \
+```bash
+.claude/skills/carnet/carnet.sh create \
+  --label limitation \
+  --title "Short statement of the gap" \
   --body "Where it is (file + symbol). What is incomplete. What the correct fix looks like."
+# → https://github.com/jfarcand/mirroir-carnet/issues/42
+#   marker: LIMITATION(registre#42): <name the limited item on this line>
 ```
+
+Add `--claim` when you are about to keep working the gap in this session, so a peer sees it
+held. The ledger line `create` writes is also how `bilan` credits the issue as a registered
+limitation rather than work this session owes.
 
 ## Step 2 — write the marker
 
@@ -74,6 +82,11 @@ Rules that make a marker valid rather than decorative:
   only "this is incomplete" is unsearchable.
 - The marker exempts **its own line** from the prose ban, not the file. A second unmarked deferral
   sentence on the next line still fails.
+- **Put it in source the gates scan.** Test, bench, example and generated trees are outside the
+  scan (`.registre/limitation-gates.sh --list-files` prints what is in), so a marker there is
+  validated by nothing and never credits the issue as registered. A gap in test *coverage*
+  belongs to the production item that goes uncovered: mark that item, where the next person to
+  change it reads it.
 
 ## Step 3 — if the feature ships disarmed, ledger it too
 

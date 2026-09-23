@@ -65,6 +65,17 @@ brew install ripgrep          # required by .registre/limitation-gates.sh
 
 This activates the `commit-msg` hook in `.githooks/` which enforces conventional commit format, max 2-line messages, and rejects `Co-Authored-By: Claude` lines. The `.registre` submodule carries the [llm-registre](https://github.com/dravr-ai/llm-registre) gates run at pre-push and in CI; `registre.toml` at the repo root configures them (private tracker, scanned extensions, `scan_dirs`, 500-line cap, inline clippy allow-list).
 
+### Register and completion skills
+
+Two shell skills (`gh` + `jq`) work the private register and measure a session's completion; the hooks that drive them are wired in the tracked `.claude/settings.json`:
+
+| Skill | Script | Hooks |
+|---|---|---|
+| `carnet` | `.claude/skills/carnet/carnet.sh` — claim / release / close / create / label issues in the tracker `registre.toml` names; the one path into the register (`register-limitation` files through it) | UserPromptSubmit status line for a named `carnet#N`, PreToolUse auto-claim, SessionEnd release |
+| `bilan` | `.claude/skills/bilan/bilan.sh` — the 0-10 completion number from git, the carnet ledger, LIMITATION markers and CI; report its number, never a narrated one | SessionStart baseline + sweep for what a dead session left |
+
+Each has a stub-`gh` suite (`bash .claude/skills/<skill>/test.sh`) run by `carnet.yml` / `bilan.yml` in CI.
+
 ## Package Manager: Swift Package Manager
 
 This project uses **Swift Package Manager** (SPM) exclusively. The `Package.swift` manifest defines all targets and dependencies.

@@ -1,0 +1,51 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "timeout": 20,
+            "command": "[ -f .claude/skills/bilan/hooks/session-start-sweep.sh ] && bash .claude/skills/bilan/hooks/session-start-sweep.sh || true"
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "timeout": 20,
+            "command": "[ -f .claude/skills/carnet/hooks/prompt-status.sh ] && bash .claude/skills/carnet/hooks/prompt-status.sh || true"
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Edit|Write|MultiEdit|NotebookEdit|Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "timeout": 20,
+            "command": "[ -f .claude/skills/carnet/hooks/auto-claim.sh ] || exit 0; bash .claude/skills/carnet/hooks/auto-claim.sh"
+          }
+        ]
+      }
+    ],
+    "SessionEnd": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "timeout": 30,
+            "command": "[ -f .claude/skills/carnet/hooks/session-end-release.sh ] && bash .claude/skills/carnet/hooks/session-end-release.sh || true"
+          }
+        ]
+      }
+    ]
+  }
+}

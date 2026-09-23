@@ -7,6 +7,10 @@
 # is incomplete, so it never goes on this repo's own tracker.
 tracker = "jfarcand/mirroir-carnet"
 
+# The title prefix carnet.sh puts on every entry this repo files ("[mirroir-mcp] …"). The
+# label stays the repo name (iphone-mirroir-mcp), read from origin.
+project = "mirroir-mcp"
+
 # Swift MCP server + Rust runner + the npm installer and website glue.
 extensions = "swift,rs,ts,tsx,js,mjs"
 

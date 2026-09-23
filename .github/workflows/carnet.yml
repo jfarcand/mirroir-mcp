@@ -1,0 +1,33 @@
+# ABOUTME: Runs the carnet skill's suite against a stub gh — no token, no tracker touched
+# ABOUTME: Path-scoped to the skill, so a push that does not change it starts no job
+name: "Guard: carnet skill"
+
+on:
+  push:
+    paths:
+      - '.claude/skills/carnet/**'
+      - '.github/workflows/carnet.yml'
+  pull_request:
+    paths:
+      - '.claude/skills/carnet/**'
+      - '.github/workflows/carnet.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.ref }}-${{ github.ref == 'refs/heads/main' && github.sha || 'shared' }}
+  cancel-in-progress: false
+
+jobs:
+  suite:
+    name: claim, release, close, and all three hooks
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: shellcheck
+        run: shellcheck -S warning .claude/skills/carnet/carnet.sh .claude/skills/carnet/hooks/*.sh
+      - name: suite against a stub gh
+        run: bash .claude/skills/carnet/test.sh
