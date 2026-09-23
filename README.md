@@ -494,7 +494,7 @@ See [Component Detection](docs/components.md) for the full definition format, ma
 
 ## Replay anywhere with `mirroir-run`
 
-`mirroir-mcp` captures iOS flows — AX + OCR + BFS exploration. `mirroir-run` replays `.mirroir/` SkillStep scenarios on Linux CI against **web, process, and HTTP** surfaces. Both speak one SkillStep grammar, so an iOS capture and a web scenario are the same language on two surfaces — tied together by `cross_surface` equivalence rather than maintained as two bespoke suites. A single Rust binary (`runner/` in this repo), independent of the Swift server.
+`mirroir-mcp` drives the iPhone — AX + OCR + BFS exploration. `mirroir-run` replays `.mirroir/` SkillStep scenarios against **web, process, HTTP, and iOS** surfaces: web through Playwright, subprocesses and HTTP natively, and each `target: { kind: ios }` block handed to `mirroir-mcp test` on a Mac with iPhone Mirroring connected. Both read one SkillStep grammar, so a single scenario can drive a browser and a phone and check that they show the same thing. A single Rust binary (`runner/` in this repo); web, process and HTTP scenarios run on Linux CI with no macOS dependency. How the two binaries meet: [Web and iOS in one scenario](docs/web-and-ios.md).
 
 Drop a `.mirroir/` directory in any repo and `mirroir-run` discovers it from the working directory:
 
@@ -526,6 +526,7 @@ Web steps compile to a Playwright `.spec.ts` and run across chromium, firefox, a
 | Compile the Playwright spec to disk | `mirroir-run --emit playwright scenario.yaml` |
 | Run one scenario end-to-end | `mirroir-run --run-scenario scenario.yaml` |
 | Boot a sample dir, run its scenarios | `mirroir-run --sample .mirroir/apps/foo` |
+| Hand an iOS block to a specific `mirroir-mcp` | `MIRROIR_MCP_BIN=/path/to/mirroir-mcp mirroir-run …` |
 | Standalone text drift check | `mirroir-run --diff-text a.txt b.txt` |
 
 ### Install `mirroir-run`
@@ -538,7 +539,7 @@ cargo install mirroir-run
 brew install jfarcand/tap/mirroir-run
 ```
 
-Prebuilt binaries for macOS (Intel + Apple Silicon), Linux (gnu + musl), and Windows are attached to each [`runner-v*` release](https://github.com/jfarcand/mirroir-mcp/releases). See [`runner/docs/`](runner/docs/) for the scenario grammar, `SAMPLE.md` schema, judge profiles, and CI integration.
+Prebuilt binaries for macOS (Intel + Apple Silicon), Linux (gnu + musl), and Windows are attached to each [`runner-v*` release](https://github.com/jfarcand/mirroir-mcp/releases). On Windows, subprocess teardown signals are not implemented, so process scenarios are not supported there. See [`runner/docs/`](runner/docs/) for the scenario grammar, `SAMPLE.md` schema, judge profiles, and CI integration.
 
 ## Security
 
@@ -644,6 +645,7 @@ See [Configuration Reference](docs/configuration.md) for all 40+ settings coveri
 | [YOLO Icon Detection](docs/yolo-models.md) | Recommended YOLO models, CoreML setup, and configuration |
 | [Compiled Skills](docs/compiled-skills.md) | Zero-OCR skill replay |
 | [Testing](docs/testing.md) | FakeMirroring, integration tests, and CI strategy |
+| [Web and iOS in one scenario](docs/web-and-ios.md) | How `mirroir-run` hands iOS blocks to `mirroir-mcp`, and how `cross_surface` compares a browser with a phone |
 | [Cross-surface replay](runner/docs/) | `mirroir-run` scenario grammar, `.mirroir/` plan, `SAMPLE.md`, judge profiles, CI |
 | [Troubleshooting](docs/troubleshooting.md) | Debug mode and common issues |
 | [Contributing](CONTRIBUTING.md) | How to add tools, commands, and tests |

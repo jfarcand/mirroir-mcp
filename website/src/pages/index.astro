@@ -529,7 +529,7 @@ if (!skillsAvailable) {
   <section id="mirroir-run">
     <h2>Replay anywhere with <code>mirroir-run</code></h2>
     <p>
-      <strong>mirroir-mcp</strong> captures iOS flows &mdash; AX + OCR + BFS exploration. <strong>mirroir-run</strong> replays <code>.mirroir/</code> SkillStep scenarios on Linux CI against web, process, and HTTP surfaces. Both speak one YAML grammar, so an iOS capture and a web scenario are the same language on two surfaces &mdash; tied together by cross-surface equivalence.
+      <strong>mirroir-mcp</strong> drives the iPhone &mdash; AX + OCR + BFS exploration. <strong>mirroir-run</strong> replays <code>.mirroir/</code> SkillStep scenarios against web, process, HTTP, and iOS: web through Playwright, subprocesses and HTTP natively, and each <code>target: &#123; kind: ios &#125;</code> block handed to <code>mirroir-mcp</code> on a Mac with iPhone Mirroring connected. Both read one YAML grammar, so a single scenario can drive a browser and a phone and check that they show the same thing. Web, process, and HTTP scenarios run on Linux CI with no macOS dependency.
     </p>
     <p>
       A single-binary Rust crate (<code>runner/</code> in this repo). Web steps compile to a Playwright <code>.spec.ts</code> and run across chromium, firefox, and webkit &mdash; selectors resolve as raw CSS, Playwright engine prefixes (<code>role=button[name="Save"]</code>, <code>text=Welcome</code>), or <code>data-test</code> + visible text. Process and HTTP steps dispatch natively. An LLM judge step scores agent responses against expected signals; drift detection catches output divergence vs. a baseline.
@@ -538,7 +538,7 @@ if (!skillsAvailable) {
       Drop a <code>.mirroir/</code> directory in any repo and a bare <code>mirroir-run</code> discovers it from the working directory, then replays the plan in <code>mirroir.yaml</code>. Each entry points at a <code>local:</code> sample tree or extends a shared <strong>archetype</strong> (<code>archetypes: ["&lt;pack&gt;/&lt;name&gt;@&lt;ver&gt;"]</code>) with per-instance <code>vars:</code> and <code>boot:</code> &mdash; capture a reusable app shape once, parameterize it per app.
     </p>
     <p>
-      The <strong>iOS leg</strong> is written by <code>generate_skill … emit=true</code> (on <code>finish</code> or <code>explore</code>): a captured flow becomes a runnable <code>target: { kind: ios }</code> scenario under <code>.mirroir/apps/&lt;app&gt;/</code>, declared in its <code>SAMPLE.md</code> and the plan. <code>mirroir-run</code> hands each <code>ios</code> block to <code>mirroir-mcp test</code> on a Mac with iPhone Mirroring connected. A scenario can hold a web block and an iOS block, and a <code>cross_surface</code> step captures both surfaces live and compares them &mdash; the run that checks the gate produces both halves.
+      The <strong>iOS leg</strong> is written by <code>generate_skill … emit=true</code> (on <code>finish</code> or <code>explore</code>): a captured flow becomes a runnable <code>target: &#123; kind: ios &#125;</code> scenario under <code>.mirroir/apps/&lt;app&gt;/</code>, declared in its <code>SAMPLE.md</code> and the plan. <code>mirroir-run</code> hands each <code>ios</code> block to <code>mirroir-mcp test</code> on a Mac with iPhone Mirroring connected. A scenario can hold a web block and an iOS block, and a <code>cross_surface</code> step captures both surfaces live and compares them &mdash; the run that checks the gate produces both halves.
     </p>
 
     <div class="pipeline-grid">
@@ -553,15 +553,15 @@ if (!skillsAvailable) {
       <div class="pipeline-step">
         <div class="pipeline-icon">2</div>
         <h3>Compile</h3>
-        <p>Preview the emitted Playwright spec + config that the runner would invoke. Stdout-friendly for piping or review.</p>
+        <p>Write the Playwright spec + config a run would invoke to <code>target/playwright/</code>, without running it &mdash; for review.</p>
         <div class="pipeline-cmd">
-          <code>mirroir-run --compile-scenario scenario.yaml</code>
+          <code>mirroir-run --emit playwright scenario.yaml</code>
         </div>
       </div>
       <div class="pipeline-step">
         <div class="pipeline-icon">3</div>
         <h3>Run</h3>
-        <p>Execute one scenario end-to-end. Process / HTTP / web steps dispatch in order; web batches go to Playwright.</p>
+        <p>Execute one scenario end-to-end, in file order: runner-side steps in Rust, the web block in one Playwright run, the iOS block in one <code>mirroir-mcp</code> run.</p>
         <div class="pipeline-cmd">
           <code>mirroir-run --run-scenario scenario.yaml</code>
         </div>
@@ -586,6 +586,9 @@ if (!skillsAvailable) {
 
     <p>
       The reference sample <a href="https://github.com/jfarcand/mirroir-mcp/tree/main/runner/samples/mega-sample" rel="noopener noreferrer"><code>runner/samples/mega-sample/</code></a> exercises every primitive in one run: cross-browser web (chromium + firefox + webkit), HTTP probe, LLM judge against a local Ollama daemon, drift detection vs. a captured baseline, and cross-surface equivalence (a web capture compared against a pre-captured iOS surface fixture). Deterministic at <code>temperature=0</code>, free per run, no remote LLM dependency in CI.
+    </p>
+    <p>
+      <a href="https://github.com/jfarcand/mirroir-mcp/tree/main/runner/samples/ios-fixture" rel="noopener noreferrer"><code>runner/samples/ios-fixture/</code></a> is the iOS counterpart: one <code>ios</code> block run through <code>mirroir-mcp</code>, its final screen captured live and compared against expected text. CI runs it against FakeMirroring on every change to either binary. On a real iPhone, the same web-vs-iOS check &mdash; desktop Chromium against iPhone Safari on one page &mdash; passes when they agree and fails when the page is reworded. How the two binaries meet: <a href="https://github.com/jfarcand/mirroir-mcp/blob/main/docs/web-and-ios.md" rel="noopener noreferrer">Web and iOS in one scenario</a>.
     </p>
     <p>
       Reference docs live under <a href="https://github.com/jfarcand/mirroir-mcp/tree/main/runner/docs" rel="noopener noreferrer"><code>runner/docs/</code></a>: scenario grammar, <code>SAMPLE.md</code> schema, judge profiles, Playwright setup, CI integration.

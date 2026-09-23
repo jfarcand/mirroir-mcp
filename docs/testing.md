@@ -147,6 +147,18 @@ printf '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}\n...' \
 
 These tests prove the installed binary (from any install path) can discover FakeMirroring, capture its window, and return a valid screenshot through the MCP protocol.
 
+### mirroir-run → mirroir-mcp (CI workflow)
+
+The `Build` workflow's macOS job, with FakeMirroring already running, also installs the Rust
+toolchain, builds `mirroir-run`, and runs `runner/samples/ios-fixture` with `MIRROIR_MCP_BIN`
+pointing at the release `mirroir-mcp`. The scenario is one `target: { kind: ios }` block plus a
+`cross_surface:` step that compares the block's live OCR capture against committed expected
+text. The step fails unless the log shows the hand-off to mirroir-mcp, the capture being
+written, the pairwise comparison, and `verdict=pass`, so a skipped block cannot pass as green.
+It is the one lane where the Swift and Rust sides of that boundary run together; the report
+format itself is also pinned by `PlaywrightReportWriterTests` against the fixture the runner's
+ingest tests read. See [Web and iOS in one scenario](web-and-ios.md).
+
 ## CI Workflow: `installers.yml`
 
 Three parallel jobs test each installation method end-to-end on `macos-15` runners. Each job installs the embacle FFI dependency (`brew install embacle-ffi`, symlink `libembacle.a`), clones `mirroir-skills` as a sibling and symlinks it into `.mirroir-mcp/skills` so FakeMirroring has AppPacks to load, then runs the full `IntegrationTests` target. After building, the workflow verifies the FFI is statically linked (`nm .build/release/mirroir-mcp | grep embacle_init`).

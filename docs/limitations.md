@@ -41,6 +41,16 @@ CGEvent keycodes are layout-independent physical keys. When the iPhone uses a no
 
 Characters with no `CGKeyMap` mapping after substitution cannot be typed (e.g. `§` and `±` on the ISO section key of Canadian-CSA, where macOS and iPhone Mirroring disagree on the physical key). These characters are skipped and reported back: `type_text` returns `success: true` with a warning of the form `Skipped N character(s) with no key mapping` — they are not silently dropped.
 
+A layout table that does not match the phone's active keyboard types the wrong character rather than skipping it. On an iPhone whose keyboard differs from the configured `Canadian-CSA` table, `/` has been observed arriving as `é`, which garbles every URL — `type_text` of a URL and a scenario `open_url:` step both fail. Open the page another way (a bookmark, a link, or an address without slashes) until the table matches.
+
+## Web and iOS Scenarios
+
+A `mirroir-run` scenario can hold a web block and an iOS block ([Web and iOS in one scenario](web-and-ios.md)), with these limits:
+
+- An iOS block needs macOS, iPhone Mirroring connected, and `mirroir-mcp`; on Linux it is refused by name.
+- The two blocks run one after the other, not in parallel, and a scenario opens at most one block per surface.
+- `cross_surface` compares token overlap, not meaning: two screens that say the same thing in different words score low.
+
 ## Modifier-State Corruption (Apple Bug)
 
 iPhone Mirroring can intermittently corrupt modifier state, producing alternating-case output (`LiKe ThIs`) regardless of the input source — Mac keyboard, CGEvent, or otherwise. The same bug is [documented for Universal Control](https://discussions.apple.com/thread/254551671). The server sends correct modifiers for every keystroke; this is an Apple-side defect, not a mirroir bug. Workarounds: toggle Caps Lock, disconnect/reconnect iPhone Mirroring, or reboot the Mac.
