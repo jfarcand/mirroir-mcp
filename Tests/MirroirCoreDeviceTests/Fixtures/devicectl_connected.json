@@ -1,0 +1,182 @@
+{
+  "info": {
+    "arguments": [
+      "devicectl",
+      "list",
+      "devices",
+      "--json-output",
+      "/tmp/devicectl.json"
+    ],
+    "commandType": "devicectl.list.devices",
+    "environment": {
+      "TERM": "xterm-256color"
+    },
+    "jsonVersion": 3,
+    "outcome": "success",
+    "version": "518.33"
+  },
+  "result": {
+    "devices": [
+      {
+        "capabilities": [
+          {
+            "featureIdentifier": "com.apple.coredevice.feature.tags",
+            "name": "Modify Tags"
+          },
+          {
+            "featureIdentifier": "com.apple.coredevice.feature.default.user.credentials",
+            "name": "Modify credentials for default users for a device"
+          },
+          {
+            "featureIdentifier": "com.apple.coredevice.feature.unpairdevice",
+            "name": "Unpair Device"
+          }
+        ],
+        "connectionProperties": {
+          "authenticationType": "manualPairing",
+          "isMobileDeviceOnly": false,
+          "lastConnectionDate": "2026-04-09T14:54:00.000Z",
+          "pairingState": "paired",
+          "potentialHostnames": [
+            "TestPhone.coredevice.local",
+            "11111111-2222-3333-4444-555555555555.coredevice.local",
+            "00008140-0000000000000001.coredevice.local"
+          ],
+          "tunnelState": "unavailable"
+        },
+        "deviceProperties": {
+          "bootedFromSnapshot": true,
+          "bootedSnapshotName": "com.apple.os.update-0000",
+          "ddiServicesAvailable": false,
+          "developerModeStatus": "enabled",
+          "hasInternalOSBuild": false,
+          "name": "OtherPhone",
+          "osBuildUpdate": "23E261",
+          "osVersionNumber": "26.4.2",
+          "rootFileSystemIsWritable": false,
+          "supportsCheckedAllocations": false
+        },
+        "hardwareProperties": {
+          "cpuType": {
+            "name": "arm64e",
+            "subType": 2,
+            "type": 16777228
+          },
+          "deviceType": "iPhone",
+          "ecid": 1,
+          "hardwareModel": "D47AP",
+          "internalStorageCapacity": 128000000000,
+          "isProductionFused": true,
+          "marketingName": "iPhone 16",
+          "platform": "iOS",
+          "productType": "iPhone17,3",
+          "reality": "physical",
+          "serialNumber": "TESTSERIAL0",
+          "supportedCPUTypes": [
+            {
+              "name": "arm64e",
+              "subType": 2,
+              "type": 16777228
+            },
+            {
+              "name": "arm64",
+              "subType": 0,
+              "type": 16777228
+            }
+          ],
+          "supportedDeviceFamilies": [
+            1
+          ],
+          "thinningProductType": "iPhone17,3",
+          "udid": "00008140-0000000000000002"
+        },
+        "identifier": "AAAAAAAA-BBBB-CCCC-DDDD-EEEEEEEEEEEE",
+        "tags": [],
+        "visibilityClass": "default"
+      },
+      {
+        "capabilities": [
+          {
+            "featureIdentifier": "com.apple.coredevice.feature.tags",
+            "name": "Modify Tags"
+          },
+          {
+            "featureIdentifier": "com.apple.coredevice.feature.default.user.credentials",
+            "name": "Modify credentials for default users for a device"
+          },
+          {
+            "featureIdentifier": "com.apple.coredevice.feature.unpairdevice",
+            "name": "Unpair Device"
+          }
+        ],
+        "connectionProperties": {
+          "authenticationType": "manualPairing",
+          "isMobileDeviceOnly": false,
+          "lastConnectionDate": "2026-04-09T14:54:00.000Z",
+          "pairingState": "paired",
+          "potentialHostnames": [
+            "TestPhone.coredevice.local",
+            "11111111-2222-3333-4444-555555555555.coredevice.local",
+            "00008140-0000000000000001.coredevice.local"
+          ],
+          "tunnelState": "connected",
+          "tunnelIPAddress": "fd7b:e5b:6f53::1",
+          "tunnelTransportProtocol": "tcp",
+          "transportType": "wired",
+          "localHostnames": [
+            "TestPhone.coredevice.local"
+          ]
+        },
+        "deviceProperties": {
+          "bootedFromSnapshot": true,
+          "bootedSnapshotName": "com.apple.os.update-0000",
+          "ddiServicesAvailable": true,
+          "developerModeStatus": "enabled",
+          "hasInternalOSBuild": false,
+          "name": "TestPhone",
+          "osBuildUpdate": "23E261",
+          "osVersionNumber": "26.4.2",
+          "rootFileSystemIsWritable": false,
+          "supportsCheckedAllocations": false
+        },
+        "hardwareProperties": {
+          "cpuType": {
+            "name": "arm64e",
+            "subType": 2,
+            "type": 16777228
+          },
+          "deviceType": "iPhone",
+          "ecid": 1,
+          "hardwareModel": "D47AP",
+          "internalStorageCapacity": 128000000000,
+          "isProductionFused": true,
+          "marketingName": "iPhone 16",
+          "platform": "iOS",
+          "productType": "iPhone17,3",
+          "reality": "physical",
+          "serialNumber": "TESTSERIAL0",
+          "supportedCPUTypes": [
+            {
+              "name": "arm64e",
+              "subType": 2,
+              "type": 16777228
+            },
+            {
+              "name": "arm64",
+              "subType": 0,
+              "type": 16777228
+            }
+          ],
+          "supportedDeviceFamilies": [
+            1
+          ],
+          "thinningProductType": "iPhone17,3",
+          "udid": "00008140-0000000000000001"
+        },
+        "identifier": "11111111-2222-3333-4444-555555555555",
+        "tags": [],
+        "visibilityClass": "default"
+      }
+    ]
+  }
+}
