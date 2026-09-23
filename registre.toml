@@ -10,6 +10,10 @@ tracker = "jfarcand/mirroir-carnet"
 # Swift MCP server + Rust runner + the npm installer and website glue.
 extensions = "swift,rs,ts,tsx,js,mjs"
 
+# The register's scope, declared once: CI and the pre-push validation call the
+# gate with no directories so both read this line.
+scan_dirs = "Sources,runner/src,npm,scripts,website/src"
+
 # Every dark-launched feature must be ledgered, so an unarmed phase always
 # carries a review date.
 require_ledger = true

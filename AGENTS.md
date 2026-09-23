@@ -63,7 +63,7 @@ git submodule update --init   # .registre — the limitation-register gates
 brew install ripgrep          # required by .registre/limitation-gates.sh
 ```
 
-This activates the `commit-msg` hook in `.githooks/` which enforces conventional commit format, max 2-line messages, and rejects `Co-Authored-By: Claude` lines. The `.registre` submodule carries the [llm-registre](https://github.com/dravr-ai/llm-registre) gates run at pre-push and in CI; `registre.toml` at the repo root configures them (private tracker, scanned extensions, 500-line cap, inline clippy allow-list).
+This activates the `commit-msg` hook in `.githooks/` which enforces conventional commit format, max 2-line messages, and rejects `Co-Authored-By: Claude` lines. The `.registre` submodule carries the [llm-registre](https://github.com/dravr-ai/llm-registre) gates run at pre-push and in CI; `registre.toml` at the repo root configures them (private tracker, scanned extensions, `scan_dirs`, 500-line cap, inline clippy allow-list).
 
 ## Package Manager: Swift Package Manager
 
@@ -113,7 +113,7 @@ under `runner/` express it mechanically; this section documents the intent.
 | `runner/clippy.toml` | `disallowed-methods` — `anyhow::Context::context` and `anyhow::Context::with_context` are forbidden in favor of structured `RunnerError` variants |
 | `runner/deny.toml` | cargo-deny: advisories, license allowlist (MIT / Apache-2.0 / ISC / BSD-3-Clause / Unicode-3.0 / etc.), bans (`wildcards = "deny"`), sources (crates.io only) |
 | `runner/scripts/ci/pre-push-validate.sh` | Tier 0 fmt → Tier 1 limitation-register gates → Tier 2 clippy → Tier 3 tests; stamps `.git/validation-passed` marker (15-min TTL) |
-| `.registre/limitation-gates.sh` + `registre.toml` | The [llm-registre](https://github.com/dravr-ai/llm-registre) gates (submodule): deferral/confession prose ban, `LIMITATION(registre#n)` marker format, dark-launch ledger, 500-line file cap, inline clippy allow-list. Also run in CI (`limitation-register.yml`) over Sources, runner/src, npm, scripts, website/src |
+| `.registre/limitation-gates.sh` + `registre.toml` | The [llm-registre](https://github.com/dravr-ai/llm-registre) gates (submodule): deferral/confession prose ban, `LIMITATION(registre#n)` marker format, dark-launch ledger, 500-line file cap, inline clippy allow-list. Pre-push and CI (`limitation-register.yml`) call it with no directories so both scan the `scan_dirs` declared in `registre.toml` |
 
 ### Forbidden Patterns (CI Enforced)
 

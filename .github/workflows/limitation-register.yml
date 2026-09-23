@@ -51,4 +51,4 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y ripgrep
 
       - name: Run the limitation register gates
-        run: ./.registre/limitation-gates.sh Sources runner/src npm scripts website/src
+        run: ./.registre/limitation-gates.sh

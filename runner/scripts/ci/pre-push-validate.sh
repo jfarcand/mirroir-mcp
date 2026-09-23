@@ -35,7 +35,7 @@ if [ ! -x "$REPO_ROOT/.registre/limitation-gates.sh" ]; then
     echo "llm-registre not checked out — run: git submodule update --init"
     exit 1
 fi
-(cd "$REPO_ROOT" && ./.registre/limitation-gates.sh Sources runner/src npm scripts website/src) || {
+(cd "$REPO_ROOT" && ./.registre/limitation-gates.sh) || {
     echo ""
     echo "Deferral prose must be implemented or registered — see .registre/README.md"
     echo "and file the gap in jfarcand/mirroir-carnet (tracker in registre.toml)."
