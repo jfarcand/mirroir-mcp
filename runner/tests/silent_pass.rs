@@ -1,4 +1,4 @@
-// ABOUTME: Pins the three paths on which a scenario used to exit 0 without evaluating anything.
+// ABOUTME: Pins the paths on which a scenario used to exit 0 without evaluating anything.
 // ABOUTME: Every case asserts a non-zero exit — a run the runner cannot substantiate is never a pass.
 
 //! Silent-pass regression suite.
@@ -9,6 +9,7 @@
 
 mod common;
 
+use std::fmt::Write as _;
 use std::fs;
 
 use common::Sandbox;
@@ -324,6 +325,98 @@ fn a_set_that_selects_no_scenario_inside_the_sample_is_not_a_pass() -> Result<()
     if report.contains("\"passed\": 1") {
         return Err(format!(
             "the summary claims a sample passed while zero of its scenarios ran:\n{report}"
+        ));
+    }
+    Ok(())
+}
+
+/// Plant a `must_pass` plan of `entries` — `(name, skip)` pairs — each a
+/// local sample whose `SAMPLE.md` declares one `report: pass` scenario, so an
+/// entry that is actually replayed passes.
+fn plant_must_pass_plan(sandbox: &Sandbox, entries: &[(&str, bool)]) -> Result<String, String> {
+    let mut plan = String::from("version: 1\nplan:\n  must_pass:\n");
+    for (name, skip) in entries {
+        sandbox.write(
+            &format!(".mirroir/samples/{name}/scenarios/smoke.yaml"),
+            "version: 1\nname: declared pass\nsteps:\n  - report: pass\n",
+        )?;
+        sandbox.write(
+            &format!(".mirroir/samples/{name}/SAMPLE.md"),
+            concat!(
+                "# Sample\n\n",
+                "```yaml\n",
+                "version: 1\n",
+                "session:\n",
+                "  boot:\n",
+                "    command: \"true\"\n",
+                "  scenarios:\n",
+                "    must_pass:\n",
+                "      - scenarios/smoke.yaml\n",
+                "```\n",
+            ),
+        )?;
+        write!(
+            plan,
+            "    - name: {name}\n      local: samples/{name}\n      boot:\n        command: \"true\"\n"
+        )
+        .map_err(|e| format!("render plan entry: {e}"))?;
+        if *skip {
+            plan.push_str("      skip: true\n");
+        }
+    }
+    sandbox.write(".mirroir/mirroir.yaml", &plan)
+}
+
+/// The selection guard counts entries a set *selects*, and an entry marked
+/// `skip: true` is selected and then never replayed. A plan whose every
+/// selected entry was skipped used to exit 0 with `verdict=pass` over zero
+/// replayed samples — the exact tree `generate_skill emit=true` writes.
+#[test]
+fn a_plan_whose_every_selected_entry_is_skipped_is_not_a_pass() -> Result<(), String> {
+    let sandbox = Sandbox::new()?;
+    let config = plant_must_pass_plan(&sandbox, &[("demo", true)])?;
+    let home = sandbox.path().display().to_string();
+
+    let run = sandbox.run_with_env(&["--config", &config], &[("HOME", &home)])?;
+    if !run.is_failure() {
+        return Err(format!(
+            "a plan whose only selected entry is `skip: true` exited {:?}; nothing was replayed, so it is not a pass.\n{}",
+            run.code,
+            run.output()
+        ));
+    }
+    let output = run.output();
+    if !output.contains("skip: true") {
+        return Err(format!(
+            "the refusal never names the `skip: true` that emptied the run:\n{output}"
+        ));
+    }
+
+    let report_path = sandbox.path().join("mirroir-run-report.json");
+    let report = fs::read_to_string(&report_path).map_err(|e| format!("read run report: {e}"))?;
+    if !report.contains("\"skipped\": 1") {
+        return Err(format!(
+            "the summary must still account for the skipped entry:\n{report}"
+        ));
+    }
+    Ok(())
+}
+
+/// The companion to the test above: a skipped entry beside one that replays
+/// and passes is still a pass. A fix that failed every plan holding a skipped
+/// entry would pass the test above and fail this one.
+#[test]
+fn a_skipped_entry_beside_a_replayed_one_still_passes() -> Result<(), String> {
+    let sandbox = Sandbox::new()?;
+    let config = plant_must_pass_plan(&sandbox, &[("parked", true), ("live", false)])?;
+    let home = sandbox.path().display().to_string();
+
+    let run = sandbox.run_with_env(&["--config", &config], &[("HOME", &home)])?;
+    if run.is_failure() {
+        return Err(format!(
+            "one replayed, passing entry beside a skipped one exited {:?}.\n{}",
+            run.code,
+            run.output()
         ));
     }
     Ok(())

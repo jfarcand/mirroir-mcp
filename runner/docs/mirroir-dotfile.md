@@ -210,7 +210,8 @@ Merge semantics:
 - **Scalars** (strings, numbers, bools) → replace.
 - **Maps** (`vars`, `boot.env`) → per-key merge; instance override wins per key.
 - **Arrays** (`flows`, `archetypes`) → **replace**, not append.
-- `skip: true` excludes from the run.
+- `skip: true` excludes from the run. It is reported as `skipped`, and a run in
+  which every selected entry is skipped exits 1: replaying nothing is not a pass.
 
 CI disables overrides via `mirroir-run --no-local`.
 

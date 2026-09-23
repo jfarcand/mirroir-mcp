@@ -145,6 +145,18 @@ pub enum MirroirError {
         config: PathBuf,
     },
 
+    /// Every plan entry the scenario set selected is marked `skip: true`, so
+    /// the run replayed no sample. The selection itself was valid — which is
+    /// why [`Self::SelectionMatchedNothing`] did not fire — but a run that
+    /// replayed nothing is not a pass.
+    #[error(
+        "none of the plan's {total} entries was replayed: every entry the scenario set selected is marked `skip: true`; a run that replayed nothing is not a pass. Remove `skip:` from an entry, or select a set that holds one without it"
+    )]
+    NothingReplayed {
+        /// Plan entries accounted for, every one of them skipped.
+        total: usize,
+    },
+
     /// `HOME` environment variable is not set; can't locate `~/.mirroir/`.
     #[error("cannot resolve user home directory ($HOME is unset)")]
     HomeDirUnavailable,

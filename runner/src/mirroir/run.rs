@@ -74,15 +74,16 @@ impl Default for MirroirRunOptions {
 ///    [`run_sample`] using the existing `ScenarioSet::MustPass` (or as
 ///    selected) machinery.
 /// 8. Emit the summary JSON to `summary_path` and return
-///    [`MirroirError::PlanFailures`] when any sample failed, or
-///    [`RunVerdict::Drift`] when none failed and at least one drifted.
+///    [`MirroirError::PlanFailures`] when any sample failed,
+///    [`MirroirError::NothingReplayed`] when every selected entry was skipped,
+///    or [`RunVerdict::Drift`] when none failed and at least one drifted.
 ///
 /// # Errors
 ///
 /// Returns any error from the underlying discovery / parse / resolve /
 /// compose / replay layers, plus the lockfile-mode enforcement variants and
-/// the two selection refusals, [`MirroirError::SelectionMatchedNothing`] and
-/// [`MirroirError::PlanEmpty`].
+/// the selection refusals, [`MirroirError::SelectionMatchedNothing`],
+/// [`MirroirError::PlanEmpty`], and [`MirroirError::NothingReplayed`].
 pub async fn run_mirroir(
     config_path: &Path,
     set: Option<ScenarioSet>,
@@ -217,10 +218,17 @@ pub async fn run_mirroir(
     let total = verdicts.len();
     let failed = totals.failed;
     let drifted = totals.drifted;
+    let replayed = totals.passed + failed + drifted;
     write_summary_full(summary_path, config_path, verdicts, totals)?;
 
     if failed > 0 {
         return Err(MirroirError::PlanFailures { failed, total }.into());
+    }
+    // The selection guard counts entries the set *selects*; an entry marked
+    // `skip: true` is selected and then never replayed. When that covers every
+    // selected entry, the run replayed nothing, and nothing is not a pass.
+    if replayed == 0 {
+        return Err(MirroirError::NothingReplayed { total }.into());
     }
     if drifted > 0 {
         return Ok(RunVerdict::Drift);
