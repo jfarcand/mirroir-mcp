@@ -81,9 +81,10 @@ pub struct AcceptArgs {
 ///    `measure:` latency this run saw.
 /// 2. each `judge.drift_baseline_file` — rewritten with the text this run
 ///    judged.
-/// 3. each `cross_surface.capture.to` — rewritten from the live page's
-///    capture. The other files a `cross_surface:` step compares belong to
-///    surfaces this runner does not drive and are named, not overwritten.
+/// 3. each `cross_surface.captures[].to` — rewritten from the web page's
+///    scrape or the iOS block's final screen. The other files a
+///    `cross_surface:` step compares are committed and are named, not
+///    overwritten.
 /// 4. `.mirroir/mirroir.lock` — re-resolved and re-checksummed, which is how a
 ///    deliberate edit inside an archetype tree gets blessed for `--locked` and
 ///    `--frozen`.

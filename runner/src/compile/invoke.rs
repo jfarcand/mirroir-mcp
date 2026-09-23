@@ -13,7 +13,8 @@ use tracing::{debug, info, warn};
 
 use crate::compile::error::PlaywrightError;
 use crate::compile::playwright::PlaywrightSpec;
-use crate::compile::report::{PlaywrightOutcome, parse_report_body};
+use crate::compile::report::{ReporterOutcome, parse_report_body};
+use crate::compile::report_error::ReportEngine;
 use crate::compile::workspace::PlaywrightWorkspace;
 use crate::error::Result;
 
@@ -79,7 +80,7 @@ impl PlaywrightRunner {
         &self,
         spec: &PlaywrightSpec,
         target: &PlaywrightWorkspace,
-    ) -> Result<PlaywrightOutcome> {
+    ) -> Result<ReporterOutcome> {
         target.materialize(&spec.spec_ts, &spec.browsers).await?;
         self.spawn_npx(target).await?;
         let report_path = target.report_path();
@@ -90,7 +91,7 @@ impl PlaywrightRunner {
                 source,
             }
         })?;
-        parse_report_body(&path, &body)
+        parse_report_body(ReportEngine::Playwright, &path, &body)
     }
 
     async fn spawn_npx(&self, workspace: &PlaywrightWorkspace) -> Result<()> {
@@ -157,7 +158,7 @@ impl PlaywrightRunner {
 }
 
 /// Keep the last [`OUTPUT_TAIL_BYTES`] of a subprocess stream, lossily decoded.
-fn tail(buf: &[u8]) -> String {
+pub fn tail(buf: &[u8]) -> String {
     let slice = if buf.len() <= OUTPUT_TAIL_BYTES {
         buf
     } else {
@@ -168,7 +169,7 @@ fn tail(buf: &[u8]) -> String {
 
 /// Minimal `which` — walk `path`, return the first directory containing an
 /// executable of `name`. Returns `None` when no such file exists.
-fn which_in(path: &OsStr, name: &str) -> Option<PathBuf> {
+pub fn which_in(path: &OsStr, name: &str) -> Option<PathBuf> {
     for dir in env::split_paths(path) {
         let candidate = dir.join(name);
         if candidate.is_file() {
@@ -189,6 +190,7 @@ mod tests {
     use tempfile::TempDir;
 
     use super::*;
+    use crate::compile::report_error::ReportError;
     use crate::error::RunnerError;
     use crate::parser::step::Browser;
 
@@ -268,10 +270,11 @@ mod tests {
         let stub = make_stub_npx(scratch.path(), canned, 1).await?;
         let runner = PlaywrightRunner::with_npx(stub);
         let res = runner.run(&sample_spec(), &workspace(scratch.path())).await;
-        let Err(RunnerError::Playwright(PlaywrightError::TestFailures {
+        let Err(RunnerError::Report(ReportError::TestFailures {
             failed,
             total,
             failures,
+            ..
         })) = res
         else {
             return Err(format!("expected TestFailures, got {res:?}").into());

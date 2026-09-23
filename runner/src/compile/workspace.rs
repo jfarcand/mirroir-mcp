@@ -21,6 +21,9 @@ pub const CONFIG_FILE: &str = "playwright.config.ts";
 /// artifact is written under.
 pub const PLAYWRIGHT_OUTPUT_ROOT: &str = "target/playwright";
 
+/// Root, under the invocation directory, of every `ios` block's workspace.
+const IOS_OUTPUT_ROOT: &str = "target/mirroir-ios";
+
 /// Characters kept verbatim in a directory component. Everything else — path
 /// separators, spaces, the em dashes scenario names carry — collapses to `-`.
 fn is_safe(c: char) -> bool {
@@ -80,6 +83,19 @@ impl PlaywrightWorkspace {
             dir,
             spec_file: format!("{}.spec.ts", slug(scenario)),
         }
+    }
+
+    /// Where an `ios` block's file and report go for the same scenario:
+    /// beside the Playwright tree, never inside it — the web workspace is
+    /// recreated empty on every run and would take the iOS artifacts with it.
+    #[must_use]
+    pub fn ios_block_dir(cwd: &Path, sample: Option<&str>, scenario: &str) -> PathBuf {
+        let mut dir = cwd.join(IOS_OUTPUT_ROOT);
+        if let Some(sample) = sample {
+            dir.push(slug(sample));
+        }
+        dir.push(slug(scenario));
+        dir
     }
 
     /// Full path to the compiled spec.

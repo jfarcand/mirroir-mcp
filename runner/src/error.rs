@@ -10,6 +10,9 @@ use std::result::Result as StdResult;
 use thiserror::Error;
 
 use crate::compile::error::PlaywrightError;
+use crate::compile::report_error::ReportError;
+use crate::cross_surface_error::CrossSurfaceError;
+use crate::ios_error::IosError;
 use crate::mirroir::error::MirroirError;
 use crate::oracle::error::OracleError;
 use crate::parser::step::TargetKind;
@@ -311,29 +314,33 @@ pub enum RunnerError {
         scenarios: usize,
     },
 
-    /// A scenario's web steps are split by a runner-side step. Every scenario
-    /// compiles to exactly one Playwright invocation, so a second run of web
-    /// steps would execute out of the order the file reads.
+    /// A device step sits outside the block its surface opened. Each block
+    /// compiles to exactly one invocation — Playwright for `web`, mirroir-mcp
+    /// for `ios` — so a second run of device steps would execute out of the
+    /// order the file reads, in a fresh session.
     #[error(
-        "scenario splits its web steps: step {index} (`{kind}`) resumes web work after step {block_end} ended the web block and step `{separator_kind}` ran on the runner side. A scenario compiles to one Playwright invocation — move every web step into a single adjacent run"
+        "scenario splits its {surface} steps: step {index} (`{kind}`) resumes {surface} work after step {block_end} ended the {surface} block and step `{separator_kind}` ran on the runner side. Each block runs as one invocation — move every {surface} step into a single adjacent run"
     )]
-    WebBlockNotContiguous {
-        /// Index of the offending web step (0-based, as the file reads).
+    BlockNotContiguous {
+        /// Index of the offending device step (0-based, as the file reads).
         index: usize,
         /// Step kind at `index`.
         kind: &'static str,
-        /// Index of the last web step in the scenario's first web run.
+        /// The surface of the block that already ended.
+        surface: TargetKind,
+        /// Index of the last step of that block.
         block_end: usize,
-        /// Kind of the runner-side step that ended the web run.
+        /// Kind of the runner-side step that ended the block.
         separator_kind: &'static str,
     },
 
-    /// A `target:` step names a surface this binary has no executor for. Only
-    /// `web` opens one here; `ios` and `macos` belong to mirroir-mcp, which
-    /// talks to the device from Swift, and `process` / `http` work is carried
-    /// by the steps themselves rather than by a surface declaration.
+    /// A `target:` step names a surface this binary has no executor for.
+    /// `web` runs through Playwright and `ios` through mirroir-mcp; `macos`
+    /// windows are driven by `mirroir-mcp test` directly, and `process` /
+    /// `http` work is carried by the steps themselves rather than by a
+    /// surface declaration.
     #[error(
-        "step {index} declares `target: {{ kind: {kind} }}`, which mirroir-run has no executor for. Only `target: {{ kind: web }}` runs here — it compiles to one Playwright invocation. `ios` and `macos` surfaces are driven by mirroir-mcp, the Swift MCP server; subprocess and REST work needs no `target:` at all, because `spawn:`, `kill:` and `http:` steps dispatch in Rust on their own"
+        "step {index} declares `target: {{ kind: {kind} }}`, which mirroir-run has no executor for. `web` blocks run through Playwright and `ios` blocks through mirroir-mcp; a `macos` window is driven by `mirroir-mcp test` directly, and subprocess and REST work needs no `target:` at all, because `spawn:`, `kill:` and `http:` steps dispatch in Rust on their own"
     )]
     NoExecutorForTargetKind {
         /// Index of the `target:` step, as the file reads.
@@ -342,16 +349,27 @@ pub enum RunnerError {
         kind: TargetKind,
     },
 
-    /// A scenario declares its surface twice. The compiler consumes the
-    /// declaration the web block opens with and emits nothing for any other,
-    /// so a second `target:` is a declaration nothing executes — including one
-    /// that switches surface mid-file, whose steps would compile into the
-    /// first surface's run.
+    /// An `ios` block runs through mirroir-mcp, which drives iPhone Mirroring
+    /// — a macOS application. On any other host the block cannot run, and it
+    /// is refused rather than skipped: a skipped block is a silent pass.
     #[error(
-        "step {index} declares a second `target:`; step {first} already declared this scenario's surface. One scenario runs on one surface: a later `target:` executes nothing, and a second Playwright invocation would start a fresh context, silently discarding the first one's cookies, storage and in-memory state"
+        "step {index} declares `target: {{ kind: ios }}`, which runs through mirroir-mcp and iPhone Mirroring on a macOS host; this host is not macOS"
     )]
-    SecondTargetDeclared {
-        /// Index of the `target:` step that already declared the surface.
+    IosNeedsMacosHost {
+        /// Index of the `target:` step, as the file reads.
+        index: usize,
+    },
+
+    /// A scenario declares the same surface twice. Each surface runs as one
+    /// invocation; a second block of it would start a fresh session, silently
+    /// discarding the first one's state.
+    #[error(
+        "step {index} declares a second `target: {{ kind: {surface} }}`; step {first} already opened this scenario's {surface} block. A second invocation would start a fresh session, silently discarding the first one's state"
+    )]
+    SurfaceDeclaredTwice {
+        /// The surface declared twice.
+        surface: TargetKind,
+        /// Index of the `target:` step that already opened it.
         first: usize,
         /// Index of the second declaration, as the file reads.
         index: usize,
@@ -403,80 +421,31 @@ pub enum RunnerError {
         name: String,
     },
 
-    /// A `cross_surface.capture` was declared but the invocation's
-    /// `mirroir-captures` attachment carried no text for it — its `to` file
-    /// would be compared stale, or not at all.
-    #[error(
-        "cross_surface step {index} declared a capture into `{to}` but the `mirroir-captures` attachment carried no text for it"
-    )]
-    CrossSurfaceNotCaptured {
-        /// Index of the `cross_surface` step, as the file reads.
-        index: usize,
-        /// The capture's `to` path.
-        to: String,
-    },
-
     /// `std::fmt::Write` failure while building emitter output. Theoretically
     /// unreachable when writing to `String`, but typed for `?`-propagation.
     #[error("internal formatting error")]
     Format(#[from] fmt::Error),
 
-    /// `cross_surface:` step found a pair of responses whose fingerprint
-    /// similarity dropped below the configured threshold.
-    #[error("cross_surface mismatch: `{a}` vs `{b}` similarity {observed:.3} < min {threshold:.3}")]
-    CrossSurfaceMismatch {
-        /// First file path of the mismatching pair.
-        a: String,
-        /// Second file path of the mismatching pair.
-        b: String,
-        /// Jaccard similarity actually observed for that pair.
-        observed: f64,
-        /// Minimum similarity required.
-        threshold: f64,
-    },
+    /// A `cross_surface:` parity-gate failure — its captures, files, or verdict.
+    #[error(transparent)]
+    CrossSurface(#[from] CrossSurfaceError),
 
-    /// `cross_surface:` step requires at least two response files to compare.
-    #[error("cross_surface: need at least 2 response files, got {count}")]
-    CrossSurfaceTooFewFiles {
-        /// How many were supplied.
-        count: usize,
-    },
-
-    /// A `cross_surface:` response file fingerprinted to no tokens. Jaccard
-    /// calls two empty token sets identical — the documented answer for drift
-    /// against a recorded baseline — so a blank surface would clear any
-    /// threshold against another blank one and prove nothing. `generate_skill`
-    /// writes a lone newline when a screen yielded no OCR text, which is how an
-    /// empty surface reaches the check in practice.
-    #[error(
-        "cross_surface response file `{path}` has no comparable text: an empty surface cannot substantiate an equivalence check"
-    )]
-    CrossSurfaceEmptySurface {
-        /// The response file whose fingerprint held no tokens.
-        path: String,
-    },
-
-    /// `cross_surface:` capture writes somewhere the step never reads. The
-    /// capture produces one of the compared baselines, so a `to` outside
-    /// `response_files` — a typo, usually — would leave the scraped text
-    /// unread and compare a stale or missing file in its place.
-    #[error(
-        "cross_surface capture writes to `{to}`, which is not one of response_files {response_files:?}"
-    )]
-    CrossSurfaceCaptureTargetNotListed {
-        /// Path the capture would have written.
-        to: String,
-        /// The files the step actually compares.
-        response_files: Vec<String>,
-    },
+    /// An `ios` block that could not be written in mirroir-mcp's dialect or run.
+    #[error(transparent)]
+    Ios(#[from] IosError),
 
     /// A judge-scoring or drift-threshold failure.
     #[error(transparent)]
     Oracle(#[from] OracleError),
 
-    /// A Playwright compile / invoke / report-ingest failure.
+    /// A Playwright compile / invoke failure.
     #[error(transparent)]
     Playwright(#[from] PlaywrightError),
+
+    /// A reporter document — Playwright's or mirroir-mcp's — that could not be
+    /// ingested, or that recorded failures.
+    #[error(transparent)]
+    Report(#[from] ReportError),
 
     /// A `.mirroir/` pipeline failure — config discovery, archetype
     /// resolution, lockfile freshness, compose, or plan aggregation.

@@ -6,7 +6,7 @@ use std::path::Path;
 
 use tracing::info;
 
-use crate::compile::report::PlaywrightCaptures;
+use crate::compile::report::RunCaptures;
 use crate::error::{Result, RunnerError};
 use crate::oracle::baseline::BaselineMode;
 use crate::oracle::drift_session::DriftSession;
@@ -39,7 +39,7 @@ use crate::parser::step::{JudgeArgs, SkillStep};
 pub async fn dispatch_judge(
     index: usize,
     args: &JudgeArgs,
-    captures: &PlaywrightCaptures,
+    captures: &RunCaptures,
     drift: &mut DriftSession,
     baselines: BaselineMode,
 ) -> Result<()> {
@@ -99,11 +99,7 @@ fn write_judge_baseline(path: &str, response: &str) -> Result<()> {
     })
 }
 
-fn load_response_text(
-    index: usize,
-    args: &JudgeArgs,
-    captures: &PlaywrightCaptures,
-) -> Result<String> {
+fn load_response_text(index: usize, args: &JudgeArgs, captures: &RunCaptures) -> Result<String> {
     if let Some(text) = &args.response_text {
         return Ok(text.clone());
     }
@@ -142,7 +138,7 @@ fn load_response_text(
 ///   no layer declares `step_latency_pct_increase`.
 pub fn verify_measures(
     steps: &[SkillStep],
-    captures: &PlaywrightCaptures,
+    captures: &RunCaptures,
     drift: &mut DriftSession,
 ) -> Result<()> {
     for step in steps {
@@ -199,7 +195,7 @@ mod tests {
 
     #[test]
     fn measure_within_budget_passes() -> TestResult {
-        let mut captures = PlaywrightCaptures::default();
+        let mut captures = RunCaptures::default();
         captures.metrics.insert("first_token".to_owned(), 900.0);
         verify_measures(
             &[measure("first_token", Some(5.0))],
@@ -211,7 +207,7 @@ mod tests {
 
     #[test]
     fn measure_over_budget_fails_with_both_numbers() -> TestResult {
-        let mut captures = PlaywrightCaptures::default();
+        let mut captures = RunCaptures::default();
         captures.metrics.insert("first_token".to_owned(), 7500.0);
         match verify_measures(
             &[measure("first_token", Some(5.0))],
@@ -239,7 +235,7 @@ mod tests {
     fn measure_with_no_recorded_timing_fails() -> TestResult {
         match verify_measures(
             &[measure("first_token", None)],
-            &PlaywrightCaptures::default(),
+            &RunCaptures::default(),
             &mut first_run(),
         ) {
             Err(RunnerError::MeasureNotCaptured { name }) if name == "first_token" => Ok(()),
@@ -253,7 +249,7 @@ mod tests {
             "profile: fast-ci\nuser_prompt_template_hash: \"sha256:abc\"\nresponse_selector: \"[data-test=reply]\"\npass_threshold: 0.9\n",
         )
         .map_err(|e| e.to_string())?;
-        let mut captures = PlaywrightCaptures::default();
+        let mut captures = RunCaptures::default();
         captures
             .judge
             .insert("6".to_owned(), "the attached reply".to_owned());
@@ -262,7 +258,7 @@ mod tests {
             return Err(format!("wrong response text: {text}"));
         }
         // A judge step with no capture and no file names the selector it wanted.
-        match load_response_text(6, &args, &PlaywrightCaptures::default()) {
+        match load_response_text(6, &args, &RunCaptures::default()) {
             Err(RunnerError::Oracle(OracleError::Decode { reason }))
                 if reason.contains("[data-test=reply]") =>
             {

@@ -201,7 +201,7 @@ steps:
 
 `list_targets` shows all configured automation targets (iPhone Mirroring, Android emulators, generic macOS windows) with their status, window size, and which is currently active.
 
-`switch_target` changes the active target for all subsequent tool calls. Use it in skills with the `target: "name"` step type to automate workflows that span multiple devices or windows.
+`switch_target` changes the active target for all subsequent tool calls. Use it in skills with the `target:` step to automate workflows that span multiple devices or windows: `target: { kind: ios }` selects the iPhone Mirroring target, and `target: { kind: macos, name: "<targets.json name>" }` selects a configured desktop window. The map is the same shape `mirroir-run` parses, so one scenario file reads the same on both sides.
 
 ## Calibrate Component
 
@@ -255,7 +255,7 @@ Steps are intents — the AI maps each to the appropriate MCP tool calls:
 | `reset_app: "AppName"` | calls `reset_app` — force-quit via App Switcher |
 | `set_network: "mode"` | calls `set_network` — toggle airplane/wifi/cellular |
 | `measure: { action, until, max }` | calls `measure` — time screen transitions |
-| `target: "name"` | calls `switch_target` — switch to a different automation target window |
+| `target: { kind: ios }` / `target: { kind: macos, name: "…" }` | calls `switch_target` — switch to the iPhone or to a configured desktop window |
 | `remember: "instruction"` | AI reads dynamic data from screen and holds it for later steps |
 | `condition:` | Branch based on screen state — see below |
 | `repeat:` | Loop over steps until a screen condition is met — see below |

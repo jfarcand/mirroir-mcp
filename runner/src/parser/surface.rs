@@ -1,7 +1,7 @@
 // ABOUTME: Classifies every SkillStep as web-compiled or runner-dispatched, and names its kind.
 // ABOUTME: One exhaustive match each — a new step kind is a compile error here before it is anywhere else.
 
-use crate::parser::step::SkillStep;
+use crate::parser::step::{SkillStep, TargetKind};
 
 /// Which executor owns a step.
 ///
@@ -63,6 +63,32 @@ pub const fn step_surface(step: &SkillStep) -> StepSurface {
 #[must_use]
 pub const fn is_web(step: &SkillStep) -> bool {
     matches!(step_surface(step), StepSurface::Web)
+}
+
+/// True when `step` drives the device of a `kind` block — the steps a block of
+/// that surface carries, and whose first absence ends it.
+///
+/// A web block runs the steps Playwright compiles. An iOS block runs those
+/// same interaction verbs plus the device-level ones only a phone has —
+/// `launch:`, `home:`, `shake:`, `reset_app:`, `set_network:` — which outside
+/// an iOS block are runner-side steps with nothing to drive.
+#[must_use]
+pub const fn is_device_step(step: &SkillStep, kind: TargetKind) -> bool {
+    match kind {
+        TargetKind::Web => is_web(step),
+        TargetKind::Ios => {
+            is_web(step)
+                || matches!(
+                    step,
+                    SkillStep::Launch(_)
+                        | SkillStep::Home(_)
+                        | SkillStep::Shake(_)
+                        | SkillStep::ResetApp(_)
+                        | SkillStep::SetNetwork(_)
+                )
+        }
+        TargetKind::Process | TargetKind::Http | TargetKind::Macos => false,
+    }
 }
 
 /// True when `step` only records a note.

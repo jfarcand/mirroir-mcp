@@ -122,12 +122,49 @@ extension SkillParserTests {
     // MARK: - Target Switching
 
     func testParseSwitchTargetStep() {
+        let steps = SkillParser.parseSteps(from: "steps:\n  - target: { kind: ios, app: \"Clock\" }")
+        guard steps.count == 1, case .switchTarget(let selector) = steps[0] else {
+            return XCTFail("Expected one .switchTarget, got \(steps)")
+        }
+        XCTAssertEqual(selector, .ios(app: "Clock"))
+    }
+
+    func testParseMacosTargetStep() {
+        let steps = SkillParser.parseSteps(
+            from: "steps:\n  - target: { kind: macos, name: \"android\" }")
+        guard steps.count == 1, case .switchTarget(let selector) = steps[0] else {
+            return XCTFail("Expected one .switchTarget, got \(steps)")
+        }
+        XCTAssertEqual(selector, .macos(name: "android"))
+    }
+
+    /// The bare-name form is gone: it is refused with the map that replaces
+    /// it, not silently read as a target called "android".
+    func testBareTargetNameIsInvalid() {
         let steps = SkillParser.parseSteps(from: "steps:\n  - target: \"android\"")
-        XCTAssertEqual(steps.count, 1)
-        if case .switchTarget(let name) = steps[0] {
-            XCTAssertEqual(name, "android")
-        } else {
-            XCTFail("Expected .switchTarget, got \(steps[0])")
+        guard case .invalid(let type, let reason) = steps.first else {
+            return XCTFail("Expected .invalid, got \(steps)")
+        }
+        XCTAssertEqual(type, "target")
+        XCTAssertTrue(reason.contains("{ kind: ios }"))
+    }
+
+    /// An unknown verb used to parse as `.skipped` and let the skill pass
+    /// around it; it is now `.invalid`, which refuses the run.
+    func testUnknownVerbIsInvalid() {
+        let steps = SkillParser.parseSteps(from: "steps:\n  - double_tap: \"A\"\n  - frobnicate")
+        let invalid = steps.compactMap { step -> String? in
+            guard case .invalid(let type, let reason) = step else { return nil }
+            return "\(type): \(reason)"
+        }
+        XCTAssertEqual(invalid, ["double_tap: unknown step type", "frobnicate: unknown step type"])
+    }
+
+    /// AI-only verbs are still skipped, not invalid: a SKILL flow may carry them.
+    func testAIOnlyVerbStaysSkipped() {
+        let steps = SkillParser.parseSteps(from: "steps:\n  - remember: \"x\"")
+        guard case .skipped = steps.first else {
+            return XCTFail("Expected .skipped, got \(steps)")
         }
     }
 
@@ -138,7 +175,7 @@ extension SkillParserTests {
           - iphone
           - android
         steps:
-          - target: "iphone"
+          - target: { kind: ios }
           - tap: "Settings"
         """
         let skill = SkillParser.parse(content: yaml)
@@ -152,13 +189,15 @@ extension SkillParserTests {
     }
 
     func testSwitchTargetTypeKey() {
-        let step = SkillStep.switchTarget(name: "android")
+        let step = SkillStep.switchTarget(.macos(name: "android"))
         XCTAssertEqual(step.typeKey, "target")
     }
 
     func testSwitchTargetDisplayName() {
-        let step = SkillStep.switchTarget(name: "android")
-        XCTAssertEqual(step.displayName, "target: \"android\"")
+        XCTAssertEqual(SkillStep.switchTarget(.macos(name: "android")).displayName,
+                       "target: { kind: macos, name: \"android\" }")
+        XCTAssertEqual(SkillStep.switchTarget(.ios(app: "Clock")).displayName,
+                       "target: { kind: ios, app: \"Clock\" }")
     }
 
     // MARK: - press_key dict modifiers syntax

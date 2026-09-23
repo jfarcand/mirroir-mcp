@@ -309,22 +309,23 @@ pub enum TargetKind {
 impl TargetKind {
     /// Whether this binary executes a scenario that declares this surface.
     ///
-    /// Only `web` does: it compiles to one Playwright invocation, and the
-    /// declaration carries the browsers and the URL that invocation needs.
+    /// `web` compiles to one Playwright invocation; `ios` is handed, as one
+    /// block, to `mirroir-mcp test`, which drives the device from Swift —
+    /// on a macOS host only, which the plan checks separately.
     ///
-    /// `ios` and `macos` are mirroir-mcp surfaces — the Swift MCP server
-    /// drives the device. `process` and `http` name no executor either: that
-    /// work lives in `spawn:` / `kill:` / `http:` steps, which dispatch in
-    /// Rust and read nothing from a `target:`, so declaring one as a surface
-    /// names something nothing here opens.
+    /// `macos` windows are driven by `mirroir-mcp test` directly. `process`
+    /// and `http` name no executor either: that work lives in `spawn:` /
+    /// `kill:` / `http:` steps, which dispatch in Rust and read nothing from a
+    /// `target:`, so declaring one as a surface names something nothing here
+    /// opens.
     ///
     /// The match is exhaustive on purpose — a new surface must declare which
     /// side owns it before this compiles.
     #[must_use]
     pub const fn runner_executes(self) -> bool {
         match self {
-            Self::Web => true,
-            Self::Process | Self::Http | Self::Ios | Self::Macos => false,
+            Self::Web | Self::Ios => true,
+            Self::Process | Self::Http | Self::Macos => false,
         }
     }
 
@@ -476,21 +477,16 @@ target:
     }
 
     /// `web` is the one surface a `target:` can declare here — it compiles to
-    /// Playwright. `ios` and `macos` belong to mirroir-mcp, and `process` and
-    /// `http` name no executor of their own: their work is dispatched by
-    /// `spawn:` / `http:` steps, which need no `target:` at all.
+    /// Playwright and `ios` to one `mirroir-mcp test`. `macos` windows are
+    /// `mirroir-mcp test`'s directly, and `process` and `http` name no executor
+    /// of their own: their work is dispatched by `spawn:` / `http:` steps,
+    /// which need no `target:` at all.
     #[test]
-    fn only_a_web_target_names_a_surface_this_binary_executes() {
-        assert!(
-            TargetKind::Web.runner_executes(),
-            "web compiles to Playwright"
-        );
-        for kind in [
-            TargetKind::Process,
-            TargetKind::Http,
-            TargetKind::Ios,
-            TargetKind::Macos,
-        ] {
+    fn web_and_ios_are_the_surfaces_a_block_opens() {
+        for kind in [TargetKind::Web, TargetKind::Ios] {
+            assert!(kind.runner_executes(), "{kind:?} opens a block");
+        }
+        for kind in [TargetKind::Process, TargetKind::Http, TargetKind::Macos] {
             assert!(
                 !kind.runner_executes(),
                 "{kind:?} names no executor a `target:` opens"

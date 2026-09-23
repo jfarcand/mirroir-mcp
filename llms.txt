@@ -147,7 +147,7 @@ mirroir test apps/settings/check-about   # auto-detects .compiled.json
 
 ## CLI Subcommands
 
-- `mirroir test <skill>` — Run skills deterministically (no AI). Supports `--junit`, `--verbose`, `--dry-run`, `--agent` for AI diagnosis.
+- `mirroir test <skill>` — Run skills deterministically (no AI). Supports `--junit`, `--report-json` (Playwright JSON-reporter format, read by `mirroir-run`), `--capture`, `--verbose`, `--dry-run`, `--agent` for AI diagnosis.
 - `mirroir compile <skill>` — Compile a skill to .compiled.json
 - `mirroir record -o <file>` — Record interactions as skill YAML via CGEvent monitoring
 - `mirroir migrate <file>` — Convert YAML skills to SKILL.md format

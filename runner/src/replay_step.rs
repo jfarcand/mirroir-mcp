@@ -3,7 +3,7 @@
 
 use tracing::info;
 
-use crate::compile::report::PlaywrightCaptures;
+use crate::compile::report::RunCaptures;
 use crate::error::{Result, RunnerError};
 use crate::oracle::baseline::BaselineMode;
 use crate::oracle::drift_session::DriftSession;
@@ -75,7 +75,7 @@ pub async fn dispatch_step(
     dispatch: &StepDispatch<'_>,
     processes: &mut ProcessRegistry,
     http: &HttpClient,
-    captures: &PlaywrightCaptures,
+    captures: &RunCaptures,
     drift: &mut DriftSession,
 ) -> Result<StepVerdict> {
     match step {
@@ -206,7 +206,7 @@ mod tests {
     use super::{
         BaselineMode, DriftSession, StepDispatch, StepVerdict, dispatch_report, dispatch_step,
     };
-    use crate::compile::report::PlaywrightCaptures;
+    use crate::compile::report::RunCaptures;
     use crate::error::RunnerError;
     use crate::oracle::thresholds::DriftPolicy;
     use crate::parser::step::{ReportArgs, SkillStep, TapArgs};
@@ -241,7 +241,7 @@ mod tests {
             &dispatch,
             &mut processes,
             &http,
-            &PlaywrightCaptures::default(),
+            &RunCaptures::default(),
             &mut session(),
         )
         .await;
@@ -276,7 +276,7 @@ mod tests {
             &dispatch,
             &mut processes,
             &http,
-            &PlaywrightCaptures::default(),
+            &RunCaptures::default(),
             &mut session(),
         )
         .await;

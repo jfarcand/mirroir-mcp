@@ -1,8 +1,8 @@
 // Copyright 2026 jfarcand@apache.org
 // Licensed under the Apache License, Version 2.0
 //
-// ABOUTME: Tests the .mirroir/ iOS-leg emitter — scenario YAML shape, baseline, plan upsert, idempotency.
-// ABOUTME: Shapes are asserted here only; the iOS walk declares a surface mirroir-run refuses by design.
+// ABOUTME: Tests the .mirroir/ iOS-leg emitter — scenario YAML shape, SAMPLE.md, plan upsert, idempotency.
+// ABOUTME: The emitted tree must be runnable as it lands: readable by mirroir-mcp and declared for mirroir-run.
 
 import XCTest
 import HelperLib
@@ -40,7 +40,10 @@ final class MirroirAppTreeEmitterTests: XCTestCase {
             .appendingPathComponent("mirroir-emit-\(UUID().uuidString)/.mirroir")
     }
 
-    func testEmitWritesScenarioBaselineAppMdAndPlan() throws {
+    /// The emitted tree runs as it lands: the scenario, the SAMPLE.md that
+    /// declares it, and a `must_pass` plan entry — no committed baseline for an
+    /// orphan guard to refuse, and no `skip: true` stub for a run to pass over.
+    func testEmitWritesARunnableTree() throws {
         let root = tmpRoot()
         defer { try? FileManager.default.removeItem(at: root.deletingLastPathComponent()) }
 
@@ -49,14 +52,9 @@ final class MirroirAppTreeEmitterTests: XCTestCase {
 
         let fm = FileManager.default
         XCTAssertTrue(fm.fileExists(atPath: result.scenarioPath.path))
-        XCTAssertTrue(fm.fileExists(atPath: result.baselinePath.path))
         XCTAssertTrue(fm.fileExists(atPath: result.appDir.appendingPathComponent("APP.md").path))
-        XCTAssertTrue(fm.fileExists(atPath: root.appendingPathComponent("mirroir.yaml").path))
-
-        // The parity gate belongs to the web leg's own scenario, whose `capture:`
-        // scrapes the live page. A gate emitted here would name a `.web.txt` with
-        // no web block to produce it, so the emitter writes no scenario but the
-        // captured walk.
+        XCTAssertFalse(fm.fileExists(atPath: result.appDir.appendingPathComponent("baselines").path),
+                       "the iOS block's live capture replaces a committed baseline")
         let scenarios = try fm.contentsOfDirectory(
             atPath: result.scenarioPath.deletingLastPathComponent().path)
         XCTAssertEqual(scenarios, ["check-software-version.ios.yaml"])
@@ -71,16 +69,40 @@ final class MirroirAppTreeEmitterTests: XCTestCase {
         // Destination landmark = the longest label on the final screen.
         XCTAssertTrue(scenario.contains("- assert_visible: \"Software Version 17.5.1\""))
 
-        // Baseline is the destination screen's OCR tokens.
-        let baseline = try String(contentsOf: result.baselinePath, encoding: .utf8)
-        XCTAssertTrue(baseline.contains("Software Version 17.5.1"))
-        XCTAssertTrue(baseline.contains("Model Name"))
+        // SAMPLE.md declares the scenario under must_pass.
+        let sample = try String(
+            contentsOf: result.appDir.appendingPathComponent("SAMPLE.md"), encoding: .utf8)
+        XCTAssertTrue(sample.contains("    must_pass:\n      - scenarios/check-software-version.ios.yaml"))
+        XCTAssertTrue(sample.contains("command: \"true\""))
 
-        // Plan entry created, skip:true under nice_to_pass.
+        // Plan entry under must_pass, never skipped.
         let plan = try String(contentsOf: root.appendingPathComponent("mirroir.yaml"), encoding: .utf8)
-        XCTAssertTrue(plan.contains("name: settings"))
+        XCTAssertTrue(plan.contains("  must_pass:\n    - name: settings"))
         XCTAssertTrue(plan.contains("local: apps/settings"))
-        XCTAssertTrue(plan.contains("skip: true"))
+        XCTAssertFalse(plan.contains("skip:"))
+        XCTAssertFalse(plan.contains("nice_to_pass"))
+
+        // The parsed file is a runnable skill for mirroir-mcp too: its target
+        // is the iPhone, and no step is unreadable.
+        let skill = SkillParser.parse(content: scenario, filePath: result.scenarioPath.path)
+        XCTAssertNil(InvalidStepGate.refuse(skills: [skill]))
+        guard case .switchTarget(let selector) = skill.steps.first else {
+            return XCTFail("the scenario must open with its target: \(skill.steps)")
+        }
+        XCTAssertEqual(selector, .ios(app: "Settings"))
+    }
+
+    /// A second flow of the same app joins a SAMPLE.md a human may have
+    /// edited: the emitter returns the line to add instead of rewriting it.
+    func testASecondFlowReturnsASampleSnippet() throws {
+        let root = tmpRoot()
+        defer { try? FileManager.default.removeItem(at: root.deletingLastPathComponent()) }
+        _ = try MirroirAppTreeEmitter.emit(
+            appName: "Settings", flow: "first", screens: sampleScreens(), root: root)
+        let second = try MirroirAppTreeEmitter.emit(
+            appName: "Settings", flow: "second", screens: sampleScreens(), root: root)
+        XCTAssertTrue(second.sampleNote.contains("      - scenarios/second.ios.yaml"),
+                      "expected a snippet for the second flow: \(second.sampleNote)")
     }
 
     func testReEmitIsIdempotentForPlan() throws {

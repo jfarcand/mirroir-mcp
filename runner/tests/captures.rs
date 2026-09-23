@@ -187,9 +187,10 @@ fn cross_surface_baseline_arrives_through_the_playwright_attachment() -> Result<
                 "        - \"{ios}\"\n",
                 "        - \"{web}\"\n",
                 "      min_similarity: 0.9\n",
-                "      capture:\n",
-                "        selector: \"[data-test=answer]\"\n",
-                "        to: \"{web}\"\n"
+                "      captures:\n",
+                "        - surface: web\n",
+                "          selector: \"[data-test=answer]\"\n",
+                "          to: \"{web}\"\n"
             ),
             ios = ios,
             web = web_path
@@ -239,9 +240,10 @@ fn a_declared_capture_missing_from_the_attachment_fails_the_run() -> Result<(), 
                 "        - \"{ios}\"\n",
                 "        - \"{web}\"\n",
                 "      min_similarity: 0.9\n",
-                "      capture:\n",
-                "        selector: \"[data-test=answer]\"\n",
-                "        to: \"{web}\"\n"
+                "      captures:\n",
+                "        - surface: web\n",
+                "          selector: \"[data-test=answer]\"\n",
+                "          to: \"{web}\"\n"
             ),
             ios = ios,
             web = web

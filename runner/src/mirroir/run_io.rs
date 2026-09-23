@@ -175,6 +175,7 @@ mod tests {
 
     use super::{RunSummary, RunTotals, SampleStatus, SampleVerdict, write_summary_full};
     use crate::compile::report::parse_report_body;
+    use crate::compile::report_error::ReportEngine;
     use crate::error::RunnerError;
 
     type TestResult = StdResult<(), String>;
@@ -184,13 +185,16 @@ mod tests {
         include_str!("../compile/fixtures/playwright-strict-mode.json");
 
     /// The locator text Playwright produced must survive every hop to the run
-    /// summary a CI lane reads: reporter JSON → `PlaywrightError::TestFailures`
+    /// summary a CI lane reads: reporter JSON → `ReportError::TestFailures`
     /// → the sample's first scenario failure → `samples[].error`. A bare count
     /// at any hop makes the artifact useless for diagnosis.
     #[test]
     fn a_strict_mode_violation_reaches_samples_error_in_the_summary() -> TestResult {
-        let Err(playwright) = parse_report_body("playwright-report.json", STRICT_MODE_REPORT)
-        else {
+        let Err(playwright) = parse_report_body(
+            ReportEngine::Playwright,
+            "playwright-report.json",
+            STRICT_MODE_REPORT,
+        ) else {
             return Err("the canned report should have parsed as a failure".to_owned());
         };
         // `run_sample` records the first failing scenario's message verbatim.

@@ -160,7 +160,9 @@ impl Sandbox {
             .env_remove("MIRROIR_PLAYWRIGHT_HOME")
             // A drift-defaults.yaml from the developer's own environment must
             // not decide a test's verdict.
-            .env_remove("MIRROIR_SKILLS");
+            .env_remove("MIRROIR_SKILLS")
+            // Nor may a real mirroir-mcp drive a connected iPhone from a test.
+            .env_remove("MIRROIR_MCP_BIN");
         for (key, value) in env {
             command.env(key, value);
         }

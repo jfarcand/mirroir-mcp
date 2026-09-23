@@ -84,8 +84,7 @@ async fn emit_one(
     };
     let scenario = load_scenario_with_extras(source, &extras)?;
     let plan = ScenarioPlan::build(&scenario.steps)?;
-    let target = plan.web_target(&scenario.steps)?;
-    let spec = compile_scenario(&scenario, target, &ScenarioSource::read(source)?)?;
+    let spec = compile_scenario(&scenario, &plan, &ScenarioSource::read(source)?)?;
 
     let workspace = PlaywrightWorkspace::for_scenario(cwd, sample_name, &path_stem(source));
     workspace.materialize(&spec.spec_ts, &spec.browsers).await?;

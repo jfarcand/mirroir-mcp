@@ -368,6 +368,8 @@ mirroir test --dry-run apps/settings/check-about    # validate without executing
 | Option | Description |
 |---|---|
 | `--junit <path>` | Write JUnit XML report |
+| `--report-json <path>` | Write a Playwright JSON-reporter document — the format `mirroir-run` ingests |
+| `--capture <key>` | Attach each skill's final-screen OCR text to the `--report-json` document under `cross_surface.<key>` |
 | `--screenshot-dir <dir>` | Save failure screenshots (default: `./mirroir-test-results/`) |
 | `--timeout <seconds>` | `wait_for` timeout (default: 15) |
 | `--verbose` | Step-by-step detail |
@@ -376,7 +378,7 @@ mirroir test --dry-run apps/settings/check-about    # validate without executing
 | `--no-auto-recompile` | Skip auto-recompilation of compiled skills that have drifted |
 | `--agent <name>` | AI diagnosis of a failed step (see [AI-Assisted Diagnosis](#ai-assisted-diagnosis)) |
 
-Exit code `0` = all pass, `1` = any failure.
+Exit code `0` = all pass, `1` = any failure. A skill whose every step was skipped is a failure, and a skill holding a step the parser cannot read (an unknown verb, a malformed `target:`) is refused before anything runs, `--dry-run` included.
 
 By default the CLI auto-recompiles a compiled skill whose screen fingerprint has drifted; `--no-auto-recompile` disables that and reuses the stale coordinates.
 
@@ -514,7 +516,7 @@ mirroir-run --scenarios all          # include nice-to-pass entries too
 
 Each plan entry either points at a `local:` sample tree or extends a shared **archetype** (`archetypes: ["<pack>/<name>@<ver>"]`) with per-instance `vars:` and `boot:`. An archetype captures a reusable app shape — say, an AI chat console — once, and parameterizes it per app.
 
-**Where the iOS leg comes from.** `generate_skill … emit=true` (on `finish` or `explore`) writes the captured flow into `.mirroir/apps/<app>/` as an iOS capture of the walk plus a cross-surface oracle (`baselines/<flow>.ios.txt`) — additive to the web leg's runnable scenarios. The capture declares `target: { kind: ios }`, a surface `mirroir-run` has no executor for, so the runner refuses it by name; the baseline is the part it consumes. Run the MCP from your consumer repo (or pass `output_dir`) so the tree lands in the right `.mirroir/`; emitting into `~/.mirroir` (the runner's pack home) is refused. The parity gate itself belongs to the web leg: its scenario ends in a `cross_surface:` step whose `capture:` scrapes the live page and compares it against that baseline, so the run that checks the gate is the run that produces its web half. See [`runner/docs/mirroir-dotfile.md`](runner/docs/mirroir-dotfile.md) for the pairing convention.
+**Where the iOS leg comes from.** `generate_skill … emit=true` (on `finish` or `explore`) writes the captured flow into `.mirroir/apps/<app>/` as a runnable iOS leg: a `target: { kind: ios }` scenario, a `SAMPLE.md` declaring it, and a `must_pass` plan entry. `mirroir-run` hands each `ios` block to `mirroir-mcp test` on a macOS host with iPhone Mirroring connected, and refuses it by name on any other host. Run the MCP from your consumer repo (or pass `output_dir`) so the tree lands in the right `.mirroir/`; emitting into `~/.mirroir` (the runner's pack home) is refused. One scenario can hold both legs: a `web` block, an `ios` block, and a `cross_surface:` step whose `captures:` record the page's scrape and the phone's final screen live, then compare them — the run that checks the gate produces both halves. See [`runner/docs/mirroir-dotfile.md`](runner/docs/mirroir-dotfile.md).
 
 Web steps compile to a Playwright `.spec.ts` and run across chromium, firefox, and webkit. Selectors resolve three ways: raw CSS, Playwright engine prefixes (`role=button[name="Save"]`, `text=Welcome`, `xpath=…`), or a bare label resolved in Playwright's own priority — role, label, placeholder, `data-test`, visible text. Every compiled spec also collects uncaught page errors and failed responses, so a page that throws is a failure even when every locator resolved. The spec, its config, and the trace / video / screenshot of a failure persist under `target/playwright/<sample>/<scenario>/`. Process and HTTP steps dispatch natively; an LLM judge step scores agent responses against expected signals, and drift detection catches output divergence vs. a baseline.
 

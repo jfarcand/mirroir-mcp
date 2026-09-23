@@ -23,7 +23,9 @@ use tracing_subscriber::{EnvFilter, fmt};
 mod accept;
 mod baseline_coverage;
 mod compile;
+mod cross_surface_error;
 mod error;
+mod ios_error;
 mod mirroir;
 mod oracle;
 mod parser;
@@ -45,7 +47,7 @@ use crate::mirroir::lock::LockfileMode;
 use crate::mirroir::run::{MirroirRunOptions, run_mirroir, run_mirroir_autodiscover};
 use crate::oracle::baseline::BaselineMode;
 use crate::oracle::drift::{DriftVerdict, detect_drift};
-use crate::parser::step::ResponseDriftConfig;
+use crate::parser::step::{ResponseDriftConfig, TargetKind};
 use crate::replay::{ReplayRoots, ScenarioSet, load_scenario, run_sample, run_scenario};
 use crate::replay_plan::ScenarioPlan;
 use crate::verdict::{EXIT_FAIL, RunVerdict};
@@ -254,9 +256,9 @@ async fn run(cli: &Cli) -> Result<RunVerdict> {
             file = %path.display(),
             name = %scenario.name,
             steps = scenario.steps.len(),
-            pre_hooks = plan.pre().len(),
             web_block = ?plan.web(),
-            post_hooks = plan.post().len(),
+            ios_block = ?plan.block(TargetKind::Ios),
+            segments = plan.segments().len(),
             tags = ?scenario.tags,
             "scenario validated"
         );

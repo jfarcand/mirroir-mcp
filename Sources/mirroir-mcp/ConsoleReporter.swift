@@ -24,13 +24,16 @@ enum ConsoleReporter {
                 && stepResults.contains { $0.status == .passed }
         }
 
-        /// Why a skill that did not pass failed, for the summary listing.
+        /// Why a skill that did not pass failed: every failed step, named by its
+        /// index in the skill, or why nothing ran.
         var failureReasons: [String] {
-            let failedSteps = stepResults.filter { $0.status == .failed }
+            let failedSteps = stepResults.enumerated().filter { $0.element.status == .failed }
             if failedSteps.isEmpty {
                 return ["no step executed: every step was skipped"]
             }
-            return failedSteps.map { "\($0.step.displayName): \($0.message ?? "unknown error")" }
+            return failedSteps.map { index, result in
+                "step \(index) (\(result.step.displayName)): \(result.message ?? "unknown error")"
+            }
         }
     }
 

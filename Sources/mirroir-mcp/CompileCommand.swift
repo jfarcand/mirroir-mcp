@@ -230,7 +230,7 @@ enum CompileCommand {
             // Measure steps compile the observed total time as a sleep
             return .sleep(delayMs: elapsedMs)
 
-        case .skipped:
+        case .skipped, .invalid:
             // AI-only steps cannot be compiled
             return nil
 

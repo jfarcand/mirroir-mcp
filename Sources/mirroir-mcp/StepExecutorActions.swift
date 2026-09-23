@@ -281,8 +281,8 @@ extension StepExecutor {
 
     // MARK: - switch_target
 
-    func executeSwitchTarget(name: String, startTime: CFAbsoluteTime) -> StepResult {
-        let step = SkillStep.switchTarget(name: name)
+    func executeSwitchTarget(selector: TargetSelector, startTime: CFAbsoluteTime) -> StepResult {
+        let step = SkillStep.switchTarget(selector)
 
         guard let registry = registry else {
             return StepResult(step: step, status: .failed,
@@ -290,10 +290,13 @@ extension StepExecutor {
                               durationSeconds: elapsed(startTime))
         }
 
-        guard let ctx = registry.resolve(name) else {
-            let available = registry.allTargets.map { $0.name }.joined(separator: ", ")
+        let ctx: TargetContext
+        switch selector.resolve(in: registry) {
+        case .success(let resolved):
+            ctx = resolved
+        case .failure(let error):
             return StepResult(step: step, status: .failed,
-                              message: "Unknown target '\(name)'. Available: [\(available)]",
+                              message: error.localizedDescription,
                               durationSeconds: elapsed(startTime))
         }
 
@@ -301,7 +304,7 @@ extension StepExecutor {
                          describer: ctx.describer, capture: ctx.capture)
 
         return StepResult(step: step, status: .passed,
-                          message: "Switched to target '\(name)'",
+                          message: "Switched to target '\(ctx.name)'",
                           durationSeconds: elapsed(startTime))
     }
 

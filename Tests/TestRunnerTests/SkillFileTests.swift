@@ -306,6 +306,7 @@ final class SkillFileTests: XCTestCase {
         case .drag: return "drag"
         case .switchTarget: return "target"
         case .skipped(let type, _): return type
+        case .invalid(let type, _): return type
         }
     }
 

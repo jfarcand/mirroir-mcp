@@ -1,5 +1,5 @@
 // ABOUTME: Pins that `--validate` resolves an executor for the plan it builds, not just the plan's shape.
-// ABOUTME: A scenario nothing here can run is refused by its real reason — the target kind, or the missing browser.
+// ABOUTME: A scenario nothing here can run is refused by its real reason — the target kind, the host, or the missing browser.
 
 //! Executor-resolution suite for `--validate`.
 //!
@@ -12,55 +12,92 @@ mod common;
 
 use common::Sandbox;
 
-/// A scenario whose `target:` names an iOS app declares a surface this binary
-/// has no executor for: `ios` and `macos` are mirroir-mcp's, driven from
-/// Swift. Validate must say so by name — diagnosing it as a web-block
-/// contiguity problem points the author at a shape that is not the issue.
+/// An iOS scenario, as `generate_skill emit=true` writes one.
+const IOS_SCENARIO: &str = concat!(
+    "version: 1\n",
+    "name: acme on ios\n",
+    "steps:\n",
+    "  - target:\n",
+    "      kind: ios\n",
+    "      app: \"Acme\"\n",
+    "  - launch: \"Acme\"\n",
+    "  - tap: \"Sign in\"\n",
+    "  - assert_visible: \"Welcome\"\n",
+);
+
+/// On macOS an `ios` block has an executor — `mirroir-mcp test` — so validate
+/// accepts it and names the block. Running it without mirroir-mcp installed
+/// is an error naming the missing binary, never a pass.
+#[cfg(target_os = "macos")]
+#[test]
+fn validate_accepts_an_ios_block_and_the_run_needs_mirroir_mcp() -> Result<(), String> {
+    let sandbox = Sandbox::new()?;
+    let scenario = sandbox.scenario("ios-target.yaml", IOS_SCENARIO)?;
+
+    let validated = sandbox.run(&["--validate", &scenario])?;
+    if validated.is_failure() {
+        return Err(format!(
+            "validate refused an ios block on macOS.\n{}",
+            validated.output()
+        ));
+    }
+    if !validated.output().contains("Some(0..4)") {
+        return Err(format!(
+            "validate did not plan the ios block\n{}",
+            validated.output()
+        ));
+    }
+
+    let run = sandbox.run(&["--run-scenario", &scenario])?;
+    if !run.is_failure() || !run.output().contains("mirroir-mcp is not installed") {
+        return Err(format!(
+            "an ios block with no mirroir-mcp exited {:?}.\n{}",
+            run.code,
+            run.output()
+        ));
+    }
+    Ok(())
+}
+
+/// Off macOS the iOS block cannot run: validate refuses it by name, and the
+/// run path agrees.
+#[cfg(not(target_os = "macos"))]
+#[test]
+fn validate_refuses_an_ios_block_off_macos() -> Result<(), String> {
+    let sandbox = Sandbox::new()?;
+    let scenario = sandbox.scenario("ios-target.yaml", IOS_SCENARIO)?;
+    for mode in ["--validate", "--run-scenario"] {
+        let run = sandbox.run(&[mode, &scenario])?;
+        if !run.is_failure() || !run.output().contains("macOS host") {
+            return Err(format!(
+                "{mode} did not refuse the ios block by host.\n{}",
+                run.output()
+            ));
+        }
+    }
+    Ok(())
+}
+
+/// A `macos` window is driven by `mirroir-mcp test` directly; mirroir-run
+/// opens no block for it, and says so by name rather than blaming contiguity.
 #[test]
 fn validate_rejects_a_target_kind_with_no_executor() -> Result<(), String> {
     let sandbox = Sandbox::new()?;
     let scenario = sandbox.scenario(
-        "ios-target.yaml",
-        concat!(
-            "version: 1\n",
-            "name: acme on ios\n",
-            "steps:\n",
-            "  - target:\n",
-            "      kind: ios\n",
-            "      app: \"Acme\"\n",
-            "  - launch: \"Acme\"\n",
-            "  - tap: \"Sign in\"\n",
-            "  - assert_visible: \"Welcome\"\n",
-        ),
+        "macos-target.yaml",
+        "version: 1\nname: window\nsteps:\n  - target: { kind: macos }\n  - tap: \"Build\"\n",
     )?;
-
     let validated = sandbox.run(&["--validate", &scenario])?;
-    if !validated.is_failure() {
-        return Err(format!(
-            "validate accepted an ios target (exit {:?}); nothing in this binary executes one.\n{}",
-            validated.code,
-            validated.output()
-        ));
-    }
     let output = validated.output();
-    for fragment in ["kind: ios", "mirroir-mcp"] {
-        if !output.contains(fragment) {
-            return Err(format!(
-                "the validate failure did not name `{fragment}`\n{output}"
-            ));
-        }
-    }
-    if output.contains("splits its web steps") {
+    if !validated.is_failure() || !output.contains("kind: macos") || output.contains("splits its") {
         return Err(format!(
-            "the failure blamed web-block contiguity; the file declares an unrunnable target kind\n{output}"
+            "validate did not refuse the macos target by kind.\n{output}"
         ));
     }
-
-    // The run path refuses the same file — validate and run agree on it.
     let run = sandbox.run(&["--run-scenario", &scenario])?;
     if !run.is_failure() {
         return Err(format!(
-            "the ios target exited {:?} on --run-scenario.\n{}",
+            "the macos target exited {:?} on --run-scenario.\n{}",
             run.code,
             run.output()
         ));
@@ -115,13 +152,13 @@ fn validate_rejects_a_web_block_with_no_web_target() -> Result<(), String> {
     Ok(())
 }
 
-/// A `target:` lower down the file declares a surface just as loudly as the
-/// first one does. A scenario that opens on the browser and then names the
-/// phone is refused at that second declaration — accepting it compiles the
-/// phone's taps into the browser run, because the compiler emits nothing for a
-/// target step and Playwright happily clicks whatever label it is handed.
+/// A scenario that opens on the browser and then names the phone plans two
+/// blocks. The failure this pins is the phone's `tap:` compiling into the
+/// browser's spec, where Playwright would happily click whatever label it is
+/// handed: the emitted spec must carry the web block only.
+#[cfg(target_os = "macos")]
 #[test]
-fn validate_rejects_an_ios_target_declared_after_a_web_one() -> Result<(), String> {
+fn a_web_block_then_an_ios_block_never_compiles_the_phone_into_the_browser() -> Result<(), String> {
     let sandbox = Sandbox::new()?;
     let scenario = sandbox.scenario(
         "web-then-ios.yaml",
@@ -141,35 +178,20 @@ fn validate_rejects_an_ios_target_declared_after_a_web_one() -> Result<(), Strin
     )?;
 
     let validated = sandbox.run(&["--validate", &scenario])?;
-    if !validated.is_failure() {
-        return Err(format!(
-            "validate accepted an ios target declared at step 2 (exit {:?}); nothing here executes one.\n{}",
-            validated.code,
-            validated.output()
-        ));
-    }
     let output = validated.output();
-    for fragment in ["step 2", "kind: ios", "mirroir-mcp"] {
-        if !output.contains(fragment) {
-            return Err(format!(
-                "the validate failure did not name `{fragment}`\n{output}"
-            ));
-        }
+    if validated.is_failure() || !output.contains("Some(0..2)") || !output.contains("Some(2..4)") {
+        return Err(format!("validate did not plan both blocks\n{output}"));
     }
 
-    // Emitting must refuse it too: the failure mode this closes is the phone's
-    // tap landing in the browser's spec, which only the compiler can produce.
     let emitted = sandbox.run(&["--emit", "playwright", &scenario])?;
-    if !emitted.is_failure() {
+    if emitted.is_failure() {
         return Err(format!(
-            "`--emit playwright` accepted the ios target (exit {:?}).\n{}",
-            emitted.code,
+            "`--emit playwright` refused a valid two-block scenario\n{}",
             emitted.output()
         ));
     }
-    if let Ok(spec) = sandbox.emitted_spec("web-then-ios")
-        && spec.contains("Sign in")
-    {
+    let spec = sandbox.emitted_spec("web-then-ios")?;
+    if spec.contains("\"Sign in\"") || !spec.contains("\"Dashboard\"") {
         return Err(format!(
             "the phone's tap compiled into the browser spec\n{spec}"
         ));

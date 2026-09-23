@@ -171,24 +171,18 @@ failure.
 
 ### What accept deliberately does not write
 
-A `cross_surface:` step compares files from two surfaces. The runner drives
-web (Playwright), process, and HTTP targets — so it can regenerate the web
-side, and it does. `baselines/<flow>.ios.txt` comes from mirroir-mcp's
-`generate_skill` against a connected iPhone, and there is no iOS executor in
-this binary. Accept names every such file it left alone, with whether the file
-is present:
+A `cross_surface:` step compares files from two surfaces. Each file a capture
+writes — a web block's scrape, an `ios` block's final screen read through
+mirroir-mcp — is re-recorded from the run accept just made. A compared file no
+capture writes is committed, and accept names it instead of overwriting it:
 
 ```
-WARN accept left this cross_surface baseline alone: it is written by the
-     surface that owns it (an iOS capture comes from `generate_skill`)
+WARN accept left this cross_surface file alone: no capture in this step writes it
      file=.mirroir/apps/acme/baselines/checkout.ios.txt present=true
 ```
 
-Overwriting it with the web capture would make the parity oracle compare a file
-against itself — green forever, testing nothing. So accept regenerates what it
-drives, reports what it does not, and a `cross_surface:` pair still below
-`min_similarity` after accept is reported rather than enforced: re-capture that
-surface, and the next ordinary run holds you to it.
+A pair still below `min_similarity` after accept is reported rather than
+enforced; fix the committed file, and the next ordinary run holds you to it.
 
 ### Accept refuses to run in CI
 

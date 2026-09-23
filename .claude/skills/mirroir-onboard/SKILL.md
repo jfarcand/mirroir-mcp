@@ -255,16 +255,17 @@ Scenario URLs use `http://localhost:PORT/` (Phase 0.3). Add to consumer
 whitespace-joined OCR text of the iPhone screen at the flow's equivalence point.
 When a flow you authored has one, your scenario owes the other half — and it
 produces that half itself. End the flow's **own** web block with a
-`cross_surface:` step whose `capture:` scrapes the same screen:
+`cross_surface:` step whose web capture scrapes the same screen:
 
 ```yaml
   # …the primary action and its state-change assertion (Phase 3)…
   - cross_surface:
-      capture:
-        # Resolved by the same helper as Phase 2's labels: raw CSS, role=,
-        # text=, or a bare label.
-        selector: "[data-test=order-summary]"
-        to: "${MIRROIR_SAMPLE_DIR}/baselines/<flow>.web.txt"
+      captures:
+        - surface: web
+          # Resolved by the same helper as Phase 2's labels: raw CSS, role=,
+          # text=, or a bare label.
+          selector: "[data-test=order-summary]"
+          to: "${MIRROIR_SAMPLE_DIR}/baselines/<flow>.web.txt"
       response_files:
         - "${MIRROIR_SAMPLE_DIR}/baselines/<flow>.web.txt"
         - "${MIRROIR_SAMPLE_DIR}/baselines/<flow>.ios.txt"
@@ -276,7 +277,7 @@ Rules that bite:
 - The step belongs **inside the flow's own scenario, after its web block**. A
   `cross_surface:` alone in a file of its own has no page to scrape, so the
   `.web.txt` is never written and that gate can only ever fail.
-- `capture.to` must be one of `response_files` — the runner refuses the step
+- A capture's `to` must be one of `response_files` — the runner refuses the step
   otherwise, because the scrape would go unread and a stale file compared instead.
 - `min_similarity` is required; there is no default. `0.5` suits iOS↔web phrasing
   divergence — the iOS side carries chrome (back chevron, nav title) the web page

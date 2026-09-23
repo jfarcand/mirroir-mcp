@@ -37,8 +37,11 @@ enum SkillStep {
     indirect case measure(name: String, action: SkillStep, until: String, maxSeconds: Double?)
     case longPress(label: String, durationMs: Int?)
     case drag(fromLabel: String, toLabel: String)
-    case switchTarget(name: String)
+    case switchTarget(TargetSelector)
     case skipped(stepType: String, reason: String)
+    /// A step the parser could not turn into an action: an unknown verb or a
+    /// malformed value. A skill holding one is refused before it runs.
+    case invalid(stepType: String, reason: String)
 
     /// The step type as a YAML key string (e.g. "tap", "wait_for", "launch").
     var typeKey: String {
@@ -63,6 +66,7 @@ enum SkillStep {
         case .drag: return "drag"
         case .switchTarget: return "target"
         case .skipped(let stepType, _): return stepType
+        case .invalid(let stepType, _): return stepType
         }
     }
 
@@ -87,8 +91,8 @@ enum SkillStep {
         case .measure(let name, _, _, _): return name
         case .longPress(let label, _): return label
         case .drag(let fromLabel, _): return fromLabel
-        case .switchTarget(let name): return name
-        case .skipped: return nil
+        case .switchTarget(let selector): return selector.labelValue
+        case .skipped, .invalid: return nil
         }
     }
 
@@ -115,8 +119,9 @@ enum SkillStep {
         case .measure(let name, _, _, _): return "measure: \"\(name)\""
         case .longPress(let label, _): return "long_press: \"\(label)\""
         case .drag(let from, let to): return "drag: \"\(from)\" -> \"\(to)\""
-        case .switchTarget(let name): return "target: \"\(name)\""
+        case .switchTarget(let selector): return "target: \(selector.displayName)"
         case .skipped(let type, _): return "\(type) (skipped)"
+        case .invalid(let type, _): return "\(type) (invalid)"
         }
     }
 }
@@ -233,8 +238,11 @@ enum SkillParser {
             return .shake
         }
 
-        // Parse "key: value" format
-        guard let colonIndex = trimmed.firstIndex(of: ":") else { return nil }
+        // Parse "key: value" format. A bare word that is not a known keyword
+        // is not an action this runner can perform.
+        guard let colonIndex = trimmed.firstIndex(of: ":") else {
+            return .invalid(stepType: trimmed, reason: "unknown step type")
+        }
         let key = String(trimmed[trimmed.startIndex..<colonIndex])
             .trimmingCharacters(in: .whitespaces)
         let rawValue = String(trimmed[trimmed.index(after: colonIndex)...])
@@ -277,7 +285,11 @@ enum SkillParser {
         case "drag":
             return parseDrag(value)
         case "target":
-            return .switchTarget(name: value)
+            switch TargetSelector.parse(rawValue) {
+            case .success(let selector): return .switchTarget(selector)
+            case .failure(let error):
+                return .invalid(stepType: key, reason: error.localizedDescription)
+            }
         case "measure":
             return parseMeasure(value)
         // AI-only steps that cannot run deterministically
@@ -285,8 +297,7 @@ enum SkillParser {
             return .skipped(stepType: key,
                             reason: "AI-only step — requires human interpretation")
         default:
-            return .skipped(stepType: key,
-                            reason: "Unknown step type")
+            return .invalid(stepType: key, reason: "unknown step type")
         }
     }
 

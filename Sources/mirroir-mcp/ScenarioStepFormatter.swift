@@ -2,19 +2,17 @@
 // Licensed under the Apache License, Version 2.0
 //
 // ABOUTME: Formats a linear iOS exploration capture into a mirroir-run SkillStep scenario (YAML).
-// ABOUTME: Pure transformation — emits target/launch/tap/... steps + a cross-surface baseline; no side effects.
+// ABOUTME: Pure transformation — emits target/launch/tap/... steps and renders a screen's OCR text; no side effects.
 
 import Foundation
 import HelperLib
 
 /// Renders a linear exploration capture into a `mirroir-run` SkillStep scenario
-/// on the iOS surface, plus the cross-surface baseline text for that flow.
+/// on the iOS surface, and a screen's OCR text for a live capture.
 ///
-/// The emitted YAML is written in the shared step grammar, but it declares
-/// `target: { kind: ios }` — a surface mirroir-run has no executor for, so the
-/// runner refuses it by name rather than planning it. It is a faithful record of
-/// the captured walk; the baseline beside it is the anchor the web leg's own
-/// `cross_surface:` step compares its live scrape against.
+/// The emitted YAML is written in the shared step grammar and opens
+/// `target: { kind: ios }`: mirroir-run hands that block to `mirroir-mcp test`
+/// on a macOS host, and this binary's own parser reads it the same way.
 enum ScenarioStepFormatter {
 
     /// Errors raised when a capture cannot be rendered faithfully.
@@ -53,10 +51,10 @@ enum ScenarioStepFormatter {
         return "version: 1\nname: \(yamlScalar(name))\nsteps:\n" + steps.joined(separator: "\n") + "\n"
     }
 
-    /// The cross-surface oracle: whitespace-joined OCR text of the destination
-    /// screen — the equivalence landmark a paired web capture is diffed against.
-    static func baseline(screens: [ExploredScreen]) -> String {
-        let tokens = (screens.last?.elements ?? [])
+    /// Whitespace-joined OCR text of one screen — what an iOS block's live
+    /// capture carries into a `cross_surface:` comparison.
+    static func screenText(elements: [TapPoint]) -> String {
+        let tokens = elements
             .map(\.text)
             .filter { !$0.isEmpty }
         return tokens.joined(separator: " ") + "\n"

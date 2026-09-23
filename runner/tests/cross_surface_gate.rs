@@ -5,7 +5,7 @@
 //!
 //! `samples/web-fixture/scenarios/parity.yaml` is the gate in the shape that
 //! can produce both of its halves: one contiguous web block ending in a
-//! `cross_surface:` step whose `capture:` scrapes the live panel into
+//! `cross_surface:` step whose web capture scrapes the live panel into
 //! `baselines/parity.web.txt` — one of the two files that same step then
 //! compares. The other half, `baselines/parity.ios.txt`, is a committed
 //! stand-in for a `generate_skill` device capture. Nothing in this tree
@@ -290,14 +290,15 @@ fn accept(gate: &ParityGate<'_>, log: &mut PhaseLog) -> Result<(), String> {
     // Phase 2's refusing run left the reworded scrape on disk, so the file
     // already holds what a re-record would write. Plant text no page renders
     // first: now only a genuine scrape can put the panel's words back, and an
-    // `accept` that stopped writing `capture.to` is visible instead of inferred.
+    // `accept` that stopped writing the web capture's `to` is visible instead
+    // of inferred.
     gate.plant_baseline(WEB_BASELINE, SENTINEL)?;
 
     let run = gate.accept()?;
     expect_exit(&run, 0, "3 ACCEPT")?;
     let untouched = line_with(
         &run.output,
-        "accept left this cross_surface baseline alone",
+        "accept left this cross_surface file alone",
         "3 ACCEPT",
     )?;
     expect(untouched, IOS_BASELINE, "3 ACCEPT")?;

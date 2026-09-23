@@ -2,14 +2,17 @@
 // ABOUTME: Owns locator selection, per-step timeouts, and the JS string-literal encoder.
 
 use std::fmt::Write as _;
+use std::ops::Range;
 
 use crate::compile::error::PlaywrightError;
 use crate::compile::playwright_keys::{playwright_key_combo, swipe_delta};
 use crate::compile::playwright_measure::emit_measure;
 use crate::error::Result;
 use crate::parser::scenario::Scenario;
-use crate::parser::step::{AssertArgs, SkillStep, TapArgs, TypeArgs, WaitForArgs};
+use crate::parser::step::{AssertArgs, SkillStep, TapArgs, TargetKind, TypeArgs, WaitForArgs};
+use crate::parser::step_args::CaptureSurface;
 use crate::parser::surface::{is_web, step_kind};
+use crate::replay_plan::{ScenarioPlan, Segment};
 
 /// Ceiling, in milliseconds, for a locator action or assertion whose step
 /// declares no `timeout_s` of its own.
@@ -231,14 +234,36 @@ const fn timeout_ms(timeout_s: Option<u32>) -> u64 {
 /// runner-side steps that need a live-page value — the capture that feeds
 /// their post-hook.
 ///
+/// Steps inside another surface's block (`ios`) run in that surface's own
+/// invocation: they are named in a comment and never compiled, so a phone's
+/// `tap:` cannot land in the browser's spec.
+///
 /// # Errors
 ///
 /// Anything [`emit_step`] returns, plus [`PlaywrightError::Encode`] when a
 /// capture selector can't be encoded as a JS string literal.
-pub fn emit_steps(scenario: &Scenario, body: &mut String) -> Result<()> {
+pub fn emit_steps(scenario: &Scenario, plan: &ScenarioPlan, body: &mut String) -> Result<()> {
+    let foreign: Vec<(TargetKind, Range<usize>)> = plan
+        .segments()
+        .iter()
+        .filter_map(|segment| match segment {
+            Segment::Block { kind, range } if *kind != TargetKind::Web => {
+                Some((*kind, range.clone()))
+            }
+            _ => None,
+        })
+        .collect();
     let mut ctx = EmitContext::default();
     let mut web_started = false;
     for (index, step) in scenario.steps.iter().enumerate() {
+        if let Some((kind, _)) = foreign.iter().find(|(_, range)| range.contains(&index)) {
+            writeln!(
+                body,
+                "  // {kind} block step (runs outside Playwright): {}",
+                step_kind(step)
+            )?;
+            continue;
+        }
         emit_step(step, &mut ctx, body)?;
         if is_web(step) {
             web_started = true;
@@ -272,17 +297,19 @@ fn emit_capture(index: usize, step: &SkillStep, body: &mut String) -> Result<()>
             )?;
         }
         SkillStep::CrossSurface(args) => {
-            let Some(capture) = args.capture.as_ref() else {
-                return Ok(());
-            };
-            if capture.selector.trim().is_empty() {
-                return Ok(());
+            // The plan validated every capture's shape: a web capture carries
+            // its selector. An iOS capture is the iOS block's to record.
+            for capture in &args.captures {
+                let (CaptureSurface::Web, Some(selector)) = (capture.surface, &capture.selector)
+                else {
+                    continue;
+                };
+                let selector = js_string_literal(selector, "cross_surface.captures.selector")?;
+                writeln!(
+                    body,
+                    "  _captures.cross_surface[\"{index}\"] = await _by(page, {selector}).innerText();"
+                )?;
             }
-            let selector = js_string_literal(&capture.selector, "cross_surface.capture.selector")?;
-            writeln!(
-                body,
-                "  _captures.cross_surface[\"{index}\"] = await _by(page, {selector}).innerText();"
-            )?;
         }
         _ => {}
     }

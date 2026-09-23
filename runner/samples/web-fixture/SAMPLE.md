@@ -96,7 +96,7 @@ ceiling. That is the DRIFT verdict — exit code 65, a candidate row in
 `parity.html` and `parity-reworded.html` are the same page for the drift pair's
 reason, and `scenarios/parity.yaml` is the cross-surface gate in the shape that
 produces its own web half: a `cross_surface:` step at the end of a real web
-block, whose `capture:` scrapes the live panel into `baselines/parity.web.txt` —
+block, whose web capture scrapes the live panel into `baselines/parity.web.txt` —
 one of the two files the same step compares.
 
 `baselines/parity.ios.txt` is the other half: the same screen as an iPhone's OCR

@@ -1,0 +1,23 @@
+version: 1
+name: ios-fixture — Settings list, captured live
+description: |
+  One iOS block against FakeMirroring, the stand-in iPhone CI drives: launch
+  Settings through Spotlight and assert the list rendered. mirroir-run hands
+  the block to `mirroir-mcp test`, reads back the Playwright-shaped report it
+  writes, and the `cross_surface:` step compares the block's final screen —
+  captured live by OCR — against the committed expected text. Every hop
+  between the two binaries is on this path; tap navigation on FakeMirroring is
+  CompiledTapFlowTests' to cover.
+steps:
+  - target: { kind: ios, app: "Settings" }
+  - launch: "Settings"
+  - assert_visible: "General"
+  - assert_visible: "Wi-Fi"
+  - cross_surface:
+      captures:
+        - surface: ios
+          to: "${MIRROIR_SAMPLE_DIR}/baselines/settings-list.ios.txt"
+      response_files:
+        - "${MIRROIR_SAMPLE_DIR}/baselines/settings-list.ios.txt"
+        - "${MIRROIR_SAMPLE_DIR}/expected/settings-list.txt"
+      min_similarity: 0.5

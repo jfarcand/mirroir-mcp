@@ -145,11 +145,16 @@ final class StepExecutor {
             result = executeMeasure(name: name, action: action, until: until,
                                      maxSeconds: maxSeconds, stepIndex: stepIndex,
                                      skillName: skillName, startTime: startTime)
-        case .switchTarget(let name):
-            result = executeSwitchTarget(name: name, startTime: startTime)
+        case .switchTarget(let selector):
+            result = executeSwitchTarget(selector: selector, startTime: startTime)
         case .skipped(let stepType, let reason):
             let duration = CFAbsoluteTimeGetCurrent() - startTime
             result = StepResult(step: step, status: .skipped,
+                                message: "\(stepType): \(reason)",
+                                durationSeconds: duration)
+        case .invalid(let stepType, let reason):
+            let duration = CFAbsoluteTimeGetCurrent() - startTime
+            result = StepResult(step: step, status: .failed,
                                 message: "\(stepType): \(reason)",
                                 durationSeconds: duration)
         }

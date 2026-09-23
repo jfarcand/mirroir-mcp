@@ -22,6 +22,9 @@ on:
       - 'Package.swift'
       - 'Package.resolved'
       - 'scripts/**'
+      # mirroir-run hands ios blocks to this binary: the both-toolchains step
+      # below runs the runner against it, so a runner change reruns it too.
+      - 'runner/**'
       - '.github/actions/setup-embacle/**'
       - '.github/actions/setup-fake-mirroring/**'
       - '.github/workflows/build.yml'
@@ -38,6 +41,9 @@ on:
       - 'Package.swift'
       - 'Package.resolved'
       - 'scripts/**'
+      # mirroir-run hands ios blocks to this binary: the both-toolchains step
+      # below runs the runner against it, so a runner change reruns it too.
+      - 'runner/**'
       - '.github/actions/setup-embacle/**'
       - '.github/actions/setup-fake-mirroring/**'
       - '.github/workflows/build.yml'
@@ -147,6 +153,36 @@ jobs:
           MIRROIR_PROCESS_NAME: FakeMirroring
         run: |
           .build/release/mirroir-mcp test --verbose Tests/Fixtures/skills/fake-mirroring-compiled.yaml
+
+      # Both toolchains in one job: the Swift server built above, and the Rust
+      # runner that hands it an ios block. This is the only lane where a change
+      # on either side of that boundary meets the other — the report format,
+      # the target map, the block dialect, the live capture.
+      - name: Install Rust toolchain (runner)
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: 1.96.0
+
+      - name: mirroir-run → mirroir-mcp ios block (FakeMirroring)
+        working-directory: runner
+        env:
+          MIRROIR_BUNDLE_ID: com.jfarcand.FakeMirroring
+          MIRROIR_PROCESS_NAME: FakeMirroring
+          MIRROIR_MCP_BIN: ${{ github.workspace }}/.build/release/mirroir-mcp
+        run: |
+          set -euo pipefail
+          cargo build --locked
+          ./target/debug/mirroir-run --sample samples/ios-fixture 2>&1 | tee ios-fixture.log
+          # A skipped block must not pass as green: the run has to show the
+          # hand-off, the live capture, and the comparison it fed.
+          plain=$(sed 's/\x1b\[[0-9;]*m//g' ios-fixture.log)
+          for marker in \
+              "dispatching the scenario's ios block to mirroir-mcp" \
+              "cross_surface capture written" \
+              "cross_surface pairwise check" \
+              "verdict=pass"; do
+            grep -qF "$marker" <<<"$plain" || { echo "missing: $marker"; exit 1; }
+          done
 
       - name: Upload test results
         if: always()

@@ -224,10 +224,11 @@ final class SkillParserTests: XCTestCase {
         let steps = SkillParser.parseSteps(
             from: "steps:\n  - custom_action: \"something\"")
         XCTAssertEqual(steps.count, 1)
-        if case .skipped(let stepType, _) = steps[0] {
+        if case .invalid(let stepType, let reason) = steps[0] {
             XCTAssertEqual(stepType, "custom_action")
+            XCTAssertEqual(reason, "unknown step type")
         } else {
-            XCTFail("Expected skipped step for unknown type")
+            XCTFail("Expected invalid step for unknown type")
         }
     }
 

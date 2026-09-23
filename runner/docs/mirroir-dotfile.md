@@ -362,57 +362,52 @@ assert they stay equivalent:
 - **Web leg** — the runnable scenario (`scenarios/<flow>.yaml`) with real DOM
   selectors, authored against the running web app by the `mirroir-onboard` skill
   (`.claude/skills/mirroir-onboard/`, the agent + `chrome-devtools-mcp` recorder). `mirroir-run` replays it on Linux CI.
-- **iOS leg** — emitted by `mirroir-mcp`'s `generate_skill … emit=true` from an
-  iPhone Mirroring capture: a `scenarios/<flow>.ios.yaml` capture artifact
-  (a faithful linear walk) plus the cross-surface oracle
-  `baselines/<flow>.ios.txt`. It opens `- target: { kind: ios, … }`, a surface
-  this binary has no executor for, so `mirroir-run` refuses it by name — at
-  `--validate` exactly as at run time, since validate builds the plan a run
-  would execute. The iOS walk is the parity gate's anchor, not a scenario
-  `mirroir-run` plans; its shape is pinned by the emitter's own tests in
-  `mirroir-mcp`.
+- **iOS leg** — a `target: { kind: ios, app: "…" }` block. `mirroir-run`
+  hands it, as one block, to `mirroir-mcp test` on a macOS host with iPhone
+  Mirroring connected, and reads back the report it writes; on any other host
+  it is refused by name, never skipped. `generate_skill … emit=true` records
+  one from a capture on the phone.
 
-The two meet in a `cross_surface:` step at the **end of the web leg's own
-scenario**. Its `capture: { selector, to }` scrapes that selector's text into the
-`mirroir-captures` attachment (the same Playwright mechanism `judge:` uses), the
-post-hook writes it to `to`, and `to` is one of the files the same step then
-compares by Jaccard similarity. The run that checks the gate is therefore the run
-that produces its web half — no hand-authored Playwright spec needed:
+Both legs can live in **one scenario**, and the `cross_surface:` step after
+them compares a live capture from each:
 
 ```yaml
   - target: { kind: web, url: "http://localhost:3000/" }
   # …navigate to the equivalence point…
   - assert_visible: "summary"
+  - target: { kind: ios, app: "Safari" }
+  - open_url: "http://<lan-host>:3000/"
+  - assert_visible: "Summary"
   - cross_surface:
-      capture:
-        selector: "[data-test=summary]"
-        to: "${MIRROIR_SAMPLE_DIR}/baselines/<flow>.web.txt"
+      captures:
+        - surface: web
+          selector: "[data-test=summary]"
+          to: "${MIRROIR_SAMPLE_DIR}/baselines/<flow>.web.txt"
+        - surface: ios
+          to: "${MIRROIR_SAMPLE_DIR}/baselines/<flow>.ios.txt"
       response_files:
         - "${MIRROIR_SAMPLE_DIR}/baselines/<flow>.web.txt"
         - "${MIRROIR_SAMPLE_DIR}/baselines/<flow>.ios.txt"
       min_similarity: 0.5
 ```
 
-`capture.selector` is resolved by the compiled spec's `_by` helper, so a raw CSS
-selector (anything opening `[`, `#`, `.`, `:`, `>` or `*`) passes straight
-through and a bare word is looked up as a label. `capture.to` must be one of
-`response_files`, or the scrape goes unread and a stale file is compared in its
-place — the runner refuses that outright.
+The web capture scrapes the selector at the step's position in the flow; the
+iOS capture is the iOS block's final screen, read by mirroir-mcp's OCR. Each is
+written to its `to` before the comparison, so the run that checks the gate is
+the run that produces both halves. `to` must be one of `response_files`, a web
+capture needs its `selector`, and the scenario must open a block for every
+captured surface — `--validate` refuses each of those before anything runs.
 
-`samples/web-fixture/scenarios/parity.yaml` is this shape end to end, and
-`runner/tests/cross_surface_gate.rs` pins the sequence it produces: agree,
-reword and refuse, accept, refuse again.
+`samples/web-fixture/scenarios/parity.yaml` is the web half of this shape
+against a committed `parity.ios.txt`, and `runner/tests/cross_surface_gate.rs`
+pins the sequence it produces: agree, reword and refuse, accept, refuse again.
 
-Without `capture` the step only **compares** files that already exist, so both
+Without `captures` the step only **compares** files that already exist, so both
 surfaces have to arrive from somewhere else. That is sound when both really do —
 `samples/mega-sample/scenarios/cross-surface.yaml` is a lone `cross_surface:`
-step comparing two committed fixtures, and neither file needs producing. It is
-the shape to avoid when one surface is expected to be *scraped*: a step written
-with no web block around it has no page to scrape, so a `<flow>.web.txt` it
-names has no producer at all, and adding a `capture:` to it only moves the
-failure to `CrossSurfaceNotCaptured`.
+step comparing two committed fixtures, and neither file needs producing.
 
-Either way, until the web baseline exists the parity step **fails closed** — a
+Either way, until every compared file exists the parity step **fails closed** — a
 missing file is an error, never a silent pass, and so is a file with no text in
 it: two blank surfaces score a perfect match, which is exactly what a screen that
 yielded no OCR elements would leave behind.
@@ -428,20 +423,16 @@ raise it for high-entropy screens, and treat low-vocabulary screens (e.g. a bare
 login form) with care — a generic token set can clear a low threshold by
 coincidence.
 
-`mirroir-run accept` re-records the **web** side of a parity gate: the
-`capture.to` file is rewritten from the live page. It never writes
-`baselines/<flow>.ios.txt` — that file comes from `generate_skill` against a
-connected iPhone, and overwriting it with the web capture would leave the gate
-comparing a file against itself. Accept names every such file it left alone,
-with whether the file is present, and reports a pair still below
-`min_similarity` instead of failing on it; re-capture that surface on the
-device, and the next ordinary run holds you to it. The full loop is in
-[drift-and-accept.md](drift-and-accept.md).
+`mirroir-run accept` re-records every captured file — the web scrape and the
+iOS block's final screen — from the run it just made, and names every compared
+file no capture writes instead of overwriting it. A pair still below
+`min_similarity` after accept is reported rather than failed. The full loop is
+in [drift-and-accept.md](drift-and-accept.md).
 
 > Two surfaces, one grammar. The iOS and web legs are written in the same
-> `SkillStep` language and tied by `cross_surface`, rather than maintained as two
-> bespoke suites. The runner gains no iOS executor (it stays Linux-CI-friendly);
-> the iOS leg is a baseline + parity anchor.
+> `SkillStep` language, planned together, and tied by `cross_surface`, rather
+> than maintained as two bespoke suites. A `web` block runs anywhere; an `ios`
+> block runs through mirroir-mcp on macOS.
 
 ## Troubleshooting
 

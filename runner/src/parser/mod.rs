@@ -1,5 +1,5 @@
-// ABOUTME: YAML parser for mirroir SkillStep grammar plus scenario + compiled.json cache structs.
-// ABOUTME: Shared schema with Swift Sources/mirroir-mcp/SkillParser.swift and CompiledSkill.swift.
+// ABOUTME: YAML parser for the mirroir SkillStep grammar, scenarios, SAMPLE.md, and the .mirroir/ plan.
+// ABOUTME: The step grammar is shared with Swift Sources/mirroir-mcp/SkillParser.swift, which runs ios blocks.
 
 pub mod archetype;
 pub mod env;

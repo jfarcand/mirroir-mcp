@@ -1,6 +1,7 @@
 // ABOUTME: Oracle / verdict step argument types — judge, drift, http, report, cross_surface.
 // ABOUTME: Split from step.rs to keep the grammar file under the 500-line ceiling; behavior unchanged.
 
+use std::fmt;
 use std::result::Result as StdResult;
 
 use serde::Deserialize;
@@ -108,11 +109,14 @@ pub enum ReportVerdict {
 }
 
 /// Arguments for `cross_surface` — verify pairwise equivalence of N captured
-/// responses (one per surface). Surfaces are *runner-agnostic*: each entry is
-/// a path to a file the surface wrote, so iOS scenarios (via `mirroir-mcp`),
-/// web scenarios (via Playwright capture), or HTTP probes can all feed into
-/// the same equivalence check.
+/// responses (one per surface). Each entry is a path to a file a surface
+/// wrote, so a web block's scrape, an iOS block's final screen, or a committed
+/// file can all feed into the same equivalence check.
+///
+/// Unknown keys are refused: a misspelt `captures:` would otherwise leave the
+/// step comparing whatever stale files sit at the listed paths.
 #[derive(Debug, Clone, Deserialize, PartialEq)]
+#[serde(deny_unknown_fields)]
 pub struct CrossSurfaceArgs {
     /// Filesystem paths whose contents are compared pairwise.
     pub response_files: Vec<String>,
@@ -120,25 +124,53 @@ pub struct CrossSurfaceArgs {
     /// threshold *is* the gate, so the scenario declares how close the surfaces
     /// have to be rather than inheriting a number nobody chose.
     pub min_similarity: f64,
-    /// Optional runner-driven web capture: scrape `selector`'s text into `to`
-    /// during the preceding web block (the same Playwright mechanism `judge:`
-    /// uses), producing one of the `response_files` baselines instead of
-    /// requiring a hand-authored Playwright spec.
+    /// Files this run writes before comparing, one per captured surface: a web
+    /// block scrapes a selector, an iOS block records its final screen. Each
+    /// produces one of the `response_files` instead of a hand-committed copy.
     #[serde(default)]
-    pub capture: Option<CrossSurfaceCapture>,
+    pub captures: Vec<CrossSurfaceCapture>,
 }
 
-/// A web text capture that produces a `cross_surface` baseline during replay.
+/// One surface's capture, written to `to` during replay.
 #[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
 pub struct CrossSurfaceCapture {
-    /// CSS / Playwright selector whose `textContent()` is scraped.
-    pub selector: String,
-    /// File path the scraped text is written to. Must be one of
-    /// `response_files` — a capture pointing anywhere else is rejected with
-    /// [`crate::error::RunnerError::CrossSurfaceCaptureTargetNotListed`], since
-    /// its text would never be read and a stale file would be compared instead.
-    /// `${MIRROIR_SAMPLE_DIR}` is resolved at load time.
+    /// The block whose run produces the text.
+    pub surface: CaptureSurface,
+    /// For `surface: web`, the CSS / Playwright selector whose text is scraped.
+    /// An iOS capture is the block's final screen and takes none.
+    #[serde(default)]
+    pub selector: Option<String>,
+    /// File path the captured text is written to. Must be one of
+    /// `response_files`. `${MIRROIR_SAMPLE_DIR}` is resolved at load time.
     pub to: String,
+}
+
+/// The surface a `cross_surface` capture reads.
+#[derive(Debug, Clone, Copy, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum CaptureSurface {
+    /// Scraped from the page by the scenario's Playwright invocation.
+    Web,
+    /// The final screen of the scenario's iOS block, read by mirroir-mcp's OCR.
+    Ios,
+}
+
+impl CaptureSurface {
+    /// The surface as a scenario spells it.
+    #[must_use]
+    pub const fn as_yaml(self) -> &'static str {
+        match self {
+            Self::Web => "web",
+            Self::Ios => "ios",
+        }
+    }
+}
+
+impl fmt::Display for CaptureSurface {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(self.as_yaml())
+    }
 }
 
 impl<'de> Deserialize<'de> for ReportArgs {

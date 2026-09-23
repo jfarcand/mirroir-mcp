@@ -1,8 +1,8 @@
 // Copyright 2026 jfarcand@apache.org
 // Licensed under the Apache License, Version 2.0
 //
-// ABOUTME: Emits a runner-consumable .mirroir/apps/<slug>/ iOS oracle leg from a finished exploration.
-// ABOUTME: Writes the iOS capture + the cross-surface baseline mirroir-run compares; never overwrites onboard's web files.
+// ABOUTME: Emits a runnable .mirroir/apps/<slug>/ iOS leg from a finished exploration.
+// ABOUTME: Writes the ios scenario, declares it in SAMPLE.md and the plan; never overwrites onboard's web files.
 
 import Foundation
 import HelperLib
@@ -11,16 +11,17 @@ import HelperLib
 /// `generate_skill` capture. The web leg (real DOM selectors, runnable) is authored
 /// separately by the `mirroir-onboard` skill in `.claude/skills/mirroir-onboard/`,
 /// which drives the running web app through chrome-devtools-mcp. This emitter is
-/// purely additive — it
-/// writes the `.ios.yaml` scenario + the cross-surface baseline and upserts a plan
-/// entry, and never overwrites a file the web leg owns.
+/// purely additive — it writes the `.ios.yaml` scenario, declares it in
+/// `SAMPLE.md` and a `must_pass` plan entry, and never overwrites a file the web
+/// leg owns.
 enum MirroirAppTreeEmitter {
 
     /// Paths written by an emit, surfaced to the caller for the MCP result text.
     struct EmitResult: Sendable {
         let appDir: URL
         let scenarioPath: URL
-        let baselinePath: URL
+        /// Human-readable note: SAMPLE.md was created, or a copy-paste snippet.
+        let sampleNote: String
         /// Human-readable note: the plan was created/updated, or a copy-paste snippet.
         let planNote: String
     }
@@ -58,18 +59,15 @@ enum MirroirAppTreeEmitter {
         let flowSlug = slugify(flow.isEmpty ? "capture" : flow)
         let appDir = mirroirRoot.appendingPathComponent("apps/\(slug)", isDirectory: true)
         let scenariosDir = appDir.appendingPathComponent("scenarios", isDirectory: true)
-        let baselinesDir = appDir.appendingPathComponent("baselines", isDirectory: true)
 
         let fm = FileManager.default
         try fm.createDirectory(at: scenariosDir, withIntermediateDirectories: true)
-        try fm.createDirectory(at: baselinesDir, withIntermediateDirectories: true)
 
-        let scenarioPath = scenariosDir.appendingPathComponent("\(flowSlug).ios.yaml")
-        let baselinePath = baselinesDir.appendingPathComponent("\(flowSlug).ios.txt")
+        let scenarioFile = "scenarios/\(flowSlug).ios.yaml"
+        let scenarioPath = appDir.appendingPathComponent(scenarioFile)
         try ScenarioStepFormatter.scenarioYAML(name: flowSlug, appName: appName, screens: screens)
             .write(to: scenarioPath, atomically: true, encoding: .utf8)
-        try ScenarioStepFormatter.baseline(screens: screens)
-            .write(to: baselinePath, atomically: true, encoding: .utf8)
+        let sampleNote = try upsertSample(appDir: appDir, appName: appName, scenario: scenarioFile)
 
         // APP.md is the shared contract's human doc — the web leg owns the canonical
         // one, so only seed a banner when the dir doesn't already have it.
@@ -80,8 +78,8 @@ enum MirroirAppTreeEmitter {
 
         let planNote = try upsertPlan(mirroirRoot: mirroirRoot, slug: slug)
         return EmitResult(
-            appDir: appDir, scenarioPath: scenarioPath, baselinePath: baselinePath,
-            planNote: planNote
+            appDir: appDir, scenarioPath: scenarioPath,
+            sampleNote: sampleNote, planNote: planNote
         )
     }
 
@@ -109,40 +107,74 @@ enum MirroirAppTreeEmitter {
         # \(appName) — iOS capture (mirroir-mcp)
 
         The **iOS leg** of this app dir is emitted by `generate_skill` from an
-        iPhone Mirroring capture. The `scenarios/<flow>.ios.yaml` document is a
-        faithful **linear** record of the captured walk. It opens
-        `target: { kind: ios }`, a surface mirroir-run has no executor for, so the
-        runner refuses it by name — at `--validate` exactly as at run time. It is
-        a capture artifact and the parity gate's anchor, not a runner scenario.
+        iPhone Mirroring capture. Each `scenarios/<flow>.ios.yaml` is a faithful
+        **linear** record of the captured walk, opened by
+        `target: { kind: ios }`. `mirroir-run` hands that block to
+        `mirroir-mcp test` on a macOS host with iPhone Mirroring connected, and
+        refuses it by name on any other host. `SAMPLE.md` declares every flow
+        under `must_pass`.
 
-        The **web leg** (real DOM selectors, runnable on `mirroir-run`) is authored
-        separately, and it owns the parity gate: its scenario ends in a
-        `cross_surface:` step whose `capture:` scrapes the live page into
-        `baselines/<flow>.web.txt` and compares that against
-        `baselines/<flow>.ios.txt` (emitted here). The gate fails closed until the
-        web leg exists to run it.
+        To hold the app's **web leg** to the same screen, add this flow's iOS
+        block to the web scenario and end it with a `cross_surface:` step that
+        captures both surfaces live — a web `selector` scrape and the iOS
+        block's final screen — and compares them.
 
         This `.mirroir/` directory is the runner's consumer dotfile, distinct from
         the Swift MCP's `~/.mirroir-mcp/` home.
         """
     }
 
-    /// Add a `local:` plan entry for `slug` under `plan.nice_to_pass` (`skip: true`
-    /// until a web boot is wired). Creates `mirroir.yaml` when absent; when present
-    /// and human-edited, returns a copy-paste snippet rather than risk a lossy rewrite.
+    /// Declare `scenario` in the app dir's `SAMPLE.md` under `must_pass`.
+    /// Creates `SAMPLE.md` when absent; when present, returns a copy-paste
+    /// snippet rather than risk a lossy rewrite of a human-edited manifest.
+    private static func upsertSample(appDir: URL, appName: String, scenario: String) throws -> String {
+        let samplePath = appDir.appendingPathComponent("SAMPLE.md")
+        let entry = "      - \(scenario)"
+        let fm = FileManager.default
+        guard fm.fileExists(atPath: samplePath.path) else {
+            let doc = """
+                # \(appName)
+
+                The iOS flows `generate_skill` recorded for this app. Each runs as
+                one `target: { kind: ios }` block through `mirroir-mcp test`; the
+                app needs no server, so the boot command starts nothing.
+
+                ```yaml
+                version: 1
+                session:
+                  boot:
+                    command: "true"
+                  scenarios:
+                    must_pass:
+                \(entry)
+                ```
+
+                """
+            try doc.write(to: samplePath, atomically: true, encoding: .utf8)
+            return "created SAMPLE.md declaring \(scenario)"
+        }
+        let existing = (try? String(contentsOf: samplePath, encoding: .utf8)) ?? ""
+        if existing.contains(scenario) {
+            return "\(scenario) already declared in SAMPLE.md"
+        }
+        return "add this line to SAMPLE.md under session.scenarios.must_pass:\n\(entry)"
+    }
+
+    /// Add a `local:` plan entry for `slug` under `plan.must_pass`. Creates
+    /// `mirroir.yaml` when absent; when present and human-edited, returns a
+    /// copy-paste snippet rather than risk a lossy rewrite.
     private static func upsertPlan(mirroirRoot: URL, slug: String) throws -> String {
         let planPath = mirroirRoot.appendingPathComponent("mirroir.yaml")
         let entry = [
             "    - name: \(slug)",
             "      local: apps/\(slug)",
-            "      skip: true",
             "      boot:",
             "        command: \"true\"",
         ].joined(separator: "\n")
 
         let fm = FileManager.default
         guard fm.fileExists(atPath: planPath.path) else {
-            let doc = "version: 1\nplan:\n  nice_to_pass:\n" + entry + "\n"
+            let doc = "version: 1\nplan:\n  must_pass:\n" + entry + "\n"
             try doc.write(to: planPath, atomically: true, encoding: .utf8)
             return "created .mirroir/mirroir.yaml with plan entry '\(slug)'"
         }
@@ -150,6 +182,6 @@ enum MirroirAppTreeEmitter {
         if existing.contains("name: \(slug)") {
             return "plan entry '\(slug)' already present in mirroir.yaml"
         }
-        return "add this entry to .mirroir/mirroir.yaml under plan.nice_to_pass:\n\(entry)"
+        return "add this entry to .mirroir/mirroir.yaml under plan.must_pass:\n\(entry)"
     }
 }

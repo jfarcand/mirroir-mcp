@@ -250,7 +250,7 @@ final class StepExecutorTests: XCTestCase {
     func testSwitchTargetWithoutRegistryFails() {
         // The default executor has no registry
         let result = executor.execute(
-            step: .switchTarget(name: "android"), stepIndex: 0, skillName: "test")
+            step: .switchTarget(.ios(app: nil)), stepIndex: 0, skillName: "test")
         XCTAssertEqual(result.status, .failed)
         XCTAssertTrue(result.message?.contains("No target registry") ?? false)
     }
@@ -286,7 +286,7 @@ final class StepExecutorTests: XCTestCase {
             config: config, registry: registry)
 
         let result = registryExecutor.execute(
-            step: .switchTarget(name: "android"), stepIndex: 0, skillName: "test")
+            step: .switchTarget(.macos(name: "android")), stepIndex: 0, skillName: "test")
         XCTAssertEqual(result.status, .passed)
         XCTAssertTrue(result.message?.contains("android") ?? false)
     }
@@ -309,8 +309,8 @@ final class StepExecutorTests: XCTestCase {
             config: config, registry: registry)
 
         let result = registryExecutor.execute(
-            step: .switchTarget(name: "nonexistent"), stepIndex: 0, skillName: "test")
+            step: .switchTarget(.macos(name: "nonexistent")), stepIndex: 0, skillName: "test")
         XCTAssertEqual(result.status, .failed)
-        XCTAssertTrue(result.message?.contains("Unknown target") ?? false)
+        XCTAssertTrue(result.message?.contains("no target named 'nonexistent'") ?? false)
     }
 }

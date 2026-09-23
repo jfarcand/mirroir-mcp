@@ -336,7 +336,7 @@ fn a_screenshot_after_the_teardown_is_still_rejected() -> Result<(), String> {
         "scenario splits its web steps",
         "step 5 (`screenshot`)",
         "step `kill` ran on the runner side",
-        "A scenario compiles to one Playwright invocation",
+        "Each block runs as one invocation",
         "move every web step into a single adjacent run",
     ] {
         if !output.contains(fragment) {

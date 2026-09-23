@@ -6,14 +6,21 @@ scenarios. Reads scenarios authored against mirroir's step grammar and drives:
 - **Web** — compiles steps to Playwright `.spec.ts` and invokes `npx playwright test` against Chromium / Firefox / WebKit.
 - **Process** — spawns subprocesses (server lifecycle, CLI tests), captures logs, asserts log shape, kills cleanly.
 - **HTTP** — REST probes against MCP, A2A, and other JSON-RPC endpoints.
+- **iOS** — hands a `target: { kind: ios }` block to `mirroir-mcp test`, which drives the iPhone through iPhone Mirroring, and reads back the report it writes. macOS hosts only.
 
-Runs on Linux + macOS CI without macOS-only AppKit dependencies. iOS replay
-stays on mirroir's existing Swift `StepExecutor` at the parent level.
+Web, process and HTTP run on Linux and macOS without AppKit. An iOS block runs
+on a macOS host with mirroir-mcp and iPhone Mirroring; on any other host it is
+refused by name, never skipped.
 
 ## Status
 
-Shipped. The full build sequence is delivered (13 / 13) and `main.rs` dispatches
-a multi-mode runner: scenario `--validate` / `--emit playwright` /
+The locked spec's build sequence (the design gist, §12) has 18 steps. The
+runner milestones below cover its spine; iOS delegation and live web↔iOS parity
+(steps 17–18, sequential form) run through mirroir-mcp. Still open against the
+spec: parallel web/iOS lanes, `wait_for_agui_event`, the LLM
+`cross_surface_equivalent` judge, native Anthropic/Ollama judge clients,
+per-browser verdicts, and `.compiled.json` drift. `main.rs` dispatches a
+multi-mode runner: scenario `--validate` / `--emit playwright` /
 `--run-scenario`, `--sample` session replay, `--diff-text` drift, and the
 `.mirroir/` consumer pipeline (explicit `--config` or bare-invocation
 autodiscovery). Every module carries real implementation — no placeholder code
@@ -206,10 +213,9 @@ is deleted first — its rows are the queue accept answers. The judge still runs
 and its `pass_threshold` is still enforced: accept moves the drift baseline, it
 does not bless a response the judge fails.
 
-A `cross_surface:` baseline written by a surface this runner does not drive —
-`baselines/<flow>.ios.txt` comes from mirroir-mcp's `generate_skill` against a
-connected iPhone — is named, not overwritten. Overwriting it with the web
-capture would make the parity oracle compare a file against itself.
+Every file a `cross_surface:` capture writes — the web block's scrape, the
+`ios` block's final screen — is re-recorded from this run. A compared file no
+capture writes is committed: accept names it, and leaves it alone.
 
 **Accept refuses to run in CI.** Accepting a baseline is a person saying the
 new output is correct; a job that could say it would report green forever. The
@@ -237,7 +243,7 @@ Playwright attachment into the post-hooks, is in
 | Playwright install + `MIRROIR_PLAYWRIGHT_HOME` walkthrough | [docs/playwright-setup.md](docs/playwright-setup.md) |
 | CI lanes, caching, exit codes, integration into downstream repos | [docs/ci-integration.md](docs/ci-integration.md) |
 
-## Build sequence — fully delivered (13 / 13)
+## Runner milestones
 
 | # | Milestone | Commit |
 |---|-----------|--------|
@@ -259,9 +265,9 @@ Cross-surface implementation note: the runner provides the equivalence-compariso
 primitive (`cross_surface:` step + pairwise Jaccard fingerprint). Surfaces feed
 their captured responses to it via filesystem paths. The web side captures via
 the compiled spec's `mirroir-captures` attachment, which the runner writes to
-the declared path; the iOS side captures via `mirroir-mcp` (Swift) writing its
-observed AX/OCR output. The runner is surface-agnostic — both are just files to
-compare.
+the declared path; the iOS side is the `ios` block's final screen, which
+`mirroir-mcp test --capture` OCRs and attaches to the same kind of report. Both
+land as files the step compares.
 
 ## Module layout
 
@@ -271,13 +277,13 @@ src/
 ├── accept.rs              # `mirroir-run accept` — re-record every baseline; structural CI refusal
 ├── error.rs               # RunnerError + Result (thiserror; sub-enums in compile/, mirroir/, oracle/)
 ├── verdict.rs             # PASS / FAIL / DRIFT + the exit codes they map to
-├── replay.rs              # scenario orchestration: pre-hooks, one web invocation, post-hooks
-├── replay_plan.rs         # step partition + the contiguous-web-block rule
+├── replay.rs              # scenario orchestration: hooks and device blocks, in file order
+├── replay_plan.rs         # hooks + device blocks (web, ios); one block per surface, contiguous
 ├── replay_dispatch.rs     # judge / drift / cross_surface / measure post-hook helpers
 ├── replay_step.rs         # exhaustive SkillStep → runner-side dispatch
 ├── replay_sample.rs       # `--sample <dir>` session machinery (SAMPLE.md + shared boot)
 ├── parser/
-│   ├── mod.rs             # parser index + compiled.json cache structs
+│   ├── mod.rs             # parser index
 │   ├── archetype.rs       # archetype.md manifest (YAML frontmatter + markdown body)
 │   ├── env.rs             # ${VAR} / ${VAR:-default} textual substitution
 │   ├── substitute.rs      # post-parse ${VAR} substitution on serde_yaml::Value trees
@@ -335,15 +341,18 @@ Single crate; no internal sub-crates until an external consumer appears.
 
 ## Relationship to Swift mirroir
 
-This runner does **not** port mirroir's Swift code. It implements the **shared
-schema** — `SkillStep` grammar verbatim + `.compiled.json` cache format —
-against which both runtimes operate.
+This runner does **not** port mirroir's Swift code. Both read the shared
+`SkillStep` grammar, and an `ios` block crosses between them:
 
-- Swift `Sources/mirroir-mcp/StepExecutor.swift` keeps running iOS / macOS targets.
-- Rust `runner/src/` adds web (via Playwright) / process / http targets for Linux CI.
-- A cross-parser fixture test diffs both implementations' parsed AST against
-  the same `mirroir-skills/legacy/testing/expo-go/login-flow.yaml` to catch
-  drift between the two parsers.
+- `compile::mirroir_block` writes the block in mirroir-mcp's one-step-per-line
+  dialect; `target::ios` runs `mirroir-mcp test --report-json … --capture ios`.
+- mirroir-mcp's `StepExecutor` drives the phone and writes a Playwright
+  JSON-reporter document, which `compile::report` ingests exactly as it does
+  Playwright's own.
+- The contract is pinned on both sides: Swift's `PlaywrightReportWriterTests`
+  checks its writer against `src/target/fixtures/mirroir-mcp-report.json`, the
+  file `target::ios`'s tests ingest, and the `Build` workflow runs
+  `samples/ios-fixture` through both binaries against FakeMirroring.
 
 The runner owns its own `.mirroir/` consumer pipeline (`runner/src/mirroir/`): a
 checked-out repo carries a `.mirroir/mirroir.yaml` plan that lists samples plus

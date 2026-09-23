@@ -12,3 +12,6 @@
 # counterpart `baselines/parity.ios.txt` IS committed — that surface has no
 # producer here.
 /samples/web-fixture/baselines/parity.web.txt
+# The live iOS capture `samples/ios-fixture/scenarios/settings-list.yaml`
+# writes on every run; `expected/settings-list.txt` is the committed half.
+/samples/ios-fixture/baselines/

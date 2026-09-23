@@ -3,7 +3,7 @@ name: web-fixture — the delivery panel matches its iOS capture
 description: |
   The cross-surface parity gate in the shape that can actually produce both of
   its halves: ONE contiguous web block that opens the page, asserts the panel
-  rendered, and ends in a `cross_surface:` step whose `capture:` scrapes the
+  rendered, and ends in a `cross_surface:` step whose web capture scrapes the
   live panel into `baselines/parity.web.txt`. That file is one of the two
   surfaces the same step then compares, so the web half is written by the run
   that checks it. The other half, `baselines/parity.ios.txt`, is a committed
@@ -28,9 +28,10 @@ steps:
   - assert_visible: "page-title"
   - assert_visible: "parity-panel"
   - cross_surface:
-      capture:
-        selector: "[data-test=parity-panel]"
-        to: "${MIRROIR_SAMPLE_DIR}/baselines/parity.web.txt"
+      captures:
+        - surface: web
+          selector: "[data-test=parity-panel]"
+          to: "${MIRROIR_SAMPLE_DIR}/baselines/parity.web.txt"
       response_files:
         - "${MIRROIR_SAMPLE_DIR}/baselines/parity.web.txt"
         - "${MIRROIR_SAMPLE_DIR}/baselines/parity.ios.txt"

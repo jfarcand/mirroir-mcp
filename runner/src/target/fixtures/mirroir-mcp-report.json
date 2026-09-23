@@ -1,0 +1,36 @@
+{
+  "suites" : [
+    {
+      "file" : "check-alarms.yaml",
+      "specs" : [
+        {
+          "ok" : true,
+          "tests" : [
+            {
+              "projectName" : "ios",
+              "results" : [
+                {
+                  "attachments" : [
+                    {
+                      "body" : "eyJjcm9zc19zdXJmYWNlIjp7ImlvcyI6IkFsYXJtZXMgQXVjdW5lIGFsYXJtZVxuIn0sIm1ldHJpY3MiOnt9fQ==",
+                      "contentType" : "application\/json",
+                      "name" : "mirroir-captures"
+                    }
+                  ],
+                  "duration" : 1000,
+                  "errors" : [
+
+                  ],
+                  "status" : "passed"
+                }
+              ],
+              "status" : "expected"
+            }
+          ],
+          "title" : "check-alarms"
+        }
+      ],
+      "title" : "check-alarms.yaml"
+    }
+  ]
+}

@@ -167,24 +167,37 @@ step](#annotation-step).
 
 ### `target`
 
-Declares the web surface for the scenario's web run. One per scenario, as the
-first step of that run — both rules are enforced by `--validate` and by the
-run, because a second declaration compiles to nothing and a late one would let
-web steps execute before the page is navigated.
+Opens a device block. The block carries the device steps that follow it and
+ends at the first runner-side step; it runs as **one invocation** of its
+surface's engine. A scenario opens at most one block per surface, and a device
+step outside its block is refused — both at `--validate` and at run time,
+because a second block of one surface would start a fresh session and silently
+discard the first one's state.
 
 ```yaml
 - target:
-    kind: web                                       # the only kind mirroir-run executes
+    kind: web                                       # compiled to one Playwright invocation
     browsers: [chrome, firefox, webkit]             # default [chrome]
     url: "http://localhost:8081/"                   # initial navigation
+
+- target: { kind: ios, app: "Safari" }              # handed, as one block, to `mirroir-mcp test`
 ```
 
-`kind` parses `web|process|http|ios|macos`, but `web` is the only one this
-binary opens a run for; every other kind is refused by name at validate time.
-`ios` and `macos` are mirroir-mcp's surfaces — the Swift MCP server drives the
-device. Subprocess and REST scenarios declare **no** `target:` at all: their
-work is carried by the `spawn:` / `kill:` / `http:` steps, which dispatch in
-Rust and read nothing from a surface declaration.
+| `kind` | Engine | Where it runs |
+|---|---|---|
+| `web` | Playwright (`npx playwright test`) | any host |
+| `ios` | `mirroir-mcp test` against iPhone Mirroring | macOS only — refused by name elsewhere (`IosNeedsMacosHost`) |
+| `macos`, `process`, `http` | none — refused by name | a `macos` window is driven by `mirroir-mcp test` directly; subprocess and REST work needs no `target:`, its `spawn:` / `kill:` / `http:` steps dispatch in Rust |
+
+An `ios` block carries the interaction verbs a web block does plus the
+device-level ones only a phone has — `launch:`, `home:`, `shake:`,
+`reset_app:`, `set_network:`. The runner writes the block in mirroir-mcp's
+one-step-per-line dialect (`target/mirroir-ios/<scenario>/ios-block.yaml`) and
+reads back the Playwright-JSON-shaped report `mirroir-mcp test --report-json`
+writes, through the same ingest as a web block. A web-only option in an iOS
+block (`last:`, `into:`, `contains:`, a per-step `timeout_s:` on `tap:` or an
+assert) is refused by name (`IosError::NotExpressible`), never dropped.
+`mirroir-mcp` is found through `MIRROIR_MCP_BIN`, else `PATH`.
 
 ### `tap`, `type`, `wait_for`, `assert_visible`, `assert_not_visible`
 
@@ -305,12 +318,11 @@ fails with `ScenarioNothingEvaluated`.
 
 ---
 
-## Native-only steps (iOS / macOS via mirroir-mcp Swift)
+## Device-level steps (inside an `ios` block)
 
-The Rust runner does not execute these. They parse so cross-platform
-scenarios stay portable; in `mirroir-run` they are no-ops (logged as
-"step kind not yet wired"). The Swift `mirroir-mcp` binary dispatches them
-on iOS/macOS targets.
+Inside an `ios` block these run on the phone, through `mirroir-mcp test`.
+Anywhere else they have nothing to drive: they parse, are logged as "no replay
+dispatch for this step kind; skipping", and count toward no verdict.
 
 ```yaml
 - launch: "Expo Go"
@@ -450,33 +462,41 @@ surface). Uses Jaccard fingerprint similarity over normalized token sets.
 
 ```yaml
 - cross_surface:
+    captures:                                        # optional: files this run writes
+      - surface: web                                 #   scraped from the page at this step
+        selector: "[data-test=surface]"
+        to: "${MIRROIR_SAMPLE_DIR}/baselines/surface.web.txt"
+      - surface: ios                                 #   the ios block's final screen, by OCR
+        to: "${MIRROIR_SAMPLE_DIR}/baselines/surface.ios.txt"
     response_files:
       - "${MIRROIR_SAMPLE_DIR}/baselines/surface.web.txt"
       - "${MIRROIR_SAMPLE_DIR}/baselines/surface.ios.txt"
     min_similarity: 0.5                              # required
-    capture:                                         # optional: produce the web baseline
-      selector: "[data-test=surface]"                #   scrape this selector's innerText()
-      to: "${MIRROIR_SAMPLE_DIR}/baselines/surface.web.txt"  #   into this file (one of response_files)
 ```
 
-With `capture`, the compiled spec scrapes `selector`'s text at the step's own
-position in the flow and files it in the `mirroir-captures` attachment (the
-same channel `judge:` uses); the post-hook writes it to `to`. The web baseline
-is produced at run time rather than hand-authored. Without `capture`, all
-`response_files` must already exist. A declared capture that the attachment
-never carried fails the step (`CrossSurfaceNotCaptured`) rather than comparing
-a stale file.
+A **web** capture makes the compiled spec scrape `selector`'s text at the
+step's own position in the flow and file it in the `mirroir-captures`
+attachment (the same channel `judge:` uses). An **ios** capture is the `ios`
+block's final screen: `mirroir-mcp test` OCRs it after the block's last step and
+attaches it under the fixed key `ios`, and it takes no `selector`. The step
+writes each capture to its `to` before comparing, so both surfaces are produced
+by the run that checks them. Without `captures`, every `response_files` entry
+must already exist. A declared capture the attachment never carried fails the
+step (`NotCaptured`) rather than comparing a stale file.
 
-`capture.selector` goes through the compiled spec's `_by` helper, the same one
+These are checked when the plan is built, so `--validate` sees them:
+
+- `to` **must** be one of the `response_files` — a capture aimed elsewhere
+  writes text nothing reads, and the stale file at the listed path compares clean.
+- two captures may not write one file;
+- a `web` capture needs a `selector`, an `ios` capture takes none;
+- the scenario must open a block for every captured surface.
+
+A web `selector` goes through the compiled spec's `_by` helper, the same one
 every locator step uses: anything opening `[`, `#`, `.`, `:`, `>` or `*` reaches
 `page.locator` as raw CSS, and a bare word is looked up as a role / label /
 placeholder / `data-test` / visible text. A bare element name like `main` is not
 a label, matches none of those, and resolves to nothing.
-
-`to` **must** be one of the `response_files`, and the step fails when it is not:
-a capture aimed elsewhere writes text nothing reads, leaving the comparison to
-run against whatever sits at the listed path — a stale baseline from an earlier
-run compares clean and the check passes for the wrong reason.
 
 `min_similarity` is **required** — the threshold is the gate, and a scenario
 that never declared one holds the run to nothing. A listed file that
@@ -484,15 +504,17 @@ fingerprints to no tokens (blank, whitespace, or punctuation only) is refused
 before any pair is scored: two empty surfaces score a perfect match, so a check
 over them would pass without evidence.
 
-A surface this runner drives no executor for is named `<flow>.ios.txt`, flat
-under the sample's `baselines/`. That spelling is the contract, not a
-convention: `--sample` accounts for every `baselines/*.ios.txt` and refuses a
-sample committing one no scenario compares — see
-[sample-md-format.md](sample-md-format.md). A capture spelled any other way is
-outside that guard, so an orphan of it rides along green.
+A committed iOS file is named `<flow>.ios.txt`, flat under the sample's
+`baselines/`. That spelling is the contract, not a convention: `--sample`
+accounts for every `baselines/*.ios.txt` and refuses a sample committing one no
+scenario compares — see [sample-md-format.md](sample-md-format.md).
 
-Errors: `CrossSurfaceTooFewFiles`, `CrossSurfaceCaptureTargetNotListed`,
-`CrossSurfaceNotCaptured`, `CrossSurfaceEmptySurface`, `CrossSurfaceMismatch`.
+`mirroir-run accept` rewrites every captured file and names each compared file
+no capture writes, leaving it alone.
+
+Errors (`CrossSurfaceError`): `TooFewFiles`, `CaptureTargetNotListed`,
+`DuplicateCaptureTarget`, `WebCaptureWithoutSelector`, `IosCaptureWithSelector`,
+`CaptureWithoutBlock`, `NotCaptured`, `EmptySurface`, `Mismatch`.
 
 ---
 
@@ -502,9 +524,10 @@ Errors: `CrossSurfaceTooFewFiles`, `CrossSurfaceCaptureTargetNotListed`,
 |---|---|---|
 | `spawn`, `kill`, `wait_port`, `assert_log`, `assert_log_clean` | `target::process` (tokio) | Per-scenario `ProcessRegistry`; shared in `boot_once` mode |
 | `http` | `target::http` (reqwest) | One `HttpClient` per scenario |
-| `target` (kind=web), `tap`, `type`, `wait_for`, `assert_visible`, `assert_not_visible`, `screenshot`, `press_key`, `swipe`, `scroll_to`, `long_press`, `drag`, `open_url`, `measure` | `compile::playwright` + `compile::invoke` | One spec, one `npx playwright test` per scenario |
+| `target` (kind=web), `tap`, `type`, `wait_for`, `assert_visible`, `assert_not_visible`, `screenshot`, `press_key`, `swipe`, `scroll_to`, `long_press`, `drag`, `open_url`, `measure` — inside a web block | `compile::playwright` + `compile::invoke` | One spec, one `npx playwright test` per web block |
+| `target` (kind=ios), the same interaction verbs, `launch`, `home`, `shake`, `reset_app`, `set_network` — inside an ios block | `compile::mirroir_block` + `target::ios` | One `mirroir-mcp test` per ios block, macOS host only |
 | `remember` | annotation | Neither surface: a comment in the spec when it sits inside the web run, a logged note when it sits outside. Never splits the run. |
 | `judge` | `oracle::judge` | OpenAI-compatible chat completions |
 | `cross_surface` | `oracle::drift` | Jaccard over `Fingerprint` |
 | `report` | `replay_step` | Applies the declared verdict to the scenario. |
-| `launch`, `home`, `shake`, `reset_app`, `set_network`, `condition` | unwired | Parse and skip; logged. iOS-side dispatched by `mirroir-mcp` (Swift) when the scenario also runs there. |
+| `launch`, `home`, `shake`, `reset_app`, `set_network` outside an ios block, `condition` | unwired | Parse and skip; logged. |

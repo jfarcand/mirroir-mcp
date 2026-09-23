@@ -135,10 +135,11 @@ extension MirroirMCP {
                     "emit": .object([
                         "type": .string("boolean"),
                         "description": .string(
-                            "When true on the finish or explore action, write a runner-consumable " +
-                            ".mirroir/apps/<app>/ iOS leg (the captured walk + the cross-surface " +
-                            "baseline the web leg's cross_surface: step compares against) into " +
-                            "the consumer repo. Default: false."),
+                            "When true on the finish or explore action, write a runnable " +
+                            ".mirroir/apps/<app>/ iOS leg into the consumer repo: the captured " +
+                            "walk as a target: { kind: ios } scenario, a SAMPLE.md declaring it, " +
+                            "and a must_pass plan entry — mirroir-run replays it through " +
+                            "mirroir-mcp test on macOS. Default: false."),
                     ]),
                     "output_dir": .object([
                         "type": .string("string"),

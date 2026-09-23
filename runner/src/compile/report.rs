@@ -7,7 +7,7 @@ use base64::Engine as _;
 use base64::engine::general_purpose::STANDARD as BASE64;
 use serde::Deserialize;
 
-use crate::compile::error::PlaywrightError;
+use crate::compile::report_error::{ReportEngine, ReportError};
 use crate::error::Result;
 
 /// Name of the attachment the emitted spec writes its captures to.
@@ -22,7 +22,7 @@ pub const CAPTURES_ATTACHMENT: &str = "mirroir-captures";
 /// `passed + failed + skipped + flaky` equals the total result records the JSON
 /// reporter wrote — one per (test × browser project × retry) tuple.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
-pub struct PlaywrightVerdict {
+pub struct ReporterVerdict {
     /// Number of result records with `status: "passed"`.
     pub passed: usize,
     /// Number of result records with `status: "failed"`.
@@ -33,7 +33,7 @@ pub struct PlaywrightVerdict {
     pub flaky: usize,
 }
 
-impl PlaywrightVerdict {
+impl ReporterVerdict {
     /// Total result records the reporter wrote.
     #[must_use]
     pub const fn total(&self) -> usize {
@@ -62,7 +62,7 @@ pub struct TestFailure {
 /// its own captures; they merge in reporter order, so the last project's
 /// values win for a key every project wrote.
 #[derive(Debug, Clone, Default, Deserialize, PartialEq)]
-pub struct PlaywrightCaptures {
+pub struct RunCaptures {
     /// `measure:` latencies in milliseconds, keyed by measure name.
     #[serde(default)]
     pub metrics: BTreeMap<String, f64>,
@@ -83,8 +83,9 @@ pub struct PlaywrightCaptures {
     pub failed_requests: Vec<String>,
 }
 
-impl PlaywrightCaptures {
-    fn merge(&mut self, other: Self) {
+impl RunCaptures {
+    /// Fold another block's captures in; a key both carry takes `other`'s.
+    pub fn merge(&mut self, other: Self) {
         self.metrics.extend(other.metrics);
         self.judge.extend(other.judge);
         self.cross_surface.extend(other.cross_surface);
@@ -95,11 +96,11 @@ impl PlaywrightCaptures {
 
 /// Everything one Playwright invocation reported.
 #[derive(Debug, Clone, Default, PartialEq)]
-pub struct PlaywrightOutcome {
+pub struct ReporterOutcome {
     /// Aggregate pass/fail/skip/flaky counts.
-    pub verdict: PlaywrightVerdict,
+    pub verdict: ReporterVerdict,
     /// Values the spec attached for the Rust post-hooks to consume.
-    pub captures: PlaywrightCaptures,
+    pub captures: RunCaptures,
 }
 
 /// Parse a Playwright JSON reporter body into an outcome.
@@ -108,24 +109,30 @@ pub struct PlaywrightOutcome {
 ///
 /// # Errors
 ///
-/// * [`PlaywrightError::Report`] when the body isn't valid reporter JSON.
-/// * [`PlaywrightError::CaptureDecode`] when a `mirroir-captures` attachment
+/// * [`ReportError::Unparseable`] when the body isn't valid reporter JSON.
+/// * [`ReportError::CaptureDecode`] when a `mirroir-captures` attachment
 ///   can't be base64-, UTF-8-, or JSON-decoded.
-/// * [`PlaywrightError::TestFailures`] when at least one result failed, with
+/// * [`ReportError::TestFailures`] when at least one result failed, with
 ///   each failure's title + reporter message attached.
-/// * [`PlaywrightError::ReportEmpty`] when the reporter recorded no results.
-pub fn parse_report_body(path: &str, body: &str) -> Result<PlaywrightOutcome> {
+/// * [`ReportError::Empty`] when the reporter recorded no results.
+pub fn parse_report_body(engine: ReportEngine, path: &str, body: &str) -> Result<ReporterOutcome> {
     let parsed: ReporterRoot =
-        serde_json::from_str(body).map_err(|source| PlaywrightError::Report {
+        serde_json::from_str(body).map_err(|source| ReportError::Unparseable {
+            engine,
             path: path.to_owned(),
             source,
         })?;
-    let mut ingest = Ingest::default();
+    let mut ingest = Ingest {
+        engine,
+        outcome: ReporterOutcome::default(),
+        failures: Vec::new(),
+    };
     walk_suites(&parsed.suites, &mut ingest)?;
 
     let total = ingest.outcome.verdict.total();
     if ingest.outcome.verdict.failed > 0 {
-        return Err(PlaywrightError::TestFailures {
+        return Err(ReportError::TestFailures {
+            engine,
             failed: ingest.outcome.verdict.failed,
             total,
             failures: ingest.failures,
@@ -133,7 +140,8 @@ pub fn parse_report_body(path: &str, body: &str) -> Result<PlaywrightOutcome> {
         .into());
     }
     if total == 0 {
-        return Err(PlaywrightError::ReportEmpty {
+        return Err(ReportError::Empty {
+            engine,
             path: path.to_owned(),
         }
         .into());
@@ -142,9 +150,10 @@ pub fn parse_report_body(path: &str, body: &str) -> Result<PlaywrightOutcome> {
 }
 
 /// Accumulator threaded through [`walk_suites`].
-#[derive(Debug, Default)]
+#[derive(Debug)]
 struct Ingest {
-    outcome: PlaywrightOutcome,
+    engine: ReportEngine,
+    outcome: ReporterOutcome,
     failures: Vec<TestFailure>,
 }
 
@@ -179,7 +188,8 @@ fn ingest_result(title: &str, result: &ReporterResult, ingest: &mut Ingest) -> R
         "skipped" => ingest.outcome.verdict.skipped += 1,
         "flaky" => ingest.outcome.verdict.flaky += 1,
         other => {
-            return Err(PlaywrightError::UnknownStatus {
+            return Err(ReportError::UnknownStatus {
+                engine: ingest.engine,
                 status: other.to_owned(),
                 title: title.to_owned(),
             }
@@ -198,17 +208,17 @@ fn ingest_result(title: &str, result: &ReporterResult, ingest: &mut Ingest) -> R
 
 /// Decode one `mirroir-captures` attachment body. The JSON reporter
 /// base64-encodes attachment bodies, so the transport is base64 → UTF-8 → JSON.
-fn decode_captures(encoded: &str) -> Result<PlaywrightCaptures> {
+fn decode_captures(encoded: &str) -> Result<RunCaptures> {
     let raw = BASE64
         .decode(encoded)
-        .map_err(|source| PlaywrightError::CaptureDecode {
+        .map_err(|source| ReportError::CaptureDecode {
             reason: format!("attachment body is not base64: {source}"),
         })?;
-    let text = String::from_utf8(raw).map_err(|source| PlaywrightError::CaptureDecode {
+    let text = String::from_utf8(raw).map_err(|source| ReportError::CaptureDecode {
         reason: format!("attachment body is not UTF-8: {source}"),
     })?;
     serde_json::from_str(&text)
-        .map_err(|source| PlaywrightError::CaptureDecode {
+        .map_err(|source| ReportError::CaptureDecode {
             reason: format!("attachment body is not a captures object: {source}"),
         })
         .map_err(Into::into)
@@ -291,8 +301,8 @@ struct ReporterAttachment {
 mod tests {
     use std::result::Result as StdResult;
 
-    use super::{PlaywrightCaptures, parse_report_body};
-    use crate::compile::error::PlaywrightError;
+    use super::{RunCaptures, parse_report_body};
+    use crate::compile::report_error::{ReportEngine, ReportError};
     use crate::error::RunnerError;
 
     type TestResult = StdResult<(), String>;
@@ -302,14 +312,15 @@ mod tests {
 
     #[test]
     fn strict_mode_violation_reaches_the_failure_message() -> TestResult {
-        let res = parse_report_body("report.json", STRICT_MODE_REPORT);
-        let Err(RunnerError::Playwright(err @ PlaywrightError::TestFailures { .. })) = res else {
+        let res = parse_report_body(ReportEngine::Playwright, "report.json", STRICT_MODE_REPORT);
+        let Err(RunnerError::Report(err @ ReportError::TestFailures { .. })) = res else {
             return Err(format!("expected TestFailures, got {res:?}"));
         };
-        let PlaywrightError::TestFailures {
+        let ReportError::TestFailures {
             failed,
             total,
             ref failures,
+            ..
         } = err
         else {
             return Err("matched variant changed".to_owned());
@@ -340,8 +351,8 @@ mod tests {
 
     #[test]
     fn captures_attachment_is_base64_decoded_into_the_outcome() -> TestResult {
-        let outcome =
-            parse_report_body("report.json", CAPTURES_REPORT).map_err(|e| format!("parse: {e}"))?;
+        let outcome = parse_report_body(ReportEngine::Playwright, "report.json", CAPTURES_REPORT)
+            .map_err(|e| format!("parse: {e}"))?;
         if outcome.verdict.passed != 1 {
             return Err(format!("wrong verdict: {:?}", outcome.verdict));
         }
@@ -372,11 +383,9 @@ mod tests {
         let json = r#"{"suites":[{"title":"s","specs":[{"title":"order flow","tests":[{"results":[
             {"status":"timedOut","error":{"message":"locator.click: Test timeout of 30000ms exceeded.\nwaiting for locator('[data-test=place-order]')"}}
         ]}]}],"suites":[]}]}"#;
-        match parse_report_body("report.json", json) {
-            Err(RunnerError::Playwright(PlaywrightError::TestFailures {
-                failed,
-                failures,
-                ..
+        match parse_report_body(ReportEngine::Playwright, "report.json", json) {
+            Err(RunnerError::Report(ReportError::TestFailures {
+                failed, failures, ..
             })) => {
                 if failed != 1 {
                     return Err(format!("timed-out result not counted: failed={failed}"));
@@ -400,8 +409,8 @@ mod tests {
         let json = r#"{"suites":[{"title":"s","specs":[{"title":"t","tests":[{"results":[
             {"status":"quantum"}
         ]}]}],"suites":[]}]}"#;
-        match parse_report_body("report.json", json) {
-            Err(RunnerError::Playwright(PlaywrightError::UnknownStatus { status, title }))
+        match parse_report_body(ReportEngine::Playwright, "report.json", json) {
+            Err(RunnerError::Report(ReportError::UnknownStatus { status, title, .. }))
                 if status == "quantum" && title == "t" =>
             {
                 Ok(())
@@ -412,11 +421,9 @@ mod tests {
 
     #[test]
     fn empty_report_is_not_a_pass() -> TestResult {
-        let res = parse_report_body("report.json", r#"{"suites":[]}"#);
+        let res = parse_report_body(ReportEngine::Playwright, "report.json", r#"{"suites":[]}"#);
         match res {
-            Err(RunnerError::Playwright(PlaywrightError::ReportEmpty { path }))
-                if path == "report.json" =>
-            {
+            Err(RunnerError::Report(ReportError::Empty { path, .. })) if path == "report.json" => {
                 Ok(())
             }
             other => Err(format!("expected ReportEmpty, got {other:?}")),
@@ -436,12 +443,13 @@ mod tests {
               }
             ]
         }"#;
-        let outcome = parse_report_body("report.json", json).map_err(|e| format!("parse: {e}"))?;
+        let outcome = parse_report_body(ReportEngine::Playwright, "report.json", json)
+            .map_err(|e| format!("parse: {e}"))?;
         if outcome.verdict.passed != 1 || outcome.verdict.flaky != 1 || outcome.verdict.skipped != 1
         {
             return Err(format!("wrong counts: {:?}", outcome.verdict));
         }
-        if outcome.captures != PlaywrightCaptures::default() {
+        if outcome.captures != RunCaptures::default() {
             return Err("captures should be empty".to_owned());
         }
         Ok(())
@@ -452,8 +460,8 @@ mod tests {
         let json = r#"{"suites":[{"title":"s","specs":[{"title":"t","tests":[{"results":[
             {"status":"passed","attachments":[{"name":"mirroir-captures","body":"!!!not-base64!!!"}]}
         ]}]}],"suites":[]}]}"#;
-        match parse_report_body("report.json", json) {
-            Err(RunnerError::Playwright(PlaywrightError::CaptureDecode { reason })) => {
+        match parse_report_body(ReportEngine::Playwright, "report.json", json) {
+            Err(RunnerError::Report(ReportError::CaptureDecode { reason })) => {
                 if reason.contains("base64") {
                     Ok(())
                 } else {

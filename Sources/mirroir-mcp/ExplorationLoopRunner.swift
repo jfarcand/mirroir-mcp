@@ -136,10 +136,10 @@ enum ExplorationLoopRunner {
                 appName: appName, flow: flow, screens: screens, outputDir: outputDir)
             return "\n\n---\nEmitted .mirroir/ iOS leg:\n" +
                 "  scenario: \(result.scenarioPath.path) " +
-                "(the captured walk; it names an ios surface mirroir-run does not drive)\n" +
-                "  baseline: \(result.baselinePath.path) " +
-                "(the web leg's cross_surface: step compares its scrape against this)\n" +
-                "  plan: \(result.planNote)"
+                "(an ios block mirroir-run hands to mirroir-mcp test on macOS)\n" +
+                "  sample: \(result.sampleNote)\n" +
+                "  plan: \(result.planNote)\n" +
+                "  run it: mirroir-run (from the consumer repo, iPhone Mirroring connected)"
         } catch {
             return "\n\n(emit skipped: \(error.localizedDescription))"
         }

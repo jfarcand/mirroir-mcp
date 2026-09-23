@@ -4,14 +4,16 @@
 use std::collections::HashMap;
 use std::env;
 use std::fs;
+use std::ops::Range;
 use std::path::{Path, PathBuf};
 
 use tracing::{info, warn};
 
 use crate::compile::invoke::PlaywrightRunner;
+use crate::compile::mirroir_block::ios_block_yaml;
 use crate::compile::playwright::compile_scenario;
 use crate::compile::playwright_prelude::ScenarioSource;
-use crate::compile::report::PlaywrightCaptures;
+use crate::compile::report::RunCaptures;
 use crate::compile::workspace::{PlaywrightWorkspace, path_stem};
 use crate::error::{Result, RunnerError};
 use crate::oracle::baseline::{BaselineMode, load_baseline, record_baseline};
@@ -21,12 +23,13 @@ use crate::oracle::thresholds::{ThresholdSearch, load_policy};
 use crate::parser::env::substitute;
 use crate::parser::sample::{SAMPLE_SCHEMA_VERSION, SampleManifest, extract_yaml_block};
 use crate::parser::scenario::{SCHEMA_VERSION, Scenario};
-use crate::parser::step::TargetArgs;
+use crate::parser::step::TargetKind;
 use crate::parser::surface::step_kind;
 use crate::replay_dispatch::verify_measures;
-use crate::replay_plan::ScenarioPlan;
+use crate::replay_plan::{ScenarioPlan, Segment};
 use crate::replay_step::{StepDispatch, StepVerdict, dispatch_step};
 use crate::target::http::HttpClient;
+use crate::target::ios::MirroirMcpRunner;
 use crate::target::process::ProcessRegistry;
 use crate::verdict::RunVerdict;
 
@@ -170,14 +173,14 @@ pub struct ReplayRoots<'a> {
 
 /// Execute one scenario end-to-end.
 ///
-/// A scenario compiles to exactly one `npx playwright test` invocation:
-/// - runner-side steps before the scenario's web block run as **pre-hooks**
-///   (`spawn:`, `wait_port:`, …);
-/// - every web step compiles into one spec and runs in that single invocation,
-///   which attaches the values only the live page has (`measure:` latencies,
-///   `judge:` response text, `cross_surface:` captures);
-/// - runner-side steps after the block run as **post-hooks**, reading those
-///   attached values (`judge:`, `http:`, `kill:`, `assert_log_clean:`, …).
+/// The scenario's [`ScenarioPlan`] runs in file order:
+/// - runner-side steps run as **hooks** in Rust (`spawn:`, `http:`, `judge:`,
+///   `kill:`, …);
+/// - a `web` block compiles into one spec and runs in one `npx playwright
+///   test`; an `ios` block is written in mirroir-mcp's dialect and runs in one
+///   `mirroir-mcp test`. Each attaches the values only its surface has
+///   (`measure:` latencies, `judge:` response text, `cross_surface:` captures);
+/// - a hook after a block reads everything the blocks before it attached.
 ///
 /// A scenario in which no step ever reports [`StepVerdict::Evaluated`]
 /// checked nothing about the system under test and fails with
@@ -194,7 +197,7 @@ pub struct ReplayRoots<'a> {
 /// # Errors
 ///
 /// Any error returned by the dispatched step variants propagates verbatim,
-/// plus [`RunnerError::WebBlockNotContiguous`] for a scenario whose web steps
+/// plus [`RunnerError::BlockNotContiguous`] for a scenario whose device steps
 /// are split, [`RunnerError::ScenarioNothingEvaluated`] for a scenario that
 /// evaluated nothing, and
 /// [`crate::oracle::error::OracleError::ThresholdUnspecified`] when a drift
@@ -250,48 +253,56 @@ pub async fn run_scenario_with_context(
         "scenario run starting"
     );
 
-    let empty = PlaywrightCaptures::default();
-    run_hooks(
-        plan.pre(),
-        &scenario,
-        &dispatch,
-        processes,
-        &http,
-        &empty,
-        &mut counters,
-        &mut drift,
-    )
-    .await?;
-
-    let captures = match plan.web() {
-        Some(block) => {
-            let workspace = PlaywrightWorkspace::for_scenario(
-                &review_root,
-                context.map(|ctx| path_stem(ctx.sample_dir)).as_deref(),
-                &path_stem(path),
-            );
-            let source = ScenarioSource::read(path)?;
-            let target = plan.web_target(&scenario.steps)?;
-            let captures =
-                run_web_block(&scenario, target, &source, block.len(), &workspace).await?;
-            counters.evaluated += block.len();
-            verify_measures(&scenario.steps[block], &captures, &mut drift)?;
-            captures
-        }
-        None => PlaywrightCaptures::default(),
-    };
-
-    run_hooks(
-        plan.post(),
-        &scenario,
-        &dispatch,
-        processes,
-        &http,
-        &captures,
-        &mut counters,
-        &mut drift,
-    )
-    .await?;
+    let sample_name = context.map(|ctx| path_stem(ctx.sample_dir));
+    let mut captures = RunCaptures::default();
+    for segment in plan.segments() {
+        let (kind, range) = match segment {
+            Segment::Hook(index) => {
+                run_hooks(
+                    &[*index],
+                    &scenario,
+                    &dispatch,
+                    processes,
+                    &http,
+                    &captures,
+                    &mut counters,
+                    &mut drift,
+                )
+                .await?;
+                continue;
+            }
+            Segment::Block { kind, range } => (*kind, range.clone()),
+        };
+        let block_captures = match kind {
+            TargetKind::Web => {
+                let workspace = PlaywrightWorkspace::for_scenario(
+                    &review_root,
+                    sample_name.as_deref(),
+                    &path_stem(path),
+                );
+                let source = ScenarioSource::read(path)?;
+                run_web_block(&scenario, &plan, &source, range.len(), &workspace).await?
+            }
+            TargetKind::Ios => {
+                let dir = PlaywrightWorkspace::ios_block_dir(
+                    &review_root,
+                    sample_name.as_deref(),
+                    &path_stem(path),
+                );
+                run_ios_block(&scenario, range.clone(), &dir).await?
+            }
+            // The plan admits only surfaces with an executor on this host.
+            TargetKind::Process | TargetKind::Http | TargetKind::Macos => {
+                return Err(RunnerError::NoExecutorForTargetKind {
+                    index: range.start,
+                    kind,
+                });
+            }
+        };
+        counters.evaluated += range.len();
+        verify_measures(&scenario.steps[range], &block_captures, &mut drift)?;
+        captures.merge(block_captures);
+    }
 
     if counters.evaluated == 0 {
         return Err(RunnerError::ScenarioNothingEvaluated {
@@ -362,7 +373,7 @@ async fn run_hooks(
     dispatch: &StepDispatch<'_>,
     processes: &mut ProcessRegistry,
     http: &HttpClient,
-    captures: &PlaywrightCaptures,
+    captures: &RunCaptures,
     counters: &mut Counters,
     drift: &mut DriftSession,
 ) -> Result<()> {
@@ -395,12 +406,12 @@ async fn run_hooks(
 /// opens, and the path is logged so a reader can find them.
 async fn run_web_block(
     scenario: &Scenario,
-    target: &TargetArgs,
+    plan: &ScenarioPlan,
     source: &ScenarioSource,
     web_steps: usize,
     workspace: &PlaywrightWorkspace,
-) -> Result<PlaywrightCaptures> {
-    let spec = compile_scenario(scenario, target, source)?;
+) -> Result<RunCaptures> {
+    let spec = compile_scenario(scenario, plan, source)?;
     let runner = PlaywrightRunner::from_env()?;
     info!(
         web_steps,
@@ -426,6 +437,33 @@ async fn run_web_block(
         cross_surface_captures = outcome.captures.cross_surface.len(),
         workspace = %workspace.dir.display(),
         "playwright invocation completed"
+    );
+    Ok(outcome.captures)
+}
+
+/// Write the scenario's `ios` block in mirroir-mcp's dialect, run it once with
+/// `mirroir-mcp test` in `dir`, and return what the run attached — the block's
+/// final screen among it — for the hooks that follow.
+async fn run_ios_block(
+    scenario: &Scenario,
+    block: Range<usize>,
+    dir: &Path,
+) -> Result<RunCaptures> {
+    let yaml = ios_block_yaml(&scenario.name, &scenario.steps, block.clone())?;
+    let runner = MirroirMcpRunner::from_env()?;
+    info!(
+        ios_steps = block.len(),
+        workspace = %dir.display(),
+        "dispatching the scenario's ios block to mirroir-mcp"
+    );
+    let outcome = runner.run(&yaml, dir).await?;
+    info!(
+        passed = outcome.verdict.passed,
+        failed = outcome.verdict.failed,
+        metrics = outcome.captures.metrics.len(),
+        cross_surface_captures = outcome.captures.cross_surface.len(),
+        workspace = %dir.display(),
+        "mirroir-mcp invocation completed"
     );
     Ok(outcome.captures)
 }
