@@ -397,6 +397,16 @@ extension EnvConfig {
         readDouble("calibrationUnclassifiedThreshold", default: TimingConstants.calibrationUnclassifiedThreshold)
     }
 
+    // MARK: - Multi-Touch Backend
+
+    /// Root URL of a WebDriverAgent runner on the iPhone (e.g.
+    /// `http://192.168.1.20:8100`) that `multi_touch` plays gestures through.
+    /// Empty means no runner is configured and `multi_touch` answers with
+    /// setup instructions.
+    public static var wdaURL: String {
+        readString("wdaURL", envVar: "MIRROIR_WDA_URL", default: "")
+    }
+
     // MARK: - App Identity
 
     public static var mirroringBundleID: String {

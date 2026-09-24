@@ -18,6 +18,7 @@ extension MirroirMCP {
         registerTouchTools(server: server, registry: registry)
         registerGestureTools(server: server, registry: registry)
         registerHoldKeysTools(server: server, registry: registry)
+        registerMultiTouchTools(server: server, registry: registry)
         registerNavigationTools(server: server, registry: registry,
                                 policy: policy)
         registerInfoTools(server: server, registry: registry)

@@ -163,6 +163,9 @@ extension EnvConfig {
             ("Component Detection", [
                 ("componentDetection", componentDetection),
             ]),
+            ("Multi-Touch Backend", [
+                ("wdaURL", wdaURL.isEmpty ? "(none)" : wdaURL),
+            ]),
             ("App Identity", [
                 ("mirroringBundleID", mirroringBundleID),
                 ("mirroringProcessName", mirroringProcessName),

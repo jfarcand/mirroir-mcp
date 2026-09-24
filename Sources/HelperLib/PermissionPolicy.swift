@@ -118,6 +118,7 @@ public struct PermissionPolicy: Sendable {
         "pinch",
         "rotate",
         "hold_keys",
+        "multi_touch",
         "shake",
         "launch_app",
         "open_url",
