@@ -174,7 +174,7 @@ jobs:
           (Get-FileHash "${DIR}.zip" -Algorithm SHA256).Hash.ToLower() | Out-File -Encoding ascii "${DIR}.zip.sha256"
 
       - name: Upload artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: mirroir-run-${{ matrix.target }}
           path: runner/mirroir-run-v*
@@ -201,7 +201,7 @@ jobs:
           merge-multiple: true
 
       - name: Create GitHub Release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           tag_name: runner-v${{ needs.version.outputs.version }}
           name: mirroir-run v${{ needs.version.outputs.version }}

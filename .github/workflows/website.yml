@@ -20,10 +20,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: withastro/action@v3
+      - uses: withastro/action@v6
         with:
           path: ./website
-          # Astro 6 requires Node >=22.12.0; the action defaults to Node 20.
+          # Astro 7 requires Node >=22.12.0; pinned here rather than inheriting the action default.
           node-version: 22
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
