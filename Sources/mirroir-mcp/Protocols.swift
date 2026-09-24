@@ -1,7 +1,7 @@
 // Copyright 2026 jfarcand@apache.org
 // Licensed under the Apache License, Version 2.0
 //
-// ABOUTME: Protocol abstractions for system boundaries (mirroring bridge, input, capture, recording, OCR).
+// ABOUTME: Protocol abstractions for system boundaries (mirroring bridge, input, multi-touch, capture, recording, OCR).
 // ABOUTME: Enables dependency injection for testing without requiring real macOS system APIs.
 
 import AppKit
@@ -198,6 +198,20 @@ protocol TouchContactPosting: PointerEngaging {
     func pointerLocation() -> CGPoint
     /// Put the system pointer back at `point`.
     func warpPointer(to point: CGPoint)
+}
+
+/// Plays multi-finger gestures on the iPhone through a runner on the device
+/// (WebDriverAgent's XCTest event synthesis), a path separate from iPhone
+/// Mirroring's single pointer. Coordinates are device points in the
+/// foreground app's viewport. A gesture plays whole within one call: no
+/// finger stays down after `perform` returns.
+protocol MultiTouchProviding: Sendable {
+    /// Whether the runner is reachable and ready, and which OS it runs on.
+    func status() throws(WebDriverAgentError) -> MultiTouchBackendStatus
+    /// The foreground app's viewport in points, in its current orientation.
+    func viewportSize() throws(WebDriverAgentError) -> CGSize
+    /// Play `gesture` and return once the device has finished playing it.
+    func perform(_ gesture: MultiTouchGesture) throws(WebDriverAgentError) -> MultiTouchReport
 }
 
 /// Default nil cursorMode for backward compatibility.
