@@ -128,13 +128,59 @@ final class XPCWireCodecSecurityTests: XCTestCase {
         XCTAssertThrowsError(try XPCWireCodec.decodeMessage(message(body: body)))
     }
 
-    /// Every strict prefix of a real message must throw: no truncation point
-    /// may read out of bounds or return a partial message.
-    func testEveryTruncationOfTheCaptureThrows() throws {
-        let bytes = try Fixture.data("xpc_dict", "bin")
-        for length in 0..<bytes.count {
-            XCTAssertThrowsError(try XPCWireCodec.decodeMessage(bytes.prefix(length)), "prefix \(length)")
+    func testWrongBodyVersionIsRejected() throws {
+        var bytes = [UInt8](try Fixture.data("xpc_dict", "bin"))
+        let versionOffset = XPCWireCodec.wrapperHeaderLength + 4
+        bytes.replaceSubrange(versionOffset..<(versionOffset + 4), with: [6, 0, 0, 0])
+        XCTAssertThrowsError(try XPCWireCodec.decodeMessage(Data(bytes))) { error in
+            XCTAssertEqual(error as? XPCCodecError, .unsupportedBodyVersion(6))
         }
+    }
+
+    /// Every strict prefix of a real message must throw: no truncation point
+    /// may read out of bounds or return a partial message. The declared body
+    /// length is rewritten to match each prefix, so the cut lands inside the
+    /// object decoder rather than being caught by the outer length check.
+    func testEveryTruncationOfTheCaptureThrows() throws {
+        let bytes = [UInt8](try Fixture.data("xpc_dict", "bin"))
+        let bodyLengthOffset = 8
+        let bodyStart = XPCWireCodec.wrapperHeaderLength + XPCWireCodec.bodyHeaderLength
+        for length in 0..<bytes.count {
+            var prefix = Array(bytes.prefix(length))
+            if length >= bodyStart {
+                var declared: [UInt8] = []
+                declared.appendUInt64LE(UInt64(length - XPCWireCodec.wrapperHeaderLength))
+                prefix.replaceSubrange(bodyLengthOffset..<(bodyLengthOffset + 8), with: declared)
+            }
+            XCTAssertThrowsError(try XPCWireCodec.decodeMessage(Data(prefix)), "prefix \(length)") { error in
+                XCTAssertTrue(error is XPCCodecError, "prefix \(length): \(error)")
+            }
+        }
+    }
+
+    /// A dictionary of many distinct keys decodes in time linear in its size:
+    /// a quadratic key lookup would take minutes on this input.
+    func testManyKeyDictionaryDecodesWithinBound() throws {
+        let keyCount = 100_000
+        let bound: TimeInterval = 10
+        var payload: [UInt8] = []
+        payload.appendUInt32LE(UInt32(keyCount))
+        for index in 0..<keyCount {
+            let key = Array(String(format: "k%07d", index).utf8) + [0]
+            payload.append(contentsOf: key)
+            payload.append(contentsOf: [UInt8](repeating: 0, count: XPCWireCodec.padding(for: key.count)))
+            payload.appendUInt32LE(0x1000)
+        }
+        var body: [UInt8] = []
+        body.appendUInt32LE(dictionaryType)
+        body.appendUInt32LE(UInt32(payload.count))
+        body.append(contentsOf: payload)
+        let started = Date()
+        let decoded = try XCTUnwrap(try XPCWireCodec.decodeMessage(message(body: body)).body)
+        let elapsed = Date().timeIntervalSince(started)
+        XCTAssertEqual(decoded.count, keyCount)
+        XCTAssertEqual(decoded["k0099999"], .null)
+        XCTAssertLessThan(elapsed, bound)
     }
 
     /// Flipping any single byte either decodes or throws; it never traps.

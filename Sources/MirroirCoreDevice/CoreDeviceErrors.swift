@@ -69,6 +69,10 @@ public enum HTTP2Error: Error, Equatable, Sendable {
     case unexpectedStream(UInt32)
     /// A write was attempted on a stream RemoteXPC does not use.
     case unsupportedStream(UInt32)
+    /// The peer sent a SETTINGS value outside the range RFC 9113 allows.
+    case invalidSetting(id: UInt16, value: UInt32)
+    /// Data arrived for a stream faster than it was read, past the buffer cap.
+    case receiveBufferOverflow(streamID: UInt32, buffered: Int, limit: Int)
 }
 
 /// Failures of the RemoteXPC layer above HTTP/2.
@@ -111,6 +115,25 @@ public enum MultiTouchSessionError: Error, Equatable, Sendable {
     case contactAlreadyDown(UInt8)
     /// `move` for a contact that is not held.
     case contactNotDown(UInt8)
+}
+
+/// A touch report that could not be written, and the lift the session sent to
+/// recover from it. The device may have applied the failed report, so every
+/// contact it described is lifted where that report put it.
+public struct MultiTouchSendError: Error {
+    /// Why the report was not written.
+    public let underlying: Error
+    /// The contacts of the recovery lift report, all with `touching == false`.
+    public let recoveryLift: [TouchContact]
+    /// Why the recovery lift was not written either. When set, the device may
+    /// still consider `recoveryLift`'s contacts down.
+    public let recoveryLiftError: Error?
+
+    public init(underlying: Error, recoveryLift: [TouchContact], recoveryLiftError: Error?) {
+        self.underlying = underlying
+        self.recoveryLift = recoveryLift
+        self.recoveryLiftError = recoveryLiftError
+    }
 }
 
 /// Failures locating the macOS CoreDevice tunnel of a device.

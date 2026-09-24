@@ -32,9 +32,16 @@ public final class RemoteXPCConnection {
         self.http = http
     }
 
-    /// Runs HTTP/2 set-up and the XPC init handshake over `transport`.
+    /// Runs HTTP/2 set-up and the XPC init handshake over `transport`. The
+    /// transport is closed when either step fails.
     public static func open(transport: ByteTransport) throws -> RemoteXPCConnection {
-        let http = try HTTP2Connection(transport: transport)
+        let http: HTTP2Connection
+        do {
+            http = try HTTP2Connection(transport: transport)
+        } catch {
+            transport.close()
+            throw error
+        }
         let connection = RemoteXPCConnection(http: http)
         do {
             try connection.initialize()

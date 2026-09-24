@@ -69,16 +69,23 @@ public struct RemoteXPCDictionaryEntry: Equatable, Sendable {
 ///
 /// The order is what the encoder writes, so a decoded message re-encodes to the
 /// bytes it came from. Equality compares contents only, because two senders may
-/// legitimately order the same keys differently.
+/// legitimately order the same keys differently. A key-to-position index keeps
+/// lookups and inserts constant-time, so decoding a peer-supplied dictionary is
+/// linear in its entry count.
 public struct RemoteXPCDictionary: Equatable, Sendable, ExpressibleByDictionaryLiteral {
     public private(set) var entries: [RemoteXPCDictionaryEntry]
+    /// Position of each key in `entries`.
+    private var positions: [String: Int]
 
     public init() {
         entries = []
+        positions = [:]
     }
 
     public init(_ entries: [(String, RemoteXPCObject)]) {
-        self.entries = []
+        self.init()
+        self.entries.reserveCapacity(entries.count)
+        positions.reserveCapacity(entries.count)
         for (key, value) in entries {
             self[key] = value
         }
@@ -93,17 +100,22 @@ public struct RemoteXPCDictionary: Equatable, Sendable, ExpressibleByDictionaryL
     public var keys: [String] { entries.map(\.key) }
 
     /// Reads a value, or replaces it in place (keeping its position), or appends
-    /// a new key at the end. Assigning `nil` removes the key.
+    /// a new key at the end. Assigning `nil` removes the key, which shifts the
+    /// positions of the keys after it.
     public subscript(key: String) -> RemoteXPCObject? {
-        get { entries.first { $0.key == key }?.value }
+        get { positions[key].map { entries[$0].value } }
         set {
-            let existing = entries.firstIndex { $0.key == key }
-            switch (existing, newValue) {
+            switch (positions[key], newValue) {
             case let (index?, value?):
                 entries[index] = RemoteXPCDictionaryEntry(key: key, value: value)
             case let (index?, nil):
                 entries.remove(at: index)
+                positions[key] = nil
+                for shifted in index..<entries.count {
+                    positions[entries[shifted].key] = shifted
+                }
             case let (nil, value?):
+                positions[key] = entries.count
                 entries.append(RemoteXPCDictionaryEntry(key: key, value: value))
             case (nil, nil):
                 break

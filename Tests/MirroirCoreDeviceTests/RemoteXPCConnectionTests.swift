@@ -33,8 +33,14 @@ final class RemoteXPCConnectionTests: XCTestCase {
         return (try RemoteXPCConnection.open(transport: transport), transport)
     }
 
+    /// Each handshake reply is released only after the request it answers, so
+    /// a client that reads before writing, or writes on the wrong stream,
+    /// fails here instead of consuming replies queued up front.
     func testInitHandshakeMatchesGoIOS() throws {
-        let (_, transport) = try openConnection()
+        let transport = GatedTransport(initial: DeviceScript.settings(), gates: try DeviceScript.handshakeGates())
+        _ = try RemoteXPCConnection.open(transport: transport)
+        XCTAssertEqual(transport.remainingGates, 0)
+        XCTAssertEqual(transport.outOfOrderStreams, [])
         let sent = try sentMessages(transport.written)
         XCTAssertEqual(sent.count, 3)
         XCTAssertEqual(sent[0].0, 1)
@@ -68,6 +74,21 @@ final class RemoteXPCConnectionTests: XCTestCase {
         let (connection, _) = try openConnection(extra: extra)
         XCTAssertEqual(try connection.receiveOnClientServerStream().body, ["n": .int64(5)])
         XCTAssertEqual(try connection.receiveOnServerClientStream().body, ["ok": .bool(true)])
+    }
+
+    func testGatedTransportRefusesAReadBeforeTheRequest() throws {
+        let transport = GatedTransport(initial: Data(), gates: try DeviceScript.handshakeGates())
+        XCTAssertThrowsError(try transport.read(maximumLength: 1)) { error in
+            XCTAssertEqual(error as? TransportError, .closed)
+        }
+    }
+
+    func testHTTP2SetupFailureClosesTheTransport() {
+        let transport = ScriptedTransport(inbound: DeviceScript.settings([(.maxFrameSize, 0)]))
+        XCTAssertThrowsError(try RemoteXPCConnection.open(transport: transport)) { error in
+            XCTAssertEqual(error as? HTTP2Error, .invalidSetting(id: HTTP2SettingID.maxFrameSize.rawValue, value: 0))
+        }
+        XCTAssertTrue(transport.closed)
     }
 
     func testHandshakeFailureClosesTheTransport() {

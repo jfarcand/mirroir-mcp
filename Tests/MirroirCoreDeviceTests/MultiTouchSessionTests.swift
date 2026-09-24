@@ -155,8 +155,14 @@ final class MultiTouchSessionTests: XCTestCase {
     func testSixthFingerIsRejectedWithoutDisturbingTheFive() throws {
         let sender = RecordingHIDSender()
         let session = makeSession(sender)
-        for id in 0..<5 { try session.down(identifier: UInt8(id), x: 0, y: 0) }
-        XCTAssertThrowsError(try session.down(identifier: 0, x: 0, y: 0))
+        for id in 0..<TouchscreenReport.maximumContacts { try session.down(identifier: UInt8(id), x: 0, y: 0) }
+        let sixth = UInt8(TouchscreenReport.maximumContacts)
+        XCTAssertFalse(session.heldIdentifiers.contains(sixth))
+        XCTAssertThrowsError(try session.down(identifier: sixth, x: 0, y: 0)) { error in
+            XCTAssertEqual(error as? TouchReportError,
+                           .contactCountOutOfRange(count: 6, maximum: TouchscreenReport.maximumContacts))
+        }
+        XCTAssertEqual(sender.sent.count, TouchscreenReport.maximumContacts, "the rejected report is never sent")
         XCTAssertEqual(session.heldIdentifiers, [0, 1, 2, 3, 4])
     }
 
@@ -164,23 +170,70 @@ final class MultiTouchSessionTests: XCTestCase {
     /// be down, including the contact being put down, is lifted.
     func testFailedDownLiftsEverythingIncludingTheNewContact() throws {
         let sender = RecordingHIDSender()
-        sender.failOnCall = 2
+        sender.failingCalls = [2]
         let session = makeSession(sender)
         try session.down(identifier: 0, x: 1, y: 1)
-        XCTAssertThrowsError(try session.down(identifier: 1, x: 2, y: 2)) { error in
-            XCTAssertTrue(error is RecordingHIDSender.InjectedFailure)
-        }
-        let recovery = try XCTUnwrap(sender.sent.last)
-        XCTAssertEqual(contacts(in: recovery.report), [
+        let expectedLift = [
             TouchContact(identifier: 0, touching: false, x: 1, y: 1),
             TouchContact(identifier: 1, touching: false, x: 2, y: 2),
+        ]
+        XCTAssertThrowsError(try session.down(identifier: 1, x: 2, y: 2)) { error in
+            guard let failure = error as? MultiTouchSendError else { return XCTFail("unexpected \(error)") }
+            XCTAssertEqual(failure.underlying as? RecordingHIDSender.InjectedFailure, .init(call: 2))
+            XCTAssertEqual(failure.recoveryLift, expectedLift)
+            XCTAssertNil(failure.recoveryLiftError)
+        }
+        let recovery = try XCTUnwrap(sender.sent.last)
+        XCTAssertEqual(contacts(in: recovery.report), expectedLift)
+        XCTAssertEqual(session.heldIdentifiers, [])
+    }
+
+    /// The failed move may have reached the device, so the recovery lift must
+    /// name the position that move carried, not the one before it.
+    func testFailedMoveLiftsAtThePositionTheMoveSent() throws {
+        let sender = RecordingHIDSender()
+        sender.failingCalls = [3]
+        let session = makeSession(sender)
+        try session.down(identifier: 0, x: 10, y: 10)
+        try session.down(identifier: 1, x: 20, y: 20)
+        XCTAssertThrowsError(try session.move(identifier: 0, x: 500, y: 600))
+        let recovery = try XCTUnwrap(sender.sent.last)
+        XCTAssertEqual(contacts(in: recovery.report), [
+            TouchContact(identifier: 0, touching: false, x: 500, y: 600),
+            TouchContact(identifier: 1, touching: false, x: 20, y: 20),
         ])
         XCTAssertEqual(session.heldIdentifiers, [])
     }
 
+    /// When the recovery lift fails too, the thrown error says so instead of
+    /// the session pretending the contacts were lifted.
+    func testFailedRecoveryLiftIsSurfacedInTheError() throws {
+        let sender = RecordingHIDSender()
+        sender.failingCalls = [2, 3]
+        let session = makeSession(sender)
+        try session.down(identifier: 0, x: 1, y: 1)
+        XCTAssertThrowsError(try session.move(identifier: 0, x: 9, y: 9)) { error in
+            guard let failure = error as? MultiTouchSendError else { return XCTFail("unexpected \(error)") }
+            XCTAssertEqual(failure.underlying as? RecordingHIDSender.InjectedFailure, .init(call: 2))
+            XCTAssertEqual(failure.recoveryLiftError as? RecordingHIDSender.InjectedFailure, .init(call: 3))
+            XCTAssertEqual(failure.recoveryLift, [TouchContact(identifier: 0, touching: false, x: 9, y: 9)])
+        }
+        XCTAssertEqual(sender.sent.count, 1, "neither the move nor its recovery was written")
+    }
+
+    func testReleasingASessionLiftsHeldContactsAndClosesTheSender() throws {
+        let sender = RecordingHIDSender()
+        var session: MultiTouchSession? = makeSession(sender)
+        try session?.down(identifier: 2, x: 30, y: 40)
+        session = nil
+        XCTAssertEqual(sender.closeCount, 1)
+        let last = try XCTUnwrap(sender.sent.last)
+        XCTAssertEqual(contacts(in: last.report), [TouchContact(identifier: 2, touching: false, x: 30, y: 40)])
+    }
+
     func testFailedLiftDuringCloseStillForgetsAndClosesAndRethrows() throws {
         let sender = RecordingHIDSender()
-        sender.failOnCall = 2
+        sender.failingCalls = [2]
         let session = makeSession(sender)
         try session.down(identifier: 0, x: 1, y: 1)
         XCTAssertThrowsError(try session.close())

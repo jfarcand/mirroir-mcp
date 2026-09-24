@@ -2,7 +2,7 @@
 // Licensed under the Apache License, Version 2.0
 //
 // ABOUTME: Stateful multi-touch session: tracks up to five held contacts and emits one digitizer report per change.
-// ABOUTME: Guarantees no contact is left down: a failed send and close() both lift everything still held.
+// ABOUTME: Guarantees no contact is left down: a failed send, close() and deinit all lift everything still held.
 //
 // Portions derived from go-ios (https://github.com/danielpaulus/go-ios),
 // Copyright (c) 2019 danielpaulus, MIT License. See THIRD_PARTY_NOTICES.md.
@@ -37,6 +37,13 @@ public final class MultiTouchSession {
         self.sender = sender
         self.serviceID = serviceID
         self.timestamp = timestamp
+    }
+
+    /// Lifts anything still held and closes the sender when the session is
+    /// released without `close()`. A deinitialiser cannot throw, so a lift
+    /// that fails here has no caller to reach; `close()` is the way to see it.
+    deinit {
+        _ = try? close()
     }
 
     /// Identifiers of the contacts currently held, in slot order.
@@ -122,21 +129,24 @@ public final class MultiTouchSession {
     /// Sends a report describing `described` and, once it is written, records
     /// `resulting` as the held set. A report that fails validation never
     /// reached the device and changes nothing. Any other failure leaves the
-    /// device's view unknown, so every contact that might be down (held or
-    /// being put down) is lifted before the error propagates.
+    /// device's view unknown, so every contact the failed report described
+    /// (it always includes every held contact) is lifted at the position that
+    /// report carried, and `MultiTouchSendError` reports both outcomes.
     private func apply(described: [TouchContact], resulting: [TouchContact]) throws {
         do {
             try send(described)
         } catch let error as TouchReportError {
             throw error
         } catch {
-            let attempted = described.filter { contact in
-                !held.contains { $0.identifier == contact.identifier }
-            }
-            let suspect = (held + attempted).map(Self.lifted)
+            let recovery = described.map(Self.lifted)
             held.removeAll()
-            try? send(suspect)
-            throw error
+            var recoveryError: Error?
+            do {
+                try send(recovery)
+            } catch let liftError {
+                recoveryError = liftError
+            }
+            throw MultiTouchSendError(underlying: error, recoveryLift: recovery, recoveryLiftError: recoveryError)
         }
         held = resulting
     }

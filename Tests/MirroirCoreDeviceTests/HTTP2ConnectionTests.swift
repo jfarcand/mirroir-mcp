@@ -51,13 +51,72 @@ final class HTTP2ConnectionTests: XCTestCase {
         let transport = ScriptedTransport(inbound: DeviceScript.settings())
         let connection = try HTTP2Connection(transport: transport)
         let setupLength = transport.written.count
-        let payload = Data(repeating: 7, count: HTTP2Framer.defaultMaxFrameSize + 10)
-        try connection.write(payload, on: .clientServer)
+        let payload = Data((0..<(HTTP2Framer.defaultMaxFrameSize + 10)).map { UInt8(truncatingIfNeeded: $0 * 7) })
+        try connection.write(payload, on: .serverClient)
 
         let reader = HTTP2Framer(transport: ScriptedTransport(inbound: Data(transport.written.dropFirst(setupLength))))
-        XCTAssertEqual(try reader.readFrame().type, .headers)
-        XCTAssertEqual(try reader.readFrame().payload.count, HTTP2Framer.defaultMaxFrameSize)
-        XCTAssertEqual(try reader.readFrame().payload.count, 10)
+        let headers = try reader.readFrame()
+        XCTAssertEqual(headers.type, .headers)
+        XCTAssertEqual(headers.streamID, RemoteXPCStream.serverClient.rawValue)
+        let first = try reader.readFrame()
+        let second = try reader.readFrame()
+        XCTAssertEqual([first.type, second.type], [.data, .data])
+        XCTAssertEqual([first.streamID, second.streamID],
+                       [RemoteXPCStream.serverClient.rawValue, RemoteXPCStream.serverClient.rawValue])
+        XCTAssertEqual(first.payload, payload.prefix(HTTP2Framer.defaultMaxFrameSize))
+        XCTAssertEqual(second.payload, payload.suffix(10))
+        XCTAssertEqual(first.payload + second.payload, payload)
+    }
+
+    func testPeerFrameSizeOutsideTheRFCRangeIsRejectedAtSetup() {
+        let invalid: [UInt32] = [0, UInt32(HTTP2Framer.defaultMaxFrameSize - 1), UInt32(HTTP2Framer.largestFrameLength + 1)]
+        for value in invalid {
+            let transport = ScriptedTransport(inbound: DeviceScript.settings([(.maxFrameSize, value)]))
+            XCTAssertThrowsError(try HTTP2Connection(transport: transport), "\(value)") { error in
+                XCTAssertEqual(error as? HTTP2Error,
+                               .invalidSetting(id: HTTP2SettingID.maxFrameSize.rawValue, value: value))
+            }
+        }
+    }
+
+    func testPeerFrameSizeAtTheRFCBoundsIsAccepted() throws {
+        for value in [UInt32(HTTP2Framer.defaultMaxFrameSize), UInt32(HTTP2Framer.largestFrameLength)] {
+            _ = try HTTP2Connection(transport: ScriptedTransport(inbound: DeviceScript.settings([(.maxFrameSize, value)])))
+        }
+    }
+
+    func testMidStreamZeroFrameSizeIsRejectedBeforeAnyWriteUsesIt() throws {
+        let transport = ScriptedTransport(inbound: DeviceScript.settings()
+            + DeviceScript.settings([(.maxFrameSize, 0)]))
+        let connection = try HTTP2Connection(transport: transport)
+        XCTAssertThrowsError(try connection.read(1, from: .clientServer)) { error in
+            XCTAssertEqual(error as? HTTP2Error, .invalidSetting(id: HTTP2SettingID.maxFrameSize.rawValue, value: 0))
+        }
+        try connection.write(Data(count: 3), on: .clientServer)
+    }
+
+    func testInitialWindowSizeAbove31BitsIsRejected() {
+        let transport = ScriptedTransport(inbound: DeviceScript.settings([(.initialWindowSize, 0x8000_0000)]))
+        XCTAssertThrowsError(try HTTP2Connection(transport: transport)) { error in
+            XCTAssertEqual(error as? HTTP2Error,
+                           .invalidSetting(id: HTTP2SettingID.initialWindowSize.rawValue, value: 0x8000_0000))
+        }
+    }
+
+    /// Data for a stream nobody reads must not accumulate without bound.
+    func testUnreadStreamBufferIsBounded() throws {
+        let limit = 8
+        let inbound = DeviceScript.settings()
+            + DeviceScript.data(Data(count: 5), stream: .serverClient)
+            + DeviceScript.data(Data(count: 5), stream: .serverClient)
+            + DeviceScript.data(Data([1]), stream: .clientServer)
+        let connection = try HTTP2Connection(transport: ScriptedTransport(inbound: inbound),
+                                             maximumBufferedBytesPerStream: limit)
+        XCTAssertThrowsError(try connection.read(1, from: .clientServer)) { error in
+            XCTAssertEqual(error as? HTTP2Error,
+                           .receiveBufferOverflow(streamID: RemoteXPCStream.serverClient.rawValue,
+                                                  buffered: 10, limit: limit))
+        }
     }
 
     func testReadsDemultiplexStreamsAndSurviveShortReads() throws {

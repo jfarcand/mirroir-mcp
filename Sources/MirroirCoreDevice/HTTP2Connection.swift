@@ -33,6 +33,12 @@ public final class HTTP2Connection {
     /// Connection window increment sent after the settings: 983041 bytes,
     /// raising the 65535-byte default connection window to 1 MiB + 1 (go-ios value).
     public static let connectionWindowIncrement: UInt32 = 983_041
+    /// Default cap on the bytes buffered for one stream that nobody reads: one
+    /// maximal RemoteXPC message (wrapper plus the largest accepted body).
+    public static let defaultMaximumBufferedBytesPerStream =
+        XPCWireCodec.wrapperHeaderLength + Int(XPCWireCodec.maximumBodyLength)
+    /// Largest SETTINGS_INITIAL_WINDOW_SIZE a peer may send (RFC 9113 6.5.2).
+    public static let largestInitialWindowSize: UInt32 = 0x7FFF_FFFF
 
     private let transport: ByteTransport
     private let framer: HTTP2Framer
@@ -43,13 +49,22 @@ public final class HTTP2Connection {
     private var buffers: [RemoteXPCStream: Data] = [.clientServer: Data(), .serverClient: Data()]
     private var openedStreams: Set<RemoteXPCStream> = []
     private var peerMaxFrameSize = HTTP2Framer.defaultMaxFrameSize
+    /// Bytes one stream may hold unread before the peer is treated as hostile.
+    private let maximumBufferedBytesPerStream: Int
 
     /// Performs the client side of connection set-up over `transport`:
     /// preface, SETTINGS, WINDOW_UPDATE, then reads the server's first frame and
-    /// acknowledges it when it is SETTINGS.
-    public init(transport: ByteTransport) throws {
+    /// acknowledges it when it is SETTINGS. Throws `HTTP2Error.invalidSetting`
+    /// when that frame carries a value RFC 9113 forbids.
+    ///
+    /// - Parameter maximumBufferedBytesPerStream: data received for a stream
+    ///   that has not been read yet is buffered up to this many bytes; more
+    ///   throws `HTTP2Error.receiveBufferOverflow`.
+    public init(transport: ByteTransport,
+                maximumBufferedBytesPerStream: Int = HTTP2Connection.defaultMaximumBufferedBytesPerStream) throws {
         self.transport = transport
         self.framer = HTTP2Framer(transport: transport)
+        self.maximumBufferedBytesPerStream = maximumBufferedBytesPerStream
         try framer.writePreface()
         try framer.writeSettings([
             (.maxConcurrentStreams, Self.advertisedMaxConcurrentStreams),
@@ -60,26 +75,49 @@ public final class HTTP2Connection {
 
         let first = try framer.readFrame()
         guard first.type == .settings else { return }
-        applyPeerSettings(first)
+        try applyPeerSettings(first)
         try framer.writeSettingsAck()
     }
 
     /// go-ios feeds the peer's SETTINGS_INITIAL_WINDOW_SIZE to
     /// `SetMaxReadFrameSize`; this keeps that behaviour, clamped to what a
     /// frame header can express, and also honours SETTINGS_MAX_FRAME_SIZE for
-    /// the frames this side writes.
-    private func applyPeerSettings(_ frame: HTTP2Frame) {
-        for setting in HTTP2Framer.settings(in: frame) {
+    /// the frames this side writes. Values outside RFC 9113's ranges are a
+    /// connection error: a zero frame size would make every write loop forever.
+    private func applyPeerSettings(_ frame: HTTP2Frame) throws {
+        let settings = HTTP2Framer.settings(in: frame)
+        for setting in settings {
+            try Self.validate(setting)
+        }
+        for setting in settings {
             switch HTTP2SettingID(rawValue: setting.id) {
             case .initialWindowSize:
                 framer.maxReadFrameSize = min(Int(setting.value), HTTP2Framer.largestFrameLength)
             case .maxFrameSize:
                 writeLock.withLock {
-                    peerMaxFrameSize = min(Int(setting.value), HTTP2Framer.largestFrameLength)
+                    peerMaxFrameSize = Int(setting.value)
                 }
             default:
                 continue
             }
+        }
+    }
+
+    /// RFC 9113 6.5.2: SETTINGS_MAX_FRAME_SIZE must lie between the 16 KiB
+    /// default and the 24-bit maximum; SETTINGS_INITIAL_WINDOW_SIZE must fit 31 bits.
+    private static func validate(_ setting: (id: UInt16, value: UInt32)) throws {
+        switch HTTP2SettingID(rawValue: setting.id) {
+        case .maxFrameSize:
+            let allowed = HTTP2Framer.defaultMaxFrameSize...HTTP2Framer.largestFrameLength
+            guard allowed.contains(Int(setting.value)) else {
+                throw HTTP2Error.invalidSetting(id: setting.id, value: setting.value)
+            }
+        case .initialWindowSize:
+            guard setting.value <= largestInitialWindowSize else {
+                throw HTTP2Error.invalidSetting(id: setting.id, value: setting.value)
+            }
+        default:
+            return
         }
     }
 
@@ -128,7 +166,13 @@ public final class HTTP2Connection {
                 guard let stream = RemoteXPCStream(rawValue: frame.streamID), stream != .connection else {
                     throw HTTP2Error.unexpectedStream(frame.streamID)
                 }
-                buffers[stream, default: Data()].append(try HTTP2Framer.dataPayload(of: frame))
+                let payload = try HTTP2Framer.dataPayload(of: frame)
+                let buffered = buffers[stream, default: Data()].count + payload.count
+                guard buffered <= maximumBufferedBytesPerStream else {
+                    throw HTTP2Error.receiveBufferOverflow(
+                        streamID: stream.rawValue, buffered: buffered, limit: maximumBufferedBytesPerStream)
+                }
+                buffers[stream, default: Data()].append(payload)
                 return
             case .goAway:
                 throw HTTP2Error.goAway(
@@ -136,7 +180,7 @@ public final class HTTP2Connection {
                     errorCode: HTTP2Framer.word(in: frame, at: HTTP2Framer.streamIDFieldWidth))
             case .settings:
                 if !frame.has(flag: HTTP2Flags.ack) {
-                    applyPeerSettings(frame)
+                    try applyPeerSettings(frame)
                     try writeLock.withLock { try framer.writeSettingsAck() }
                 }
             case .rstStream:

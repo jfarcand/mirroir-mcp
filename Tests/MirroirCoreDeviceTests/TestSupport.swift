@@ -49,6 +49,71 @@ final class ScriptedTransport: ByteTransport {
     }
 }
 
+/// A `ByteTransport` that behaves like a device answering requests: each reply
+/// is released only after the client has written a DATA frame on the stream the
+/// reply is gated on, in order. A client that reads before writing the request
+/// finds nothing to read (a peer close), and one that writes on the wrong
+/// stream never unlocks the reply, so ordering mistakes fail the test.
+final class GatedTransport: ByteTransport {
+    struct Gate {
+        /// Stream the client must write a DATA frame on to release `reply`.
+        let stream: RemoteXPCStream
+        let reply: Data
+    }
+
+    private let inner: ScriptedTransport
+    private var gates: [Gate]
+    private var parsedOffset = HTTP2Framer.clientPreface.count
+    /// DATA-frame streams the client wrote that did not match the next gate.
+    private(set) var outOfOrderStreams: [UInt32] = []
+
+    /// - Parameters:
+    ///   - initial: bytes available before the client writes anything (the
+    ///     device's opening SETTINGS).
+    ///   - gates: replies, each released by the matching client write.
+    init(initial: Data, gates: [Gate]) {
+        self.inner = ScriptedTransport(inbound: initial)
+        self.gates = gates
+    }
+
+    var written: Data { inner.written }
+    var closed: Bool { inner.closed }
+    var remainingGates: Int { gates.count }
+
+    func write(_ data: Data) throws {
+        try inner.write(data)
+        releaseRepliesForCompleteFrames()
+    }
+
+    func read(maximumLength: Int) throws -> Data {
+        try inner.read(maximumLength: maximumLength)
+    }
+
+    func close() {
+        inner.close()
+    }
+
+    private func releaseRepliesForCompleteFrames() {
+        let bytes = [UInt8](inner.written)
+        while bytes.count - parsedOffset >= HTTP2Framer.frameHeaderLength {
+            let length = Int(bytes.bigEndianValue(at: parsedOffset, width: HTTP2Framer.lengthFieldWidth))
+            let end = parsedOffset + HTTP2Framer.frameHeaderLength + length
+            guard end <= bytes.count else { return }
+            let type = bytes[parsedOffset + HTTP2Framer.lengthFieldWidth]
+            let stream = UInt32(bytes.bigEndianValue(
+                at: parsedOffset + HTTP2Framer.lengthFieldWidth + 2, width: HTTP2Framer.streamIDFieldWidth))
+            parsedOffset = end
+            guard type == HTTP2FrameType.data.rawValue else { continue }
+            guard let gate = gates.first, gate.stream.rawValue == stream else {
+                outOfOrderStreams.append(stream)
+                continue
+            }
+            gates.removeFirst()
+            inner.enqueue(gate.reply)
+        }
+    }
+}
+
 /// Builds the bytes a device sends on the wire.
 enum DeviceScript {
     /// The device's opening SETTINGS frame.
@@ -67,6 +132,18 @@ enum DeviceScript {
 
     static func message(_ message: RemoteXPCMessage, stream: RemoteXPCStream) throws -> Data {
         data(try XPCWireCodec.encodeMessage(message), stream: stream)
+    }
+
+    /// The three init-handshake replies, each gated on the client request it answers.
+    static func handshakeGates() throws -> [GatedTransport.Gate] {
+        [
+            GatedTransport.Gate(stream: .clientServer, reply: try message(
+                RemoteXPCMessage(flags: .alwaysSet, body: RemoteXPCDictionary()), stream: .clientServer)),
+            GatedTransport.Gate(stream: .serverClient, reply: try message(
+                RemoteXPCMessage(flags: [.alwaysSet, .initHandshake], body: nil), stream: .serverClient)),
+            GatedTransport.Gate(stream: .clientServer, reply: try message(
+                RemoteXPCMessage(flags: .alwaysSet, body: nil), stream: .clientServer)),
+        ]
     }
 
     /// The three replies of the XPC init handshake, as a device sends them.
@@ -139,17 +216,19 @@ final class RecordingHIDSender: HIDReportSending {
         let serviceID: UInt64
     }
 
-    struct InjectedFailure: Error {}
+    struct InjectedFailure: Error, Equatable {
+        let call: Int
+    }
 
     private(set) var sent: [Sent] = []
     private(set) var closeCount = 0
-    /// 1-based index of the `sendReport` call that fails; 0 never fails.
-    var failOnCall = 0
+    /// 1-based indexes of the `sendReport` calls that fail.
+    var failingCalls: Set<Int> = []
     private var calls = 0
 
     func sendReport(_ report: Data, serviceID: UInt64) throws {
         calls += 1
-        if calls == failOnCall { throw InjectedFailure() }
+        if failingCalls.contains(calls) { throw InjectedFailure(call: calls) }
         sent.append(Sent(report: report, serviceID: serviceID))
     }
 
