@@ -4,7 +4,7 @@
   "Properties": {
     "AppleInternal": false,
     "BoardId": 26,
-    "BootSessionUUID": "aeaf223a-9447-4771-bc4c-1572f330b68c",
+    "BootSessionUUID": "00000000-0000-4000-8000-000000000001",
     "BuildVersion": "21A360",
     "CPUArchitecture": "arm64e",
     "CertificateProductionStatus": true,
@@ -18,7 +18,7 @@
     "EffectiveProductionStatusSEP": true,
     "EffectiveSecurityModeAp": true,
     "EffectiveSecurityModeSEP": true,
-    "EthernetMacAddress": "90:e1:7b:21:7b:84",
+    "EthernetMacAddress": "02:00:00:00:00:00",
     "HWModel": "D331pAP",
     "HardwarePlatform": "t8020",
     "HasSEP": true,
@@ -39,13 +39,13 @@
     "RestoreLongVersion": "21.1.360.0.0,0",
     "SecurityDomain": 1,
     "SensitivePropertiesVisible": true,
-    "SerialNumber": "FFMXNFFJKPH1",
+    "SerialNumber": "TESTSERIAL00",
     "SigningFuse": true,
     "StoreDemoMode": false,
     "SupplementalBuildVersion": "21A360",
     "ThinningProductType": "iPhone11,6",
-    "UniqueChipID": 7125711553429550,
-    "UniqueDeviceID": "00008020-001950CC01EA002E"
+    "UniqueChipID": 1000000000000000,
+    "UniqueDeviceID": "00008020-0000000000000000"
   },
   "Services": {
     "com.apple.GPUTools.MobileService.shim.remote": {
@@ -456,5 +456,5 @@
       "Port": "50324"
     }
   },
-  "UUID": "d09e3fd1-62aa-47bc-b01a-23df97017d34"
+  "UUID": "00000000-0000-4000-8000-000000000002"
 }

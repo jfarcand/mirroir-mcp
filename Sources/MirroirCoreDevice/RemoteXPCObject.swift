@@ -3,6 +3,9 @@
 //
 // ABOUTME: Value model for RemoteXPC messages: the XPC object enum, an insertion-ordered dictionary, and message flags.
 // ABOUTME: Dictionaries keep wire order so a decoded message re-encodes byte-for-byte; equality ignores order.
+//
+// Portions derived from go-ios (https://github.com/danielpaulus/go-ios),
+// Copyright (c) 2019 danielpaulus, MIT License. See THIRD_PARTY_NOTICES.md.
 
 import Foundation
 

@@ -3,6 +3,9 @@
 //
 // ABOUTME: UniversalHID service request payloads and the RemoteXPC connection that delivers HID reports.
 // ABOUTME: Port of go-ios ios/hid/payload.go and hid.go (universalConnection); wire shape confirmed by ipb captures.
+//
+// Portions derived from go-ios (https://github.com/danielpaulus/go-ios),
+// Copyright (c) 2019 danielpaulus, MIT License. See THIRD_PARTY_NOTICES.md.
 
 import Foundation
 

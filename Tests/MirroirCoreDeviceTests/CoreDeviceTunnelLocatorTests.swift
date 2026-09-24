@@ -3,6 +3,9 @@
 //
 // ABOUTME: devicectl device-list parsing tests: an unavailable device captured on a Mac, and a connected variant.
 // ABOUTME: The connected fixture adds the documented tunnelIPAddress field; the only local device had no tunnel to capture.
+//
+// Portions derived from go-ios (https://github.com/danielpaulus/go-ios),
+// Copyright (c) 2019 danielpaulus, MIT License. See THIRD_PARTY_NOTICES.md.
 
 import Foundation
 import XCTest

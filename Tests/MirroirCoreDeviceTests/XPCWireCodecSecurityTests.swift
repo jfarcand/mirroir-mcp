@@ -3,6 +3,9 @@
 //
 // ABOUTME: Bounds-checking tests for the XPC decoder: malformed, truncated and hostile input must throw, never trap.
 // ABOUTME: Ports go-ios ios/xpc/encoding_security_test.go and adds a truncation sweep and a nesting bomb.
+//
+// Portions derived from go-ios (https://github.com/danielpaulus/go-ios),
+// Copyright (c) 2019 danielpaulus, MIT License. See THIRD_PARTY_NOTICES.md.
 
 import Foundation
 import XCTest

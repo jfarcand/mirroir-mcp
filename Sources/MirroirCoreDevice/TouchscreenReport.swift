@@ -3,6 +3,9 @@
 //
 // ABOUTME: Builds the UniversalHID DigitizerReport (report ID 9, 58 bytes) for one to five touch contacts.
 // ABOUTME: Field map from the host UniversalHID report descriptor (ipb descriptors.txt); single contact matches go-ios.
+//
+// Portions derived from go-ios (https://github.com/danielpaulus/go-ios),
+// Copyright (c) 2019 danielpaulus, MIT License. See THIRD_PARTY_NOTICES.md.
 
 import Foundation
 

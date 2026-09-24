@@ -3,6 +3,9 @@
 //
 // ABOUTME: DigitizerReport tests: go-ios's single-contact golden bytes, multi-contact layout, and validation.
 // ABOUTME: Timestamp placement follows the UniversalHID descriptor (bytes 45..52), not go-ios (byte 44).
+//
+// Portions derived from go-ios (https://github.com/danielpaulus/go-ios),
+// Copyright (c) 2019 danielpaulus, MIT License. See THIRD_PARTY_NOTICES.md.
 
 import Foundation
 import XCTest

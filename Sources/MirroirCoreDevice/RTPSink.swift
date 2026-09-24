@@ -3,6 +3,9 @@
 //
 // ABOUTME: Minimal UDP sink for the display service's RTP stream: bind on the tunnel address, drain, discard.
 // ABOUTME: Touch is only applied while a media stream runs, so the stream must be received even though it is unused.
+//
+// Portions derived from go-ios (https://github.com/danielpaulus/go-ios),
+// Copyright (c) 2019 danielpaulus, MIT License. See THIRD_PARTY_NOTICES.md.
 
 import Foundation
 import Network

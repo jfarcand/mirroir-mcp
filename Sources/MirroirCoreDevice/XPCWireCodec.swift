@@ -3,6 +3,9 @@
 //
 // ABOUTME: Encodes and decodes Apple's RemoteXPC wire format (wrapper header, body header, typed objects).
 // ABOUTME: Ported from go-ios ios/xpc/encoding.go; every wire length is bounded before it drives an allocation.
+//
+// Portions derived from go-ios (https://github.com/danielpaulus/go-ios),
+// Copyright (c) 2019 danielpaulus, MIT License. See THIRD_PARTY_NOTICES.md.
 
 import Foundation
 

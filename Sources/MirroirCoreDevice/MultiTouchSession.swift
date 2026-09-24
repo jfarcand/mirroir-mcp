@@ -3,6 +3,9 @@
 //
 // ABOUTME: Stateful multi-touch session: tracks up to five held contacts and emits one digitizer report per change.
 // ABOUTME: Guarantees no contact is left down: a failed send and close() both lift everything still held.
+//
+// Portions derived from go-ios (https://github.com/danielpaulus/go-ios),
+// Copyright (c) 2019 danielpaulus, MIT License. See THIRD_PARTY_NOTICES.md.
 
 import Foundation
 

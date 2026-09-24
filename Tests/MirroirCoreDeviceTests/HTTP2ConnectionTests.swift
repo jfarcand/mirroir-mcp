@@ -3,6 +3,9 @@
 //
 // ABOUTME: HTTP/2 framer and connection tests over an in-memory transport: exact set-up bytes, streams, errors.
 // ABOUTME: The set-up bytes are what golang.org/x/net/http2 emits for go-ios NewHttpConnection.
+//
+// Portions derived from go-ios (https://github.com/danielpaulus/go-ios),
+// Copyright (c) 2019 danielpaulus, MIT License. See THIRD_PARTY_NOTICES.md.
 
 import Foundation
 import XCTest

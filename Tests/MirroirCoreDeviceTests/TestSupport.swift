@@ -3,6 +3,9 @@
 //
 // ABOUTME: Shared test doubles and helpers: an in-memory scripted transport, fixture loading, hex, JSON-to-XPC.
 // ABOUTME: The scripted transport replays a device's bytes and records every byte the client writes.
+//
+// Portions derived from go-ios (https://github.com/danielpaulus/go-ios),
+// Copyright (c) 2019 danielpaulus, MIT License. See THIRD_PARTY_NOTICES.md.
 
 import Foundation
 import XCTest

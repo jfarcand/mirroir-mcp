@@ -3,6 +3,9 @@
 //
 // ABOUTME: Remote service discovery: reads the device's Handshake over RemoteXPC into a service-to-port map.
 // ABOUTME: Port of go-ios ios/rsd.go (Handshake, GetPort with the .shim.remote fallback, GetService).
+//
+// Portions derived from go-ios (https://github.com/danielpaulus/go-ios),
+// Copyright (c) 2019 danielpaulus, MIT License. See THIRD_PARTY_NOTICES.md.
 
 import Foundation
 

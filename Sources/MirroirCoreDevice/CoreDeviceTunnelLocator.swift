@@ -3,6 +3,9 @@
 //
 // ABOUTME: Finds the macOS system CoreDevice tunnel of a device by parsing `xcrun devicectl list devices` JSON.
 // ABOUTME: Reads the tunnel address and RSD port defensively and throws a typed error when no tunnel is up.
+//
+// Portions derived from go-ios (https://github.com/danielpaulus/go-ios),
+// Copyright (c) 2019 danielpaulus, MIT License. See THIRD_PARTY_NOTICES.md.
 
 import Foundation
 

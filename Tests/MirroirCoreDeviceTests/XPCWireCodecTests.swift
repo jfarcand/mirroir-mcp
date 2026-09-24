@@ -3,6 +3,9 @@
 //
 // ABOUTME: XPC wire codec tests: go-ios captured fixtures decoded and re-encoded byte-for-byte, plus round trips.
 // ABOUTME: Mirrors go-ios ios/xpc/encoding_test.go vectors; malformed-input tests live in XPCWireCodecSecurityTests.
+//
+// Portions derived from go-ios (https://github.com/danielpaulus/go-ios),
+// Copyright (c) 2019 danielpaulus, MIT License. See THIRD_PARTY_NOTICES.md.
 
 import Foundation
 import XCTest

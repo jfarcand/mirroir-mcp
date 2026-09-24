@@ -3,6 +3,9 @@
 //
 // ABOUTME: Encodes the AVConference video negotiator offer the display service needs to start a media stream.
 // ABOUTME: Exact port of go-ios ios/display/offer.go: schema-less protobuf media blob, zlib level 9, binary plist.
+//
+// Portions derived from go-ios (https://github.com/danielpaulus/go-ios),
+// Copyright (c) 2019 danielpaulus, MIT License. See THIRD_PARTY_NOTICES.md.
 
 import Foundation
 import zlib

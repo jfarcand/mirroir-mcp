@@ -3,6 +3,9 @@
 //
 // ABOUTME: Typed errors for every layer of the CoreDevice stack: XPC codec, HTTP/2, transport, RSD, HID.
 // ABOUTME: Each case carries the structured context a caller needs instead of a formatted string.
+//
+// Portions derived from go-ios (https://github.com/danielpaulus/go-ios),
+// Copyright (c) 2019 danielpaulus, MIT License. See THIRD_PARTY_NOTICES.md.
 
 import Foundation
 

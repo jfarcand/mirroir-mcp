@@ -3,6 +3,9 @@
 //
 // ABOUTME: The HTTP/2 client connection RemoteXPC runs on: preface, settings exchange, and the two XPC streams.
 // ABOUTME: Faithful port of go-ios ios/http/http.go, with DATA writes split at the peer's frame-size limit.
+//
+// Portions derived from go-ios (https://github.com/danielpaulus/go-ios),
+// Copyright (c) 2019 danielpaulus, MIT License. See THIRD_PARTY_NOTICES.md.
 
 import Foundation
 

@@ -3,6 +3,9 @@
 //
 // ABOUTME: Loopback tests for the Network.framework pieces: the TCP ByteTransport and the RTP UDP sink.
 // ABOUTME: Real sockets on 127.0.0.1 / ::1; a device tunnel is only a routed IPv6 address, so loopback is representative.
+//
+// Portions derived from go-ios (https://github.com/danielpaulus/go-ios),
+// Copyright (c) 2019 danielpaulus, MIT License. See THIRD_PARTY_NOTICES.md.
 
 import Foundation
 import Network

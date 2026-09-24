@@ -3,6 +3,9 @@
 //
 // ABOUTME: Display-stream tests: the media blob pinned to go-ios's captured offer, the plist envelope, zlib level.
 // ABOUTME: Also pins the startmediastream / stopmediastream request payload shapes.
+//
+// Portions derived from go-ios (https://github.com/danielpaulus/go-ios),
+// Copyright (c) 2019 danielpaulus, MIT License. See THIRD_PARTY_NOTICES.md.
 
 import Foundation
 import XCTest

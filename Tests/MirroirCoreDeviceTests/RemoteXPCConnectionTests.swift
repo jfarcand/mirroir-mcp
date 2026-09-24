@@ -3,6 +3,9 @@
 //
 // ABOUTME: RemoteXPC connection tests: the three-message init handshake, request flags and ids, framed receives.
 // ABOUTME: Runs the full HTTP/2 + XPC stack over a scripted in-memory transport and decodes what the client wrote.
+//
+// Portions derived from go-ios (https://github.com/danielpaulus/go-ios),
+// Copyright (c) 2019 danielpaulus, MIT License. See THIRD_PARTY_NOTICES.md.
 
 import Foundation
 import XCTest

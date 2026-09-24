@@ -3,6 +3,9 @@
 //
 // ABOUTME: UniversalHID payload and MultiTouchSession tests with a recording report sender.
 // ABOUTME: Pins the XPC payload shape and proves a session never leaves a contact down.
+//
+// Portions derived from go-ios (https://github.com/danielpaulus/go-ios),
+// Copyright (c) 2019 danielpaulus, MIT License. See THIRD_PARTY_NOTICES.md.
 
 import Foundation
 import XCTest

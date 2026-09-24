@@ -3,6 +3,9 @@
 //
 // ABOUTME: System-boundary protocols of the CoreDevice stack: the byte transport and the HID report sink.
 // ABOUTME: Real implementations use Network.framework and RemoteXPC; tests substitute in-memory fakes.
+//
+// Portions derived from go-ios (https://github.com/danielpaulus/go-ios),
+// Copyright (c) 2019 danielpaulus, MIT License. See THIRD_PARTY_NOTICES.md.
 
 import Foundation
 

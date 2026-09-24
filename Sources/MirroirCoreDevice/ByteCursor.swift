@@ -3,6 +3,9 @@
 //
 // ABOUTME: Bounds-checked little/big-endian reader and writer helpers over byte buffers.
 // ABOUTME: Every read checks the remaining length first, so malformed input throws instead of trapping.
+//
+// Portions derived from go-ios (https://github.com/danielpaulus/go-ios),
+// Copyright (c) 2019 danielpaulus, MIT License. See THIRD_PARTY_NOTICES.md.
 
 import Foundation
 

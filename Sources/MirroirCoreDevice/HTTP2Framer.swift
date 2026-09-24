@@ -3,6 +3,9 @@
 //
 // ABOUTME: Minimal HTTP/2 frame reader and writer (RFC 9113 section 4) over a ByteTransport.
 // ABOUTME: Covers exactly the frame types RemoteXPC exchanges, mirroring golang.org/x/net/http2's Framer as go-ios uses it.
+//
+// Portions derived from go-ios (https://github.com/danielpaulus/go-ios),
+// Copyright (c) 2019 danielpaulus, MIT License. See THIRD_PARTY_NOTICES.md.
 
 import Foundation
 

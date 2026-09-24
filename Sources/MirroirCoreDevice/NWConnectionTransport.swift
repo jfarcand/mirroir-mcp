@@ -3,6 +3,9 @@
 //
 // ABOUTME: Blocking TCP ByteTransport on Network.framework's NWConnection, for tunnel and RSD endpoints.
 // ABOUTME: Bridges NWConnection's callbacks to blocking reads and writes with semaphores and deadlines.
+//
+// Portions derived from go-ios (https://github.com/danielpaulus/go-ios),
+// Copyright (c) 2019 danielpaulus, MIT License. See THIRD_PARTY_NOTICES.md.
 
 import Foundation
 import Network

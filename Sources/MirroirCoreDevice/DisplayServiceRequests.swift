@@ -3,6 +3,9 @@
 //
 // ABOUTME: Builds the CoreDevice display-service requests that start and stop a video media stream.
 // ABOUTME: Port of go-ios ios/display/display.go and coredevice.BuildRequestWithAction payload shapes.
+//
+// Portions derived from go-ios (https://github.com/danielpaulus/go-ios),
+// Copyright (c) 2019 danielpaulus, MIT License. See THIRD_PARTY_NOTICES.md.
 
 import Foundation
 

@@ -3,6 +3,9 @@
 //
 // ABOUTME: RemoteXPC client: XPC messages over HTTP/2 streams 1 and 3, with the three-message init handshake.
 // ABOUTME: Port of go-ios CreateXpcConnection/initializeXpcConnection (connect.go) and xpc.Connection (xpc.go).
+//
+// Portions derived from go-ios (https://github.com/danielpaulus/go-ios),
+// Copyright (c) 2019 danielpaulus, MIT License. See THIRD_PARTY_NOTICES.md.
 
 import Foundation
 

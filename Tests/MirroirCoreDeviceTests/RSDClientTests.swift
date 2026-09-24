@@ -3,6 +3,9 @@
 //
 // ABOUTME: RSD handshake tests: go-ios rsd_test.go's device handshake, sent as XPC over the full scripted stack.
 // ABOUTME: Covers the service-to-port map, device properties, the .shim.remote fallback and malformed handshakes.
+//
+// Portions derived from go-ios (https://github.com/danielpaulus/go-ios),
+// Copyright (c) 2019 danielpaulus, MIT License. See THIRD_PARTY_NOTICES.md.
 
 import Foundation
 import XCTest
@@ -29,7 +32,7 @@ final class RSDClientTests: XCTestCase {
         let connection = try RemoteXPCConnection.open(transport: transport)
         let handshake = try RSDClient.handshake(over: connection)
 
-        XCTAssertEqual(handshake.udid, "00008020-001950CC01EA002E")
+        XCTAssertEqual(handshake.udid, "00008020-0000000000000000")
         XCTAssertEqual(handshake.services.count, 67)
         XCTAssertEqual(handshake.properties["ProductType"], .string("iPhone11,6"))
         XCTAssertEqual(handshake.properties["OSVersion"], .string("17.0.3"))
