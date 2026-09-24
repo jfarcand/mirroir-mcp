@@ -1,16 +1,17 @@
 // Copyright 2026 jfarcand@apache.org
 // Licensed under the Apache License, Version 2.0
 //
-// ABOUTME: System-boundary protocols of the CoreDevice stack: the byte transport and the HID report sink.
-// ABOUTME: Real implementations use Network.framework and RemoteXPC; tests substitute in-memory fakes.
+// ABOUTME: System-boundary protocols of the CoreDevice stack: byte transport, HID sink, CoreDeviceService, tunnel state.
+// ABOUTME: Real implementations use a socket fd, RemoteXPC, libxpc and devicectl; tests substitute fakes.
 //
 // Portions derived from go-ios (https://github.com/danielpaulus/go-ios),
 // Copyright (c) 2019 danielpaulus, MIT License. See THIRD_PARTY_NOTICES.md.
 
 import Foundation
+import XPC
 
-/// A blocking, ordered byte stream: a TCP connection to the device in
-/// production, an in-memory buffer in tests. HTTP/2 framing sits on top.
+/// A blocking, ordered byte stream: a connected service socket to the device
+/// in production, an in-memory buffer in tests. HTTP/2 framing sits on top.
 public protocol ByteTransport: AnyObject {
     /// Writes every byte of `data`, blocking until the transport accepted them.
     func write(_ data: Data) throws
@@ -41,4 +42,22 @@ public protocol HIDReportSending: AnyObject {
     func sendReport(_ report: Data, serviceID: UInt64) throws
     /// Releases the underlying connection.
     func close()
+}
+
+/// Exchanges one libxpc message with the Mac's CoreDeviceService. The Mach
+/// service connection in production; a fake that inspects the request and
+/// returns canned replies in tests.
+public protocol CoreDeviceServiceMessaging: AnyObject {
+    /// Sends `message` and blocks until its reply or `timeout`. The reply is a
+    /// dictionary, or an XPC error object when the connection itself failed.
+    /// Throws `CoreDeviceServiceSocketError.timedOut` past the deadline.
+    func sendMessage(_ message: xpc_object_t, timeout: TimeInterval) throws -> xpc_object_t
+}
+
+/// Reports the CoreDevice tunnel state of a device (`connected`,
+/// `connecting`, `unavailable`, ...). `devicectl list devices` in production.
+public protocol TunnelStateReading: AnyObject {
+    /// The tunnel state of the device whose CoreDevice identifier, UDID or name
+    /// is `device`; `nil` when the device entry carries none.
+    func tunnelState(ofDevice device: String) throws -> String?
 }

@@ -1,7 +1,7 @@
 // Copyright 2026 jfarcand@apache.org
 // Licensed under the Apache License, Version 2.0
 //
-// ABOUTME: Typed errors for every layer of the CoreDevice stack: XPC codec, HTTP/2, transport, RSD, HID.
+// ABOUTME: Typed errors for every layer of the CoreDevice stack: XPC codec, HTTP/2, transport, service socket, HID.
 // ABOUTME: Each case carries the structured context a caller needs instead of a formatted string.
 //
 // Portions derived from go-ios (https://github.com/danielpaulus/go-ios),
@@ -53,6 +53,8 @@ public enum TransportError: Error, Equatable, Sendable {
     case failed(operation: String, reason: String)
     /// The host or port could not be turned into a network endpoint.
     case invalidEndpoint(host: String, port: Int)
+    /// A transport was asked to adopt a negative file descriptor.
+    case invalidFileDescriptor(Int32)
 }
 
 /// Protocol violations and peer-initiated failures on the HTTP/2 connection.
@@ -81,20 +83,6 @@ public enum RemoteXPCError: Error, Equatable, Sendable {
     case missingBody(stream: UInt32)
     /// The connection was closed and cannot be used.
     case connectionClosed
-}
-
-/// Failures of the remote service discovery handshake.
-public enum RSDError: Error, Equatable, Sendable {
-    /// The device answered with a message type other than `Handshake`.
-    case unexpectedMessageType(String?)
-    /// The handshake carried no `Properties.UniqueDeviceID`.
-    case missingUDID
-    /// The handshake carried no `Services` dictionary.
-    case missingServices
-    /// A service entry's port was absent or not a valid port number.
-    case invalidPort(service: String)
-    /// No service by that name (nor its `.shim.remote` variant) is published.
-    case serviceNotPublished(String)
 }
 
 /// Failures building a touchscreen digitizer report.
@@ -136,18 +124,88 @@ public struct MultiTouchSendError: Error {
     }
 }
 
-/// Failures locating the macOS CoreDevice tunnel of a device.
+/// An NSError-shaped failure CoreDevice reported: `CoreDevice.error` in a
+/// CoreDeviceService reply, or `error` in a `devicectl --json-output` document.
+public struct CoreDeviceFailure: Equatable, Sendable {
+    /// The error domain of CoreDevice's own failures.
+    public static let coreDeviceErrorDomain = "com.apple.dt.CoreDeviceError"
+
+    /// The CoreDevice error codes a caller can act on.
+    public enum Reason: Equatable, Sendable {
+        /// 1001: the device lacks the capability, e.g. "Create Service Socket"
+        /// on iOS before 27 or without the Xcode 27 Developer Disk Image.
+        case capabilityNotSupported
+        /// 1011: this client holds no connection (tunnel lease) to the device.
+        case connectionNotEstablished
+        /// 4000: the device's RemoteServiceDiscovery tunnel is not up.
+        case remoteServiceDiscoveryUnavailable
+        /// 10005: Developer Mode is off on the device.
+        case developerModeDisabled
+        /// Any other domain or code.
+        case unrecognised
+    }
+
+    static let capabilityNotSupportedCode: Int64 = 1001
+    static let connectionNotEstablishedCode: Int64 = 1011
+    static let remoteServiceDiscoveryUnavailableCode: Int64 = 4000
+    static let developerModeDisabledCode: Int64 = 10005
+
+    public let domain: String
+    public let code: Int64
+    /// `userInfo.NSLocalizedDescription`, when the failure carried one.
+    public let localizedDescription: String?
+
+    public init(domain: String, code: Int64, localizedDescription: String?) {
+        self.domain = domain
+        self.code = code
+        self.localizedDescription = localizedDescription
+    }
+
+    /// What the code means, for CoreDevice's own domain.
+    public var reason: Reason {
+        guard domain == Self.coreDeviceErrorDomain else { return .unrecognised }
+        switch code {
+        case Self.capabilityNotSupportedCode: return .capabilityNotSupported
+        case Self.connectionNotEstablishedCode: return .connectionNotEstablished
+        case Self.remoteServiceDiscoveryUnavailableCode: return .remoteServiceDiscoveryUnavailable
+        case Self.developerModeDisabledCode: return .developerModeDisabled
+        default: return .unrecognised
+        }
+    }
+}
+
+/// Failures asking CoreDeviceService for a connected service socket.
+public enum CoreDeviceServiceSocketError: Error, Equatable, Sendable {
+    /// CoreDeviceService answered with `CoreDevice.error`.
+    case refused(CoreDeviceFailure)
+    /// The XPC connection to CoreDeviceService failed (an XPC error object
+    /// arrived instead of a reply dictionary).
+    case serviceConnectionFailed(description: String)
+    /// No reply arrived within the deadline.
+    case timedOut(seconds: TimeInterval)
+    /// The reply was neither a well-formed success nor a CoreDevice error.
+    case malformedReply(reason: String)
+    /// The success reply carried no file descriptor.
+    case missingFileDescriptor
+    /// The installed CoreDevice version could not be read or parsed.
+    case versionUnreadable(path: String, reason: String)
+}
+
+/// Failures holding the CoreDevice tunnel of a device open.
 public enum CoreDeviceTunnelError: Error, Equatable, Sendable {
-    /// `devicectl` exited non-zero.
+    /// `devicectl list devices` exited non-zero.
     case devicectlFailed(status: Int32, stderr: String)
     /// `devicectl` wrote JSON this parser does not recognise.
     case unrecognisedOutput(reason: String)
     /// No device matched the requested identifier.
     case deviceNotFound(String)
-    /// The device is known but its tunnel is not connected.
+    /// The keep-alive process could not be launched.
+    case keepAliveLaunchFailed(reason: String)
+    /// The keep-alive process exited; `failure` is the error it reported in
+    /// its JSON output, when it wrote one.
+    case keepAliveExited(status: Int32, failure: CoreDeviceFailure?)
+    /// The tunnel did not reach `connected` before the deadline.
     case tunnelNotConnected(device: String, tunnelState: String?)
-    /// The tunnel is reported connected but carries no tunnel address.
-    case missingTunnelAddress(device: String)
 }
 
 /// Failures of the display-stream request builders and the RTP sink.

@@ -52,6 +52,13 @@ public final class RemoteXPCConnection {
         return connection
     }
 
+    // LIMITATION(registre#17): FileDescriptorTransport — whether the createservicesocket fd expects our HTTP/2 + RemoteXPC handshake or Apple's xpc_remote_connection framing is unverified until an iOS 27 device with the Xcode 27 DDI.
+    /// Runs HTTP/2 set-up and the XPC init handshake on a service socket
+    /// CoreDeviceService granted, the way this client reaches a device service.
+    public static func open(serviceSocket: CoreDeviceServiceSocketGrant) throws -> RemoteXPCConnection {
+        try open(transport: serviceSocket.transport)
+    }
+
     /// The init handshake from go-ios `initializeXpcConnection`:
     /// 1. stream 1: an empty-dictionary message with `alwaysSet`; read the reply on 1.
     /// 2. stream 3: a body-less message with `initHandshake | alwaysSet`; read the reply on 3.

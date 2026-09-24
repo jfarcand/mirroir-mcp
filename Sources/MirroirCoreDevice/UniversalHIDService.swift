@@ -11,9 +11,8 @@ import Foundation
 
 /// Request payloads for `com.apple.coredevice.hid.universalhidservice`.
 public enum UniversalHIDPayload {
-    /// The RSD name of the service (ships in the iOS 27 Developer Disk Image, `dtuhidd`).
-    public static let serviceName = "com.apple.coredevice.hid.universalhidservice"
-    /// Feature identifier every request names.
+    /// Feature identifier every request names, and the feature a service
+    /// socket is requested for (served by `dtuhidd` in the iOS 27 Developer Disk Image).
     public static let featureIdentifier = "com.apple.coredevice.feature.remote.universalhidservice"
     /// `messageType` of a request.
     public static let requestMessageType = "Request"
@@ -44,9 +43,9 @@ public enum UniversalHIDPayload {
 }
 
 /// Delivers HID reports over a RemoteXPC connection to the universal HID
-/// service. Needs a CoreDevice tunnel, the iOS 27 Developer Disk Image mounted,
-/// and a running display media stream: without one the device accepts every
-/// report and discards it with no error (go-ios `ios/hid`).
+/// service. Needs a leased CoreDevice tunnel, the iOS 27 Developer Disk Image
+/// mounted, and a running display media stream: without one the device accepts
+/// every report and discards it with no error (go-ios `ios/hid`).
 public final class UniversalHIDConnection: HIDReportSending {
     private let connection: RemoteXPCConnection
 
@@ -54,12 +53,11 @@ public final class UniversalHIDConnection: HIDReportSending {
         self.connection = connection
     }
 
-    /// Resolves the service through `handshake` and opens a RemoteXPC
-    /// connection to it on the device's tunnel address.
-    public static func connect(tunnelAddress: String, handshake: RSDHandshake) throws -> UniversalHIDConnection {
-        let port = try handshake.port(for: UniversalHIDPayload.serviceName)
-        let transport = try NWConnectionTransport(host: tunnelAddress, port: port)
-        return UniversalHIDConnection(connection: try RemoteXPCConnection.open(transport: transport))
+    /// Asks CoreDeviceService for a socket to the universal HID feature and
+    /// opens a RemoteXPC connection on it.
+    public static func connect(through serviceSocket: CoreDeviceServiceSocket) throws -> UniversalHIDConnection {
+        let grant = try serviceSocket.open(.feature(UniversalHIDPayload.featureIdentifier))
+        return UniversalHIDConnection(connection: try RemoteXPCConnection.open(serviceSocket: grant))
     }
 
     /// Sends one report with the heartbeat-request flag, as go-ios does. The

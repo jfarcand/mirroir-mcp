@@ -236,3 +236,62 @@ final class RecordingHIDSender: HIDReportSending {
         closeCount += 1
     }
 }
+
+/// A connected pair of stream sockets: one end for the code under test, the
+/// other played by the test as the device. Real kernel sockets, so partial
+/// reads and writes, shutdown and EOF behave as they do on a service socket.
+/// The peer end reports EPIPE instead of raising SIGPIPE, which would kill the
+/// test process when the client end is already closed.
+enum SocketPair {
+    static func make() throws -> (local: Int32, peer: Int32) {
+        var descriptors: [Int32] = [-1, -1]
+        guard socketpair(AF_UNIX, SOCK_STREAM, 0, &descriptors) == 0 else {
+            throw TransportError.failed(operation: "socketpair", reason: String(cString: strerror(errno)))
+        }
+        var enabled: Int32 = 1
+        guard setsockopt(descriptors[1], SOL_SOCKET, SO_NOSIGPIPE, &enabled, socklen_t(MemoryLayout<Int32>.size)) == 0 else {
+            throw TransportError.failed(operation: "setsockopt", reason: String(cString: strerror(errno)))
+        }
+        return (descriptors[0], descriptors[1])
+    }
+}
+
+/// The device end of a socket pair: writes a script, then drains everything
+/// the client sends until the client closes, on its own thread.
+final class SocketPeer: @unchecked Sendable {
+    private let descriptor: Int32
+    private let lock = NSLock()
+    private var received = Data()
+    private let finished = DispatchSemaphore(value: 0)
+
+    init(descriptor: Int32, script: Data) {
+        self.descriptor = descriptor
+        let thread = Thread { [self] in
+            script.withUnsafeBytes { raw in
+                var offset = 0
+                while offset < raw.count, let base = raw.baseAddress {
+                    let written = Darwin.write(descriptor, base + offset, raw.count - offset)
+                    guard written > 0 else { break }
+                    offset += written
+                }
+            }
+            var buffer = [UInt8](repeating: 0, count: 4096)
+            while true {
+                let count = Darwin.read(descriptor, &buffer, buffer.count)
+                guard count > 0 else { break }
+                lock.withLock { received.append(contentsOf: buffer[0..<count]) }
+            }
+            Darwin.close(descriptor)
+            finished.signal()
+        }
+        thread.start()
+    }
+
+    /// Waits for the client to close its end, then returns what it sent.
+    func receivedAfterClientCloses(timeout: TimeInterval = 5) throws -> Data {
+        guard finished.wait(timeout: .now() + timeout) == .success else {
+            throw TransportError.timedOut(operation: "peer drain")
+        }
+        return lock.withLock { received }
+    }
+}

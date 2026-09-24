@@ -6,10 +6,10 @@ It includes software derived from the third-party projects below, each under its
 ## go-ios
 
 - Project: https://github.com/danielpaulus/go-ios
-- Used in: `Sources/MirroirCoreDevice/` (a Swift port of go-ios's RemoteXPC, HTTP/2, RSD,
+- Used in: `Sources/MirroirCoreDevice/` (a Swift port of go-ios's RemoteXPC, HTTP/2,
   UniversalHID and display-service code) and `Tests/MirroirCoreDeviceTests/` (test vectors and
-  fixtures derived from go-ios: `xpc_dict.bin`, `xpc_empty_dict.bin`, the RSD handshake data and
-  the golden display-stream offer).
+  fixtures derived from go-ios: `xpc_dict.bin`, `xpc_empty_dict.bin` and the golden
+  display-stream offer).
 - License: MIT
 
 ```
@@ -40,4 +40,5 @@ SOFTWARE.
 
 - Project: https://github.com/ipbtools/ipb
 - Used in: `Sources/MirroirCoreDevice/TouchscreenReport.swift` follows the DigitizerReport field
-  layout documented in ipb's `docs/protocol.md`. No ipb source code is copied.
+  layout, and `Sources/MirroirCoreDevice/CoreDeviceServiceSocket.swift` the `createservicesocket`
+  request and reply shape, documented in ipb's `docs/protocol.md`. No ipb source code is copied.
