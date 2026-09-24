@@ -1,6 +1,6 @@
 # Tools Reference
 
-All 38 tools exposed by the MCP server. Mutating tools require [permission](permissions.md) to appear in `tools/list`.
+All 39 tools exposed by the MCP server. Mutating tools require [permission](permissions.md) to appear in `tools/list`.
 
 ## Tool List
 
@@ -19,6 +19,7 @@ All 38 tools exposed by the MCP server. Mutating tools require [permission](perm
 | `pinch` | `x`, `y`, `scale`, `duration_ms`? | Two-finger pinch centred at (x, y): `scale` > 1 spreads the fingers (zoom in), < 1 pinches them (zoom out); the spread ends at exactly `scale` times its start (0.1-10, 100-5000ms, default 500ms). Reaches iOS as a UIKit two-finger gesture (Maps, Photos); games that read raw touches may ignore it. Needs a Mac with a built-in trackpad or a Magic Trackpad; refused while a touch is held |
 | `rotate` | `x`, `y`, `degrees`, `duration_ms`? | Two-finger rotation centred at (x, y) by `degrees`: positive counter-clockwise, negative clockwise (non-zero, up to 360 either way, 100-5000ms, default 500ms). Same delivery and trackpad requirement as `pinch` |
 | `hold_keys` | `keys`, `duration_ms`?, `drag`? | Hold 1-6 keys for `duration_ms` (100-10000ms, default 1000ms), then release everything in reverse order. Keys are single unshifted characters (`w`), modifiers (`shift`, `command`, `option`, `control`), or named keys (`space`, `up`, ...). Plain keys re-post key-down every 50ms like a held physical key; modifiers are held without repeating. Optional `drag` `{from_x, from_y, to_x, to_y, button: left\|right}` holds that mouse button across the same duration. For games that switch to mouse/keyboard controls (e.g. Roblox: `w` walks while a right drag turns the camera); touch-only games ignore keys. Refused while a touch is held or when the mirroring window is not the frontmost app; stops early and releases everything if focus leaves it mid-hold |
+| `multi_touch` | `fingers`, `wda_url`? | Play 1-10 independent fingers at once through a WebDriverAgent runner on the iPhone (iOS 26). Each finger is `{id, steps}`: `down` at (`x`, `y`) at `at_ms` (default 0), any `move` to (`x`, `y`) over `duration_ms` (1-60000ms) starting at `at_ms` (default: when the previous step ends), then `up` at `at_ms` (default: when the previous step ends). Times are milliseconds from the start of the gesture; the whole gesture lasts at most 60000ms and plays in one call, so every finger lifts before the call returns. Coordinates are window-relative like `tap` and are scaled to the device viewport WebDriverAgent reports. The runner comes from `wda_url` or `MIRROIR_WDA_URL`; without one the tool returns the setup steps. Refused while a touch is held. See [Multi-finger touches on iOS 26](#multi-finger-touches-on-ios-26-webdriveragent) |
 | `type_text` | `text` | Type text — activates iPhone Mirroring and sends keystrokes |
 | `press_key` | `key`, `modifiers`? | Send a special key (return, escape, tab, delete, space, arrows) with optional modifiers (command, shift, option, control) |
 | `shake` | — | Trigger shake gesture (Ctrl+Cmd+Z) for undo/dev menus |
@@ -76,21 +77,69 @@ For navigating within apps, combine `spotlight` + `type_text` + `press_key`. For
 
 ## Games and Multi-Touch
 
-iPhone Mirroring gives an app **one pointer touch**: every mouse and trackpad on the Mac merges into it, and a second button or a second mouse only moves that same touch. Three tools cover what games need within that limit, each measured on a real iPhone:
+iPhone Mirroring gives an app **one pointer touch**: every mouse and trackpad on the Mac merges into it, and a second button or a second mouse only moves that same touch. Three tools cover what games need within that limit, each measured on a real iPhone, and a fourth reaches past it through a runner on the phone:
 
 | Game control | Tool | Example |
 |---|---|---|
 | Virtual joystick, press-and-hold, sustained drag | `touch` | `touch(action:"begin", x:132, y:340)`, then `touch(action:"move", x:132, y:290)` keeps the character walking; `touch(action:"end")` lifts the finger |
 | Keyboard and mouse controls (games that switch to them, e.g. Roblox) | `hold_keys` | `hold_keys(keys:["w"], duration_ms:3000, drag:{from_x:430, from_y:150, to_x:650, to_y:150, button:"right"})` walks forward while the camera turns |
 | Zoom and rotate gestures in maps, photos, and other gesture-recognizer UIs | `pinch`, `rotate` | `pinch(x:200, y:400, scale:2.5)` |
+| Two or more independent fingers in a touch-only game (iOS 26, WebDriverAgent runner) | `multi_touch` | hold the joystick for 3 s while tapping the fire button twice — see [the example below](#multi-finger-touches-on-ios-26-webdriveragent) |
 
-What does not work, and why:
+What iPhone Mirroring itself does not carry, and why:
 
-- **Two independent fingers in a touch-only game.** `pinch` and `rotate` do produce two touches, but they reach iOS as a trackpad gesture. UIKit gesture recognizers accept them; game engines that read raw finger touches (Brawl Stars, measured) ignore them.
+- **Two independent fingers in a touch-only game.** `pinch` and `rotate` do produce two touches, but they reach iOS as a trackpad gesture. UIKit gesture recognizers accept them; game engines that read raw finger touches (Brawl Stars, measured) ignore them. On iOS 26, `multi_touch` delivers real independent fingers by a different path — XCTest event synthesis inside a WebDriverAgent runner on the phone — which does not go through Mirroring at all.
 - **A second touch while one is held.** A click during a pinch is dropped, a pinch during a held click is ignored, and the right button or a second mouse only moves the held touch.
 - **A two-finger trackpad slide** arrives on the phone as scroll, which iOS turns into a single pan touch.
 
-True independent multi-touch would need a virtual touchscreen HID device on the Mac, which requires Apple's `com.apple.developer.hid.virtual.device` entitlement; whether iPhone Mirroring forwards such a device is unmeasured.
+True independent multi-touch through Mirroring would need a virtual touchscreen HID device on the Mac, which requires Apple's `com.apple.developer.hid.virtual.device` entitlement; whether iPhone Mirroring forwards such a device is unmeasured.
+
+## Multi-finger touches on iOS 26 (WebDriverAgent)
+
+On iOS 26 the only way to inject several independent real finger touches is XCTest event synthesis running inside a test-runner app on the iPhone. `multi_touch` uses [Appium's WebDriverAgent](https://github.com/appium/WebDriverAgent) for that: the runner listens on port 8100 on every interface, so the Mac reaches it over Wi-Fi at `http://<iphone-ip>:8100`. Everything else (screenshots, OCR, `tap`, `touch`) keeps going through iPhone Mirroring; only `multi_touch` talks to the runner.
+
+### One-time setup
+
+1. **Enable Developer Mode** on the iPhone: Settings → Privacy & Security → Developer Mode, then restart the phone and confirm.
+2. **Download the prebuilt runner.** Take `WebDriverAgentRunner-Runner.zip` (the real-device build) from the [WebDriverAgent releases](https://github.com/appium/WebDriverAgent/releases) and unzip it to get `WebDriverAgentRunner-Runner.app`.
+3. **Remove the embedded XCTest frameworks.** Per Appium's guide for iOS 17 and later, delete `WebDriverAgentRunner-Runner.app/Frameworks/XC*` (the device supplies its own XCTest), so the runner can be launched as a plain app.
+4. **Sign it with your Apple development identity.** Copy a development provisioning profile that covers the runner's bundle ID (`com.facebook.WebDriverAgentRunner.xctrunner`, or a wildcard App ID) and lists your iPhone to `WebDriverAgentRunner-Runner.app/embedded.mobileprovision`, then re-sign the frameworks and plug-ins inside the app and the app itself with `codesign --force --sign "Apple Development: <you>" --entitlements <entitlements.plist> <path>`, using the entitlements from that profile. `security find-identity -v -p codesigning` lists your identities.
+5. **Install it:** `xcrun devicectl list devices` gives the iPhone's identifier, then `xcrun devicectl device install app --device <device-id> WebDriverAgentRunner-Runner.app`.
+6. **Trust the developer certificate** on the iPhone: Settings → General → VPN & Device Management → your developer app → Trust.
+7. **Launch it:** `xcrun devicectl device process launch --device <device-id> com.facebook.WebDriverAgentRunner.xctrunner`. Check it answers with `curl http://<iphone-ip>:8100/status` (`"ready": true`; its `ios.ip` field shows the address to use).
+8. **Point mirroir at it:** set `MIRROIR_WDA_URL=http://<iphone-ip>:8100` in the MCP server's environment, or `"wdaURL": "http://<iphone-ip>:8100"` in `settings.json` (see [Configuration](configuration.md#multi-touch-backend)). A `wda_url` argument overrides it for one call.
+
+The runner has to be running for `multi_touch` to work; relaunch it with step 7 after the phone restarts. Without a configured URL, `multi_touch` answers with these steps instead of failing silently.
+
+### Timing model: one gesture per call
+
+`multi_touch` sends the whole gesture as one W3C actions request. WebDriverAgent turns each finger into one pointer of a single XCTest event record, plays it, and answers only when every finger has lifted. Consequences:
+
+- **A finger cannot stay down between calls.** Every finger must end with `up`; a joystick held for 10 s while another finger moves is one call whose joystick finger lifts at 10000 ms. For a finger held across calls, use `touch` (one finger, through Mirroring).
+- **Fingers are independent on one clock.** `at_ms` is measured from the start of the gesture, so one finger can go down late, hold, move, and lift while the others do something else. A step without `at_ms` starts when the finger's previous step ends.
+- **The call blocks for the gesture's length** (at most 60000 ms) plus the runner's answer time.
+- **Coordinates** are window-relative like `tap`. They are scaled from the mirroring window to the device viewport in points that WebDriverAgent reports for the foreground app, in its current orientation. If the window and the viewport disagree on orientation (the phone is mid-rotation, or the foreground app differs from what Mirroring shows) the call is refused rather than landing touches in the wrong place.
+
+The first call creates a WebDriverAgent session and later calls reuse it; if the runner restarted, the session is re-created and the gesture retried once.
+
+Example — hold a joystick for 3 s while a second finger taps a button twice:
+
+```json
+{"fingers": [
+  {"id": 1, "steps": [
+    {"action": "down", "x": 80, "y": 700},
+    {"action": "move", "x": 80, "y": 650, "duration_ms": 200},
+    {"action": "up", "at_ms": 3000}]},
+  {"id": 2, "steps": [
+    {"action": "down", "x": 330, "y": 690, "at_ms": 500},
+    {"action": "up", "at_ms": 580}]},
+  {"id": 3, "steps": [
+    {"action": "down", "x": 330, "y": 690, "at_ms": 1500},
+    {"action": "up", "at_ms": 1580}]}
+]}
+```
+
+Each tap is its own finger id, because a finger's timeline has exactly one `down` and one `up`.
 
 ## Scroll To
 

@@ -4,7 +4,7 @@ The server is **fail-closed by default**. Without a config file, only read-only 
 
 | Always allowed | Requires permission |
 |---------------|-------------------|
-| `screenshot`, `describe_screen`, `start_recording`, `stop_recording`, `get_orientation`, `status`, `check_health`, `list_targets`, `list_skills`, `get_skill`, `calibrate_component` | `tap`, `swipe`, `drag`, `type_text`, `press_key`, `long_press`, `double_tap`, `touch`, `pinch`, `rotate`, `hold_keys`, `shake`, `launch_app`, `open_url`, `press_home`, `press_app_switcher`, `press_back`, `spotlight`, `scroll_to`, `reset_app`, `measure`, `set_network`, `switch_target`, `record_step`, `save_compiled`, `generate_skill` |
+| `screenshot`, `describe_screen`, `start_recording`, `stop_recording`, `get_orientation`, `status`, `check_health`, `list_targets`, `list_skills`, `get_skill`, `calibrate_component` | `tap`, `swipe`, `drag`, `type_text`, `press_key`, `long_press`, `double_tap`, `touch`, `pinch`, `rotate`, `hold_keys`, `multi_touch`, `shake`, `launch_app`, `open_url`, `press_home`, `press_app_switcher`, `press_back`, `spotlight`, `scroll_to`, `reset_app`, `measure`, `set_network`, `switch_target`, `record_step`, `save_compiled`, `generate_skill` |
 
 Mutating tools are hidden from `tools/list` entirely — the MCP client never sees them unless you allow them.
 

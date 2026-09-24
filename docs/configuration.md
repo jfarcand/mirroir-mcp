@@ -15,7 +15,7 @@ All settings live in `settings.json` — project-local (`.mirroir-mcp/settings.j
 
 Every setting has a corresponding environment variable (e.g. `MIRROIR_SCREEN_DESCRIBER_MODE`, `MIRROIR_KEYSTROKE_DELAY_US`). Resolution order: project-local `settings.json` → global `settings.json` → environment variable → built-in default.
 
-Env-var names are derived from the camelCase key by inserting `_` before every uppercase letter and screaming-snake-casing the result. This means adjacent capitals in an acronym are each split: `openAITimeoutSeconds` → `MIRROIR_OPEN_A_I_TIMEOUT_SECONDS` and `defaultAIMaxTokens` → `MIRROIR_DEFAULT_A_I_MAX_TOKENS`. A handful of keys override this with a fixed env var (e.g. `keyboardLayout` → `IPHONE_KEYBOARD_LAYOUT`, `mirroringBundleID` → `MIRROIR_BUNDLE_ID`, `mirroringProcessName` → `MIRROIR_PROCESS_NAME`).
+Env-var names are derived from the camelCase key by inserting `_` before every uppercase letter and screaming-snake-casing the result. This means adjacent capitals in an acronym are each split: `openAITimeoutSeconds` → `MIRROIR_OPEN_A_I_TIMEOUT_SECONDS` and `defaultAIMaxTokens` → `MIRROIR_DEFAULT_A_I_MAX_TOKENS`. A handful of keys override this with a fixed env var (e.g. `keyboardLayout` → `IPHONE_KEYBOARD_LAYOUT`, `mirroringBundleID` → `MIRROIR_BUNDLE_ID`, `mirroringProcessName` → `MIRROIR_PROCESS_NAME`, `wdaURL` → `MIRROIR_WDA_URL`).
 
 ## Screen Intelligence
 
@@ -81,6 +81,12 @@ Env-var names are derived from the camelCase key by inserting `_` before every u
 | Setting | Default | Description |
 |---------|---------|-------------|
 | `keyboardLayout` | `""` | iPhone keyboard layout for character substitution (e.g. `"Canadian-CSA"`, `"French"`). Empty = US QWERTY |
+
+## Multi-Touch Backend
+
+| Setting | Default | Env Var | Description |
+|---------|---------|---------|-------------|
+| `wdaURL` | `""` | `MIRROIR_WDA_URL` | Root URL of a WebDriverAgent runner on the iPhone (e.g. `http://192.168.1.20:8100`) that `multi_touch` plays gestures through. Empty = `multi_touch` answers with setup instructions. See [Multi-finger touches on iOS 26](tools.md#multi-finger-touches-on-ios-26-webdriveragent) |
 
 ## App Identity
 
