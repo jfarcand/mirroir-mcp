@@ -57,7 +57,7 @@ jobs:
     timeout-minutes: 15
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Install Rust toolchain (${{ env.RUST_TOOLCHAIN }})
         uses: dtolnay/rust-toolchain@stable
@@ -135,7 +135,7 @@ jobs:
       MIRROIR_PLAYWRIGHT_HOME: /tmp/mirroir-pw
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
@@ -298,7 +298,7 @@ jobs:
       MIRROIR_E2E_REQUIRED: "1"
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
@@ -361,7 +361,7 @@ jobs:
       OLLAMA_JUDGE_MODEL: qwen2.5:0.5b
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
@@ -464,7 +464,7 @@ jobs:
       OLLAMA_JUDGE_MODEL: qwen2.5:0.5b
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
@@ -551,7 +551,7 @@ jobs:
     timeout-minutes: 15
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: cargo-deny check
         uses: EmbarkStudios/cargo-deny-action@v2
@@ -570,7 +570,7 @@ jobs:
       contents: read
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: dtolnay/rust-toolchain@stable
         with:
           toolchain: ${{ env.RUST_TOOLCHAIN }}

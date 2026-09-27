@@ -37,7 +37,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           # The suite runs the real llm-registre gate (.registre): bilan asks it
           # which files the register scans, and a stubbed scope would test against a register
