@@ -379,7 +379,7 @@ jobs:
 
       - name: Cache Ollama models
         id: ollama-cache
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: |
             ~/.ollama/models
@@ -485,7 +485,7 @@ jobs:
           with-deps: 'true'
 
       - name: Cache Ollama models
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: ~/.ollama/models
           key: ollama-${{ runner.os }}-${{ env.OLLAMA_JUDGE_MODEL }}-v1
