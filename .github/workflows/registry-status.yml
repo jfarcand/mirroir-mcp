@@ -95,7 +95,7 @@ jobs:
           fi
           echo "Confirmation OK for status=$STATUS"
 
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Install mcp-publisher
         run: |

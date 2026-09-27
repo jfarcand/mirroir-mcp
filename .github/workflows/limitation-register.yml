@@ -42,7 +42,7 @@ jobs:
     name: Limitation Register Gates
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           # The gates live in the .registre submodule.
           submodules: true

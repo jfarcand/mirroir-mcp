@@ -40,7 +40,7 @@ jobs:
             exit 1
           fi
 
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           token: ${{ secrets.RELEASE_PAT }}
           fetch-depth: 0
@@ -222,7 +222,7 @@ jobs:
       contents: read
     steps:
       - name: Checkout homebrew-tap
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           repository: jfarcand/homebrew-tap
           token: ${{ secrets.RELEASE_PAT }}
@@ -264,7 +264,7 @@ jobs:
       contents: read
     steps:
       - name: Checkout mirroir-skills
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           repository: jfarcand/mirroir-skills
           token: ${{ secrets.RELEASE_PAT }}
@@ -328,7 +328,7 @@ jobs:
       contents: read
       id-token: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           ref: v${{ github.event.inputs.version }}
 
@@ -365,7 +365,7 @@ jobs:
       contents: read
       id-token: write  # Required for OIDC authentication to the MCP Registry.
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           ref: v${{ github.event.inputs.version }}
 

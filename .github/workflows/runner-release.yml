@@ -52,7 +52,7 @@ jobs:
           fi
           echo "Dispatched from '$DEFAULT_BRANCH' - proceeding."
 
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
           token: ${{ secrets.RELEASE_PAT }}
@@ -124,7 +124,7 @@ jobs:
             archive: zip
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           ref: runner-v${{ needs.version.outputs.version }}
 
@@ -185,7 +185,7 @@ jobs:
     needs: [version, build]
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           ref: runner-v${{ needs.version.outputs.version }}
 
@@ -232,7 +232,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout tap
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           repository: jfarcand/homebrew-tap
           token: ${{ secrets.RELEASE_PAT }}
