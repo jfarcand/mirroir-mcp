@@ -7,6 +7,11 @@ on:
     # CodeQL before it lands. Tags are excluded — a release tag points at a
     # commit main has already analyzed, and a duplicate macOS run would compete
     # with release.yml for the small macOS pool at exactly the wrong moment.
+    #
+    # The branch filter is required alongside the tag filter: a push trigger
+    # that names only `tags-ignore` fires on no branch push at all. Dependabot
+    # is excluded because its PR already runs the pull_request lane below.
+    branches-ignore: ['dependabot/**']
     tags-ignore: ['**']
     # Paths filters are workflow-scoped, not per-job: any match starts both
     # language lanes, so a JS-only change still pays for the Swift analysis.
