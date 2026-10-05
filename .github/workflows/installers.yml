@@ -55,7 +55,7 @@ jobs:
       MIRROIR_BUNDLE_ID: com.jfarcand.FakeMirroring
       MIRROIR_PROCESS_NAME: FakeMirroring
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - uses: ./.github/actions/setup-embacle
 
@@ -116,7 +116,7 @@ jobs:
       MIRROIR_BUNDLE_ID: com.jfarcand.FakeMirroring
       MIRROIR_PROCESS_NAME: FakeMirroring
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - uses: ./.github/actions/setup-embacle
 
@@ -222,7 +222,7 @@ jobs:
       MIRROIR_BUNDLE_ID: com.jfarcand.FakeMirroring
       MIRROIR_PROCESS_NAME: FakeMirroring
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - uses: ./.github/actions/setup-embacle
 

@@ -4,7 +4,6 @@
 use std::env;
 use std::time::Duration;
 
-use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use tracing::{debug, info};
@@ -12,6 +11,7 @@ use tracing::{debug, info};
 use crate::error::Result;
 use crate::oracle::error::OracleError;
 use crate::parser::step::JudgeArgs;
+use crate::tls;
 
 // The profile registry lives in its own module; re-export so existing callers
 // keep using `crate::oracle::judge::{JudgeProfile, JudgeRegistry}`.
@@ -34,6 +34,7 @@ pub struct JudgeOutcome {
 ///
 /// * [`OracleError::UnknownProfile`] when `args.profile` isn't registered.
 /// * [`OracleError::MissingApiKey`] when the profile needs an env key.
+/// * [`crate::error::RunnerError::TlsConfig`] when the shared rustls config cannot be built.
 /// * [`OracleError::Transport`] on HTTP transport failure.
 /// * [`OracleError::Decode`] when the model's reply can't be parsed as a score.
 pub async fn run_judge(
@@ -53,7 +54,7 @@ pub async fn run_judge(
         "running judge"
     );
 
-    let client = Client::builder()
+    let client = tls::client_builder()?
         .timeout(Duration::from_secs(u64::from(profile.timeout_s)))
         .user_agent(format!("mirroir-run/{}", env!("CARGO_PKG_VERSION")))
         .build()

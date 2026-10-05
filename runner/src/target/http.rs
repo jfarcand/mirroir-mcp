@@ -8,6 +8,7 @@ use tracing::{debug, info};
 
 use crate::error::{Result, RunnerError};
 use crate::parser::step::{HttpArgs, HttpMethod};
+use crate::tls;
 
 /// Default per-request timeout when `http: { timeout_s: ... }` is omitted.
 const HTTP_DEFAULT_TIMEOUT_S: u32 = 30;
@@ -25,11 +26,12 @@ impl HttpClient {
     ///
     /// # Errors
     ///
-    /// [`RunnerError::HttpClient`] if the underlying `reqwest` build fails —
-    /// e.g. TLS backend init refused, native cert store unreadable.
+    /// * [`RunnerError::TlsConfig`] if the shared rustls config cannot be built.
+    /// * [`RunnerError::HttpClient`] if the underlying `reqwest` build fails —
+    ///   e.g. TLS backend init refused.
     pub fn new() -> Result<Self> {
         let user_agent = format!("mirroir-run/{}", env!("CARGO_PKG_VERSION"));
-        let client = Client::builder()
+        let client = tls::client_builder()?
             .user_agent(user_agent)
             .build()
             .map_err(|source| RunnerError::HttpClient { source })?;

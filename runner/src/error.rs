@@ -169,6 +169,14 @@ pub enum RunnerError {
         source: reqwest::Error,
     },
 
+    /// Building the rustls client config every HTTP client shares failed.
+    #[error("TLS configuration failed")]
+    TlsConfig {
+        /// Underlying `rustls` error.
+        #[source]
+        source: rustls::Error,
+    },
+
     /// An `http:` step could not complete the request (DNS, refused connect, timeout, …).
     #[error("HTTP request to `{url}` failed")]
     HttpRequest {

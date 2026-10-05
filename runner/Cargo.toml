@@ -24,16 +24,19 @@ name = "mirroir-run"
 path = "src/main.rs"
 
 [dependencies]
-base64 = "0.22"
+base64 = "0.23"
 chrono = { version = "0.4", default-features = false, features = ["serde", "clock"] }
 clap = { version = "4", features = ["derive", "env"] }
 hex = "0.4"
 regex = "1"
-reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
+# `rustls-no-provider` keeps aws-lc-rs out of the build; src/tls.rs hands every client a
+# rustls config built on the ring provider and the bundled Mozilla roots.
+reqwest = { version = "0.13", default-features = false, features = ["json", "rustls-no-provider"] }
+rustls = { version = "0.23", default-features = false, features = ["ring", "std", "tls12"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 serde_yaml = "0.9"
-sha2 = "0.10"
+sha2 = "0.11"
 shell-words = "1"
 tempfile = "3"
 thiserror = "2"
@@ -42,6 +45,7 @@ tokio = { version = "1", features = ["full"] }
 # with it the last syn 2 proc-macro, out of the build.
 tracing = { version = "0.1", default-features = false, features = ["std"] }
 tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt"] }
+webpki-roots = "1"
 
 [target.'cfg(unix)'.dependencies]
 nix = { version = "0.31", default-features = false, features = ["signal"] }

@@ -38,6 +38,7 @@ mod replay_step;
 mod replay_target;
 mod scenario_set;
 mod target;
+mod tls;
 mod verdict;
 
 use crate::accept::{AcceptArgs, run_accept};

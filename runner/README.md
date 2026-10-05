@@ -282,6 +282,7 @@ src/
 ├── replay_dispatch.rs     # judge / drift / cross_surface / measure post-hook helpers
 ├── replay_step.rs         # exhaustive SkillStep → runner-side dispatch
 ├── replay_sample.rs       # `--sample <dir>` session machinery (SAMPLE.md + shared boot)
+├── tls.rs                 # shared reqwest builder: ring provider + bundled webpki roots
 ├── parser/
 │   ├── mod.rs             # parser index
 │   ├── archetype.rs       # archetype.md manifest (YAML frontmatter + markdown body)
