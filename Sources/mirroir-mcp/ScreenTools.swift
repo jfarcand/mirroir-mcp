@@ -4,10 +4,21 @@
 // ABOUTME: Registers screen-related MCP tools: screenshot, describe_screen, start/stop recording.
 // ABOUTME: Each tool maps MCP JSON-RPC calls to the capture, recorder, and describer subsystems.
 
+import CoreGraphics
 import Foundation
 import HelperLib
 
 extension MirroirMCP {
+    /// The `settle_ms` argument of the screenshot and describe_screen tools in
+    /// microseconds, or nil when absent. Negative values clamp to 0 and values
+    /// past `frameSettleMaxTimeoutUs` clamp to it, so no input can overflow the
+    /// conversion or hold the handler for longer than the cap.
+    static func settleTimeoutUs(from args: [String: JSONValue]) -> UInt32? {
+        guard let ms = args["settle_ms"]?.asInt() else { return nil }
+        let maxMs = Int(EnvConfig.frameSettleMaxTimeoutUs / 1000)
+        return UInt32(clamping: min(max(0, ms), maxMs)) * 1000
+    }
+
     static func registerScreenTools(
         server: MCPServer,
         registry: TargetRegistry
@@ -38,6 +49,20 @@ extension MirroirMCP {
                             + "immediately, which may be stale. Defaults to the "
                             + "frameSettleTimeoutUs setting."),
                     ]),
+                    "scale": .object([
+                        "type": .string("number"),
+                        "description": .string(
+                            "Optional output scale factor in (0, 1] to downscale the returned "
+                            + "PNG and cut its vision-token cost. 1 (default) keeps full "
+                            + "resolution; 0.5 halves each dimension (~4x fewer pixels)."),
+                    ]),
+                    "region": .object([
+                        "type": .string("array"),
+                        "description": .string(
+                            "Optional crop rectangle [x, y, width, height] in window points "
+                            + "(same 0,0 = top-left space as tap coordinates). Returns only "
+                            + "that sub-rectangle, cutting token cost. Omit for the full frame."),
+                    ]),
                 ]),
             ],
             handler: { args in
@@ -60,18 +85,37 @@ extension MirroirMCP {
 
                 // A settle window of 0 is an explicit opt-out: the caller wants
                 // the first available frame and accepts that it may be stale.
-                let settleUs = args["settle_ms"]?.asInt().map { UInt32(max(0, $0)) * 1000 }
-                    ?? EnvConfig.frameSettleTimeoutUs
-                let base64 = settleUs == 0
-                    ? capture.captureBase64()
-                    : capture.captureSettledBase64(timeoutUs: settleUs)
-
-                guard let base64 else {
+                let settleUs = settleTimeoutUs(from: args) ?? EnvConfig.frameSettleTimeoutUs
+                guard let captured = capture.captureSettledWithInfo(timeoutUs: settleUs) else {
                     return .error(
                         "Failed to capture screenshot. Is the '\(ctx.name)' window visible?")
                 }
 
-                return .image(base64)
+                // Optional token lever: crop to a region and/or downscale before
+                // returning, so a caller (e.g. a kind:game scene loop) can trade
+                // frame detail for fewer vision tokens per frame.
+                let scale = args["scale"]?.asNumber()
+                var region: CGRect?
+                if case .array(let r)? = args["region"], r.count == 4,
+                   let x = r[0].asNumber(), let y = r[1].asNumber(),
+                   let w = r[2].asNumber(), let h = r[3].asNumber() {
+                    region = CGRect(x: x, y: y, width: w, height: h)
+                }
+
+                let pngData: Data
+                if scale != nil || region != nil {
+                    guard let transformed = ScreenshotRegionScaler.transform(
+                        pngData: captured.data, windowSize: captured.info.size,
+                        region: region, scale: scale
+                    ) else {
+                        return .error("Failed to apply scale/region to the screenshot")
+                    }
+                    pngData = transformed
+                } else {
+                    pngData = captured.data
+                }
+
+                return .image(pngData.base64EncodedString())
             }
         ))
 
@@ -85,7 +129,15 @@ extension MirroirMCP {
                 and the screenshot image. Coordinates are in the same point system as the \
                 tap tool (0,0 = top-left of mirroring window). \
                 Set scroll to true to scroll through the full page and collect all elements \
-                with page-absolute Y coordinates.
+                with page-absolute Y coordinates. \
+                With screenDescriberMode set to vision, elements come from an LLM vision \
+                call instead of OCR and their coordinates are approximate: elements near \
+                the bottom of the screen can come back placed too high. \
+                The call first waits for the screen to stop changing, because the mirrored \
+                frame lags the device: a frame taken right after an action can still show \
+                the pre-action screen (and in vision mode a transitional frame would still \
+                be billed). Use settle_ms to tune the wait, or 0 on a constantly animated \
+                screen such as a game, which never settles.
                 """,
             inputSchema: [
                 "type": .string("object"),
@@ -99,6 +151,14 @@ extension MirroirMCP {
                         "type": .string("boolean"),
                         "description": .string(
                             "Omit the screenshot image from the response to save context window space (default: uses MIRROIR_OMIT_SCREENSHOT env var, or false)"),
+                    ]),
+                    "settle_ms": .object([
+                        "type": .string("integer"),
+                        "description": .string(
+                            "How long to wait for two consecutive identical frames before "
+                            + "describing, in milliseconds. 0 describes the first frame, "
+                            + "which may be stale. Defaults to the frameSettleTimeoutUs "
+                            + "setting in both OCR and vision mode."),
                     ]),
                 ]),
             ],
@@ -149,7 +209,12 @@ extension MirroirMCP {
                     return MCPToolResult(content: scrollContent, isError: false)
                 }
 
-                guard let result = describer.describe() else {
+                // A client describe usually follows an action, so it settles by
+                // default in every describer mode, exactly like the screenshot
+                // tool. Server-internal polls call describe() without a window
+                // and keep the describer's own (OCR: no settle) policy.
+                let settleUs = settleTimeoutUs(from: args) ?? EnvConfig.frameSettleTimeoutUs
+                guard let result = describer.describe(settleTimeoutUs: settleUs) else {
                     return .error(
                         "Failed to capture/analyze screen. Is the '\(ctx.name)' window visible?")
                 }
@@ -165,6 +230,10 @@ extension MirroirMCP {
                     lines.append("(OCR FAILED — text recognition did not run: \(failure))")
                     lines.append("Any icons and hints below come from the non-OCR path; "
                         + "the text layer is missing, not empty.")
+                } else if result.screenBlank {
+                    lines.append("(SCREEN BLANK — the frame is a uniform fill with no text or "
+                        + "icons: the device is transitioning (rotation, launch, scene change). "
+                        + "Describe again once the screen has drawn.)")
                 } else if result.elements.isEmpty {
                     lines.append("(no text detected)")
                 }
@@ -184,7 +253,13 @@ extension MirroirMCP {
                 }
                 lines.append("")
                 lines.append("_meta: ocr_time_ms=\(result.ocrTimeMs) recognition_level=\(EnvConfig.ocrRecognitionLevel) element_count=\(result.elements.count)"
-                    + (result.ocrFailure == nil ? "" : " ocr_status=failed"))
+                    + (result.ocrFailure == nil ? "" : " ocr_status=failed")
+                    + (result.screenBlank ? " screen_blank=true" : "")
+                    + (result.visionUsage.map {
+                        " vision_prompt_tokens=\($0.promptTokens)"
+                            + " vision_completion_tokens=\($0.completionTokens)"
+                            + " vision_total_tokens=\($0.totalTokens)"
+                    } ?? ""))
                 let description = lines.joined(separator: "\n")
 
                 let content: [MCPContent] = omitScreenshot

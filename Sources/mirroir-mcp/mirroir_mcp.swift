@@ -91,12 +91,15 @@ struct MirroirMCP {
 
         // Auto-initialize embedded embacle when the Rust FFI is linked.
         // Set agentTransport to "http" in settings.json to force HTTP even when linked.
-        if EmbacleFFI.isAvailable && EnvConfig.agentTransport != "http" {
+        // The runtime serves only requests `AgentTransport` routes to it.
+        if AgentTransport.embeddedRunnerEnabled {
             guard EmbacleFFI.initialize() else {
                 fputs("Error: Failed to initialize embedded embacle runtime\n", stderr)
                 Darwin.exit(1)
             }
-            DebugLog.persist("startup", "Agent transport: embedded (Rust FFI)")
+            let agentRoute = AIAgentRegistry.resolveConfigured()
+                .map { "agent '\($0.name)' -> \($0.transport())" } ?? "no agent resolved"
+            DebugLog.persist("startup", "Agent transport: embedded (Rust FFI) available; \(agentRoute)")
         } else if EmbacleFFI.isAvailable {
             DebugLog.persist("startup", "Agent transport: HTTP (embedded available but overridden)")
         } else {
@@ -124,7 +127,7 @@ struct MirroirMCP {
                                           interruption: .shared)
 
         // Shutdown embedded embacle runtime if it was initialized
-        if EmbacleFFI.isAvailable && EnvConfig.agentTransport != "http" {
+        if AgentTransport.embeddedRunnerEnabled {
             EmbacleFFI.shutdown()
         }
     }
@@ -232,15 +235,29 @@ struct MirroirMCP {
         }
     }
 
-    /// Build the appropriate ScreenDescribing implementation based on configuration.
+    /// The two describers a target carries: the one `describe_screen` answers
+    /// with, and the local OCR one server-internal checks use.
+    struct TargetDescribers {
+        /// Client-facing describer: vision when configured, otherwise `ocr`.
+        let describer: any ScreenDescribing
+        /// Local OCR describer, the same instance as `describer` when vision is off.
+        let ocr: any ScreenDescribing
+    }
+
+    /// Build a target's describers based on configuration.
     /// "auto" (default) resolves to "ocr" for reliable coordinate accuracy.
-    /// "vision" uses VisionScreenDescriber (AI vision model via configured agent).
+    /// "vision" uses VisionScreenDescriber (AI vision model via configured agent)
+    /// for the client-facing describer only; the `ocr` describer stays local.
     /// "ocr" forces local Vision OCR + YOLO regardless of embacle availability.
-    static func buildDescriber(
+    static func buildDescribers(
         bridge: any WindowBridging,
         capture: any ScreenCapturing,
         isMobile: Bool
-    ) -> any ScreenDescribing {
+    ) -> TargetDescribers {
+        let ocr = ScreenDescriber(
+            bridge: bridge, capture: capture,
+            textRecognizer: buildTextRecognizer(), isMobile: isMobile
+        )
         let mode = EnvConfig.screenDescriberMode
         let useVision: Bool
         switch mode {
@@ -261,18 +278,16 @@ struct MirroirMCP {
                 let resolvedFrom = "vision"
                 DebugLog.persist("startup",
                     "Screen describer: \(resolvedFrom) (agent=\(agentName))")
-                return VisionScreenDescriber(
-                    bridge: bridge, capture: capture, agentConfig: agentConfig
+                let vision = VisionScreenDescriber(
+                    bridge: bridge, capture: capture,
+                    localDescriber: ocr, agentConfig: agentConfig
                 )
+                return TargetDescribers(describer: vision, ocr: ocr)
             }
             DebugLog.persist("startup",
                 "Screen describer: vision requested but agent '\(EnvConfig.agent.isEmpty ? "embacle" : EnvConfig.agent)' not found, falling back to OCR")
         }
-        let textRecognizer = buildTextRecognizer()
-        return ScreenDescriber(
-            bridge: bridge, capture: capture,
-            textRecognizer: textRecognizer, isMobile: isMobile
-        )
+        return TargetDescribers(describer: ocr, ocr: ocr)
     }
 }
 

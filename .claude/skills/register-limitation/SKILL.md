@@ -107,11 +107,12 @@ and `" #"`.
 ## Step 4 — verify
 
 ```bash
-./.registre/limitation-gates.sh Sources runner/src npm scripts website/src
+./.registre/limitation-gates.sh
 ```
 
-Expect all five gates green. Tier 1 of `runner/scripts/ci/pre-push-validate.sh` runs the same
-command before every push.
+With no arguments it scans the `scan_dirs` that `registre.toml` declares. Expect all five gates
+green. Tier 1 of `runner/scripts/ci/pre-push-validate.sh` and CI (`limitation-register.yml`) run
+the same command.
 
 ## Closing an entry
 

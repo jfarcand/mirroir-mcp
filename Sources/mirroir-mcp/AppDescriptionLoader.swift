@@ -114,6 +114,7 @@ enum AppDescriptionLoader {
             schemaVersion: description.schemaVersion,
             locale: description.locale,
             archetype: description.archetype,
+            playable: description.playable,
             resetBeforeExplore: description.resetBeforeExplore,
             obstacleMode: description.obstacleMode,
             context: description.context,

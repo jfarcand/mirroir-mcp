@@ -203,7 +203,7 @@ ledger_filed() {
 # limitation — the label plus a marker in the register's scope — and the status line runs it
 # with --cheap, which never touches the network. This line is how the label reaches it: without
 # it, --cheap capped every correctly registered limitation at 6 for as long as the register
-# required the issue to stay open (carnet#493). `off` drops it when the label is removed.
+# required the issue to stay open. `off` drops it when the label is removed.
 ledger_limitation() { # <n> <on|off>
     local f tmp
     f=$(ledger_file) || return 0

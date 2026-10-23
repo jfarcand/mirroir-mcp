@@ -23,7 +23,7 @@ issued too soon pastes the device's PREVIOUS clipboard value and looks like it
 worked. `type_text` waits `pasteboardSyncUs` (1.5s) and pastes at most once per
 call for exactly this reason.
 
-**Still true — back navigation.** `press_key(key: "[", modifiers: ["command"])`
+**Back navigation.** `press_key(key: "[", modifiers: ["command"])`
 does NOT navigate back: `Cmd+[` is a macOS convention that iOS apps do not
 implement, so the event arrives and nothing handles it. Back navigation is
 OCR-detecting the "<" chevron in the top 15% of the screen and tapping it. The
@@ -51,9 +51,10 @@ This project has companion repos on the same machine. Reference them when needed
 
 | Repo | Local Path | Purpose |
 |------|-----------|---------|
-| [mirroir-skills](https://github.com/jfarcand/mirroir-skills) | `../mirroir-skills` | Community skill YAML files (apps/, workflows/, testing/) |
+| [mirroir-skills](https://github.com/jfarcand/mirroir-skills) | `../mirroir-skills` | Community patterns and skills in Markdown — `patterns/` (`elements/`, `screens/` `*.recipe.md`, `apps/<app>/APP.md`) and `skills/` (`apps/`, `workflows/`, `testing/`, `ci/`) — plus `legacy/` holding the old YAML skills |
 
-Compiled `.compiled.json` files live alongside their source `.yaml` in the skills repo.
+A compiled skill is a `.compiled.json` written next to its source (`check-about.md` →
+`check-about.compiled.json`); the skills repo tracks none.
 
 ## Setup After Clone
 
@@ -233,41 +234,16 @@ after validation invalidates the marker — re-run the script.
 
 ### Idiomatic Rust
 
-Default to idiomatic Rust. The points below are the non-obvious or
-project-enforced ones for `runner/`.
+Default to idiomatic Rust; the clippy configuration (`all`/`pedantic`/`nursery` at deny) enforces
+most of it. What this project adds:
 
-**Ownership & collections.** PREFER borrowing (`&T`, `&str`, `&[T]`) over owned
-params unless ownership is needed; `Cow<T>` for conditionally owned data;
-`AsRef<T>`/`Into<T>` for flexible APIs. Clone the `Arc`, never its contents
-(`arc.clone()`, not `(*arc).clone()`) — `Arc`/`Rc` clones need no comment,
-JUSTIFY non-obvious value clones. PREFER iterator chains, `filter_map()` over
-`filter().map()`, `and_then()` over nested match; pre-size with
-`with_capacity()` when the size is known. PREFER format args `format!("{name}")`
-over concatenation; `&'static str` for string constants.
-
-**Control flow, types & API design.** PREFER early returns with `?` over nested
-matches; `if let` for single patterns, `match` for complex logic; exhaustive
-match when every variant needs distinct handling, catch-all `_` only for
-genuinely evolving enums. Newtype pattern for domain ids; `enum` over boolean
-flags for state; `const fn`/associated consts for type-level values. `impl
-Trait` in argument position for flexibility, concrete return types when callers
-must name them. DESIGN APIs to be hard to misuse (parse, don't validate);
-builder pattern for many-optional-field structs. PREFER small focused functions,
-composition over inheritance, `std` over external crates when sufficient.
-
-**Async, concurrency & performance.** PREFER `async fn` over `impl Future`;
-`tokio::spawn` for concurrent tasks, `.await` for sequential; structured
-concurrency via `join!`/`select!`; always handle `JoinHandle` results (don't
-swallow panics). `Arc<RwLock<T>>` over `Arc<Mutex<T>>` for read-heavy; channels
-over shared mutable state; atomics for simple counters. DOCUMENT every `Arc<T>`
-with its sharing justification. `std::sync::LazyLock` for lazy statics,
-`OnceLock` for one-time runtime init. AVOID premature `#[inline]`; `#[cold]` for
-error paths; `const fn` for compile-time eval; `Box<T>` for recursive types.
-
-**Modules & imports** (enforced by `clippy::absolute_paths = "deny"`). USE `use`
-imports at the top of the file; AVOID inline qualified paths like
-`std::collections::HashMap` mid-body. Qualified paths only for name collisions or
-single-use clarity. PREFER flat module hierarchies.
+- Clone the `Arc`, never its contents (`arc.clone()`, not `(*arc).clone()`). `Arc`/`Rc` clones need
+  no comment; justify a non-obvious value clone, and document every `Arc<T>` with why it is shared.
+- Always handle a `JoinHandle`'s result; a dropped handle swallows the task's panic.
+- `enum` over boolean flags for state; design APIs to be hard to misuse (parse, don't validate).
+- `use` imports at the top of the file, no inline qualified paths mid-body
+  (`clippy::absolute_paths = "deny"`); qualified paths only for a name collision. Prefer flat
+  module hierarchies.
 
 ### Architectural Discipline
 
@@ -338,13 +314,12 @@ STOP and surface to ChefFamille before proceeding when you find:
 8. **Invariant test with an exception list** — you're pinning debt.
 9. **Phantom dependency integration** — a crate whose API isn't actually called.
 
-## Git Workflow: NO Pull Requests
+## Git Workflow: No Pull Requests
 
-**CRITICAL: NEVER create Pull Requests. All merges happen locally via squash merge.**
+All merges happen locally via squash merge, so don't open a pull request (`gh pr create` or any
+other way) and don't suggest one.
 
 ### Rules
-- **NEVER use `gh pr create`** or any PR creation command
-- **NEVER suggest creating a PR**
 - Feature branches are merged via **local squash merge**
 
 ### Workflow for Features
@@ -420,7 +395,7 @@ When creating a new type or file, walk this checklist in order:
 
 # Writing code
 
-- CRITICAL: NEVER USE --no-verify WHEN COMMITTING CODE
+- Never commit with `--no-verify`: the hooks are what enforce the commit format and the register gates.
 - We prefer simple, clean, maintainable solutions over clever or complex ones, even if the latter are more concise or performant. Readability and maintainability are primary concerns.
 - Make the smallest reasonable changes to get to the desired outcome. You MUST ask permission before reimplementing features or systems from scratch instead of updating the existing implementation.
 - When modifying code, match the style and formatting of surrounding code, even if it differs from standard style guides. Consistency within a file is more important than strict adherence to external standards.
@@ -428,7 +403,7 @@ When creating a new type or file, walk this checklist in order:
 - NEVER remove code comments unless you can prove that they are actively false. Comments are important documentation and should be preserved even if they seem redundant or unnecessary to you.
 - All code files should start with a brief 2 line comment explaining what the file does. Each line of the comment should start with the string "ABOUTME: " to make it easy to grep for.
 - When writing comments, avoid referring to temporal context about refactors or recent changes. Comments should be evergreen and describe the code as it is, not how it evolved or was recently changed.
-- When you are trying to fix a bug or compilation error or any other issue, YOU MUST NEVER throw away the old implementation and rewrite without explicit permission from the user. If you are going to do this, YOU MUST STOP and get explicit permission from the user.
+- When fixing a bug, a compile error or any other issue, don't throw the existing implementation away and rewrite it; get explicit permission first.
 - NEVER name things as 'improved' or 'new' or 'enhanced', etc. Code naming should be evergreen. What is new today will be "old" someday.
 - NEVER add placeholder or dead code or mock or name variable starting with _
 - Do not hard code magic values
@@ -592,9 +567,9 @@ Mocks are permitted ONLY in test code for:
 - Document all environment variables and configuration options
 - Provide troubleshooting section for common issues
 
-## Task Completion Protocol - MANDATORY
+## Task Completion Protocol
 
-### Before Claiming ANY Task Complete:
+### Before Claiming a Task Complete:
 
 1. **Run Validation:**
    ```bash
@@ -627,19 +602,18 @@ If ANY of the above checks fail, the task is NOT complete regardless of test pas
 
 # Getting help
 
-- ALWAYS ask for clarification rather than making assumptions.
+- Ask for clarification when a requirement is ambiguous and neither the request nor the code settles it.
 - If you're having trouble with something, it's ok to stop and ask for help. Especially if it's something your human might be better at.
 
 # Testing
 
 - Tests MUST cover the functionality being implemented.
-- NEVER ignore the output of the system or the tests - Logs and messages often contain CRITICAL information.
 - If the logs are supposed to contain errors, capture and test it.
 - NO EXCEPTIONS POLICY: Under no circumstances should you mark any test type as "not applicable". Every project, regardless of size or complexity, MUST have unit tests, integration tests, AND end-to-end tests. If you believe a test type doesn't apply, you need the human to say exactly "I AUTHORIZE YOU TO SKIP WRITING TESTS THIS TIME"
 
 ## Test Integrity: No Skipping, No Ignoring
 
-**CRITICAL: All tests must run and pass. No exceptions.**
+**All tests must run and pass.**
 
 ### Forbidden Patterns
 - **Swift**: NEVER use `XCTSkip` or comment out test methods to make tests pass

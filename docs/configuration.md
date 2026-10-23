@@ -23,9 +23,9 @@ Env-var names are derived from the camelCase key by inserting `_` before every u
 |---------|---------|-------------|
 | `screenDescriberMode` | `"auto"` | `"auto"` uses vision when embacle FFI is linked, OCR otherwise. `"vision"` forces AI vision, `"ocr"` forces local OCR + YOLO |
 | `agent` | `""` | AI agent name for vision mode and diagnosis (e.g. `"embacle"`, `"embacle:claude"`) |
-| `agentTransport` | `"auto"` | Agent transport: `"auto"` uses embedded Rust FFI if linked, HTTP otherwise. `"http"` forces HTTP |
+| `agentTransport` | `"auto"` | Agent transport: `"auto"` runs an `embacle` agent whose model is a bare Copilot model id on the embedded Rust FFI when it is linked, HTTP otherwise. A `runner:model` embacle model (e.g. `embacle:claude` → `claude:sonnet`), a bare embacle-server runner name (`claude`, `copilot`, `gemini`, …, meaning that runner's default model) and every Anthropic, OpenAI and Ollama agent always use HTTP. `"http"` forces HTTP for everything |
 | `visionImageWidth` | `500` | Target image width in pixels for vision API calls (screenshots are resized before sending) |
-| `visionModel` | `""` | Override the model name sent in vision chat completion requests. Empty = provider default (e.g. `"copilot_headless"` for embacle) |
+| `visionModel` | `""` | Override the model name sent in vision chat completion requests. Empty = the agent's own model. The value also decides the transport under the `agentTransport` rule |
 | `ocrBackend` | `"auto"` | OCR backend: `"auto"`, `"vision"` (text only), `"yolo"` (icons only), or `"both"` |
 | `ocrRecognitionLevel` | `"accurate"` | Apple Vision OCR quality: `"accurate"` or `"fast"` |
 | `ocrLanguageCorrection` | `true` | Enable language correction during OCR text recognition |
@@ -95,12 +95,33 @@ Env-var names are derived from the camelCase key by inserting `_` before every u
 | Setting | Default | Description |
 |---------|---------|-------------|
 | `openAITimeoutSeconds` | `30` | Timeout for OpenAI API requests |
-| `anthropicTimeoutSeconds` | `30` | Timeout for Anthropic API requests |
+| `anthropicTimeoutSeconds` | derived (`450`) | Timeout for one Anthropic API request. Requests are non-streaming, so the deadline must cover a reply that uses the request's whole `max_tokens` budget. Unset, it is derived from the `max_tokens` the request sends (`anthropicMaxTokens` for the built-in agents, a profile's own `max_tokens` otherwise) at the Anthropic SDKs' planning rate of 128000 output tokens per hour: 16000 tokens -> 450 s, never below 30 s and never above 600 s. 600 s is the SDKs' ~10-minute non-streaming limit, past which an idle connection is dropped, so a budget above ~21000 tokens is unsupported: it needs streaming, which mirroir does not use. Set it only to pin a fixed deadline for every Anthropic request |
 | `ollamaTimeoutSeconds` | `120` | Timeout for Ollama API requests |
 | `embacleTimeoutSeconds` | `60` | Timeout for embacle FFI/API requests |
 | `commandTimeoutSeconds` | `60` | Timeout for command-based AI agent processes |
 | `defaultAIMaxTokens` | `1024` | Maximum tokens for AI model responses |
+| `anthropicMaxTokens` | `16000` | Maximum tokens for the built-in Anthropic agents (and Anthropic YAML profiles without `max_tokens`). Higher than `defaultAIMaxTokens` because current Claude models always think, and thinking tokens count toward the limit |
+| `anthropicEffort` | `"low"` | `output_config.effort` sent on Anthropic diagnosis calls (`low`, `medium`, `high`, `xhigh`, `max`, case-insensitive); controls how much the model thinks. Any other value falls back to `low` and prints one warning on stderr |
 | `visionMaxTokens` | `8192` | Maximum tokens for vision chat-completion responses. Higher than `defaultAIMaxTokens` because home screens with 20+ elements need more output room |
+
+## System Prompts
+
+The AI system prompts are built into the binary. To replace one, drop a same-named Markdown file into a prompt directory. The file is read on every call, so an override takes effect immediately:
+
+| File | Replaces |
+|------|----------|
+| `diagnosis.md` | The failure-diagnosis prompt sent with `mirroir test --agent` |
+| `screen-describe.md` | The vision prompt used by AI vision mode (`describe_screen` via embacle). Keep its output contract: a JSON array of objects with `label`, `x`, `y`, and `type` |
+
+Prompt directories are searched in order, and the first non-empty file wins:
+
+1. `<cwd>/.mirroir-mcp/prompts/` (project-local)
+2. `~/.mirroir-mcp/prompts/` (global)
+3. The built-in prompt
+
+An agent profile's `system_prompt` key takes precedence over `diagnosis.md` for that agent.
+
+An override replaces the built-in prompt completely, so it also hides every later improvement to it. Older `mirroir.sh` installs copied both `diagnosis.md` and `screen-describe.md` into `~/.mirroir-mcp/prompts/`; unless you edited a copy yourself, delete it so the built-in prompt takes effect. `mirroir doctor` lists each active override file by path.
 
 ## Patterns
 

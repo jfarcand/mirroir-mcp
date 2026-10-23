@@ -51,7 +51,7 @@ extension MirroirMCP {
                     return .error(error)
                 }
                 return LaunchAppConfirmation.outcome(
-                    appName: appName, describer: ctx.describer,
+                    appName: appName, describer: ctx.ocrDescriber,
                     windowHeight: ctx.bridge.getWindowInfo().map { Double($0.size.height) }
                 )
             }
@@ -179,7 +179,7 @@ extension MirroirMCP {
                     }
                 }
 
-                guard let result = ctx.describer.describe() else {
+                guard let result = ctx.ocrDescriber.describe() else {
                     return .error(
                         "Failed to capture/analyze screen. Is the '\(ctx.name)' window visible?")
                 }

@@ -267,8 +267,22 @@ public enum TimingConstants {
     /// Default timeout for Ollama API requests (seconds).
     public static let ollamaTimeoutSeconds: Int = 120
 
-    /// Default timeout for Anthropic API requests (seconds).
-    public static let anthropicTimeoutSeconds: Int = 30
+    /// Output rate the Anthropic SDKs estimate a non-streaming request at: an hour for
+    /// 128000 output tokens. The SDKs use it to refuse a non-streaming request whose
+    /// `max_tokens` would run past ~10 minutes, because an idle connection held that
+    /// long gets dropped. The default `anthropicTimeoutSeconds` is derived from the
+    /// request's `max_tokens` at this rate (16000 tokens -> 450 seconds).
+    public static let anthropicPlannedOutputTokensPerHour: Int = 128_000
+
+    /// Ceiling of the derived Anthropic timeout (seconds): the SDKs' ~10-minute
+    /// non-streaming guard. A non-streaming connection is not held open longer, so a
+    /// `max_tokens` budget beyond what fits (~21333 tokens at the planning rate) needs
+    /// streaming, which the Anthropic provider does not use.
+    public static let anthropicMaxNonStreamingSeconds: Int = 600
+
+    /// Floor of the derived Anthropic timeout (seconds): a reply with a small
+    /// `max_tokens` still needs time to connect and think.
+    public static let anthropicMinTimeoutSeconds: Int = 30
 
     /// Default timeout for embacle-server API requests (seconds).
     /// Higher than direct API providers because embacle spawns CLI subprocesses.
@@ -280,13 +294,22 @@ public enum TimingConstants {
     /// Default max tokens for AI model responses.
     public static let defaultAIMaxTokens: Int = 1024
 
+    /// Default max tokens for Anthropic Messages API diagnosis calls.
+    /// Higher than defaultAIMaxTokens because current Claude models always think
+    /// (adaptive thinking) and thinking tokens count toward max_tokens.
+    public static let anthropicMaxTokens: Int = 16000
+
+    /// `output_config.effort` for Anthropic diagnosis calls. A diagnosis is a short
+    /// structured answer, so `.low` keeps the thinking — and with it latency and cost — short.
+    public static let anthropicEffort: AnthropicEffort = .low
+
     /// Default max tokens for vision screen description responses.
     /// Higher than defaultAIMaxTokens because home screens with 20+ elements
     /// produce JSON arrays that easily exceed 4096 tokens.
     public static let visionMaxTokens: Int = 8192
 
     /// Override the model name sent in vision chat completion requests.
-    /// Empty string means use the provider default (e.g. "copilot_headless" for embacle).
+    /// Empty string means use the configured agent's own model.
     /// Set to a specific model (e.g. "gpt-4.1") to route through the configured provider.
     public static let visionModel: String = ""
 

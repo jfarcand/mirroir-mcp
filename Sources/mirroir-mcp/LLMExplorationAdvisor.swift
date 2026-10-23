@@ -61,6 +61,11 @@ struct HeuristicExplorationAdvisor: ExplorationAdvising {
 /// promising untapped element for discovering new screens.
 struct VisionExplorationAdvisor: ExplorationAdvising {
 
+    /// Bare Copilot model id sent with every request: the configured agent's
+    /// model, chosen only when `AIAgentRegistry.embeddedAgentModel()` says the
+    /// embedded runner serves that agent.
+    let model: String
+
     private static var timeoutSeconds: Int { EnvConfig.embacleTimeoutSeconds }
 
     func suggest(
@@ -136,7 +141,7 @@ struct VisionExplorationAdvisor: ExplorationAdvising {
         ]
 
         let requestBody: [String: Any] = [
-            "model": "copilot_headless",
+            "model": model,
             "max_tokens": 100,
             "messages": [
                 ["role": "user", "content": userContent],

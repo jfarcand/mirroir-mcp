@@ -151,7 +151,7 @@ extension BFSExplorerTests {
 
     private func makeTabAppDescription(tabs: [String]) -> AppDescription {
         AppDescription(
-            appName: "TestApp", schemaVersion: 1, locale: "fr_CA", archetype: nil,
+            appName: "TestApp", schemaVersion: 1, locale: "fr_CA", archetype: nil, playable: nil,
             resetBeforeExplore: false, obstacleMode: .auto, context: "test",
             obstacles: [], skipElements: [], credentials: [:], hints: [],
             tabs: tabs, tabLayout: TabLayout(orientation: .horizontal, edge: .bottom),

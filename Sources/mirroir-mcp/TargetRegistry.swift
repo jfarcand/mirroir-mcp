@@ -33,6 +33,7 @@ struct TargetContext: Target, Sendable {
     let input: any InputProviding
     let capture: any ScreenCapturing
     let describer: any ScreenDescribing
+    let ocrDescriber: any ScreenDescribing
     let recorder: any ScreenRecording
     let backtracker: any Backtracking
     let lifecycle: any AppLifecycleHandling
@@ -48,6 +49,7 @@ struct TargetContext: Target, Sendable {
         input: any InputProviding,
         capture: any ScreenCapturing,
         describer: any ScreenDescribing,
+        ocrDescriber: any ScreenDescribing,
         recorder: any ScreenRecording,
         backtracker: any Backtracking,
         lifecycle: any AppLifecycleHandling,
@@ -61,6 +63,7 @@ struct TargetContext: Target, Sendable {
         self.input = input
         self.capture = capture
         self.describer = describer
+        self.ocrDescriber = ocrDescriber
         self.recorder = recorder
         self.backtracker = backtracker
         self.lifecycle = lifecycle
@@ -71,7 +74,8 @@ struct TargetContext: Target, Sendable {
     /// outside the `TargetKind` registry). Infers `profile`, `backtracker`, and
     /// `lifecycle` from the `targetType` string by asking `TargetKind` for the
     /// matching profile. New code should use the canonical initializer or the
-    /// per-target `build()` factories directly.
+    /// per-target `build()` factories directly. `ocrDescriber` is the
+    /// `describer` itself unless the caller supplies a separate one.
     init(
         name: String,
         targetType: String,
@@ -80,6 +84,7 @@ struct TargetContext: Target, Sendable {
         input: any InputProviding,
         capture: any ScreenCapturing,
         describer: any ScreenDescribing,
+        ocrDescriber: (any ScreenDescribing)? = nil,
         recorder: any ScreenRecording,
         capabilities: Set<TargetCapability>
     ) {
@@ -93,7 +98,8 @@ struct TargetContext: Target, Sendable {
         self.init(
             name: name, targetType: targetType, bundleID: bundleID,
             profile: profile, bridge: bridge, input: input,
-            capture: capture, describer: describer, recorder: recorder,
+            capture: capture, describer: describer,
+            ocrDescriber: ocrDescriber ?? describer, recorder: recorder,
             backtracker: backtracker, lifecycle: lifecycle,
             capabilities: capabilities
         )

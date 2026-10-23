@@ -106,7 +106,7 @@ extension AIAgentProviderTests {
         #expect(config!.name == "embacle")
         #expect(config!.mode == .api)
         #expect(config!.provider == .embacle)
-        #expect(config!.model == "copilot")
+        #expect(config!.model == defaultAgentModel)
         #expect(config!.apiKeyEnvVar == nil)
         #expect(config!.baseURL == "http://localhost:3000")
     }
@@ -117,8 +117,36 @@ extension AIAgentProviderTests {
         #expect(config != nil)
         #expect(config!.name == "embacle:claude")
         #expect(config!.provider == .embacle)
-        #expect(config!.model == "claude")
+        #expect(config!.model == "claude:sonnet")
         #expect(config!.baseURL == "http://localhost:3000")
+    }
+
+    @Test("Default agent model is a concrete model id, not an embacle provider alias")
+    func defaultAgentModelIsNotProviderAlias() {
+        // embacle maps these aliases to its own catalog default (an Opus model)
+        // instead of the model mirroir means to run.
+        #expect(!["copilot", "copilot_headless", "claude"].contains(defaultAgentModel))
+        #expect(defaultAgentModel == "claude-sonnet-5.5")
+    }
+
+    @Test("Embedded model follows the built-in embacle agent when the runner is on")
+    func embeddedAgentModelForBuiltInEmbacle() {
+        let config = AIAgentRegistry.builtInAgents["embacle"]
+        #expect(AIAgentRegistry.embeddedAgentModel(
+            config: config, embeddedRunnerEnabled: true) == defaultAgentModel)
+        #expect(AIAgentRegistry.embeddedAgentModel(
+            config: config, embeddedRunnerEnabled: false) == nil)
+    }
+
+    @Test("No embedded model for agents the embedded runner does not serve")
+    func embeddedAgentModelNilForHTTPAgents() {
+        for name in ["embacle:claude", "claude-opus-5-5", "gpt-5.3", "ollama:llama3"] {
+            let config = AIAgentRegistry.resolve(name: name)
+            #expect(config != nil, "\(name) should resolve")
+            #expect(AIAgentRegistry.embeddedAgentModel(
+                config: config, embeddedRunnerEnabled: true) == nil, "\(name)")
+        }
+        #expect(AIAgentRegistry.embeddedAgentModel(config: nil, embeddedRunnerEnabled: true) == nil)
     }
 
     // MARK: - Available Agents
@@ -126,8 +154,9 @@ extension AIAgentProviderTests {
     @Test("availableAgents includes built-in models and ollama placeholder")
     func availableAgentsIncludesBuiltIns() {
         let agents = AIAgentRegistry.availableAgents()
-        #expect(agents.contains("claude-sonnet-4-6"))
-        #expect(agents.contains("claude-haiku-4-5"))
+        #expect(agents.contains("claude-opus-5-5"))
+        #expect(agents.contains("claude-sonnet-5-5"))
+        #expect(agents.contains("claude-haiku-5-5"))
         #expect(agents.contains("gpt-5.3"))
         #expect(agents.contains("embacle"))
         #expect(agents.contains("embacle:claude"))
@@ -138,7 +167,7 @@ extension AIAgentProviderTests {
 
     @Test("createProvider returns AnthropicProvider for anthropic config")
     func createAnthropicProvider() {
-        let config = AIAgentRegistry.builtInAgents["claude-sonnet-4-6"]!
+        let config = AIAgentRegistry.builtInAgents["claude-opus-5-5"]!
         let provider = AIAgentRegistry.createProvider(config: config)
         #expect(provider != nil)
         #expect(provider is AnthropicProvider)
@@ -209,30 +238,82 @@ extension AIAgentProviderTests {
 
     // MARK: - Prompt Loading
 
-    @Test("loadDiagnosisPrompt returns non-empty default when no file exists")
+    @Test("loadSystemPrompt returns the built-in when no override file exists")
     func loadDefaultPrompt() {
-        // Even if no file exists at the expected paths, the hardcoded default is returned
-        let prompt = loadDiagnosisPrompt(filename: "nonexistent-prompt-xyz.md")
-        #expect(!prompt.isEmpty)
-        #expect(prompt.contains("iOS"))
-        #expect(prompt.contains("JSON"))
+        let prompt = loadSystemPrompt(searchDirs: [makeTempPromptDir()])
+        #expect(prompt == aiDiagnosisDefaultPrompt)
     }
 
-    @Test("loadDiagnosisPrompt loads from file when present")
+    @Test("built-in diagnosis prompt describes every DiagnosticPayload field and the response keys")
+    func diagnosisPromptMatchesPayload() {
+        let prompt = aiDiagnosisDefaultPrompt
+        #expect(!prompt.isEmpty)
+        for field in ["skillName", "skillFilePath", "failedSteps", "stepIndex", "stepType",
+                      "label", "deterministicDiagnosis", "patches", "shouldBe",
+                      "analysis", "suggested_fixes", "should_be", "confidence"] {
+            #expect(prompt.contains(field), "diagnosis prompt is missing \(field)")
+        }
+    }
+
+    @Test("built-in vision prompt names the label/x/y/type keys VisionResponseParser reads")
+    func visionPromptNamesParserKeys() {
+        let prompt = VisionScreenDescriber.defaultSystemPrompt
+        #expect(!prompt.isEmpty)
+        for key in ["\"label\"", "\"x\"", "\"y\"", "\"type\""] {
+            #expect(prompt.contains(key), "vision prompt is missing \(key)")
+        }
+    }
+
+    @Test("loadSystemPrompt prefers an override file over the built-in")
     func loadPromptFromFile() throws {
-        let tmpDir = NSTemporaryDirectory() + "prompt-test-\(UUID().uuidString)"
-        defer { try? FileManager.default.removeItem(atPath: tmpDir) }
-        let promptsDir = tmpDir + "/.mirroir-mcp/prompts"
-        try FileManager.default.createDirectory(atPath: promptsDir, withIntermediateDirectories: true)
+        let localDir = makeTempPromptDir()
+        let globalDir = makeTempPromptDir()
+        defer {
+            try? FileManager.default.removeItem(atPath: localDir)
+            try? FileManager.default.removeItem(atPath: globalDir)
+        }
+        try FileManager.default.createDirectory(atPath: globalDir, withIntermediateDirectories: true)
+        try "# Global Prompt".write(
+            toFile: globalDir + "/" + SystemPromptFile.diagnosis.rawValue, atomically: true, encoding: .utf8)
 
-        let content = "# Custom Prompt\nAnalyze the failure."
-        try content.write(toFile: promptsDir + "/diagnosis.md", atomically: true, encoding: .utf8)
+        let globalOnly = loadSystemPrompt(searchDirs: [localDir, globalDir])
+        #expect(globalOnly == "# Global Prompt")
 
-        // The function checks PermissionPolicy.promptDirs which are based on cwd,
-        // so we test the file loading indirectly via loadYAMLProfile pattern
-        let data = FileManager.default.contents(atPath: promptsDir + "/diagnosis.md")
-        let loaded = String(data: data!, encoding: .utf8)!
-        #expect(loaded.contains("Custom Prompt"))
+        try FileManager.default.createDirectory(atPath: localDir, withIntermediateDirectories: true)
+        try "# Local Prompt".write(
+            toFile: localDir + "/" + SystemPromptFile.diagnosis.rawValue, atomically: true, encoding: .utf8)
+
+        let both = loadSystemPrompt(searchDirs: [localDir, globalDir])
+        #expect(both == "# Local Prompt")
+    }
+
+    @Test("loadSystemPrompt ignores a whitespace-only override file")
+    func loadPromptIgnoresEmptyFile() throws {
+        let dir = makeTempPromptDir()
+        defer { try? FileManager.default.removeItem(atPath: dir) }
+        try FileManager.default.createDirectory(atPath: dir, withIntermediateDirectories: true)
+        let filename = SystemPromptFile.screenDescribe.rawValue
+        try "  \n".write(toFile: dir + "/" + filename, atomically: true, encoding: .utf8)
+
+        let prompt = loadSystemPrompt(.screenDescribe, searchDirs: [dir])
+        #expect(prompt == VisionScreenDescriber.defaultSystemPrompt)
+    }
+
+    @Test("Each overridable prompt file names a distinct .md file with a non-empty built-in")
+    func systemPromptRegistryIsConsistent() {
+        let names = SystemPromptFile.allCases.map(\.rawValue)
+        #expect(Set(names).count == names.count)
+        for file in SystemPromptFile.allCases {
+            #expect(file.rawValue.hasSuffix(".md"))
+            #expect(!file.builtIn.isEmpty)
+        }
+        #expect(SystemPromptFile.diagnosis.builtIn == aiDiagnosisDefaultPrompt)
+        #expect(SystemPromptFile.screenDescribe.builtIn == VisionScreenDescriber.defaultSystemPrompt)
+    }
+
+    /// A unique, not-yet-created prompt directory under the system temp dir.
+    private func makeTempPromptDir() -> String {
+        NSTemporaryDirectory() + "prompt-test-\(UUID().uuidString)"
     }
 
     // MARK: - CommandProvider ${PAYLOAD} substitution

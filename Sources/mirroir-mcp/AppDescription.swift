@@ -28,6 +28,13 @@ struct AppDescription: Sendable {
     /// Optional archetype name referencing a screen recipe (e.g. "dashboard", "social-feed").
     /// When set, bypasses recipe auto-detection and uses this recipe directly.
     let archetype: String?
+    /// Optional playability class from the `playable:` front-matter field:
+    /// "observe-only", "single-control", or "pc-controls". Absent means an
+    /// ordinary, explorable app. Anything other than "observe-only" marks a
+    /// driveable game, which the explorer refuses to BFS — a game scene is
+    /// driven by a `kind: game` skill, not by autonomous exploration. Nil for
+    /// an ordinary app; only APP.md files that declare `playable:` set it.
+    let playable: String?
     /// Whether to force-quit the app via App Switcher before launching for exploration.
     let resetBeforeExplore: Bool
     /// Obstacle handling mode: "auto", "hint", or "off".
@@ -59,6 +66,14 @@ struct AppDescription: Sendable {
     /// Present once the app has been ported to the FakeMirroring simulator;
     /// nil for guidance-only APP.md files that haven't been ported yet.
     let simulator: SimulatorSpec?
+
+    /// Whether the explorer may BFS this app. True for ordinary apps (no
+    /// `playable:` declared) and for `observe-only` apps; false for any other
+    /// `playable` class (`single-control`, `pc-controls`, or an unrecognized
+    /// value — fail safe toward never driving a game).
+    var allowsExploration: Bool {
+        (playable ?? "observe-only") == "observe-only"
+    }
 }
 
 /// Geometric hint for the tab bar layout. Defaults to `.horizontal` bottom-edge
@@ -114,6 +129,7 @@ enum AppDescriptionParser {
         guard let appName = frontMatter["app"] else { return nil }
         let locale = frontMatter["locale"]
         let archetype = frontMatter["archetype"]
+        let playable = frontMatter["playable"]
         let resetBeforeExplore = ["true", "yes", "1"].contains(
             (frontMatter["reset_before_explore"] ?? "false").lowercased())
         let obstacleMode = ObstacleMode(rawValue: frontMatter["obstacle_mode"] ?? "auto") ?? .auto
@@ -161,6 +177,7 @@ enum AppDescriptionParser {
             schemaVersion: schemaVersion,
             locale: locale,
             archetype: archetype,
+            playable: playable,
             resetBeforeExplore: resetBeforeExplore,
             obstacleMode: obstacleMode,
             context: context,

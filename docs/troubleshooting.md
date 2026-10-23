@@ -42,6 +42,8 @@ mirroir doctor
 
 Use `--json` for machine-readable output or `--no-color` to disable ANSI colors.
 
+Doctor also warns about each prompt file that overrides a built-in AI system prompt, with its path. Older `mirroir.sh` installs copied both `diagnosis.md` and `screen-describe.md` into `~/.mirroir-mcp/prompts/`; a copy you did not write is stale — delete it (see [System Prompts](configuration.md#system-prompts)).
+
 ## Development Watch Mode
 
 During development, use `mirroir-watch.sh` to automatically rebuild and restart the server when source files change:
@@ -64,11 +66,11 @@ The script uses `fswatch` to monitor `Sources/` for `.swift` file changes, rebui
 
 **YOLO model not loading** — Check `~/.mirroir-mcp/debug.log` for startup messages. The server logs whether it found a model (`OCR: auto-detected YOLO model, using Vision + YOLO`) or not (`OCR: no YOLO model found`). Verify the `.mlmodelc` directory exists in `~/.mirroir-mcp/models/` and is a valid compiled CoreML model. You can also set `yoloModelPath` in `settings.json` to point to a specific path.
 
-**AI vision mode not activating** — Check `~/.mirroir-mcp/debug.log` for the agent-transport startup line. `Agent transport: embedded (Rust FFI)` means the embedded embacle runtime is linked and active; `Agent transport: HTTP` means the embacle FFI is not linked into this binary. If it falls back to HTTP, verify that `embacle-ffi` is installed (`brew list embacle-ffi`) and rebuild from source (`swift build -c release`) — the FFI library (`libembacle.a`) must be linked at compile time. If linked but vision requests fail, check that your CLI agent (GitHub Copilot or Claude Code) is authenticated. Set `"screenDescriberMode": "ocr"` in `settings.json` to force local OCR as a fallback. (`agentTransport: "http"` in `settings.json` also forces HTTP even when the FFI is linked.)
+**AI vision mode not activating** — Check `~/.mirroir-mcp/debug.log` for the agent-transport startup line. `Agent transport: embedded (Rust FFI) available; agent '<name>' -> embedded` means the embedded embacle runtime is linked and serves the configured agent (`-> http` means that agent goes over HTTP: a non-embacle provider, or a `runner:model` embacle model such as `embacle:claude`, which needs `embacle-server` running); `Agent transport: HTTP` means the embacle FFI is not linked into this binary. If it falls back to HTTP, verify that `embacle-ffi` is installed (`brew list embacle-ffi`) and rebuild from source (`swift build -c release`) — the FFI library (`libembacle.a`) must be linked at compile time. If linked but vision requests fail, check that your CLI agent (GitHub Copilot or Claude Code) is authenticated. Set `"screenDescriberMode": "ocr"` in `settings.json` to force local OCR as a fallback. (`agentTransport: "http"` in `settings.json` also forces HTTP even when the FFI is linked.)
 
 **Compiled skill fails but you don't know why** — Use `--agent` to diagnose failures. Deterministic OCR analysis runs first (free, no API key), then optionally sends context to an AI for richer root-cause analysis:
 ```bash
 mirroir test --agent skill.yaml                    # deterministic OCR diagnosis (YAML or SKILL.md)
-mirroir test --agent claude-sonnet-4-6 skill.yaml  # deterministic + AI diagnosis
+mirroir test --agent claude-sonnet-5-5 skill.yaml  # deterministic + AI diagnosis
 ```
 See the [AI-Assisted Diagnosis](../README.md#ai-assisted-diagnosis) section for all supported providers and custom agent configuration.

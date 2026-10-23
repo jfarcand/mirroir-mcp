@@ -18,7 +18,7 @@ struct OllamaProvider: AIAgentProviding {
         let baseURL = config.baseURL ?? "http://localhost:11434"
         guard let url = URL(string: baseURL + Self.generatePath) else { return nil }
 
-        let systemPrompt = config.systemPrompt ?? loadDiagnosisPrompt()
+        let systemPrompt = config.systemPrompt ?? loadSystemPrompt()
 
         guard let payloadJSON = try? JSONEncoder().encode(payload),
               let payloadStr = String(data: payloadJSON, encoding: .utf8) else {
@@ -41,7 +41,8 @@ struct OllamaProvider: AIAgentProviding {
             "Content-Type": "application/json",
         ]
 
-        guard let responseData = sendAgentHTTPRequest(
+        guard let responseData = sendAgentRequest(
+            transport: config.transport(),
             url: url, headers: headers, body: body, timeoutSeconds: Self.timeoutSeconds
         ) else {
             fputs("Warning: Cannot reach Ollama at \(baseURL)\n", stderr)

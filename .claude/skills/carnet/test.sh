@@ -399,7 +399,7 @@ assert_eq "prompt hook: silent when no issue is named" "$(wc -c < "$tmp/hook3" |
 
 # A peer NAMING an issue is not your user ASSIGNING it. Both non-user vectors reach `.prompt`
 # byte-identically to a typed prompt (verified against captured live payloads), and both used
-# to arm the pending list: carnet#279/#321/#261 were auto-claimed off peer messages that only
+# to arm the pending list: three issues were auto-claimed off peer messages that only
 # mentioned them, one of them a peer replying "Not mine."
 reset; rm -rf "$pending_dir_h"
 peer_msg='<cross-session-message from=\"uds:/tmp/cc-socks/1.sock\" from-name=\"iphone-mirroir-mcp-e8\" from-mode=\"bypass\">\nI hold carnet#42 and am moving the pins, stay off these files.\n</cross-session-message>'
@@ -436,9 +436,9 @@ printf '{"prompt":"e8 said <cross-session-message>I hold carnet#42</cross-sessio
 assert_grep "a quoted envelope mid-prompt is still the user" '^42$' "$pending_dir_h/$ME.txt"
 
 # The session is a machine author too. A /loop or ScheduleWakeup re-fire is a prompt the model
-# wrote for itself, and it names whatever the model was thinking about: dravr-platform-7f put
-# carnet#436 into its own wakeup on 2026-09-18 and held it for 67 minutes, the human never
-# having typed the number. The payload's `source` field says so once Claude Code emits it.
+# wrote for itself, and it names whatever the model was thinking about: a session once put an
+# issue into its own wakeup and held it for over an hour, the human never having typed the
+# number. The payload carries no `source` field today; the branch honours one if it appears.
 reset; rm -rf "$pending_dir_h"
 printf '{"prompt":"Continue the plan; comment the eight strings on carnet#42","session_id":"%s","source":"loop_wakeup"}' "$ME" \
     | bash "$here/hooks/prompt-status.sh" > "$tmp/hookw"
@@ -531,7 +531,7 @@ assert_eq "&>/dev/null claims nothing" "$(wc -c < "$S/calls.log" | tr -d ' ')" 0
 
 # A git verb needs a terminator, or `merge` matches inside `git merge-base` —
 # the standard "is this commit on main?" query — and a pure read claims. That
-# took carnet#323 off a peer who was mid-investigation and stood down for it.
+# took an issue off a peer who was mid-investigation and stood down for it.
 auto_claim "$(bash_payload 'git merge-base --is-ancestor abc123 origin/main')"
 assert_eq "git merge-base claims nothing" "$(wc -c < "$S/calls.log" | tr -d ' ')" 0
 auto_claim "$(bash_payload 'git merge-base --fork-point main')"
@@ -675,7 +675,7 @@ assert_eq "a missing hook script leaves the tool alone" "$rc" 0
 # ================================================================== summary
 # ---- a number the user only QUOTED must not arm --------------------------------
 # The user pastes a peer session's terminal output constantly; every issue it mentions used to
-# be claimed for the reader. carnet#343, #394 and #103 were all taken that way.
+# be claimed for the reader, and three issues were taken that way.
 #
 # The first attempt split the prompt at the first transcript marker and armed on the prose
 # before it. #103 slipped through: that paste's agent prose led with no marker, so the number

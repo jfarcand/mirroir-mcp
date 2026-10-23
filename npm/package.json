@@ -30,7 +30,6 @@
     "bin/",
     "install.js",
     "install-cmd.js",
-    "prompts/",
     "agents/",
     "README.md"
   ]

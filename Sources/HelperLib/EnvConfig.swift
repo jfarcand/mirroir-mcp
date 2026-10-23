@@ -73,6 +73,22 @@ public enum EnvConfig {
         readUInt32("frameSettleTimeoutUs", default: TimingConstants.frameSettleTimeoutUs)
     }
 
+    public static var frameSettleMaxTimeoutUs: UInt32 {
+        readUInt32("frameSettleMaxTimeoutUs", default: TimingConstants.frameSettleMaxTimeoutUs)
+    }
+
+    public static var blankFrameSampleSize: Int {
+        readInt("blankFrameSampleSize", default: TimingConstants.blankFrameSampleSize)
+    }
+
+    public static var blankFrameLuminanceTolerance: Int {
+        readInt("blankFrameLuminanceTolerance", default: TimingConstants.blankFrameLuminanceTolerance)
+    }
+
+    public static var blankFrameMaxContentFraction: Double {
+        readDouble("blankFrameMaxContentFraction", default: TimingConstants.blankFrameMaxContentFraction)
+    }
+
     // MARK: - App Switching & Navigation
 
     public static var spaceSwitchSettleUs: UInt32 {
@@ -275,26 +291,40 @@ public enum EnvConfig {
         return result
     }
 
+    /// Read `key` from `settings`, then from its `MIRROIR_*` variable in `env`, else
+    /// `fallback`. `settings` and `env` default to the process-wide sources.
     static func readString(_ key: String, envVar: String? = nil,
-                            default fallback: String) -> String {
+                            default fallback: String,
+                            settings: [String: Any] = EnvConfig.settings,
+                            env: [String: String] = EnvConfig.env) -> String {
         if let val = settings[key] as? String { return val }
         if let val = env[envVar ?? envVarName(key)] { return val }
         return fallback
     }
 
-    static func readUInt32(_ key: String, default fallback: UInt32) -> UInt32 {
+    static func readUInt32(_ key: String, default fallback: UInt32,
+                            settings: [String: Any] = EnvConfig.settings,
+                            env: [String: String] = EnvConfig.env) -> UInt32 {
         if let value = settings[key] {
-            if let intVal = value as? Int, intVal >= 0 { return UInt32(intVal) }
-            if let doubleVal = value as? Double, doubleVal >= 0 { return UInt32(doubleVal) }
+            if let intVal = value as? Int, intVal >= 0 { return UInt32(clamping: intVal) }
+            if let doubleVal = value as? Double, doubleVal >= 0,
+               let parsed = UInt32(exactly: Swift.min(doubleVal, Double(UInt32.max)).rounded(.towardZero)) {
+                return parsed
+            }
         }
         if let str = env[envVarName(key)], let parsed = UInt32(str) { return parsed }
         return fallback
     }
 
-    static func readInt(_ key: String, default fallback: Int) -> Int {
+    static func readInt(_ key: String, default fallback: Int,
+                            settings: [String: Any] = EnvConfig.settings,
+                            env: [String: String] = EnvConfig.env) -> Int {
         if let value = settings[key] {
             if let intVal = value as? Int { return intVal }
-            if let doubleVal = value as? Double { return Int(doubleVal) }
+            if let doubleVal = value as? Double,
+               let parsed = Int(exactly: doubleVal.rounded(.towardZero)) {
+                return parsed
+            }
         }
         if let str = env[envVarName(key)], let parsed = Int(str) { return parsed }
         return fallback

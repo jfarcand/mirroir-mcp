@@ -55,6 +55,7 @@ enum DoctorCommand {
         checks.append(checkScreenRecording())
         checks.append(checkAccessibility())
         checks.append(EmbacleVersionCheck.run())
+        checks.append(contentsOf: PromptOverrideCheck.run())
         checks.append(contentsOf: checkConfiguredTargets())
 
         if config.json {

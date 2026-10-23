@@ -8,10 +8,9 @@ user-invocable: true
 # Carnet
 
 The register is shared by every repo of the product (registre.toml names it) and by many
-Claude Code sessions at once. Nothing on an issue says a session is on it, so peers collide: the same
-design was built twice ~35 minutes apart on 2026-08-31, and carnet#197 was found and written
-up independently by two sessions. A **claim** fixes that. It is three native GitHub facts
-that move together:
+Claude Code sessions at once. Nothing on an issue says a session is on it, so peers collide: two
+sessions build the same design, or find and write up the same issue independently. A **claim**
+fixes that. It is three native GitHub facts that move together:
 
 | Carrier | Meaning |
 |---|---|
@@ -20,9 +19,6 @@ that move together:
 | newest `carnet-claim` marker comment | **which** session — id, name, user, host, pid, repo, branch, time |
 
 One script does everything: `.claude/skills/carnet/carnet.sh`.
-
-The incident history quoted in this skill (carnet#197, carnet#279, carnet#436, …) happened in
-the dravr-* family, where it was built; those numbers are in `dravr-ai/dravr-carnet`.
 
 Never run `gh issue` against the tracker by hand — the script is the one path that keeps the
 three carriers consistent and the title shape uniform.
@@ -38,8 +34,9 @@ three carriers consistent and the title shape uniform.
 2. **A refusal is a peer, not an obstacle.** Exit code 2 means another *live* session holds
    the issue, or a session on another host does. Tell the user who and which session, and
    stop. The auto-claim hook enforces this once: it blocks your first edit and names the
-   holder. It does not block again — after that you are accountable, not the hook. Do not `--steal` on your own judgement — stealing is the user's call, and the
-   stolen-from session is warned on the issue.
+   holder. It does not block again — after that you are accountable, not the hook. Do not
+   `--steal` on your own judgement — stealing is the user's call, and the stolen-from session
+   is warned on the issue.
 3. **Release when you stop, close when it is fixed.** `release <n>` when you abandon or hand
    off; `close <n> --why "…" --commit <sha>` when the work landed. Both drop the label and
    the assignee and post a marker. A session that ends still holding claims is released by
@@ -75,7 +72,7 @@ Add `--dry-run` to any of them to see the `gh` calls without making them.
 
 - **UserPromptSubmit** (`hooks/prompt-status.sh`): when a prompt names `carnet#N`,
   `registre#N`, or a carnet issue URL, one status line per issue lands in your context
-  before you answer — `carnet#197 · held by @jfarcand · session i18Guards (a3f9c2d1) on 1Q84
+  before you answer — `carnet#N · held by @jfarcand · session i18Guards (a3f9c2d1) on 1Q84
   [running] · feature/i18n-guards · since …`. Read it. If it says `unclaimed`, claim before
   editing. If it says `[session ended — stale]`, a plain `claim` takes it over. A peer
   message or a background task result gets the status line **plus a note saying it armed
@@ -107,14 +104,15 @@ blocks twice for the same issue: a permanent block would deadlock a session over
 was only mentioned in passing.
 
 **A wakeup you write is not an assignment you received.** When you schedule a wakeup
-(`/loop`, `ScheduleWakeup`), the prompt that comes back is yours, and the hooks now know it:
-the prompt hook cannot tell at submit time (Claude Code 2.1.276 sends no `source` yet and the
-transcript entry is written after the hook runs), so it records the prompt id, and the claim
-hook reads that entry — `promptSource: "system"`, `isMeta: true`, `scheduledTaskId` — before
-claiming. dravr-platform-7f (2026-09-18) wrote "comment the eight coach_id strings on
-carnet#436" into its own wakeup and held #436 for 67 minutes, ChefFamille never having typed
-the number. Do not put issue numbers into a wakeup prompt as a to-do list for yourself; and
-if you are told a claim was refused because the prompt was a wakeup, that is the hook working.
+(`/loop`, `ScheduleWakeup`), the prompt that comes back is yours, and the hooks know it.
+The prompt hook honours a `source` field when the UserPromptSubmit payload carries one (any
+value but `user` is a machine author); the payload Claude Code sends carries none, and the
+transcript entry that names the author is written after the hook runs, so the prompt hook
+records the prompt id and the claim hook reads that entry — `promptSource: "system"`,
+`isMeta: true`, `scheduledTaskId` — before claiming: a session that writes an issue number
+into its own wakeup would otherwise hold that issue though nobody asked it to. Do not put
+issue numbers into a wakeup prompt as a to-do list for yourself; and if you are told a claim
+was refused because the prompt was a wakeup, that is the hook working.
 
 ## A peer naming an issue is not assigning it
 
@@ -131,10 +129,10 @@ in both directions:
 
 | | what happened |
 |---|---|
-| **false claim** | `carnet#279` was claimed 31s after a peer wrote *"do **not** put my point 1 in carnet#325"*; `#321` two minutes after a peer replied *"Not mine."*; `#261` 25s after a peer retracted a diagnosis. Three issues assigned — label, assignee and marker comment — to sessions that were never going to work them. |
-| **false block** | one FYI (*"I hold carnet#323, stay off these files"*) blocked a tool call in six separate sessions, each told *"Do not do this work twice"* about work it had never started. Two were obstaque sessions — a different product. |
+| **false claim** | an issue was claimed 31s after a peer wrote that their point must **not** go into it; a second two minutes after a peer replied *"Not mine."*; a third 25s after a peer retracted a diagnosis. Three issues assigned — label, assignee and marker comment — to sessions that were never going to work them. |
+| **false block** | one FYI (*"I hold this issue, stay off these files"*) blocked a tool call in six separate sessions, each told *"Do not do this work twice"* about work it had never started. Two belonged to a different product. |
 
-Both vectors now print the status line and arm nothing: knowing who holds `#323` is exactly
+Both vectors now print the status line and arm nothing: knowing who holds the issue is exactly
 what you need in order to answer the sender, and a peer cannot redirect your session's claim
 onto an issue it happened to mention. Taking work a peer hands over is still fine — it is just
 explicit now: `carnet.sh claim <n>`.

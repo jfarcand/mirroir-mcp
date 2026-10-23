@@ -15,23 +15,24 @@ struct AIAgentProviderTests {
 
     // MARK: - Built-in Agent Resolution
 
-    @Test("Resolves claude-sonnet-4-6 from built-in registry")
-    func resolveClaudeSonnet() {
-        let config = AIAgentRegistry.resolve(name: "claude-sonnet-4-6")
+    @Test("Built-in Anthropic agents send the current-generation model id they are named after",
+          arguments: ["claude-opus-5-5", "claude-sonnet-5-5", "claude-haiku-5-5"])
+    func resolveClaudeAgents(name: String) {
+        let config = AIAgentRegistry.resolve(name: name)
         #expect(config != nil)
-        #expect(config!.name == "claude-sonnet-4-6")
+        #expect(config!.name == name)
         #expect(config!.mode == .api)
         #expect(config!.provider == .anthropic)
-        #expect(config!.model == "claude-sonnet-4-6-20250514")
+        #expect(config!.model == name)
         #expect(config!.apiKeyEnvVar == "ANTHROPIC_API_KEY")
+        #expect(config!.baseURL == "https://api.anthropic.com")
+        #expect(config!.maxTokens == EnvConfig.anthropicMaxTokens)
     }
 
-    @Test("Resolves claude-haiku-4-5 from built-in registry")
-    func resolveClaudeHaiku() {
-        let config = AIAgentRegistry.resolve(name: "claude-haiku-4-5")
-        #expect(config != nil)
-        #expect(config!.provider == .anthropic)
-        #expect(config!.model == "claude-haiku-4-5-20251001")
+    @Test("Previous-generation Anthropic agent names are not registered",
+          arguments: ["claude-sonnet-4-6", "claude-haiku-4-5"])
+    func previousClaudeAgentsAreGone(name: String) {
+        #expect(AIAgentRegistry.resolve(name: name) == nil)
     }
 
     @Test("Resolves gpt-5.3 from built-in registry")
@@ -88,7 +89,7 @@ struct AIAgentProviderTests {
             name: my-cloud-agent
             mode: api
             provider: anthropic
-            model: claude-sonnet-4-6-20250514
+            model: claude-sonnet-5-5
             api_key_env: MY_API_KEY
             max_tokens: 2048
             """
@@ -100,7 +101,7 @@ struct AIAgentProviderTests {
         #expect(config!.name == "my-cloud-agent")
         #expect(config!.mode == .api)
         #expect(config!.provider == .anthropic)
-        #expect(config!.model == "claude-sonnet-4-6-20250514")
+        #expect(config!.model == "claude-sonnet-5-5")
         #expect(config!.apiKeyEnvVar == "MY_API_KEY")
         #expect(config!.maxTokens == 2048)
     }
@@ -126,6 +127,25 @@ struct AIAgentProviderTests {
         #expect(config!.mode == .command)
         #expect(config!.command == "claude")
         #expect(config!.args == ["--model", "sonnet", "--print"])
+    }
+
+    @Test("Anthropic API profile without max_tokens gets the thinking-sized limit")
+    func anthropicProfileDefaultsToAnthropicMaxTokens() throws {
+        let tmpDir = NSTemporaryDirectory() + "agent-test-\(UUID().uuidString)"
+        defer { try? FileManager.default.removeItem(atPath: tmpDir) }
+        try FileManager.default.createDirectory(atPath: tmpDir, withIntermediateDirectories: true)
+
+        let anthropicPath = tmpDir + "/claude-agent.yaml"
+        try "mode: api\nprovider: anthropic\nmodel: claude-haiku-5-5\n"
+            .write(toFile: anthropicPath, atomically: true, encoding: .utf8)
+        let openAIPath = tmpDir + "/gpt-agent.yaml"
+        try "mode: api\nprovider: openai\nmodel: gpt-5.3\n"
+            .write(toFile: openAIPath, atomically: true, encoding: .utf8)
+
+        let anthropic = try #require(AIAgentRegistry.loadYAMLProfile(path: anthropicPath))
+        let openAI = try #require(AIAgentRegistry.loadYAMLProfile(path: openAIPath))
+        #expect(anthropic.maxTokens == EnvConfig.anthropicMaxTokens)
+        #expect(openAI.maxTokens == EnvConfig.defaultAIMaxTokens)
     }
 
     @Test("Returns nil for nonexistent profile file")

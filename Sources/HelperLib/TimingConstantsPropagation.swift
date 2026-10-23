@@ -1,7 +1,7 @@
 // Copyright 2026 jfarcand@apache.org
 // Licensed under the Apache License, Version 2.0
 //
-// ABOUTME: Timing defaults for waits where the Mac acts and the device catches up.
+// ABOUTME: Timing and frame-readiness defaults for waits where the Mac acts and the device catches up.
 // ABOUTME: Split from TimingConstants.swift to stay under the 500-line limit.
 
 /// Waits on asynchronous propagation between the Mac and the mirrored device.
@@ -61,4 +61,27 @@ extension TimingConstants {
     /// a spinner, video, or blinking caret never settles, so this bounds the wait
     /// rather than failing.
     public static let frameSettleTimeoutUs: UInt32 = 1_500_000
+
+    /// Largest settle window a tool caller may request through `settle_ms`
+    /// (microseconds). The wait blocks the tool handler, so a caller-supplied
+    /// window is capped here instead of trusted.
+    public static let frameSettleMaxTimeoutUs: UInt32 = 10_000_000
+
+    /// Side length, in pixels, of the grid a frame is downsampled to when
+    /// checking whether it is blank. Enough samples to see a label or icon,
+    /// few enough that the check costs nothing next to a describe.
+    public static let blankFrameSampleSize: Int = 64
+
+    /// How far, in 0-255 luminance steps, a sample may sit from the frame's
+    /// median luminance and still count as part of a uniform background.
+    /// Tolerates compression noise and the faint gradient of a fading frame.
+    public static let blankFrameLuminanceTolerance: Int = 24
+
+    /// Largest fraction of samples allowed to differ from the background for
+    /// a frame to still count as blank: 8 of the 4096 samples of a 64-square
+    /// grid. A frame mid-rotation or mid-launch is a solid fill (0 samples).
+    /// A short label on a dark game splash can still fall under it (a 10pt
+    /// "Loading..." on a 500x252 frame measures ~0.002), so a pixel-blank frame
+    /// skips the vision call only once local OCR on the same frame finds nothing.
+    public static let blankFrameMaxContentFraction: Double = 0.002
 }

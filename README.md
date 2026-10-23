@@ -408,7 +408,7 @@ When a test step fails, pass `--agent` to get an AI diagnosis of what went wrong
 
 ```bash
 mirroir test --agent gpt-5.3 apps/settings/check-about
-mirroir test --agent claude-sonnet-4-6 apps/settings/check-about
+mirroir test --agent claude-sonnet-5-5 apps/settings/check-about
 mirroir test --agent ollama:llama3 apps/settings/check-about
 mirroir test --agent embacle apps/settings/check-about
 ```
@@ -418,9 +418,11 @@ Built-in agents:
 | Agent | Provider | API Key |
 |-------|----------|---------|
 | `gpt-5.3` | OpenAI | `OPENAI_API_KEY` |
-| `claude-sonnet-4-6`, `claude-haiku-4-5` | Anthropic | `ANTHROPIC_API_KEY` |
+| `claude-opus-5-5`, `claude-sonnet-5-5`, `claude-haiku-5-5` | Anthropic | `ANTHROPIC_API_KEY` |
 | `ollama:<model>` | [Ollama](https://ollama.com) (local) | None |
 | `embacle`, `embacle:claude` | [embacle-server](https://github.com/dravr-ai/dravr-embacle) | CLI agent key |
+
+How a request reaches its agent: Anthropic, OpenAI and Ollama agents always call their own HTTP API. An `embacle` agent whose model is a bare Copilot model id (`embacle` sends `claude-sonnet-5.5`) runs on the embedded embacle runtime when `libembacle` is linked and `agentTransport` is not `"http"`, and over HTTP to `base_url` otherwise. An embacle model in embacle-server's `runner:model` form always goes over HTTP, because the embedded runtime is the Copilot runner only: `embacle:claude` sends `claude:sonnet`, which selects embacle-server's Claude Code runner, so it needs `embacle-server` listening on `http://localhost:3000`. A bare runner name as the model (`claude`, `copilot`, …) means that runner's default model and also goes over HTTP.
 
 Custom agents are defined as YAML profiles in `<cwd>/.mirroir-mcp/agents/<name>.yaml` (project-local) or `~/.mirroir-mcp/agents/<name>.yaml` (global, project-local wins). Pass the file's `<name>` to `--agent`.
 
@@ -635,6 +637,8 @@ All settings live in `settings.json` — project-local (`.mirroir-mcp/settings.j
   "explorationMaxScreens": 30
 }
 ```
+
+The AI system prompts are built in; override one by dropping `diagnosis.md` or `screen-describe.md` into `.mirroir-mcp/prompts/` (project-local) or `~/.mirroir-mcp/prompts/` (global) — see [System Prompts](docs/configuration.md#system-prompts).
 
 See [Configuration Reference](docs/configuration.md) for all 40+ settings covering screen intelligence, input timing, scroll behavior, exploration budgets, AI providers, and keyboard layouts.
 

@@ -158,6 +158,11 @@ extension TestRunner {
         capture: ScreenCapture,
         config: StepExecutorConfig
     ) -> CompiledSkill? {
+        if skill.kind == "game" {
+            fputs("  Skipping \(skill.name): kind:game is model-interpreted — "
+                + "never compiled or replayed by the runner.\n", stderr)
+            return nil
+        }
         let windowInfo = bridge.getWindowInfo()
         let windowWidth = windowInfo.map { Double($0.size.width) } ?? 0
         let windowHeight = windowInfo.map { Double($0.size.height) } ?? 0

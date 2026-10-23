@@ -50,7 +50,7 @@ extension MirroirMCP {
                 guard let ctx else { return err! }
                 let bridge = ctx.bridge
                 let input = ctx.input
-                let describer = ctx.describer
+                let describer = ctx.ocrDescriber
 
                 guard let label = args["label"]?.asString() else {
                     return .error("Missing required parameter: label (string)")

@@ -143,6 +143,8 @@ extension EnvConfig {
                 ("embacleTimeoutSeconds", "\(embacleTimeoutSeconds)"),
                 ("commandTimeoutSeconds", "\(commandTimeoutSeconds)"),
                 ("defaultAIMaxTokens", "\(defaultAIMaxTokens)"),
+                ("anthropicMaxTokens", "\(anthropicMaxTokens)"),
+                ("anthropicEffort", anthropicEffort.rawValue),
             ]),
             ("Exploration", [
                 ("explorationMaxDepth", "\(explorationMaxDepth)"),

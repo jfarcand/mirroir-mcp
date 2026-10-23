@@ -1,6 +1,6 @@
 #!/bin/bash
 # ABOUTME: One-step installer for mirroir-mcp.
-# ABOUTME: Builds the MCP server binary, installs prompts/agents, and verifies setup.
+# ABOUTME: Builds the MCP server binary, installs agent profiles, and verifies setup.
 
 set -e
 
@@ -58,25 +58,13 @@ echo ""
 echo "=== Configuring ==="
 "$MCP_FULL_PATH" configure
 
-# --- Step 4: Install prompts and agent profiles ---
+# --- Step 4: Install agent profiles ---
 
 echo ""
-echo "=== Installing prompts and agent profiles ==="
+echo "=== Installing agent profiles ==="
 
 GLOBAL_CONFIG_DIR="$HOME/.mirroir-mcp"
-mkdir -p "$GLOBAL_CONFIG_DIR/prompts" "$GLOBAL_CONFIG_DIR/agents"
-
-# Copy prompts (skip if user has customized)
-for f in prompts/*.md; do
-    [ -f "$f" ] || continue
-    dest="$GLOBAL_CONFIG_DIR/prompts/$(basename "$f")"
-    if [ ! -f "$dest" ]; then
-        cp "$f" "$dest"
-        echo "  Installed: $dest"
-    else
-        echo "  Skipped (user-customized): $dest"
-    fi
-done
+mkdir -p "$GLOBAL_CONFIG_DIR/agents"
 
 # Copy agent profiles (skip if user has customized)
 for f in agents/*.yaml; do

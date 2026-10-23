@@ -44,7 +44,7 @@ extension MirroirMCP {
                     return .error("Target '\(ctx.name)' does not support set_network")
                 }
                 let input = ctx.input
-                let describer = ctx.describer
+                let describer = ctx.ocrDescriber
 
                 guard let mode = args["mode"]?.asString() else {
                     return .error("Missing required parameter: mode (string)")

@@ -51,6 +51,43 @@ final class SkillParserTests: XCTestCase {
         XCTAssertEqual(skill.steps.count, 0)
     }
 
+    // MARK: - kind: game
+
+    func testKindDefaultsToEmptyForOrdinarySkill() {
+        let yaml = "name: Ordinary\nsteps:\n  - home"
+        let skill = SkillParser.parse(content: yaml, filePath: "ordinary.yaml")
+        XCTAssertEqual(skill.kind, "", "a skill without a kind: header is ordinary")
+    }
+
+    func testParseKindGameFromSkillMdFrontMatter() {
+        let md = """
+        ---
+        version: 1
+        name: Tutorial Scene
+        app: Brawl Stars
+        kind: game
+        playable: single-control
+        ---
+
+        Play the Brawl Stars tutorial.
+
+        ## Steps
+
+        1. Launch **Brawl Stars**
+        """
+        let skill = SkillParser.parse(content: md, filePath: "tutorial.md")
+        XCTAssertEqual(skill.kind, "game")
+        XCTAssertEqual(skill.name, "Tutorial Scene")
+    }
+
+    func testHeaderKindExtractsGame() {
+        XCTAssertEqual(SkillParser.headerKind(from: "kind: game\nname: X"), "game")
+    }
+
+    func testHeaderKindEmptyWhenAbsent() {
+        XCTAssertEqual(SkillParser.headerKind(from: "name: X\nsteps:\n  - home"), "")
+    }
+
     // MARK: - Step Type Parsing
 
     func testParseLaunchStep() {

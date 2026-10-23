@@ -29,7 +29,7 @@ final class BFSExplorerTabInjectionTests: XCTestCase {
         tabLayout: TabLayout? = TabLayout(orientation: .horizontal, edge: .bottom)
     ) -> AppDescription {
         AppDescription(
-            appName: "TestApp", schemaVersion: 1, locale: "fr_CA", archetype: nil,
+            appName: "TestApp", schemaVersion: 1, locale: "fr_CA", archetype: nil, playable: nil,
             resetBeforeExplore: false, obstacleMode: .auto, context: "test",
             obstacles: [], skipElements: [], credentials: [:], hints: [],
             tabs: tabs, tabLayout: tabLayout, deepTabs: [], simulator: nil

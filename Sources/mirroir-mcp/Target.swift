@@ -29,8 +29,13 @@ protocol Target: Sendable {
     var input: any InputProviding { get }
     /// Screenshot capture from the target window.
     var capture: any ScreenCapturing { get }
-    /// OCR + hint extraction.
+    /// Screen description the client asked for (`describe_screen`): local OCR,
+    /// or the paid vision model when `screenDescriberMode` is `vision`.
     var describer: any ScreenDescribing { get }
+    /// Always local OCR. Server-internal checks that merely look for known text
+    /// (launch confirmation, back chevron, switcher card, scroll target) use
+    /// this one, so bookkeeping never spends a vision call the client did not request.
+    var ocrDescriber: any ScreenDescribing { get }
     /// Video recording of the target window.
     var recorder: any ScreenRecording { get }
     /// Strategy for returning to the previous screen (OCR chevron tap vs. keyboard shortcut).

@@ -88,6 +88,12 @@ enum CompileCommand {
                 continue
             }
 
+            if skill.kind == "game" {
+                fputs("Skipping \(skill.name): kind:game is model-interpreted — "
+                    + "never compiled to a .compiled.json.\n", stderr)
+                continue
+            }
+
             fputs("Compiling: \(skill.name) (\(skill.steps.count) steps)\n", stderr)
 
             let compiled = compileSkill(

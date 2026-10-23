@@ -51,7 +51,7 @@ extension MirroirMCP {
                 guard let ctx else { return err! }
                 let bridge = ctx.bridge
                 let input = ctx.input
-                let describer = ctx.describer
+                let describer = ctx.ocrDescriber
 
                 guard let actionStr = args["action"]?.asString() else {
                     return .error("Missing required parameter: action (string)")

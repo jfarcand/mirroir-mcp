@@ -136,6 +136,32 @@ final class ScreenToolHandlerTests: XCTestCase {
         XCTAssertTrue(text?.contains("(100, 200)") ?? false)
     }
 
+    func testDescribeScreenMetaReportsVisionTokensWhenProviderSendsThem() {
+        bridge.processRunning = true
+        describer.describeResult = ScreenDescriber.DescribeResult(
+            elements: [TapPoint(text: "Play", tapX: 10, tapY: 20, confidence: 0.9)],
+            screenshotBase64: "iVBORw0KGgo=",
+            visionUsage: ChatCompletionUsage(
+                promptTokens: 1662, completionTokens: 48, totalTokens: 1710)
+        )
+        let text = extractText(callTool("describe_screen"))
+        XCTAssertTrue(text?.contains("vision_prompt_tokens=1662") ?? false)
+        XCTAssertTrue(text?.contains("vision_completion_tokens=48") ?? false)
+        XCTAssertTrue(text?.contains("vision_total_tokens=1710") ?? false)
+    }
+
+    func testDescribeScreenMetaOmitsVisionTokensForOCR() {
+        bridge.processRunning = true
+        describer.describeResult = ScreenDescriber.DescribeResult(
+            elements: [TapPoint(text: "Play", tapX: 10, tapY: 20, confidence: 0.9)],
+            screenshotBase64: "iVBORw0KGgo="
+        )
+        let text = extractText(callTool("describe_screen"))
+        XCTAssertTrue(text?.contains("_meta: ocr_time_ms=") ?? false)
+        XCTAssertFalse(text?.contains("vision_") ?? true,
+            "OCR results carry no usage, so the _meta line stays unchanged")
+    }
+
     func testDescribeScreenIncludesImageByDefault() {
         bridge.processRunning = true
         describer.describeResult = ScreenDescriber.DescribeResult(

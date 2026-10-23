@@ -25,8 +25,8 @@ final class RecordingDescriber: ScreenDescribing, @unchecked Sendable {
         self.wrapped = describer
     }
 
-    func describe() -> ScreenDescriber.DescribeResult? {
-        let result = wrapped.describe()
+    func describe(settleTimeoutUs: UInt32?) -> ScreenDescriber.DescribeResult? {
+        let result = wrapped.describe(settleTimeoutUs: settleTimeoutUs)
         lastResult = result
         if firstResult == nil && result != nil {
             firstResult = result

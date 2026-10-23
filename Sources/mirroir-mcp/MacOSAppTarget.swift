@@ -53,7 +53,7 @@ enum MacOSAppTarget {
             windowTitleContains: config?.windowTitleContains
         )
         let capture = ScreenCapture(bridge: bridge)
-        let describer = MirroirMCP.buildDescriber(
+        let describers = MirroirMCP.buildDescribers(
             bridge: bridge, capture: capture,
             isMobile: profile.coordinateSystem == .mobile
         )
@@ -65,7 +65,8 @@ enum MacOSAppTarget {
             bridge: bridge,
             input: InputSimulation(bridge: bridge, cursorMode: profile.cursorMode),
             capture: capture,
-            describer: describer,
+            describer: describers.describer,
+            ocrDescriber: describers.ocr,
             recorder: ScreenRecorder(bridge: bridge),
             backtracker: KeyboardShortcutBacktracker.cmdBracket,
             lifecycle: MacOSAppLifecycle(),

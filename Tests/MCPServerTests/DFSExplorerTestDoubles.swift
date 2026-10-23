@@ -27,7 +27,7 @@ final class MockExplorerDescriber: ScreenDescribing, @unchecked Sendable {
         self.screens = screens
     }
 
-    func describe() -> ScreenDescriber.DescribeResult? {
+    func describe(settleTimeoutUs: UInt32?) -> ScreenDescriber.DescribeResult? {
         lock.lock()
         defer { lock.unlock() }
         guard index < screens.count else {

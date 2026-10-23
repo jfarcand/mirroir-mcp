@@ -28,7 +28,7 @@ struct OpenAIProvider: AIAgentProviding {
         let baseURL = config.baseURL ?? "https://api.openai.com"
         guard let url = URL(string: baseURL + Self.completionsPath) else { return nil }
 
-        let systemPrompt = config.systemPrompt ?? loadDiagnosisPrompt()
+        let systemPrompt = config.systemPrompt ?? loadSystemPrompt()
 
         guard let payloadJSON = try? JSONEncoder().encode(payload),
               let payloadStr = String(data: payloadJSON, encoding: .utf8) else {
@@ -53,7 +53,8 @@ struct OpenAIProvider: AIAgentProviding {
             "Authorization": "Bearer \(apiKey)",
         ]
 
-        guard let responseData = sendAgentHTTPRequest(
+        guard let responseData = sendAgentRequest(
+            transport: config.transport(),
             url: url, headers: headers, body: body, timeoutSeconds: Self.timeoutSeconds
         ) else {
             return nil

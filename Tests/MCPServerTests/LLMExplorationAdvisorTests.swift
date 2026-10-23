@@ -106,7 +106,7 @@ final class LLMExplorationAdvisorTests: XCTestCase {
     func testVisionAdvisorFallsBackWithoutEmbacle() {
         // In test environment, EmbacleFFI.isAvailable is false,
         // so VisionExplorationAdvisor should fall back to heuristic
-        let visionAdvisor = VisionExplorationAdvisor()
+        let visionAdvisor = VisionExplorationAdvisor(model: defaultAgentModel)
         let elements = [tap("Settings"), tap("General")]
         let result = visionAdvisor.suggest(
             screenshotBase64: "", elements: elements,
@@ -119,7 +119,7 @@ final class LLMExplorationAdvisorTests: XCTestCase {
     }
 
     func testVisionAdvisorReturnsEmptyWhenAllVisited() {
-        let visionAdvisor = VisionExplorationAdvisor()
+        let visionAdvisor = VisionExplorationAdvisor(model: defaultAgentModel)
         let elements = [tap("Settings")]
         let result = visionAdvisor.suggest(
             screenshotBase64: "", elements: elements,

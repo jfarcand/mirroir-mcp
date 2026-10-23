@@ -20,7 +20,7 @@ struct EmbacleProvider: AIAgentProviding {
         let baseURL = config.baseURL ?? "http://localhost:3000"
         guard let url = URL(string: baseURL + Self.completionsPath) else { return nil }
 
-        let systemPrompt = config.systemPrompt ?? loadDiagnosisPrompt()
+        let systemPrompt = config.systemPrompt ?? loadSystemPrompt()
 
         guard let payloadJSON = try? JSONEncoder().encode(payload),
               let payloadStr = String(data: payloadJSON, encoding: .utf8) else {
@@ -28,7 +28,7 @@ struct EmbacleProvider: AIAgentProviding {
         }
 
         let requestBody: [String: Any] = [
-            "model": config.model ?? "copilot",
+            "model": config.model ?? defaultAgentModel,
             "max_tokens": config.maxTokens,
             "messages": [
                 ["role": "system", "content": systemPrompt],
@@ -49,11 +49,17 @@ struct EmbacleProvider: AIAgentProviding {
             headers["Authorization"] = "Bearer \(apiKey)"
         }
 
-        guard let responseData = sendAgentHTTPRequest(
+        guard let responseData = sendAgentRequest(
+            transport: config.transport(),
             url: url, headers: headers, body: body, timeoutSeconds: Self.timeoutSeconds
         ) else {
             return nil
         }
+
+        let usageNote = ChatCompletionUsage.parse(from: responseData).map {
+            "tokens prompt=\($0.promptTokens) completion=\($0.completionTokens) total=\($0.totalTokens)"
+        } ?? "tokens not reported by provider"
+        DebugLog.log("diagnosis", "embacle: \(usageNote)")
 
         // Embacle-server returns OpenAI-format responses: {"choices": [{"message": {"content": "..."}}]}
         guard let responseText = extractEmbacleText(from: responseData) else {

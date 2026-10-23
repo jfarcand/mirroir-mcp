@@ -106,7 +106,7 @@ enum ExplorationLoopRunner {
                 }
                 _ = ctx.lifecycle.forceQuitBeforeExplore(
                     appName: appName, bridge: ctx.bridge,
-                    input: ctx.input, describer: ctx.describer)
+                    input: ctx.input, describer: ctx.ocrDescriber)
                 if case .failure(let failure) = MirroirMCP.launchAndWait(appName: appName, ctx: ctx) {
                     let report = explorer.generateReport()
                     let snapshot = explorer.graph.finalize()

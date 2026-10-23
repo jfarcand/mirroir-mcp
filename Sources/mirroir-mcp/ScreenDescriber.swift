@@ -41,26 +41,46 @@ final class ScreenDescriber: Sendable {
         /// Why text recognition failed, when it did. Nil means the engine ran:
         /// an empty `elements` list then genuinely means no text on screen.
         let ocrFailure: String?
+        /// Token counts the vision model reported for this frame. Nil for the
+        /// OCR describer, and for vision providers that do not report usage.
+        let visionUsage: ChatCompletionUsage?
+        /// The described frame was a uniform fill (rotation, launch, scene swap):
+        /// `elements` is empty because the screen is transitioning, not because
+        /// it holds no text. The vision describer makes no model call for it.
+        let screenBlank: Bool
 
         init(elements: [TapPoint], icons: [IconDetector.DetectedIcon] = [],
              hints: [String] = [], screenshotBase64: String, ocrTimeMs: Int = 0,
-             ocrFailure: String? = nil) {
+             ocrFailure: String? = nil, visionUsage: ChatCompletionUsage? = nil,
+             screenBlank: Bool = false) {
             self.elements = elements
             self.icons = icons
             self.hints = hints
             self.screenshotBase64 = screenshotBase64
             self.ocrTimeMs = ocrTimeMs
             self.ocrFailure = ocrFailure
+            self.visionUsage = visionUsage
+            self.screenBlank = screenBlank
         }
     }
 
     /// Capture the mirroring window, run OCR, and return detected text elements
     /// with their tap coordinates plus the screenshot as base64 PNG.
-    func describe() -> DescribeResult? {
-        // Single capture call resolves window info and screenshot together
-        guard let result = capture.captureWithInfo() else { return nil }
-        let info = result.info
-        let data = result.data
+    ///
+    /// Nil `settleTimeoutUs` describes the first frame: local OCR is cheap and
+    /// its callers poll with their own retry delays, so waiting for a settled
+    /// frame would only add latency (the full settle window on an animated screen).
+    func describe(settleTimeoutUs: UInt32?) -> DescribeResult? {
+        guard let frame = capture.captureSettledWithInfo(timeoutUs: settleTimeoutUs ?? 0) else {
+            return nil
+        }
+        return describe(frame: frame)
+    }
+
+    /// Run OCR and icon detection on an already captured `frame`.
+    func describe(frame: CaptureResult) -> DescribeResult? {
+        let info = frame.info
+        let data = frame.data
 
         // Create CGImage for text recognition (OCR runs on the clean image, before grid overlay)
         guard let imageSource = CGImageSourceCreateWithData(data as CFData, nil),
@@ -121,12 +141,17 @@ final class ScreenDescriber: Sendable {
             windowHeight: windowHeight, isMobile: isMobile
         )
 
+        // Local OCR is cheap, so it always runs; the blank flag only explains
+        // an empty result, matching what the vision describer reports.
+        let screenBlank = elements.isEmpty && icons.isEmpty && ocrFailure == nil
+            && BlankFrameDetector.isBlank(cgImage)
+
         let griddedData = GridOverlay.addOverlay(to: data, windowSize: info.size) ?? data
         let base64 = griddedData.base64EncodedString()
 
         return DescribeResult(elements: elements, icons: icons, hints: hints,
                               screenshotBase64: base64, ocrTimeMs: ocrMs,
-                              ocrFailure: ocrFailure)
+                              ocrFailure: ocrFailure, screenBlank: screenBlank)
     }
 
 }

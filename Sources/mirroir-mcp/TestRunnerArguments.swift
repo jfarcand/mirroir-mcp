@@ -205,7 +205,8 @@ extension TestRunner {
           --no-auto-recompile Skip auto-recompilation of drifted compiled skills
           --agent [model]     Diagnose compiled failures. Without model: deterministic OCR only.
                               With model: deterministic + AI diagnosis.
-                              Built-in: gpt-5.3, claude-sonnet-4-6, claude-haiku-4-5, embacle
+                              Built-in: gpt-5.3, claude-opus-5-5, claude-sonnet-5-5,
+                                        claude-haiku-5-5, embacle, embacle:claude
                               Ollama: ollama:<model>  Custom: name from agents/ dir
           --help, -h          Show this help
 
@@ -214,7 +215,7 @@ extension TestRunner {
           mirroir-mcp test apps/settings/check-about.yaml
           mirroir-mcp test --junit results.xml apps/settings/*.yaml
           mirroir-mcp test --agent skill.yaml           # deterministic diagnosis
-          mirroir-mcp test --agent claude-sonnet-4-6 skill.yaml  # AI diagnosis
+          mirroir-mcp test --agent claude-sonnet-5-5 skill.yaml  # AI diagnosis
           mirroir-mcp test                    # run all discovered skills
         """
         fputs(usage + "\n", stderr)

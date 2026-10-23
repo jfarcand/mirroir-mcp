@@ -16,7 +16,8 @@ final class DestructiveStepGateTests: XCTestCase {
             description: "",
             filePath: "/tmp/\(name).yaml",
             steps: steps,
-            targets: []
+            targets: [],
+            kind: ""
         )
     }
 

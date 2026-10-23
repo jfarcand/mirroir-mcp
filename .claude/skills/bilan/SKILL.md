@@ -9,10 +9,6 @@ user-invocable: true
 
 **The completion number is this script's number, never yours.**
 
-The incident history quoted below (carnet#236, carnet#406, carnet#493, …) happened in the
-dravr-* family, where this skill was built; those numbers are in `dravr-ai/dravr-carnet`, not in
-this repo's register.
-
 It used to be narrated: it came from my account of the session, so a session that *believed* it
 was done reported 8 or 10 while it still held open carnet issues, had commits sitting unpushed,
 or had left a background task running. Every one of those facts is machine-checkable, and
@@ -101,16 +97,16 @@ your score.
 
 **`/bilan`** — on demand, the full measurement including CI.
 
-There is deliberately no Stop gate. dravr-platform ran one that refused a stop while the score
-was 8 or below, and disarmed it on 2026-09-09: it once graded every session in a shared worktree
-on one peer's red CI and blocked all of them over a commit none of them made. A wrong number
-costs a paragraph; a wrong number that can *stop the session* costs a night.
+There is deliberately no Stop gate. A gate that refuses a stop below a score grades every session
+in a shared worktree on one peer's red CI, and blocks all of them over a commit none of them
+made. A wrong number costs a paragraph; a wrong number that can *stop the session* costs a
+night.
 
 **The startup sweep** (`hooks/session-start-sweep.sh`) — the only cover for a session that was
 killed. A `kill -9`, a closed terminal or an exhausted context fires no exit hook, so the dead
 session can never report on itself; the next session in the repo looks for it instead, across
-every worktree and every ledger on the machine. It found `carnet#236`, held by a session that
-died on 2026-09-03, five days after the fact.
+every worktree and every ledger on the machine, so a claim a dead session held does not sit
+unnoticed for days.
 
 ## Work that leaves no trace
 
@@ -121,8 +117,9 @@ false 10:
 `<scratchpad>/<session-id>/tasks/<id>.output` and closes it with `[exited with code N]` or
 `[killed]`; no marker and a live holder means it never ended. The path carries the session id,
 so ten terminals are ten separate answers — a session is only ever accountable for its own.
-Closing a session with one running throws that work away, so it caps at **7**. bilan runs *inside* one of those streams itself, so a file held by anything in its own
-process ancestry is this invocation, not a task.
+Closing a session with one running throws that work away, so it caps at **7**. bilan runs
+*inside* one of those streams itself, so a file held by anything in its own process ancestry
+is this invocation, not a task.
 
 **Issues the session filed.** `carnet.sh create` writes a `filed` line to the ledger and
 `close` removes it, so what remains is what this session opened and did not fix. That caps at
@@ -134,8 +131,8 @@ slip past.
 **Except a registered limitation, which is the one filed issue that is not work owed.** The
 LIMITATION procedure *requires* an open issue for as long as a marker names it, so this cap
 punished a session for obeying it — and there was nothing the session could do, because the fix
-is to close an issue the rules say must stay open. carnet#406 held a session at 6 for hours on
-2026-09-11: keyword narrowing of the tool surface had been deleted for starving a turn, a
+is to close an issue the rules say must stay open. One registered limitation held a session at 6
+for hours: keyword narrowing of the tool surface had been deleted for starving a turn, a
 classifier was rejected for failing the same way, static narrowing was already done and the tools
 are provider-agnostic. Nothing to fix, and nothing honest to close.
 
@@ -152,9 +149,9 @@ scan: the directories `registre.toml` declares in `scan_dirs`, the configured ex
 test, bench, example and generated trees. bilan used to keep its own copy of those exclusions; it
 drifted from the gate's both ways, and a marker one tool honoured was invisible to the other. A
 test tree is outside both, so a gap in test *coverage* is marked on the production item that goes
-uncovered — carnet#493's marker sits on `assemble_prompt_and_messages`, not on the eval driver
-that fails to call it. If the gate is missing, a session that wrote a marker caps at 6 (it cannot
-be verified) and every other session is unaffected.
+uncovered — the marker sits on the production function an eval never exercises, not on the eval
+driver that fails to call it. If the gate is missing, a session that wrote a marker caps at 6
+(it cannot be verified) and every other session is unaffected.
 
 **Both halves are local, so `--cheap` credits it too.** The full run reads the label from the
 tracker. `--cheap` reads the line `carnet.sh` writes to the session ledger when it applies the

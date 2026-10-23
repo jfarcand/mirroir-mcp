@@ -452,10 +452,10 @@ check_carnet_held() {
 # A registered limitation is the one filed issue that is NOT work owed, and it has to be exempt.
 # The LIMITATION procedure REQUIRES an open issue for as long as a marker names it — a marker must
 # be "backed by an issue" in the tracker — so a session that followed that procedure correctly was
-# capped at 6 for complying, with no action available to it. carnet#406 is the case that surfaced
-# it on 2026-09-11: keyword narrowing was deleted for starving a turn, an LLM classifier was
-# rejected for failing the same way, static category narrowing is already done and the tools are
-# provider-agnostic, so there was nothing to fix AND nothing honest to close. The score sat at 6
+# capped at 6 for complying, with no action available to it. The case that surfaced it was a
+# registered gap whose every remedy had already been tried or done — one approach deleted for
+# starving a turn, its replacement rejected for failing the same way, the remaining narrowing
+# already shipped — so there was nothing to fix AND nothing honest to close. The score sat at 6
 # for a whole session over an issue whose own body says it is a registration and not a task.
 #
 # The exemption needs BOTH halves, which is what keeps it from being a loophole:
@@ -468,10 +468,10 @@ check_carnet_held() {
 #
 # Both halves are answerable without the network, and have to be: the status line runs --cheap,
 # and while the label could only be read from GitHub, --cheap capped every correctly registered
-# limitation at 6 for as long as the register required it to stay open — carnet#493, 2026-09-21,
-# against a documented promise that the two runs give the same number. carnet.sh records the label
-# in the session ledger when it applies it (`create --label limitation`, `label +limitation`), so
-# --cheap reads that line, and the full run still asks the tracker, which is the authority.
+# limitation at 6 for as long as the register required it to stay open, against a documented
+# promise that the two runs give the same number. carnet.sh records the label in the session
+# ledger when it applies it (`create --label limitation`, `label +limitation`), so --cheap reads
+# that line, and the full run still asks the tracker, which is the authority.
 labelled_limitation() { # <issue-number>
     local f
     if [ "$CHEAP" = 0 ] && command -v gh >/dev/null 2>&1; then
@@ -516,11 +516,11 @@ check_carnet_filed() {
 # Where a marker counts is the register's decision, not bilan's. The gates scan the directories
 # registre.toml declares (scan_dirs), for the configured source extensions, minus test, bench,
 # example and generated trees — and `limitation-gates.sh --list-files` prints exactly that set.
-# bilan asks for it rather than keeping a copy. It kept one until 2026-09-21, and the copy had
-# drifted both ways: it skipped Markdown and its own tree, which the gate never scanned anyway,
-# and scanned benches, examples, vendored and generated code, which the gate does not. A marker
-# one tool honoured was invisible to the other, and a limitation registered by the book was never
-# credited (carnet#493). Asking cannot drift.
+# bilan asks for it rather than keeping a copy. A kept copy drifts, and one did, both ways: it
+# skipped Markdown and its own tree, which the gate never scanned anyway, and scanned benches,
+# examples, vendored and generated code, which the gate does not. A marker one tool honoured was
+# invisible to the other, and a limitation registered by the book was never credited. Asking
+# cannot drift.
 #
 # The self-match that motivated the old skip list stays impossible: bilan's own tree is shell and
 # Markdown, neither of which the register scans.
@@ -925,11 +925,12 @@ is_session_alive() { # <session-id> <pid>
 # A worktree with an agent actively working in it is not something a dead session left behind.
 # The sweep checked liveness for ledgers and not for worktrees, so it reported every checkout
 # with uncommitted work — including one ChefFamille confirmed was in active use. Same false
-# alarm as the closed issue, one level over.
+# alarm as a dead ledger naming an already-closed issue (see cmd_sweep), one level over.
 #
-# A session's own cwd is NOT the signal, and that was measured: every dravr-platform session on
-# this machine sits in the main checkout and reaches a worktree by path, so the worktree that
-# was actually busy had no session pointing at it. Two things do show it:
+# A session's own cwd is NOT the signal, and that was measured: every session of one
+# multi-worktree project on this machine sits in the main checkout and reaches a worktree by
+# path, so the worktree that was actually busy had no session pointing at it. Two things do
+# show it:
 #
 #   * a live process whose cwd is inside it — a dev server started from that checkout,
 #   * a file modified there recently — an agent editing by path leaves no process at all.
@@ -966,9 +967,9 @@ cmd_sweep() {
             is_session_alive "$id" "$pid" && continue
             name=$(head -1 "$f" | jq -r '.name // "?"')
             at=$(head -1 "$f"   | jq -r '.at // "?"')
-            # A dead session's ledger outlives the issue. carnet#236 was closed by somebody on
-            # 2026-09-03 and MCPNext's ledger still named it, so every session start since has
-            # reported an abandoned issue that no longer exists — a recurring false alarm that
+            # A dead session's ledger outlives the issue. An issue closed by somebody else stayed
+            # named in a dead session's ledger, so every later session start reported an
+            # abandoned issue that no longer exists — a recurring false alarm that
             # trains the reader to skip the line the sweep exists to print. Ask the tracker, and
             # drop what has been resolved: SessionEnd would have cleaned this ledger up, and it
             # is only here because the session was killed before it could.

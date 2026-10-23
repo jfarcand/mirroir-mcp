@@ -9,7 +9,7 @@
 #     "command": "[ -f .claude/skills/carnet/hooks/prompt-status.sh ] && bash .claude/skills/carnet/hooks/prompt-status.sh || true" }]}]
 #
 # Whatever this prints lands in the model's context before it answers, so a session that is
-# told "carnet#197 · held by @jfarcand · session i18Guards [running]" cannot start the same
+# told "carnet#N · held by @owner · session <name> [running]" cannot start the same
 # work without knowing. One gh call per issue mentioned, at most five per prompt.
 #
 # It also writes the numbers it found to carnet-claims/pending/<session>.txt, which is what
@@ -23,31 +23,27 @@
 #
 # A THIRD machine author is the session itself. A `/loop` or ScheduleWakeup re-fire arrives as
 # a prompt whose text the model wrote on its previous turn, and it names whatever the model
-# was thinking about: on 2026-09-18 session dravr-platform-7f put "comment the eight coach_id
-# strings on carnet#436" into its own wakeup, was blocked once over carnet#446 (a cloud peer
-# held it) and then held #436 for 67 minutes, while the human had typed neither number all
-# day. Nothing in the text marks a wakeup — it starts with whatever the model chose — so the
-# prompt hook cannot see it here: the payload's `source` field ("loop_wakeup",
-# "schedule_wakeup", "system") is declared but not yet emitted by 2.1.276, and the transcript
-# entry that would say `promptSource: "system"` is not written until AFTER this hook has run
-# (verified against a resumed headless session). What this hook CAN do is record which prompt
-# armed the list (`prompt=<prompt_id>`), so auto-claim.sh — which runs after the entry exists
-# — can look it up and refuse a machine-authored arm. When `source` does start arriving, the
-# check below honours it here as well.
+# was thinking about: a session that put an issue number into its own wakeup has gone on to
+# claim and hold that issue for over an hour while its human typed the number nowhere. Nothing
+# in the text marks a wakeup — it starts with whatever the model chose — so the prompt hook
+# cannot see it here: the UserPromptSubmit payload carries no `source` field, and the
+# transcript entry that says `promptSource: "system"` is written only AFTER this hook has run.
+# What this hook CAN do is record which prompt armed the list (`prompt=<prompt_id>`), so
+# auto-claim.sh — which runs after the entry exists — can look it up and refuse a
+# machine-authored arm. Should a payload carry a `source`, the check below honours it here.
 #
-# This is not hypothetical. Of 354 cross-session messages on this machine, 98 named a carnet
-# issue and reached 32 sessions, and both failure directions fired:
-#   * false claim  -- carnet#279 was auto-claimed 31s after a peer wrote "do NOT put my point
-#                     1 in carnet#325"; carnet#321 two minutes after a peer replied "Not
-#                     mine."; carnet#261 25s after a peer retracted a diagnosis. Three issues
-#                     assigned to sessions that were never going to work them, with the label
-#                     and the marker comment all saying otherwise.
-#   * false block  -- one FYI ("I hold carnet#323, stay off these files") blocked a tool call
+# Both failure directions have been observed with peer messages that name an issue:
+#   * false claim  -- an issue auto-claimed 31s after a peer wrote that their point must
+#                     NOT go into it; another two minutes after a peer replied "Not mine.";
+#                     a third 25s after a peer retracted a diagnosis. Each was assigned to a
+#                     session that was never going to work it, with the label and the marker
+#                     comment all saying otherwise.
+#   * false block  -- one FYI ("I hold carnet#N, stay off these files") blocked a tool call
 #                     in six separate sessions, each told "Do not do this work twice" about
-#                     work it had never started. Two of the recipients were obstaque sessions,
-#                     a different product entirely.
-# The status lines still print for both: knowing who holds #323 is exactly what the receiver
-# needs in order to answer. Printing informs. Arming assigns. Only a typed prompt assigns.
+#                     work it had never started — some of them in unrelated repositories.
+# The status lines still print for both: knowing who holds the issue is exactly what the
+# receiver needs in order to answer. Printing informs. Arming assigns. Only a typed prompt
+# assigns.
 set -uo pipefail
 
 here=$(cd "$(dirname "$0")" && pwd)
@@ -69,9 +65,9 @@ case $prompt in
         from_peer=1 ;;
     *)  from_peer=0 ;;
 esac
-# The payload's own answer, once Claude Code sends it: `user` is the interactive composer and
-# everything else (`sdk`, `system`, `loop_wakeup`, `schedule_wakeup`, `poll_event`) is a
-# machine. Absent today; when present it outranks the envelope test above.
+# The payload's own answer, when it carries one: `user` is the interactive composer and every
+# other value (`sdk`, `system`, `loop_wakeup`, `schedule_wakeup`, `poll_event`) is a machine.
+# The UserPromptSubmit payload has no such field; if one appears it outranks the envelope test.
 source=$(printf '%s' "$payload" | jq -r '.source // empty' 2>/dev/null || true)
 if [ -n "$source" ] && [ "$source" != user ]; then from_peer=1; fi
 
@@ -85,15 +81,15 @@ nums=$(printf '%s' "$prompt" | issue_nums)
 # A number the user only QUOTED is not a number the user assigned. The anchored peer test above
 # catches a peer message that arrives on its own, but not the far commoner case here: the user
 # pastes a peer session's terminal output to show you something, and every issue that transcript
-# happens to mention gets claimed for the reader. carnet#343, #394 and #103 were all taken that
-# way by a session writing shell scripts, and one of those blocked a tool call over an issue a
-# live peer held.
+# happens to mention gets claimed for the reader. Three issues were taken that way by one
+# session writing shell scripts, and one of those blocked a tool call over an issue a live peer
+# held.
 #
 # The first attempt split the prompt at the first transcript marker and armed on the prose
 # before it. That was too clever: a paste whose agent prose leads with no marker at all — the
-# user's own sentence running straight into it — puts the number on the wrong side of the split,
-# which is exactly how #103 was taken. So the test is now the whole prompt, not a boundary
-# within it: if terminal-transcript glyphs appear ANYWHERE, nothing arms.
+# user's own sentence running straight into it — puts the number on the wrong side of the
+# split, which is exactly how the third of those was taken. So the test is now the whole
+# prompt, not a boundary within it: if terminal-transcript glyphs appear ANYWHERE, nothing arms.
 #
 # It fails in the safe direction on purpose. Missing a claim costs one `carnet.sh claim <n>`;
 # taking a peer's issue costs them an interrupted tool call and a stolen assignment. Status still
@@ -137,10 +133,10 @@ for n in $nums; do
         # The cache is shared by every session on this machine; the line is not. `status` says
         # "held by THIS session" when the holder is the caller, which is true only for the
         # session that wrote it — a peer then reads it and is told it holds an issue it does
-        # not. That happened with carnet#394 on 2026-09-08: this session printed
-        # "held by THIS session (DravrArchitectureDocument)" about a peer's issue, and a session
-        # acting on that would close someone else's work. Only session-neutral lines are shared;
-        # the holder pays one gh call per prompt for its own issues, which is the cheap side.
+        # not. A session has printed "held by THIS session (<peer's name>)" about a peer's
+        # issue that way, and a session acting on that would close someone else's work. Only
+        # session-neutral lines are shared; the holder pays one gh call per prompt for its own
+        # issues, which is the cheap side.
         case "$line" in
             *"THIS session"*) : ;;
             *) printf '%s\n' "$line" > "$cache" ;;

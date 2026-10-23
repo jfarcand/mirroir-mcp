@@ -189,14 +189,17 @@ Compiled `.json` files live alongside their source skill files (`.md` or `.yaml`
 
 ```
 mirroir-skills/
-  apps/
-    settings/
-      check-about.md                ← source SKILL.md (committed)
-      check-about.compiled.json     ← compiled (committed or gitignored, your choice)
-    clock/
-      set-timer.md
-      set-timer.compiled.json
+  skills/
+    apps/
+      settings/
+        check-about.md                ← source SKILL.md (committed)
+        check-about.compiled.json     ← compiled on your machine (not committed)
+      clock/
+        set-timer.md
+        set-timer.compiled.json
 ```
+
+The mirroir-skills repository commits no compiled files: every user compiles against their own device. In your own skill directories, committing or ignoring them is your choice.
 
 Compiled files are device-specific (coordinates depend on window dimensions). If your team uses different display modes or device models, each device configuration needs its own compilation run.
 

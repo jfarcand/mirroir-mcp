@@ -354,6 +354,59 @@ final class AppDescriptionTests: XCTestCase {
         XCTAssertEqual(desc?.deepTabs, [])
     }
 
+    // MARK: - Playable / exploration gate
+
+    /// Builds a minimal, valid APP.md carrying the given `playable:` line
+    /// (or none when nil) so the parser returns a non-nil description.
+    private func describeWithPlayable(_ playable: String?) -> AppDescription? {
+        let playableLine = playable.map { "playable: \($0)\n" } ?? ""
+        let content = """
+        ---
+        app: GameApp
+        \(playableLine)---
+
+        # GameApp
+
+        ## Structure
+
+        A game.
+        """
+        return AppDescriptionParser.parse(content: content)
+    }
+
+    func testParsePlayableField() {
+        let desc = describeWithPlayable("single-control")
+        XCTAssertEqual(desc?.playable, "single-control")
+    }
+
+    func testPlayableDefaultsToNil() {
+        let desc = describeWithPlayable(nil)
+        XCTAssertNil(desc?.playable, "playable is nil when the field is absent")
+    }
+
+    func testAllowsExplorationForOrdinaryApp() {
+        // No `playable:` → ordinary app → explorable.
+        XCTAssertEqual(describeWithPlayable(nil)?.allowsExploration, true)
+    }
+
+    func testAllowsExplorationForObserveOnly() {
+        XCTAssertEqual(describeWithPlayable("observe-only")?.allowsExploration, true)
+    }
+
+    func testAllowsExplorationBlockedForSingleControl() {
+        XCTAssertEqual(describeWithPlayable("single-control")?.allowsExploration, false)
+    }
+
+    func testAllowsExplorationBlockedForPcControls() {
+        XCTAssertEqual(describeWithPlayable("pc-controls")?.allowsExploration, false)
+    }
+
+    func testAllowsExplorationFailsSafeForUnknownPlayable() {
+        // An unrecognized value is treated as not-explorable: never drive a
+        // game the schema doesn't understand.
+        XCTAssertEqual(describeWithPlayable("twin-stick")?.allowsExploration, false)
+    }
+
 }
 // Loader-level integration (filesystem walk + diacritics match) was removed:
 // parallel XCTest runs can't safely share a CWD swap, and the walk itself is

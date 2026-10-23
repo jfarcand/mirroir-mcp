@@ -191,4 +191,70 @@ final class DoctorCommandTests: XCTestCase {
         XCTAssertEqual(color, "")
         XCTAssertEqual(reset, "")
     }
+
+    // MARK: - Prompt Override Check
+
+    func testPromptOverrideCheckPassesWhenNoOverrideExists() throws {
+        let (local, global) = try makePromptDirs()
+        let checks = PromptOverrideCheck.run(searchDirs: [local, global])
+        XCTAssertEqual(checks.count, 1)
+        XCTAssertEqual(checks.first?.status, .passed)
+    }
+
+    func testPromptOverrideCheckWarnsWithPathOfEachActiveOverride() throws {
+        let (local, global) = try makePromptDirs()
+        let diagnosis = global + "/" + SystemPromptFile.diagnosis.rawValue
+        let vision = local + "/" + SystemPromptFile.screenDescribe.rawValue
+        try "stale diagnosis prompt".write(toFile: diagnosis, atomically: true, encoding: .utf8)
+        try "custom vision prompt".write(toFile: vision, atomically: true, encoding: .utf8)
+
+        let checks = PromptOverrideCheck.run(searchDirs: [local, global])
+
+        XCTAssertEqual(checks.count, 2)
+        XCTAssertTrue(checks.allSatisfy { $0.status == .warned && $0.fixHint != nil })
+        XCTAssertTrue(checks.contains { $0.detail.contains(diagnosis) })
+        XCTAssertTrue(checks.contains { $0.detail.contains(vision) })
+        // Each hint names the file it reports, not a fixed one.
+        for file in SystemPromptFile.allCases {
+            let check = checks.first { $0.detail.hasSuffix("/" + file.rawValue) }
+            XCTAssertTrue(check?.fixHint?.contains("copied \(file.rawValue) there") ?? false,
+                          "hint for \(file.rawValue) does not name it")
+        }
+    }
+
+    func testPromptOverrideCheckReportsOnlyTheFileThatWins() throws {
+        let (local, global) = try makePromptDirs()
+        let localDiagnosis = local + "/" + SystemPromptFile.diagnosis.rawValue
+        try "local prompt".write(toFile: localDiagnosis, atomically: true, encoding: .utf8)
+        try "global prompt".write(
+            toFile: global + "/" + SystemPromptFile.diagnosis.rawValue, atomically: true, encoding: .utf8)
+
+        let checks = PromptOverrideCheck.run(searchDirs: [local, global])
+
+        XCTAssertEqual(checks.count, 1)
+        XCTAssertEqual(checks.first?.detail, "override active: \(localDiagnosis)")
+    }
+
+    func testPromptOverrideCheckIgnoresWhitespaceOnlyFile() throws {
+        let (local, global) = try makePromptDirs()
+        try "  \n\t\n".write(
+            toFile: global + "/" + SystemPromptFile.diagnosis.rawValue, atomically: true, encoding: .utf8)
+
+        let checks = PromptOverrideCheck.run(searchDirs: [local, global])
+
+        XCTAssertEqual(checks.count, 1)
+        XCTAssertEqual(checks.first?.status, .passed)
+    }
+
+    /// Creates a local and a global prompt directory under a temp root removed after the test.
+    private func makePromptDirs() throws -> (local: String, global: String) {
+        let root = NSTemporaryDirectory() + "doctor-prompt-test-\(UUID().uuidString)"
+        let local = root + "/local"
+        let global = root + "/global"
+        for dir in [local, global] {
+            try FileManager.default.createDirectory(atPath: dir, withIntermediateDirectories: true)
+        }
+        addTeardownBlock { try? FileManager.default.removeItem(atPath: root) }
+        return (local, global)
+    }
 }

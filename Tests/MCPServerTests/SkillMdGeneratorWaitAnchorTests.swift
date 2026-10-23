@@ -28,7 +28,7 @@ final class SkillMdGeneratorWaitAnchorTests: XCTestCase {
 
     private func makeAppDescription(tabs: [String]) -> AppDescription {
         AppDescription(
-            appName: "TestApp", schemaVersion: 1, locale: nil, archetype: nil,
+            appName: "TestApp", schemaVersion: 1, locale: nil, archetype: nil, playable: nil,
             resetBeforeExplore: false, obstacleMode: .auto, context: "",
             obstacles: [], skipElements: [], credentials: [:], hints: [],
             tabs: tabs, tabLayout: nil, deepTabs: [], simulator: nil)

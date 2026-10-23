@@ -15,6 +15,10 @@ struct SkillDefinition {
     let steps: [SkillStep]
     /// Target names declared in the skill header (for multi-target skills).
     let targets: [String]
+    /// Skill variant from the `kind:` header. "game" marks a model-interpreted
+    /// scene skill that is never compiled to a .compiled.json and never replayed
+    /// by the runner; empty for an ordinary, compilable/replayable skill.
+    let kind: String
 }
 
 /// A single executable step within a skill.
@@ -146,14 +150,29 @@ enum SkillParser {
 
         let steps = parseSteps(from: content)
         let targets = parseTargets(from: content)
+        let kind = headerKind(from: content)
 
         return SkillDefinition(
             name: header.name,
             description: header.description,
             filePath: filePath,
             steps: steps,
-            targets: targets
+            targets: targets,
+            kind: kind
         )
+    }
+
+    /// Extract the `kind:` header field (e.g. "game"), scanning the header
+    /// prefix the same way name/description are read so it works for both
+    /// SKILL.md front matter and legacy YAML skills. Empty when absent.
+    static func headerKind(from content: String) -> String {
+        for line in content.components(separatedBy: .newlines).prefix(20) {
+            let trimmed = line.trimmingCharacters(in: .whitespaces)
+            if trimmed.hasPrefix("kind:") {
+                return MirroirMCP.extractYAMLValue(from: trimmed, key: "kind")
+            }
+        }
+        return ""
     }
 
     /// Extract target names from the `targets:` header block.

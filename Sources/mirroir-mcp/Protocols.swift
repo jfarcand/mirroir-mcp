@@ -292,7 +292,15 @@ enum TextRecognitionError: Error, CustomStringConvertible {
 
 /// Abstracts OCR-based screen element detection.
 protocol ScreenDescribing: Sendable {
-    func describe() -> ScreenDescriber.DescribeResult?
+    /// Describe the current screen.
+    ///
+    /// - Parameter settleTimeoutUs: How long to wait for two consecutive
+    ///   identical frames before describing (0 describes the first frame).
+    ///   Nil uses the describer's own policy: the vision describer settles,
+    ///   because a transitional frame still bills a full model call; the local
+    ///   OCR describer does not, because its callers poll with their own delays
+    ///   and a stale frame only costs one more cheap describe.
+    func describe(settleTimeoutUs: UInt32?) -> ScreenDescriber.DescribeResult?
 
     /// Describe the full page by scrolling through all viewports.
     /// Delegates to `CalibrationScroller.collectFullPage()` for element collection.
@@ -310,6 +318,11 @@ protocol ScreenDescribing: Sendable {
 }
 
 extension ScreenDescribing {
+    /// Describe the current screen with the describer's own settle policy.
+    func describe() -> ScreenDescriber.DescribeResult? {
+        describe(settleTimeoutUs: nil)
+    }
+
     func describeFullPage(
         input: any InputProviding,
         bridge: any WindowBridging,

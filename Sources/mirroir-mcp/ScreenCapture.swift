@@ -143,11 +143,13 @@ extension ScreenCapturing {
     /// ambiguity — a lagged frame differs from its successor, a settled one does
     /// not. A screen that never settles (spinner, video, blinking caret) returns
     /// its most recent frame once `timeoutUs` elapses: a live screen is still a
-    /// truthful answer, and only a *stale* one is a lie.
+    /// truthful answer, and only a *stale* one is a lie. A `timeoutUs` of 0
+    /// returns the first frame after a single capture.
     func captureSettledWithInfo(
         timeoutUs: UInt32 = EnvConfig.frameSettleTimeoutUs
     ) -> CaptureResult? {
         guard var previous = captureWithInfo() else { return nil }
+        guard timeoutUs > 0 else { return previous }
         let deadline = DispatchTime.now().uptimeNanoseconds
             + (UInt64(timeoutUs) * UInt64(NSEC_PER_USEC))
 

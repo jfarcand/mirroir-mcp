@@ -34,19 +34,12 @@ extension MirroirMCP {
         // (matched via persisted graph root fingerprint). Saves ~3s per call
         // and avoids stealing focus while a user is mid-flow inside the app.
         let result: ScreenDescriber.DescribeResult
-        if let preLaunch = ctx.describer.describe(),
-           case .alreadyForeground(let similarity) = AppForegroundDetector.detect(
-               elements: preLaunch.elements, appName: appName) {
-            DebugLog.log("start", "already in '\(appName)' " +
-                "(root similarity \(String(format: "%.2f", similarity))) — skipping Spotlight launch")
-            result = preLaunch
-        } else {
-            switch launchAndWait(appName: appName, ctx: ctx) {
-            case .success(let launched):
-                result = launched
-            case .failure(let failure):
-                return .error(failure.message)
-            }
+        switch describeIfAlreadyForeground(appName: appName, ctx: ctx, logTag: "start")
+            ?? launchAndDescribe(appName: appName, ctx: ctx) {
+        case .success(let first):
+            result = first
+        case .failure(let failure):
+            return .error(failure.message)
         }
 
         // Parse goal(s) and start session
@@ -270,6 +263,17 @@ extension MirroirMCP {
         // Load APP.md description — needed below to check reset_before_explore.
         let appDesc = AppDescriptionLoader.load(appName: appName)
 
+        // A playable game is never BFS-explored: driving a scene starts matches
+        // and burns frames, and a game scene is scripted by a kind:game skill,
+        // not discovered. Only ordinary and observe-only apps are explorable.
+        // Runs before any force-quit/launch so the game app is left untouched.
+        if let appDesc, !appDesc.allowsExploration {
+            return .text(
+                "Exploration skipped: '\(appName)' is declared playable "
+                + "(\(appDesc.playable ?? "")) in its APP.md — a game is driven "
+                + "by a kind:game skill, not the explorer. App left untouched.")
+        }
+
         // Force-quit the app before launching if APP.md requests it.
         // Ensures a clean start for apps with overlays or stateful UI
         // (TikTok, Instagram). Delegates to the target's lifecycle so all
@@ -281,7 +285,7 @@ extension MirroirMCP {
                 appName: appName,
                 bridge: ctx.bridge,
                 input: ctx.input,
-                describer: ctx.describer
+                describer: ctx.ocrDescriber
             ) {
                 // Non-fatal here because the Spotlight launch below re-fronts
                 // the target and the post-launch foreground guard aborts if it
@@ -297,43 +301,15 @@ extension MirroirMCP {
         // Skip Spotlight launch if iPhone is already showing the target app.
         // reset_before_explore always relaunches; otherwise we OCR-fingerprint
         // the current screen against the persisted graph root and skip on match.
-        var firstResult: ScreenDescriber.DescribeResult
-        if !mustReset,
-           let preLaunch = ctx.describer.describe(),
-           case .alreadyForeground(let similarity) = AppForegroundDetector.detect(
-               elements: preLaunch.elements, appName: appName) {
-            DebugLog.log("explore", "already in '\(appName)' " +
-                "(root similarity \(String(format: "%.2f", similarity))) — skipping Spotlight launch")
-            firstResult = preLaunch
-        } else {
-            switch launchAndWait(appName: appName, ctx: ctx) {
-            case .success(let result):
-                firstResult = result
-            case .failure(let failure):
-                return .error(failure.message)
-            }
-        }
-
-        // Foreground guard: never explore a screen that looks like a DIFFERENT
-        // app. A subverted launch (Spotlight over a stuck App Switcher, a
-        // failed reset that tap-selected another card) can leave a foreign app
-        // frontmost — tapping exploration anchors into someone's Mail is the
-        // failure mode this exists to stop. One relaunch retry, then abort.
-        if AppForegroundDetector.looksForeign(elements: firstResult.elements, appName: appName) {
-            DebugLog.log("explore",
-                "foreground looks foreign to '\(appName)' — retrying launch before aborting")
-            switch launchAndWait(appName: appName, ctx: ctx) {
-            case .success(let retry):
-                if AppForegroundDetector.looksForeign(elements: retry.elements, appName: appName) {
-                    return .error(
-                        "Aborting explore: the foreground screen does not look like "
-                        + "'\(appName)' even after relaunching. Bring the app to the "
-                        + "foreground manually and retry.")
-                }
-                firstResult = retry
-            case .failure(let failure):
-                return .error(failure.message)
-            }
+        // No match launches behind the foreground guard (see launchInForeground).
+        let firstResult: ScreenDescriber.DescribeResult
+        let foreground = mustReset
+            ? nil : describeIfAlreadyForeground(appName: appName, ctx: ctx, logTag: "explore")
+        switch foreground ?? launchInForeground(appName: appName, ctx: ctx) {
+        case .success(let result):
+            firstResult = result
+        case .failure(let failure):
+            return .error(failure.message)
         }
 
         // Budget + skip-list merge. Built-ins, the global permissions.json list,
@@ -429,8 +405,8 @@ extension MirroirMCP {
             let detectionMode = ComponentDetectionMode(rawValue: EnvConfig.componentDetection) ?? .llmFirstScreen
             let classifier = detectionMode.buildClassifier(
                 server: server, agentConfig: AIAgentRegistry.resolveConfigured())
-            let advisor: any ExplorationAdvising = EmbacleFFI.isAvailable
-                ? VisionExplorationAdvisor() : HeuristicExplorationAdvisor()
+            let advisor: any ExplorationAdvising = AIAgentRegistry.embeddedAgentModel()
+                .map { VisionExplorationAdvisor(model: $0) } ?? HeuristicExplorationAdvisor()
             explorer = BFSExplorer(
                 session: session, budget: budget, windowSize: windowSize,
                 componentDefinitions: componentDefinitions,

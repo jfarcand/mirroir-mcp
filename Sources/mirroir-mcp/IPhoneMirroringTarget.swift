@@ -67,7 +67,7 @@ enum IPhoneMirroringTarget {
     static func build(config: TargetConfig?, name: String = "iphone") -> TargetContext {
         let bridge = MirroringBridge(targetName: name, bundleID: config?.bundleID)
         let capture = ScreenCapture(bridge: bridge)
-        let describer = MirroirMCP.buildDescriber(
+        let describers = MirroirMCP.buildDescribers(
             bridge: bridge, capture: capture,
             isMobile: profile.coordinateSystem == .mobile
         )
@@ -79,7 +79,8 @@ enum IPhoneMirroringTarget {
             bridge: bridge,
             input: InputSimulation(bridge: bridge, cursorMode: profile.cursorMode),
             capture: capture,
-            describer: describer,
+            describer: describers.describer,
+            ocrDescriber: describers.ocr,
             recorder: ScreenRecorder(bridge: bridge),
             backtracker: OCRChevronBacktracker(),
             lifecycle: MirroringAppLifecycle(),

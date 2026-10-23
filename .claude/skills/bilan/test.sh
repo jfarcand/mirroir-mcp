@@ -184,7 +184,7 @@ git -C "$R" add -A && git -C "$R" commit -qm "the register" && git -C "$R" push 
 #
 # The LIMITATION procedure requires an OPEN issue for as long as a marker names it, so a session
 # that followed that procedure correctly was capped at 6 for complying, with no action available.
-# carnet#406 held a session there for hours on 2026-09-11: keyword narrowing was deleted for
+# One issue held a session there for hours: keyword narrowing was deleted for
 # starving a turn, a classifier was rejected for failing the same way, static narrowing was already
 # done — nothing to fix, and nothing honest to close.
 #
@@ -232,7 +232,7 @@ check "and the registered limitation is still REPORTED, not silently dropped" 1 
 git -C "$R" checkout -q -- src/lib.rs
 
 # The same marker where the register does not look. Neither the gate nor bilan scans a test
-# tree, so a marker there is validated by nothing and must credit nothing: carnet#493 was
+# tree, so a marker there is validated by nothing and must credit nothing: an issue was
 # registered on a test harness and sat at 6 until the marker moved to the production function
 # the harness fails to cover.
 mkdir -p "$R/crates/x/tests"
@@ -277,7 +277,7 @@ git -C "$R" checkout -q -- src/lib.rs
 # The commit that installed bilan reported three markers that were all its own: the fixture here,
 # the row in SKILL.md, and the grep pattern in bilan.sh. A scanner that reports itself is worse
 # than no scanner. The files are STAGED: bilan reads the session's diff, and an untracked file is
-# in no diff — the version of this case before 2026-09-21 left them untracked and passed without
+# in no diff — an earlier version of this case left them untracked and passed without
 # looking at any of them.
 mkdir -p "$R/.claude/skills/bilan" "$R/crates/x/tests"
 echo 'LIMITATION(registre#[^)]*) is the pattern' > "$R/.claude/skills/bilan/bilan.sh"
@@ -453,7 +453,7 @@ check "the opening ask is kept beside it" 1 "$(printf '%s\n' "$report" | grep -c
 rm -rf "$CFG/projects"
 
 # ---- the sweep must not report a dead session's claim on an issue that is already closed.
-# carnet#236 was closed on 2026-09-03 and MCPNext's ledger still named it, so every session
+# An issue was closed while a dead session's ledger still named it, so every session
 # start since reported an abandoned issue that no longer existed — a recurring false alarm
 # trains the reader to skip the one line the sweep exists to print.
 sweep_ledger="$CFG/carnet-claims/11111111-1111-1111-1111-111111111111.jsonl"

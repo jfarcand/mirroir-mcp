@@ -69,7 +69,7 @@ final class ExplorerTrapRecoveryTests: XCTestCase {
 
     private func makeInstagramDescription() -> AppDescription {
         AppDescription(
-            appName: "Instagram", schemaVersion: 1, locale: "fr_CA", archetype: nil,
+            appName: "Instagram", schemaVersion: 1, locale: "fr_CA", archetype: nil, playable: nil,
             resetBeforeExplore: false, obstacleMode: .auto, context: "test",
             obstacles: cameraObstacles, skipElements: [], credentials: [:], hints: [],
             tabs: [], tabLayout: nil, deepTabs: [], simulator: nil)

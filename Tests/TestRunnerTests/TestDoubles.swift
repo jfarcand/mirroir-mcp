@@ -147,7 +147,7 @@ final class StubDescriber: ScreenDescribing, @unchecked Sendable {
     var describeResults: [ScreenDescriber.DescribeResult?] = []
     private var callCount = 0
 
-    func describe() -> ScreenDescriber.DescribeResult? {
+    func describe(settleTimeoutUs: UInt32?) -> ScreenDescriber.DescribeResult? {
         if !describeResults.isEmpty {
             let result = describeResults[min(callCount, describeResults.count - 1)]
             callCount += 1

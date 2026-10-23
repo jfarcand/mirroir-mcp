@@ -152,6 +152,15 @@ extension MirroirMCP {
 
     // MARK: - save_compiled
 
+    /// Screen fingerprint for content drift detection, from one local OCR call.
+    /// Always OCR: it is bookkeeping, not a description the client asked for,
+    /// so it never spends a vision call.
+    static func captureScreenFingerprint(target: any Target) -> ScreenFingerprint? {
+        guard let describeResult = target.ocrDescriber.describe() else { return nil }
+        return StructuralFingerprint.buildScreenFingerprint(
+            elements: describeResult.elements, icons: describeResult.icons)
+    }
+
     private static func registerSaveCompiledTool(
         server: MCPServer,
         session: CompilationSession,
@@ -198,6 +207,15 @@ extension MirroirMCP {
                     return .error("Skill '\(skillName)' not found")
                 }
 
+                // A kind:game skill is model-interpreted: it is never compiled
+                // to a .compiled.json. Refuse rather than writing a dead artifact.
+                if let content = try? String(contentsOfFile: skillPath),
+                   SkillParser.headerKind(from: content) == "game" {
+                    return .error(
+                        "'\(skillName)' is a kind:game skill — model-interpreted and "
+                        + "never compiled. Run it via the game model loop instead.")
+                }
+
                 // Compute source hash
                 let sourceHash: String
                 do {
@@ -213,15 +231,7 @@ extension MirroirMCP {
                 let windowHeight = windowInfo.map { Double($0.size.height) } ?? 0
                 let orientation = target.bridge.getOrientation()?.rawValue ?? "unknown"
 
-                // Capture screen fingerprint via 1 OCR call for content drift detection
-                let fingerprint: ScreenFingerprint?
-                if let describeResult = target.describer.describe() {
-                    fingerprint = StructuralFingerprint.buildScreenFingerprint(
-                        elements: describeResult.elements,
-                        icons: describeResult.icons)
-                } else {
-                    fingerprint = nil
-                }
+                let fingerprint = captureScreenFingerprint(target: target)
 
                 // Build compiled skill
                 let steps = session.finalizeAndClear()

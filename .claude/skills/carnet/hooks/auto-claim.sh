@@ -23,18 +23,17 @@
 #
 # WHO WROTE THE PROMPT is checked here, not in the prompt hook, because only here can it be.
 # A `/loop` or ScheduleWakeup re-fire is a prompt the model wrote for itself, and it names
-# whatever the model was thinking about: session dravr-platform-7f (2026-09-18) put carnet#436
-# into its own wakeup text, the prompt hook armed it as if ChefFamille had typed it, and this
-# hook claimed it on the next redirect — 67 minutes held, the human never having typed the
-# number. The prompt text carries no marker and the payload's `source` field is not emitted
-# yet, but the transcript entry for the prompt (found by the `prompt=<prompt_id>` line the
-# prompt hook now records) says `promptSource: "system"`, `isMeta: true`,
-# `scheduledTaskId: …` — and that entry is written before the model's first tool call, which
-# a resumed headless probe confirmed while also showing it is NOT there when the prompt hook
-# runs. So: the list is consumed, the entry is read, and a machine-authored prompt claims
-# nothing and says so once. An entry that cannot be found claims as before: the transcript
-# path can be absent or translated in a cloud session, and a check that silently stops every
-# claim is the failure that cost three hours on 2026-09-02.
+# whatever the model was thinking about: a session that put an issue number into its own
+# wakeup text had the prompt hook arm it as if its human had typed it, and this hook then
+# claimed it on the next redirect and held it for over an hour, the human never having typed
+# the number. The prompt text carries no marker and the UserPromptSubmit payload carries no
+# `source` field, but the transcript entry for the prompt (found by the `prompt=<prompt_id>`
+# line the prompt hook records) says `promptSource: "system"`, `isMeta: true`,
+# `scheduledTaskId: …` — and that entry is written before the model's first tool call, though
+# NOT yet when the prompt hook runs. So: the list is consumed, the entry is read, and a
+# machine-authored prompt claims nothing and says so once. An entry that cannot be found
+# claims as a typed prompt would: the transcript path can be absent or translated in a cloud
+# session, and a check that silently stops every claim costs hours before anyone notices.
 set -uo pipefail
 
 CFG=${CLAUDE_CONFIG_DIR:-$HOME/.claude}
@@ -75,7 +74,7 @@ case "$tool" in
         # The git verbs need a terminator. Without one, `merge` matches inside
         # `git merge-base` — the standard way to ask "is this commit on main?" —
         # so a pure ancestry query counted as a write and claimed every pending
-        # issue. That took carnet#323 off a peer mid-investigation, who then
+        # issue. That took an issue off a peer mid-investigation, who then
         # stood down. Same failure class as the `2>/dev/null` bug above: a read
         # that pattern-matches as a write, costing an issue that was only NAMED.
         #

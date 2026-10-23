@@ -42,7 +42,7 @@ final class SkillFileTests: XCTestCase {
 
     func testSkillCount() {
         let stems = skillStems()
-        XCTAssertEqual(stems.count, 26, "Expected 26 skills, got \(stems.count): \(stems)")
+        XCTAssertEqual(stems.count, 29, "Expected 29 skills, got \(stems.count): \(stems)")
     }
 
     func testNoUnexpectedUnknownSteps() throws {
@@ -225,7 +225,8 @@ final class SkillFileTests: XCTestCase {
             description: header.description,
             filePath: mdPath,
             steps: [],
-            targets: []
+            targets: [],
+            kind: ""
         )
     }
 

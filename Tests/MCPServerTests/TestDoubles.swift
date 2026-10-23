@@ -231,6 +231,58 @@ final class StubTextRecognizer: TextRecognizing, @unchecked Sendable {
     }
 }
 
+// MARK: - Frame capture doubles
+
+/// Capture double that replays a fixed sequence of frames (repeating the last)
+/// and counts calls, so a test can tell a settled capture from a single grab.
+final class SequenceCapture: ScreenCapturing, @unchecked Sendable {
+    private let frames: [Data]
+    private(set) var callCount = 0
+    let windowInfo: WindowInfo
+
+    init(frames: [Data], windowSize: CGSize = CGSize(width: 410, height: 898)) {
+        self.frames = frames
+        self.windowInfo = WindowInfo(windowID: 1, position: .zero, size: windowSize, pid: 1)
+    }
+
+    func captureWithInfo() -> CaptureResult? {
+        let frame = frames[min(callCount, frames.count - 1)]
+        callCount += 1
+        return CaptureResult(data: frame, info: windowInfo)
+    }
+
+    func captureData() -> Data? { captureWithInfo()?.data }
+    func captureBase64() -> String? { captureData()?.base64EncodedString() }
+}
+
+/// Counts chat-completion requests the vision describer sends.
+final class RequestCounter: @unchecked Sendable {
+    private(set) var count = 0
+    func record() { count += 1 }
+}
+/// Vision describer whose agent replies with one "Play" button and counts
+/// every request, so a test can prove when the paid call was (not) made.
+/// `recognizer` drives the local OCR pass that confirms a blank frame.
+func makeTestVisionDescriber(
+    capture: any ScreenCapturing, counter: RequestCounter,
+    recognizer: any TextRecognizing = StubTextRecognizer()
+) -> VisionScreenDescriber {
+    let config = AgentConfig(
+        name: "test", mode: .api, provider: nil, model: "test-model",
+        apiKeyEnvVar: nil, baseURL: "http://127.0.0.1:1", systemPrompt: nil,
+        maxTokens: 256, command: nil, args: nil
+    )
+    let reply = #"{"choices":[{"message":{"content":"[{\"label\":\"Play\",\"x\":100,\"y\":50,\"type\":\"button\"}]"}}]}"#
+    let local = ScreenDescriber(bridge: StubBridge(), capture: capture, textRecognizer: recognizer)
+    return VisionScreenDescriber(
+        bridge: StubBridge(), capture: capture, localDescriber: local, agentConfig: config,
+        sendRequest: { _, _, _, _, _ in
+            counter.record()
+            return Data(reply.utf8)
+        }
+    )
+}
+
 // MARK: - StubDescriber
 
 final class StubDescriber: ScreenDescribing, @unchecked Sendable {
@@ -241,7 +293,15 @@ final class StubDescriber: ScreenDescribing, @unchecked Sendable {
     var describeResults: [ScreenDescriber.DescribeResult?] = []
     private var describeIndex = 0
 
-    func describe() -> ScreenDescriber.DescribeResult? {
+    /// Number of describe() calls made, so tests can prove a describer was not used.
+    private(set) var describeCallCount = 0
+
+    /// Settle window of the most recent describe call (nil = describer default).
+    private(set) var lastSettleTimeoutUs: UInt32?
+
+    func describe(settleTimeoutUs: UInt32?) -> ScreenDescriber.DescribeResult? {
+        describeCallCount += 1
+        lastSettleTimeoutUs = settleTimeoutUs
         if !describeResults.isEmpty {
             let result = describeResults[min(describeIndex, describeResults.count - 1)]
             describeIndex += 1
@@ -259,7 +319,8 @@ func makeTestRegistry(
     input: StubInput,
     capture: StubCapture = StubCapture(),
     recorder: StubRecorder = StubRecorder(),
-    describer: StubDescriber = StubDescriber()
+    describer: StubDescriber = StubDescriber(),
+    ocrDescriber: StubDescriber? = nil
 ) -> TargetRegistry {
     let ctx = TargetContext(
         name: "iphone",
@@ -269,6 +330,7 @@ func makeTestRegistry(
         input: input,
         capture: capture,
         describer: describer,
+        ocrDescriber: ocrDescriber,
         recorder: recorder,
         capabilities: [.menuActions, .spotlight, .home, .appSwitcher]
     )

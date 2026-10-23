@@ -95,9 +95,9 @@ final class TestRunnerConfigTests: XCTestCase {
     }
 
     func testParseAgentWithModelName() {
-        // --agent claude-sonnet-4-6 → AI model name
-        let config = TestRunner.parseArguments(["--agent", "claude-sonnet-4-6", "skill.yaml"])
-        XCTAssertEqual(config.agent, "claude-sonnet-4-6")
+        // --agent claude-sonnet-5-5 → AI model name
+        let config = TestRunner.parseArguments(["--agent", "claude-sonnet-5-5", "skill.yaml"])
+        XCTAssertEqual(config.agent, "claude-sonnet-5-5")
         XCTAssertEqual(config.skillArgs, ["skill.yaml"])
     }
 

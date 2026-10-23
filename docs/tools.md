@@ -7,7 +7,7 @@ All 38 tools exposed by the MCP server. Mutating tools require [permission](perm
 | Tool | Parameters | Description |
 |------|-----------|-------------|
 | `screenshot` | — | Capture the iPhone screen as base64 PNG |
-| `describe_screen` | `scroll`?, `omit_screenshot`? | Analyze the screen and return UI elements with tap coordinates plus a grid-overlaid screenshot. Uses local OCR or AI vision depending on `screenDescriberMode`. `scroll: true` does a full-page scroll to capture all elements. `omit_screenshot: true` returns text only (no image). |
+| `describe_screen` | `scroll`?, `omit_screenshot`?, `settle_ms`? | Analyze the screen and return UI elements with tap coordinates plus a grid-overlaid screenshot. Uses local OCR or AI vision depending on `screenDescriberMode`. `scroll: true` does a full-page scroll to capture all elements. `omit_screenshot: true` returns text only (no image). `settle_ms` sets how long to wait for the screen to stop changing first. |
 | `start_recording` | `output_path`? | Start video recording of the mirrored screen |
 | `stop_recording` | — | Stop recording and return the .mov file path |
 | `tap` | `x`, `y`, `cursor_mode`? | Tap at coordinates (relative to mirroring window) |
@@ -58,6 +58,10 @@ Coordinates are in points relative to the mirroring window's top-left corner. Us
 Set `scroll: true` to perform a full-page scroll before returning results. The server scrolls through the entire page, deduplicates elements across viewports, and returns all detected elements — not just those visible in the initial viewport.
 
 Set `omit_screenshot: true` to return only the text description without the base64 PNG image. This saves context window space during long automation sessions where screenshots aren't needed. The `MIRROIR_OMIT_SCREENSHOT` environment variable (or `describeScreenOmitScreenshot` setting) controls the default; the tool parameter overrides it per-call.
+
+Set `settle_ms` to control how long the call waits for two identical consecutive frames before describing. In both OCR and vision mode the default is the `frameSettleTimeoutUs` setting (1.5s), exactly like `screenshot`: the mirrored frame lags the device, so a frame taken right after an action can still show the pre-action screen, and in vision mode a frame caught mid-transition would still bill a full model call. A constantly animated screen (a game scene, a video) never settles, so pass `settle_ms: 0` there to skip the wait. Requested values are capped at the `frameSettleMaxTimeoutUs` setting (10s), because the wait blocks the tool call.
+
+A frame that is a uniform fill (rotation, launch, scene change) with no text or icons found by local OCR is reported as `SCREEN BLANK` (`screen_blank=true` in `_meta`). In vision mode such a frame is never sent to the model; a dark splash whose only content is a short label ("Tap to play") is still described, because the local OCR pass on the same frame finds the label.
 
 ## Typing Workflow
 

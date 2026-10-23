@@ -45,7 +45,7 @@ extension MirroirMCP {
                     input: ctx.input,
                     bridge: ctx.bridge,
                     menuBridge: menuBridge,
-                    describer: ctx.describer
+                    describer: ctx.ocrDescriber
                 ) {
                     return .error(error)
                 }

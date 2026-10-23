@@ -56,49 +56,14 @@ struct AISuggestedFix: Codable {
     }
 }
 
-/// Default system prompt for AI diagnosis, used when no prompt file is found.
-let aiDiagnosisDefaultPrompt = """
-    You are an expert iOS UI automation debugger analyzing a failed test skill.
-
-    Given the diagnostic context below, provide:
-    1. ROOT CAUSE: What specifically went wrong and why
-    2. FIX: Concrete actionable fix (coordinate changes, timing adjustments, or skill edits)
-    3. CONFIDENCE: high, medium, or low
-
-    Respond in JSON: {"analysis": "...", "suggested_fixes": [\
-    {"field": "...", "was": "...", "should_be": "..."}], "confidence": "high|medium|low"}
-    """
-
-/// Load the diagnosis system prompt from prompts/ directory, falling back to the built-in default.
-/// Resolution order: project-local config → global config → hardcoded default.
-/// Prompt files are Markdown (.md) for better structure and versioning.
-func loadDiagnosisPrompt(filename: String = "diagnosis.md") -> String {
-    for dir in PermissionPolicy.promptDirs {
-        let path = dir + "/" + filename
-        if let data = FileManager.default.contents(atPath: path),
-           let content = String(data: data, encoding: .utf8),
-           !content.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-            return content
-        }
-    }
-    return aiDiagnosisDefaultPrompt
-}
-
 /// Registry and resolver for AI agent configurations.
 enum AIAgentRegistry {
 
     /// Built-in agent configurations for common models.
     static let builtInAgents: [String: AgentConfig] = [
-        "claude-sonnet-4-6": AgentConfig(
-            name: "claude-sonnet-4-6", mode: .api, provider: .anthropic,
-            model: "claude-sonnet-4-6-20250514", apiKeyEnvVar: "ANTHROPIC_API_KEY",
-            baseURL: "https://api.anthropic.com", systemPrompt: nil,
-            maxTokens: EnvConfig.defaultAIMaxTokens, command: nil, args: nil),
-        "claude-haiku-4-5": AgentConfig(
-            name: "claude-haiku-4-5", mode: .api, provider: .anthropic,
-            model: "claude-haiku-4-5-20251001", apiKeyEnvVar: "ANTHROPIC_API_KEY",
-            baseURL: "https://api.anthropic.com", systemPrompt: nil,
-            maxTokens: EnvConfig.defaultAIMaxTokens, command: nil, args: nil),
+        defaultAnthropicModel: anthropicAgent(model: defaultAnthropicModel),
+        "claude-sonnet-5-5": anthropicAgent(model: "claude-sonnet-5-5"),
+        "claude-haiku-5-5": anthropicAgent(model: "claude-haiku-5-5"),
         "gpt-5.3": AgentConfig(
             name: "gpt-5.3", mode: .api, provider: .openai,
             model: "gpt-5.3", apiKeyEnvVar: "OPENAI_API_KEY",
@@ -106,15 +71,35 @@ enum AIAgentRegistry {
             maxTokens: EnvConfig.defaultAIMaxTokens, command: nil, args: nil),
         "embacle": AgentConfig(
             name: "embacle", mode: .api, provider: .embacle,
-            model: "copilot", apiKeyEnvVar: nil,
+            model: defaultAgentModel, apiKeyEnvVar: nil,
             baseURL: "http://localhost:3000", systemPrompt: nil,
             maxTokens: EnvConfig.defaultAIMaxTokens, command: nil, args: nil),
+        // `claude:sonnet` selects embacle-server's Claude Code runner, which
+        // passes `sonnet` to `claude --model` (the runner's accepted aliases
+        // are `sonnet`, `opus` and `haiku`; the CLI maps each to the current
+        // model of that tier). A `runner:model` id always travels over HTTP;
+        // see `AgentTransport`.
         "embacle:claude": AgentConfig(
             name: "embacle:claude", mode: .api, provider: .embacle,
-            model: "claude", apiKeyEnvVar: nil,
+            model: "claude:sonnet", apiKeyEnvVar: nil,
             baseURL: "http://localhost:3000", systemPrompt: nil,
             maxTokens: EnvConfig.defaultAIMaxTokens, command: nil, args: nil),
     ]
+
+    /// A built-in Anthropic agent named after the Messages API model id it sends.
+    private static func anthropicAgent(model: String) -> AgentConfig {
+        AgentConfig(
+            name: model, mode: .api, provider: .anthropic,
+            model: model, apiKeyEnvVar: "ANTHROPIC_API_KEY",
+            baseURL: "https://api.anthropic.com", systemPrompt: nil,
+            maxTokens: EnvConfig.anthropicMaxTokens, command: nil, args: nil)
+    }
+
+    /// Token limit for an API profile that names none: Anthropic models think on every
+    /// call and thinking counts toward the limit, so they get `anthropicMaxTokens`.
+    private static func defaultMaxTokens(for provider: ProviderType?) -> Int {
+        provider == .anthropic ? EnvConfig.anthropicMaxTokens : EnvConfig.defaultAIMaxTokens
+    }
 
     /// Agent used when none is named in the environment.
     static let defaultAgentName = "embacle"
@@ -123,6 +108,20 @@ enum AIAgentRegistry {
     /// the configured name matches nothing.
     static func resolveConfigured() -> AgentConfig? {
         resolve(name: EnvConfig.agent.isEmpty ? defaultAgentName : EnvConfig.agent)
+    }
+
+    /// Model for calls made straight to the embedded embacle runner, or nil
+    /// when `config` (the configured agent by default) is not served by it
+    /// under `AgentTransport`'s rule.
+    static func embeddedAgentModel(
+        config: AgentConfig? = resolveConfigured(),
+        embeddedRunnerEnabled: Bool = AgentTransport.embeddedRunnerEnabled
+    ) -> String? {
+        guard let config,
+              config.transport(embeddedRunnerEnabled: embeddedRunnerEnabled) == .embedded else {
+            return nil
+        }
+        return config.model ?? defaultAgentModel
     }
 
     /// Resolve an agent name to its configuration.
@@ -232,7 +231,7 @@ enum AIAgentRegistry {
             model: dict["model"], apiKeyEnvVar: dict["api_key_env"],
             baseURL: dict["base_url"],
             systemPrompt: dict["system_prompt"],
-            maxTokens: Int(dict["max_tokens"] ?? "") ?? EnvConfig.defaultAIMaxTokens,
+            maxTokens: Int(dict["max_tokens"] ?? "") ?? defaultMaxTokens(for: provider),
             command: nil, args: nil)
     }
 
@@ -281,9 +280,8 @@ enum AIAgentRegistry {
 ///
 /// Wraps the OpenAI-compatible `/v1/chat/completions` shape every provider
 /// speaks, so a caller needing a one-shot completion states the prompts and
-/// nothing else. Requests travel over whichever transport
-/// `sendAgentHTTPRequest` selects — the embedded embacle FFI when available,
-/// HTTP otherwise.
+/// nothing else. The request travels over the agent's
+/// `AgentConfig.transport()`.
 ///
 /// - Returns: The assistant's text, or nil when the agent is unreachable or
 ///   answers in a shape with no message content.
@@ -314,7 +312,8 @@ func requestChatCompletion(
         headers["Authorization"] = "Bearer \(apiKey)"
     }
 
-    guard let responseData = sendAgentHTTPRequest(
+    guard let responseData = sendAgentRequest(
+        transport: agentConfig.transport(),
         url: url, headers: headers, body: body, timeoutSeconds: timeoutSeconds
     ) else { return nil }
 
@@ -324,9 +323,17 @@ func requestChatCompletion(
 /// Endpoint used when a target declares no `baseURL`.
 let defaultAgentBaseURL = "http://localhost:3000"
 
-/// Model used when a target declares none. `copilot_headless` is embacle's
-/// default and the only one guaranteed to accept image payloads.
-let defaultAgentModel = "copilot_headless"
+/// Model used when a target declares none, and the model of the built-in
+/// `embacle` agent. It must be a real Copilot model id, never a provider alias:
+/// embacle maps the aliases `copilot` and `copilot_headless` to its own
+/// catalog default (the top-ranked Opus) and writes that into
+/// `~/.copilot/settings.json`, which is the only model input `copilot --acp`
+/// obeys.
+let defaultAgentModel = "claude-sonnet-5.5"
+
+/// Messages API model id of the built-in Anthropic agent of the same name, and the
+/// model `AnthropicProvider` sends when an Anthropic profile names none.
+let defaultAnthropicModel = "claude-opus-5-5"
 
 /// Pull the assistant text out of an OpenAI-compatible chat completions body.
 /// Falls back to the raw body so a provider answering in another shape still
@@ -346,15 +353,11 @@ func extractChatCompletionText(from data: Data) -> String? {
 // MARK: - Shared HTTP Helper
 
 /// Send a synchronous HTTP POST request and return the response body.
-/// Returns nil on error, printing a warning to stderr.
+/// Returns nil on error, printing a warning to stderr. Agent callers go
+/// through `sendAgentRequest`, which picks this or the embedded runner.
 func sendAgentHTTPRequest(
     url: URL, headers: [String: String], body: Data, timeoutSeconds: Int
 ) -> Data? {
-    // Embedded transport: bypass HTTP, call Rust FFI directly when available
-    if EmbacleFFI.isAvailable && EnvConfig.agentTransport != "http" {
-        return EmbacleFFI.chatCompletion(requestJSON: body, timeoutSeconds: timeoutSeconds)
-    }
-
     var request = URLRequest(url: url)
     request.httpMethod = "POST"
     request.httpBody = body
