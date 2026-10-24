@@ -115,6 +115,13 @@ final class TestRunnerConfigTests: XCTestCase {
         XCTAssertEqual(config.skillArgs, ["test.yml"])
     }
 
+    func testParseAgentFollowedBySkillMd() {
+        // --agent login.md → bare agent, login.md is a skill arg
+        let config = TestRunner.parseArguments(["--agent", "login.md"])
+        XCTAssertEqual(config.agent, "")
+        XCTAssertEqual(config.skillArgs, ["login.md"])
+    }
+
     func testParseAgentFollowedByFlag() {
         // --agent --verbose → bare agent, verbose flag still parsed
         let config = TestRunner.parseArguments(["--agent", "--verbose"])

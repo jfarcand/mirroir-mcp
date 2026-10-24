@@ -2,7 +2,7 @@
 // Licensed under the Apache License, Version 2.0
 //
 // ABOUTME: Tests for skill discovery and resolution of SKILL.md files alongside YAML skills.
-// ABOUTME: Covers findSkillFiles, discoverSkills, resolveSkill with .md and yamlOnly.
+// ABOUTME: Covers findSkillFiles, discoverSkills, and resolveSkill preferring .md over .yaml.
 
 import XCTest
 import HelperLib
@@ -131,55 +131,5 @@ extension SkillToolsTests {
         XCTAssertNotNil(path)
         XCTAssertTrue(path!.hasSuffix("send.md"))
         XCTAssertTrue(ambiguous.isEmpty)
-    }
-
-    // MARK: - resolveSkill with yamlOnly
-
-    func testResolveYamlOnlySkipsMd() {
-        // When both .md and .yaml exist, yamlOnly: true returns the .yaml
-        createFile("test.yaml", content: "name: YAML Version")
-        createFile("test.md", content: "---\nname: MD Version\n---\n\nBody")
-
-        let (path, ambiguous) = MirroirMCP.resolveSkill(
-            name: "test", dirs: [tmpDir], yamlOnly: true)
-        XCTAssertNotNil(path)
-        XCTAssertTrue(path!.hasSuffix("test.yaml"),
-            "yamlOnly should resolve to .yaml, got: \(path!)")
-        XCTAssertTrue(ambiguous.isEmpty)
-    }
-
-    func testResolveYamlOnlyPhase2() {
-        // Basename resolution with yamlOnly: true finds YAML in subdirectory
-        createFile("apps/slack/send.yaml", content: "name: Slack Send")
-        createFile("apps/slack/send.md", content: "---\nname: Slack Send MD\n---\n\nBody")
-
-        let (path, ambiguous) = MirroirMCP.resolveSkill(
-            name: "send", dirs: [tmpDir], yamlOnly: true)
-        XCTAssertNotNil(path)
-        XCTAssertTrue(path!.hasSuffix("send.yaml"),
-            "yamlOnly Phase 2 should resolve to .yaml, got: \(path!)")
-        XCTAssertTrue(ambiguous.isEmpty)
-    }
-
-    func testResolveYamlOnlyMdOnlyFileNotFound() {
-        // When only .md exists, yamlOnly: true should not find it
-        createFile("test.md", content: "---\nname: MD Only\n---\n\nBody")
-
-        let (path, ambiguous) = MirroirMCP.resolveSkill(
-            name: "test", dirs: [tmpDir], yamlOnly: true)
-        XCTAssertNil(path, "yamlOnly should not resolve .md-only skills")
-        XCTAssertTrue(ambiguous.isEmpty)
-    }
-
-    func testResolveYamlOnlyDefaultFalse() {
-        // Default behavior (yamlOnly not specified) still prefers .md
-        createFile("test.yaml", content: "name: YAML")
-        createFile("test.md", content: "---\nname: MD\n---\n\nBody")
-
-        let (path, _) = MirroirMCP.resolveSkill(
-            name: "test", dirs: [tmpDir])
-        XCTAssertNotNil(path)
-        XCTAssertTrue(path!.hasSuffix("test.md"),
-            "Default behavior should prefer .md")
     }
 }

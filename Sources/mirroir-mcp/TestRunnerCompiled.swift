@@ -39,6 +39,10 @@ extension TestRunner {
         var stepResults: [StepResult] = []
         var stopOnFailure = false
         var recommendations: [AgentDiagnostic.Recommendation] = []
+        // A diagnosis reports a step with its `${VAR}` placeholders, never their values.
+        let placeholderSteps = agentEnabled
+            ? (try? SkillFileLoader.load(filePath: skill.filePath, substitutingEnv: false))?.steps
+            : nil
 
         for (index, step) in skill.steps.enumerated() {
             if stopOnFailure {
@@ -75,7 +79,8 @@ extension TestRunner {
                 if agentEnabled && result.status == .failed {
                     let synthStep = CompiledStep(
                         index: index, type: step.typeKey,
-                        label: step.labelValue,
+                        label: placeholderSteps?.count == stepCount
+                            ? placeholderSteps?[index].replayValue : nil,
                         hints: StepHints.passthrough())
                     if let rec = AgentDiagnostic.diagnose(
                         step: step, compiledStep: synthStep,
@@ -156,7 +161,8 @@ extension TestRunner {
         input: InputSimulation,
         describer: ScreenDescriber,
         capture: ScreenCapture,
-        config: StepExecutorConfig
+        config: StepExecutorConfig,
+        registry: TargetRegistry?
     ) -> CompiledSkill? {
         if skill.kind == "game" {
             fputs("  Skipping \(skill.name): kind:game is model-interpreted — "
@@ -172,7 +178,8 @@ extension TestRunner {
         let executor = StepExecutor(
             bridge: bridge, input: input,
             describer: recordingDescriber, capture: capture,
-            config: config
+            config: config,
+            registry: registry
         )
 
         fputs("  Auto-recompiling \(skill.name)...\n", stderr)

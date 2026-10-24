@@ -19,7 +19,7 @@ Give your AI eyes, hands, and a real iPhone. An MCP server that lets any AI agen
 
 mirroir is growing archetype-aware coverage for **games**. A game splits into two surfaces. The **shell** — menu, shop, loadout, settings, win/lose screens — is ordinary text-labelled UI that today's skills already drive. The **scene** — the playfield — is a vision-driven loop an agent follows one touch at a time. The honest targets are **game QA smoke tests, tutorial walkthroughs, and scripted demos**, not real-time play: iPhone Mirroring exposes a single pointer, so twin-stick and twitch games stay out of reach (see [Games](#games)).
 
-**Token reductions** make the scene loop affordable. Screenshots are ~90% of an agent's cost, so text-rich shell screens read through `describe_screen` with no image at all, and a region/scale capture knob trims the per-frame image cost where a screenshot is unavoidable. The cost model is simple: frames × ~2.7k tokens, at ~3 frames/min.
+**Token reductions** make the scene loop affordable. Screenshots are ~90% of an agent's cost, so text-rich shell screens read through `describe_screen` with no image at all, and a region/scale capture knob trims the per-frame image cost where a screenshot is unavoidable. On the playfield, `describe_screen` in vision mode sends the frame to an LLM through embacle; measured on a live Brawl Stars match, one frame costs ~24k prompt tokens and 3–14 s, which GitHub Copilot bills as a single premium request on Claude Sonnet 5.5.
 
 The rollout is tracked as Gaming Surface A–E — shell coverage ships first; the scene loop is measured on a real device before it widens.
 
@@ -365,7 +365,7 @@ This calls `generate_skill(action: "explore", app_name: "Settings", goal: "check
 
 ### Test
 
-Run skills deterministically from the CLI — no AI in the loop:
+Run skills deterministically from the CLI — no AI in the loop. A YAML skill runs its own steps. A SKILL.md's body is prose for an AI, so it runs the steps recorded in its `.compiled.json` when an MCP client first ran it (`get_skill`, then `record_step` after each step and `save_compiled` at the end). An uncompiled SKILL.md is refused with that instruction, one edited since it was compiled is refused as stale, and a run with no skill arguments skips any SKILL.md that has no compiled file:
 
 ```bash
 mirroir test apps/settings/check-about
@@ -399,6 +399,8 @@ mirroir compile apps/settings/check-about        # compile
 mirroir test apps/settings/check-about            # auto-detects .compiled.json
 mirroir test --no-compiled check-about            # force full OCR
 ```
+
+`mirroir compile` re-records coordinates by running a skill's steps on the device. For a SKILL.md those are the steps in its existing `.compiled.json`, so the first compile of a SKILL.md always happens through an MCP client.
 
 AI agents auto-compile skills as a side-effect of the first MCP run. See [Compiled Skills](docs/compiled-skills.md) for details.
 
@@ -555,7 +557,7 @@ Prebuilt binaries for macOS (Intel + Apple Silicon), Linux (gnu + musl), and Win
 
 Giving an AI access to your phone demands defense in depth. mirroir-mcp is **fail-closed** at every layer.
 
-- **Tool permissions** — Without a config file, only the 11 read-only tools (`screenshot`, `describe_screen`, `start_recording`, `stop_recording`, `get_orientation`, `status`, `check_health`, `list_targets`, `list_skills`, `get_skill`, `calibrate_component`) are exposed. Every mutating tool — including `press_back` — is hidden from the MCP client entirely, so it never sees them.
+- **Tool permissions** — Without a config file, only the 12 read-only tools (`screenshot`, `describe_screen`, `start_recording`, `stop_recording`, `get_orientation`, `status`, `check_health`, `list_targets`, `list_skills`, `get_skill`, `calibrate_component`, `classify_screen`) are exposed. Every mutating tool — including `press_back` — is hidden from the MCP client entirely, so it never sees them.
 - **App blocking** — `blockedApps` in `permissions.json` prevents the AI from interacting with sensitive apps like Wallet or Banking, even if mutating tools are allowed.
 - **No root required** — Runs as a regular user process using the macOS CGEvent API. No daemons, no kernel extensions, no root privileges — just Accessibility permissions.
 - **Kill switch** — Close iPhone Mirroring to kill all input instantly.

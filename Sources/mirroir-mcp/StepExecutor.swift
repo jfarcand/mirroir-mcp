@@ -187,6 +187,14 @@ final class StepExecutor {
     private func executeTap(label: String, startTime: CFAbsoluteTime) -> StepResult {
         let step = SkillStep.tap(label: label)
 
+        // A tap recorded by coordinates alone (an icon with no text) has nothing to find.
+        guard !label.isEmpty else {
+            return StepResult(step: step, status: .failed,
+                              message: "tap has no element text: it was recorded by coordinates, "
+                                + "so it replays only from its compiled file, never by live OCR",
+                              durationSeconds: elapsed(startTime))
+        }
+
         guard let describeResult = describer.describe() else {
             return StepResult(step: step, status: .failed,
                               message: "Failed to capture screen for OCR",

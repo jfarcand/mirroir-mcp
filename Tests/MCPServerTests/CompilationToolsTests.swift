@@ -82,9 +82,8 @@ final class CompilationToolsTests: XCTestCase {
             confidence: nil, matchStrategy: nil,
             elapsedMs: 500, scrollCount: nil, scrollDirection: nil)
 
-        XCTAssertNotNil(hints)
-        XCTAssertEqual(hints?.compiledAction, .sleep)
-        XCTAssertEqual(hints?.observedDelayMs, 500)
+        // A sleep would pass without tapping: replay it live instead.
+        XCTAssertEqual(hints?.compiledAction, .passthrough)
     }
 
     func testDeriveHintsTapWithoutAnything() {
@@ -93,7 +92,8 @@ final class CompilationToolsTests: XCTestCase {
             confidence: nil, matchStrategy: nil,
             elapsedMs: nil, scrollCount: nil, scrollDirection: nil)
 
-        XCTAssertNil(hints)
+        // Replayed live: the element is found by OCR.
+        XCTAssertEqual(hints?.compiledAction, .passthrough)
     }
 
     func testDeriveHintsWaitFor() {
@@ -167,7 +167,8 @@ final class CompilationToolsTests: XCTestCase {
     func testDeriveHintsPassthroughTypes() {
         let passthroughTypes = [
             "launch", "type", "press_key", "swipe", "home", "open_url",
-            "shake", "reset_app", "set_network", "screenshot", "switch_target",
+            "shake", "reset_app", "set_network", "screenshot", "target",
+            "long_press", "drag",
         ]
 
         for stepType in passthroughTypes {
@@ -188,9 +189,8 @@ final class CompilationToolsTests: XCTestCase {
             confidence: nil, matchStrategy: nil,
             elapsedMs: 3500, scrollCount: nil, scrollDirection: nil)
 
-        XCTAssertNotNil(hints)
-        XCTAssertEqual(hints?.compiledAction, .sleep)
-        XCTAssertEqual(hints?.observedDelayMs, 3500)
+        // Replayed live: a sleep would pass without running the action or the check.
+        XCTAssertEqual(hints?.compiledAction, .passthrough)
     }
 
     func testDeriveHintsUnknownType() {

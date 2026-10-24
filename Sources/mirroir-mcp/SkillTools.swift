@@ -297,6 +297,33 @@ extension MirroirMCP {
         return value
     }
 
+    /// Matches `${VAR_NAME}` and `${VAR_NAME:-default_value}`.
+    static let envPlaceholderPattern =
+        "\\$\\{([A-Za-z_][A-Za-z0-9_]*)(?::-((?:[^}]|\\}(?!\\}))*?))?\\}"
+
+    /// The `${VAR}` placeholder of `source` whose environment value is exactly `value`,
+    /// or nil: the inverse of `substituteEnvVars` for one skill's value. An AI sees a
+    /// skill with its variables resolved, so a value it records (a user name, a password)
+    /// is stored as its placeholder and stays out of the compiled file. Only a whole
+    /// value is matched (a short value such as `on` must not rewrite the inside of
+    /// `Done`), and only a variable set in the environment: a default is written in the
+    /// skill itself, and mapping every label equal to it would tie unrelated steps to it.
+    static func envPlaceholder(resolvingTo value: String, in source: String) -> String? {
+        guard !value.isEmpty,
+              let regex = try? NSRegularExpression(pattern: envPlaceholderPattern) else {
+            return nil
+        }
+        let env = ProcessInfo.processInfo.environment
+        let range = NSRange(source.startIndex..., in: source)
+        for match in regex.matches(in: source, range: range) {
+            guard let fullRange = Range(match.range, in: source),
+                  let nameRange = Range(match.range(at: 1), in: source),
+                  env[String(source[nameRange])] == value else { continue }
+            return String(source[fullRange])
+        }
+        return nil
+    }
+
     /// Replace ${VAR} and ${VAR:-default} placeholders with environment variable values.
     /// When a default is specified via `:-`, it is used if the env var is unset.
     /// Unresolved variables without defaults are left as-is so the AI can flag them.
@@ -304,11 +331,9 @@ extension MirroirMCP {
         var result = text
         let env = ProcessInfo.processInfo.environment
 
-        // Match ${VAR_NAME} and ${VAR_NAME:-default_value} patterns
-        let pattern = "\\$\\{([A-Za-z_][A-Za-z0-9_]*)(?::-((?:[^}]|\\}(?!\\}))*?))?\\}"
         let regex: NSRegularExpression
         do {
-            regex = try NSRegularExpression(pattern: pattern)
+            regex = try NSRegularExpression(pattern: envPlaceholderPattern)
         } catch {
             DebugLog.log("SkillTools", "Regex compilation failed: \(error)")
             return result
@@ -339,92 +364,69 @@ extension MirroirMCP {
     }
 
     /// Resolve a skill name to a file path, supporting both exact relative paths and basename lookup.
-    /// Supports both .yaml and .md extensions. When both exist, .md takes precedence (unless yamlOnly).
-    /// When `yamlOnly` is true, only .yaml files are considered — used by the deterministic test runner
-    /// and compiler which cannot execute natural-language markdown.
+    /// Supports both .yaml and .md extensions. When both exist, .md takes precedence.
     /// Returns (resolvedPath, ambiguousMatches). If resolvedPath is non-nil, it's the unique match.
     /// If ambiguousMatches is non-empty, multiple files matched the basename.
+    /// The CLI runners resolve with `RunnerSkillResolver`, over the same copies.
     static func resolveSkill(
         name: String,
-        dirs: [String],
-        yamlOnly: Bool = false
+        dirs: [String]
     ) -> (path: String?, ambiguous: [String]) {
-        // Determine the stem and whether the user specified an extension
-        let stem: String
-        let hasExtension: Bool
-        if name.hasSuffix(".yaml") {
-            stem = String(name.dropLast(5))
-            hasExtension = true
-        } else if name.hasSuffix(".md") {
-            stem = String(name.dropLast(3))
-            hasExtension = true
-        } else {
-            stem = name
-            hasExtension = false
+        // Phase 1: exact relative path, .md across dirs first, then .yaml
+        if let exact = exactSkillCopies(name: name, dirs: dirs).first {
+            return (exact, [])
         }
+        // Phase 2: basename across all directories, one match per skill path
+        let groups = basenameSkillGroups(name: name, dirs: dirs, sameExtensionOnly: false)
+        if groups.count > 1 {
+            return (nil, groups.map(\.relPath))
+        }
+        return (groups.first?.paths.first, [])
+    }
 
-        // Phase 1: Try exact relative path match (project-local first)
-        // When yamlOnly, only try .yaml; otherwise try .md first (preferred), then .yaml
+    /// The files an exact relative skill name points at, in the order resolution weighs
+    /// them: every .md (nearer directory first), then every .yaml. A name given with its
+    /// extension points at that file only.
+    static func exactSkillCopies(name: String, dirs: [String]) -> [String] {
         let candidates: [String]
-        if hasExtension {
+        if name.hasSuffix(".yaml") || name.hasSuffix(".md") {
             candidates = [name]
-        } else if yamlOnly {
-            candidates = [stem + ".yaml"]
         } else {
-            candidates = [stem + ".md", stem + ".yaml"]
+            candidates = [name + ".md", name + ".yaml"]
         }
+        return candidates.flatMap { candidate in dirs.map { $0 + "/" + candidate } }
+            .filter { FileManager.default.fileExists(atPath: $0) }
+    }
 
-        for candidate in candidates {
-            for dir in dirs {
-                let path = dir + "/" + candidate
-                if FileManager.default.fileExists(atPath: path) {
-                    return (path, [])
-                }
-            }
-        }
+    /// Every skill whose file name matches the basename of `name`, one entry per path
+    /// under the skill dir, each with its copies nearer directory first and .md before
+    /// .yaml within one: a project-local copy overrides a global one, as
+    /// `discoverSkills` lists them. With `sameExtensionOnly`, a name given with its
+    /// extension matches only files of that extension.
+    static func basenameSkillGroups(
+        name: String, dirs: [String], sameExtensionOnly: Bool
+    ) -> [(relPath: String, paths: [String])] {
+        let fileName = (name as NSString).lastPathComponent
+        let hasExtension = name.hasSuffix(".yaml") || name.hasSuffix(".md")
+        let targetStem = hasExtension ? (fileName as NSString).deletingPathExtension : fileName
+        let wantedExtension = (name as NSString).pathExtension
 
-        // Phase 2: Try basename match across all directories
-        // Deduplicate by stem so local overrides global and .md overrides .yaml
-        let targetStem: String
-        if hasExtension {
-            targetStem = ((name as NSString).lastPathComponent as NSString).deletingPathExtension
-        } else {
-            targetStem = (name as NSString).lastPathComponent
-        }
-
-        var seenStems = Set<String>()
-        var matches: [String] = []
-
+        var fullStems: [String] = []
+        var groups: [String: (relPath: String, paths: [String])] = [:]
         for dir in dirs {
-            // When yamlOnly, only search YAML files; otherwise search all skill files
-            let files = yamlOnly ? findYAMLFiles(in: dir) : findSkillFiles(in: dir)
-            for relPath in files {
-                let basename = (relPath as NSString).lastPathComponent
-                let baseStem = skillStem(basename)
-                if baseStem == targetStem {
-                    let fullStem = skillStem(relPath)
-                    if seenStems.contains(fullStem) { continue }
-                    seenStems.insert(fullStem)
-                    matches.append(relPath)
+            for relPath in findSkillFiles(in: dir) {
+                guard skillStem((relPath as NSString).lastPathComponent) == targetStem else { continue }
+                if sameExtensionOnly, hasExtension,
+                   (relPath as NSString).pathExtension != wantedExtension { continue }
+                let fullStem = skillStem(relPath)
+                if groups[fullStem] == nil {
+                    fullStems.append(fullStem)
+                    groups[fullStem] = (relPath, [])
                 }
+                groups[fullStem]?.paths.append(dir + "/" + relPath)
             }
         }
-
-        if matches.count == 1 {
-            // Unique stem match — find which dir it's in
-            for dir in dirs {
-                let candidate = dir + "/" + matches[0]
-                if FileManager.default.fileExists(atPath: candidate) {
-                    return (candidate, [])
-                }
-            }
-        }
-
-        if matches.count > 1 {
-            return (nil, matches)
-        }
-
-        return (nil, [])
+        return fullStems.compactMap { groups[$0] }
     }
 
     /// Check compilation status for a skill file and return a status string.
@@ -436,15 +438,8 @@ extension MirroirMCP {
             return "[Not compiled \u{2014} use record_step after each step to compile]"
         }
 
-        // Version check
-        if compiled.version != CompiledSkill.currentVersion {
-            return "[Compiled: stale \u{2014} compiled version \(compiled.version) != current \(CompiledSkill.currentVersion)]"
-        }
-
-        // Source hash check
-        if let currentHash = try? CompiledSkillIO.sha256(of: skillPath),
-           currentHash != compiled.source.sha256 {
-            return "[Compiled: stale \u{2014} source file has changed since compilation]"
+        if let reason = CompiledSkillIO.sourceStaleness(compiled: compiled, skillPath: skillPath) {
+            return "[Compiled: stale \u{2014} \(reason)]"
         }
 
         return "[Compiled: fresh]"

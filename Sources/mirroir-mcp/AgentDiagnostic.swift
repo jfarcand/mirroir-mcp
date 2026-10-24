@@ -38,6 +38,17 @@ enum AgentDiagnostic {
         describer: ScreenDescribing
     ) -> Recommendation? {
         guard let hints = compiledStep.hints else { return nil }
+        // A compiled label is the step's replay value (e.g. `"General" timeout: 30`).
+        // The screen is matched against the element text of the step that ran, whose
+        // `${VAR}` values are resolved; the report and the AI payload show the text
+        // parsed from the stored label instead, with placeholders, so a secret stays out.
+        let matchLabel = step.labelValue ?? ""
+        let compiledStep = CompiledStep(
+            index: compiledStep.index, type: compiledStep.type,
+            label: compiledStep.label.map { label in
+                SkillParser.parseStep(key: compiledStep.type, rawValue: label).labelValue ?? label
+            },
+            hints: hints)
 
         // Run one OCR call to see the actual screen
         guard let screen = describer.describe() else {
@@ -55,15 +66,15 @@ enum AgentDiagnostic {
 
         switch hints.compiledAction {
         case .tap:
-            return diagnoseTap(compiledStep: compiledStep, hints: hints,
+            return diagnoseTap(compiledStep: compiledStep, matchLabel: matchLabel, hints: hints,
                                screen: screen, failureMessage: failureMessage,
                                screenshot: screenshot)
         case .sleep, .assertion:
-            return diagnoseSleep(compiledStep: compiledStep, hints: hints,
+            return diagnoseSleep(compiledStep: compiledStep, matchLabel: matchLabel, hints: hints,
                                  screen: screen, failureMessage: failureMessage,
                                  screenshot: screenshot)
         case .scrollSequence:
-            return diagnoseScroll(compiledStep: compiledStep, hints: hints,
+            return diagnoseScroll(compiledStep: compiledStep, matchLabel: matchLabel, hints: hints,
                                   screen: screen, failureMessage: failureMessage,
                                   screenshot: screenshot)
         case .passthrough:
@@ -77,6 +88,7 @@ enum AgentDiagnostic {
 
     private static func diagnoseTap(
         compiledStep: CompiledStep,
+        matchLabel: String,
         hints: StepHints,
         screen: ScreenDescriber.DescribeResult,
         failureMessage: String?,
@@ -87,7 +99,7 @@ enum AgentDiagnostic {
         let compiledY = hints.tapY ?? 0
 
         // Check if the target element is still on screen but at different coordinates
-        if let match = ElementMatcher.findMatch(label: label, in: screen.elements) {
+        if let match = ElementMatcher.findMatch(label: matchLabel, in: screen.elements) {
             let dx = abs(match.element.tapX - compiledX)
             let dy = abs(match.element.tapY - compiledY)
 
@@ -131,6 +143,7 @@ enum AgentDiagnostic {
 
     private static func diagnoseSleep(
         compiledStep: CompiledStep,
+        matchLabel: String,
         hints: StepHints,
         screen: ScreenDescriber.DescribeResult,
         failureMessage: String?,
@@ -140,7 +153,7 @@ enum AgentDiagnostic {
 
         // For assert_visible compiled as sleep — check if element is actually visible
         if compiledStep.type == "assert_visible" || compiledStep.type == "wait_for" {
-            if ElementMatcher.isVisible(label: label, in: screen.elements) {
+            if ElementMatcher.isVisible(label: matchLabel, in: screen.elements) {
                 let delayMs = hints.observedDelayMs ?? 0
                 return Recommendation(
                     stepIndex: compiledStep.index,
@@ -167,7 +180,7 @@ enum AgentDiagnostic {
         }
 
         if compiledStep.type == "assert_not_visible" {
-            if !ElementMatcher.isVisible(label: label, in: screen.elements) {
+            if !ElementMatcher.isVisible(label: matchLabel, in: screen.elements) {
                 return Recommendation(
                     stepIndex: compiledStep.index,
                     stepType: compiledStep.type,
@@ -202,6 +215,7 @@ enum AgentDiagnostic {
 
     private static func diagnoseScroll(
         compiledStep: CompiledStep,
+        matchLabel: String,
         hints: StepHints,
         screen: ScreenDescriber.DescribeResult,
         failureMessage: String?,
@@ -210,7 +224,7 @@ enum AgentDiagnostic {
         let label = compiledStep.label ?? ""
         let compiledCount = hints.scrollCount ?? 0
 
-        if ElementMatcher.isVisible(label: label, in: screen.elements) {
+        if ElementMatcher.isVisible(label: matchLabel, in: screen.elements) {
             return Recommendation(
                 stepIndex: compiledStep.index,
                 stepType: compiledStep.type,

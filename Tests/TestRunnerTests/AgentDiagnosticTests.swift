@@ -130,6 +130,63 @@ struct AgentDiagnosticTests {
 
     // MARK: - Sleep Diagnosis (wait_for / assert_visible)
 
+    @Test("wait_for with a timeout: matches the element, not the compiled replay value")
+    func waitForWithTimeoutMatchesTheElementText() {
+        let hints = StepHints.sleep(delayMs: 500)
+        let compiled = CompiledStep(index: 1, type: "wait_for",
+                                    label: "\"General\" timeout: 30", hints: hints)
+        let step = SkillStep.waitFor(label: "General", timeoutSeconds: 30)
+
+        let describer = makeDescriber(elements: [
+            makeTapPoint("General", x: 200, y: 340)
+        ])
+
+        let result = AgentDiagnostic.diagnose(
+            step: step, compiledStep: compiled,
+            failureMessage: nil, describer: describer)
+
+        #expect(result?.label == "General")
+        #expect(result?.diagnosis.contains("not found") == false)
+    }
+
+    @Test("A failed step's report keeps the ${VAR} placeholder, never the resolved value")
+    func reportKeepsThePlaceholder() {
+        let compiled = CompiledStep(index: 0, type: "type",
+                                    label: "${PASSWORD}", hints: .passthrough())
+        let step = SkillStep.type(text: "hunter2")
+
+        let result = AgentDiagnostic.diagnose(
+            step: step, compiledStep: compiled,
+            failureMessage: "keyboard not up", describer: makeDescriber(elements: []))
+
+        #expect(result?.label == "${PASSWORD}")
+        #expect(result?.diagnosis.contains("hunter2") == false)
+    }
+
+    @Test("Matches the screen against the resolved value, reports the placeholder")
+    func matchesResolvedReportsPlaceholder() {
+        let compiled = CompiledStep(index: 2, type: "wait_for",
+                                    label: "${ACCOUNT}", hints: .sleep(delayMs: 500))
+        let step = SkillStep.waitFor(label: "Alice Smith", timeoutSeconds: nil)
+
+        let result = AgentDiagnostic.diagnose(
+            step: step, compiledStep: compiled, failureMessage: nil,
+            describer: makeDescriber(elements: [makeTapPoint("Alice Smith", x: 200, y: 300)]))
+
+        #expect(result?.label == "${ACCOUNT}")
+        #expect(result?.diagnosis.contains("not visible") == false)
+    }
+
+    @Test("A step recorded without a label is reported without one")
+    func missingLabelStaysMissing() {
+        let compiled = CompiledStep(index: 0, type: "home", label: nil, hints: .passthrough())
+        let result = AgentDiagnostic.diagnose(
+            step: .home, compiledStep: compiled, failureMessage: "no home",
+            describer: makeDescriber(elements: []))
+        #expect(result != nil)
+        #expect(result?.label == nil)
+    }
+
     @Test("wait_for: element visible suggests increasing delay")
     func waitForElementVisibleSuggestsLongerDelay() {
         let hints = StepHints.sleep(delayMs: 500)

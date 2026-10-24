@@ -266,6 +266,18 @@ enum SkillParser {
             .trimmingCharacters(in: .whitespaces)
         let rawValue = String(trimmed[trimmed.index(after: colonIndex)...])
             .trimmingCharacters(in: .whitespaces)
+        return parseStep(key: key, rawValue: rawValue)
+    }
+
+    /// Why a step whose type no skill step has (e.g. a tool such as press_back) is invalid.
+    static let unknownStepTypeReason = "unknown step type"
+
+    /// Step types only an AI can interpret; the runner skips them.
+    static let aiOnlyStepTypes: Set<String> = ["remember", "condition", "repeat", "verify", "summarize"]
+
+    /// Parse one step from its type key and raw value, the two halves of
+    /// `key: value`. Also rebuilds a step from a compiled step's type and label.
+    static func parseStep(key: String, rawValue: String) -> SkillStep {
         let value = stripQuotes(rawValue)
 
         switch key {
@@ -303,7 +315,7 @@ enum SkillParser {
             return parseLongPress(value)
         case "drag":
             return parseDrag(value)
-        case "target":
+        case "target", "switch_target":
             switch TargetSelector.parse(rawValue) {
             case .success(let selector): return .switchTarget(selector)
             case .failure(let error):
@@ -312,163 +324,12 @@ enum SkillParser {
         case "measure":
             return parseMeasure(value)
         // AI-only steps that cannot run deterministically
-        case "remember", "condition", "repeat", "verify", "summarize":
+        case _ where aiOnlyStepTypes.contains(key):
             return .skipped(stepType: key,
                             reason: "AI-only step — requires human interpretation")
         default:
-            return .invalid(stepType: key, reason: "unknown step type")
+            return .invalid(stepType: key, reason: unknownStepTypeReason)
         }
-    }
-
-    /// Parse a press_key value which may include modifiers.
-    /// Formats: `"return"`, `"l" modifiers: ["command"]`, `"l+command"`
-    private static func parsePressKey(_ value: String) -> SkillStep {
-        // Check for dict-style modifiers: "key" modifiers: ["mod1", "mod2"]
-        if let modRange = value.range(of: #" modifiers: \["#, options: .regularExpression) {
-            let keyName = stripQuotes(
-                String(value[value.startIndex..<modRange.lowerBound])
-                    .trimmingCharacters(in: .whitespaces)
-            )
-            // Extract the bracket contents: everything between [ and ]
-            let afterBracket = value[modRange.upperBound...]
-            if let closeBracket = afterBracket.firstIndex(of: "]") {
-                let bracketContent = String(afterBracket[afterBracket.startIndex..<closeBracket])
-                let modifiers = bracketContent
-                    .split(separator: ",")
-                    .map { stripQuotes(String($0).trimmingCharacters(in: .whitespaces)) }
-                    .filter { !$0.isEmpty }
-                return .pressKey(keyName: keyName, modifiers: modifiers)
-            }
-        }
-
-        // Check for inline modifiers: "key+mod1+mod2"
-        if value.contains("+") {
-            let parts = value.split(separator: "+").map {
-                String($0).trimmingCharacters(in: .whitespaces)
-            }
-            let keyName = parts[0]
-            let modifiers = Array(parts.dropFirst())
-            return .pressKey(keyName: keyName, modifiers: modifiers)
-        }
-
-        return .pressKey(keyName: value, modifiers: [])
-    }
-
-    /// Parse a wait_for value which may include a timeout.
-    /// Formats: `"General"`, `"General" timeout: 30`
-    private static func parseWaitFor(_ value: String) -> SkillStep {
-        // Check for timeout suffix: "label" timeout: 30
-        if let timeoutRange = value.range(of: #" timeout: "#, options: .regularExpression) {
-            let label = stripQuotes(
-                String(value[value.startIndex..<timeoutRange.lowerBound])
-                    .trimmingCharacters(in: .whitespaces)
-            )
-            let timeoutStr = String(value[timeoutRange.upperBound...])
-                .trimmingCharacters(in: .whitespaces)
-            let timeout = Int(timeoutStr)
-            return .waitFor(label: label, timeoutSeconds: timeout)
-        }
-
-        return .waitFor(label: value, timeoutSeconds: nil)
-    }
-
-    /// Parse a long_press value which may include a duration.
-    /// Formats: `"Element"`, `"Element" duration: 1000`
-    private static func parseLongPress(_ value: String) -> SkillStep {
-        if let durationRange = value.range(of: #" duration: "#, options: .regularExpression) {
-            let label = stripQuotes(
-                String(value[value.startIndex..<durationRange.lowerBound])
-                    .trimmingCharacters(in: .whitespaces)
-            )
-            let durationStr = String(value[durationRange.upperBound...])
-                .trimmingCharacters(in: .whitespaces)
-            let duration = Int(durationStr)
-            return .longPress(label: label, durationMs: duration)
-        }
-        return .longPress(label: value, durationMs: nil)
-    }
-
-    /// Parse a drag value with from/to labels.
-    /// Format: `{ from: "Source", to: "Target" }`
-    private static func parseDrag(_ value: String) -> SkillStep {
-        var inner = value
-        if inner.hasPrefix("{") && inner.hasSuffix("}") {
-            inner = String(inner.dropFirst().dropLast())
-        }
-
-        let parts = inner.components(separatedBy: ",").map {
-            $0.trimmingCharacters(in: .whitespaces)
-        }
-
-        var fromLabel = ""
-        var toLabel = ""
-
-        for part in parts {
-            guard let colonIdx = part.firstIndex(of: ":") else { continue }
-            let key = String(part[part.startIndex..<colonIdx])
-                .trimmingCharacters(in: .whitespaces)
-            let val = stripQuotes(
-                String(part[part.index(after: colonIdx)...])
-                    .trimmingCharacters(in: .whitespaces)
-            )
-            switch key {
-            case "from": fromLabel = val
-            case "to": toLabel = val
-            default: break
-            }
-        }
-
-        if fromLabel.isEmpty && toLabel.isEmpty {
-            return .skipped(stepType: "drag", reason: "Missing from/to labels")
-        }
-        return .drag(fromLabel: fromLabel, toLabel: toLabel)
-    }
-
-    /// Parse a measure step value.
-    /// Format: `{ tap: "Login", until: "Dashboard", max: 5, name: "login_time" }`
-    private static func parseMeasure(_ value: String) -> SkillStep {
-        var inner = value
-        // Strip surrounding braces if present
-        if inner.hasPrefix("{") && inner.hasSuffix("}") {
-            inner = String(inner.dropFirst().dropLast())
-        }
-
-        // Extract components separated by commas
-        let parts = inner.components(separatedBy: ",").map {
-            $0.trimmingCharacters(in: .whitespaces)
-        }
-
-        var actionStep: SkillStep?
-        var until = ""
-        var maxSeconds: Double?
-        var name = "measure"
-
-        for part in parts {
-            guard let colonIdx = part.firstIndex(of: ":") else { continue }
-            let key = String(part[part.startIndex..<colonIdx])
-                .trimmingCharacters(in: .whitespaces)
-            let val = String(part[part.index(after: colonIdx)...])
-                .trimmingCharacters(in: .whitespaces)
-            let stripped = stripQuotes(val)
-
-            switch key {
-            case "until":
-                until = stripped
-            case "max":
-                maxSeconds = Double(stripped)
-            case "name":
-                name = stripped
-            default:
-                // Try to parse as an action step (e.g., tap: "Login")
-                if let step = parseStep(part) {
-                    actionStep = step
-                }
-            }
-        }
-
-        let action = actionStep ?? .skipped(stepType: "measure",
-                                             reason: "No action found in measure step")
-        return .measure(name: name, action: action, until: until, maxSeconds: maxSeconds)
     }
 
     /// Strip surrounding quotes from a value string.

@@ -38,6 +38,19 @@ final class CompiledStepExecutorTests: XCTestCase {
 
     // MARK: - Compiled Tap
 
+    func testACoordinateOnlyTapUsesItsCoordinatesWhateverTheConfidence() {
+        let compiledStep = CompiledStep(
+            index: 0, type: "tap", label: nil,
+            hints: .tap(x: 40.0, y: 880.0, confidence: 0.0, strategy: "unknown"))
+
+        let result = compiledExecutor.execute(
+            step: .tap(label: ""), compiledStep: compiledStep, stepIndex: 0, skillName: "test")
+
+        XCTAssertEqual(result.status, .passed)
+        XCTAssertEqual(input.tapCalls.count, 1)
+        XCTAssertEqual(input.tapCalls[0].x, 40.0)
+    }
+
     func testCompiledTapUsesCachedCoordinates() {
         let step = SkillStep.tap(label: "General")
         let compiledStep = CompiledStep(

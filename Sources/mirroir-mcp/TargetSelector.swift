@@ -98,17 +98,34 @@ enum TargetSelector: Equatable, Sendable {
         }
     }
 
-    /// Split a flow-map body on commas that sit outside double quotes.
-    private static func splitTopLevel(_ body: String) -> [String] {
+    /// Split a flow-map body on commas that sit outside quotes. A double-quoted value
+    /// can hold a `'` and a single-quoted one a `"` (mirroir-run single-quotes a value
+    /// that holds `"`). Also used by the skill parser for `drag` and `measure` maps,
+    /// whose values can hold commas.
+    static func splitTopLevel(_ body: String) -> [String] {
         var entries: [String] = []
         var current = ""
-        var inQuotes = false
+        var openQuote: Character?
         var previous: Character?
+        // Whether only spaces follow the last `:` or `,`: a `'` opens a quoted value
+        // only there, so an apostrophe inside a bare value (`Don't Allow`) stays text.
+        var atValueStart = true
         for char in body {
-            if char == "\"" && previous != "\\" {
-                inQuotes.toggle()
+            if char == "\"" || char == "'", previous != "\\" {
+                if openQuote == char {
+                    openQuote = nil
+                } else if openQuote == nil, char == "\"" || atValueStart {
+                    openQuote = char
+                }
             }
-            if char == "," && !inQuotes {
+            if openQuote == nil {
+                if char == ":" || char == "," {
+                    atValueStart = true
+                } else if char != " " {
+                    atValueStart = false
+                }
+            }
+            if char == "," && openQuote == nil {
                 entries.append(current)
                 current = ""
             } else {

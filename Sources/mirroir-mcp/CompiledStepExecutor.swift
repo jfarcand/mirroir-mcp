@@ -25,7 +25,8 @@ final class CompiledStepExecutor {
          input: InputProviding,
          describer: ScreenDescribing,
          capture: ScreenCapturing,
-         config: StepExecutorConfig = .default) {
+         config: StepExecutorConfig = .default,
+         registry: TargetRegistry? = nil) {
         self.bridge = bridge
         self.input = input
         self.describer = describer
@@ -34,7 +35,8 @@ final class CompiledStepExecutor {
         self.normalExecutor = StepExecutor(
             bridge: bridge, input: input,
             describer: describer, capture: capture,
-            config: config
+            config: config,
+            registry: registry
         )
     }
 
@@ -75,9 +77,12 @@ final class CompiledStepExecutor {
                             stepIndex: Int, skillName: String,
                             startTime: CFAbsoluteTime) -> StepResult {
         // Confidence gating: if compiled confidence is below threshold, fall back to live OCR
+        // A tap recorded by coordinates alone (an icon with no text) has nothing for OCR
+        // to find, so its coordinates are used whatever the confidence.
         let confidence = Double(hints.confidence ?? 1.0)
         let minConfidence = EnvConfig.compiledTapMinConfidence
-        if confidence < minConfidence {
+        let hasLabel = !(step.labelValue ?? "").isEmpty
+        if confidence < minConfidence && hasLabel {
             fputs("  Warning: compiled tap confidence \(String(format: "%.2f", confidence)) < \(String(format: "%.2f", minConfidence)) — falling back to live OCR\n", stderr)
             return normalExecutor.execute(step: step, stepIndex: stepIndex,
                                            skillName: skillName)

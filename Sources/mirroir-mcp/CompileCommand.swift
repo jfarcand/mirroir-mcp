@@ -13,6 +13,36 @@ import HelperLib
 /// Usage: `mirroir-mcp compile [options] <skill...>`
 enum CompileCommand {
 
+    /// Whether `skill` is a SKILL.md holding a tap recorded by coordinates alone (an icon
+    /// with no text): a live run cannot find it, so it is recompiled only through an MCP
+    /// client.
+    static func hasCoordinateOnlyTap(_ skill: SkillDefinition) -> Bool {
+        skill.filePath.hasSuffix(".md") && skill.steps.contains {
+            if case .tap(let label) = $0 { return label.isEmpty }
+            return false
+        }
+    }
+
+    /// The resolved skill files `mirroir compile` compiles: every file named by path or
+    /// skill name, and of the rest (found by discovery or a glob) only YAML skills whose
+    /// compiled file is not their SKILL.md twin's.
+    /// Each file left out is reported with its reason.
+    static func filesToCompile(_ resolved: [String], named: Set<String>) -> [String] {
+        resolved.filter { path in
+            if named.contains(path) { return true }
+            if path.hasSuffix(".md") {
+                fputs("Skipping \(path): a SKILL.md is recompiled only when named\n", stderr)
+                return false
+            }
+            if let owner = CompiledSkillIO.skillMdTwinOwningCompiledFile(for: path) {
+                fputs("Skipping \(path): \(CompiledSkillIO.compiledPath(for: path)) holds the "
+                    + "recorded steps of \(owner)\n", stderr)
+                return false
+            }
+            return true
+        }
+    }
+
     /// Parse arguments and run the compiler. Returns exit code (0 = success, 1 = error).
     static func run(arguments: [String]) -> Int32 {
         let config = parseArguments(arguments)
@@ -25,7 +55,17 @@ enum CompileCommand {
         // Resolve skill files
         let skillFiles: [String]
         do {
-            skillFiles = try TestRunner.resolveSkillFiles(config.skillArgs)
+            // A SKILL.md is recompiled only when named (not found by discovery or a
+            // glob): its steps come from what an AI recorded (a coordinate tap on an
+            // icon, say), which a live OCR run may not find again. Nor is a YAML skill
+            // whose compiled file holds its SKILL.md twin's steps, which compiling would
+            // overwrite, unless named: it is then refused below with that reason.
+            let resolved = try TestRunner.resolveSkillFiles(config.skillArgs)
+            var named = Set<String>()
+            for arg in config.skillArgs where !arg.contains("*") {
+                named.formUnion(try TestRunner.resolveSkillFiles([arg]))
+            }
+            skillFiles = filesToCompile(resolved, named: named)
         } catch {
             fputs("Error: \(error.localizedDescription)\n", stderr)
             return 1
@@ -63,10 +103,12 @@ enum CompileCommand {
             dryRun: false
         )
 
+        // The registry resolves `target:` steps; without it the first one fails.
         let executor = StepExecutor(
             bridge: bridge, input: input,
             describer: recordingDescriber, capture: capture,
-            config: executorConfig
+            config: executorConfig,
+            registry: MirroirMCP.buildTargetRegistry()
         )
 
         let windowWidth = Double(windowInfo.size.width)
@@ -81,9 +123,9 @@ enum CompileCommand {
         for filePath in skillFiles {
             let skill: SkillDefinition
             do {
-                skill = try SkillParser.parse(filePath: filePath)
+                skill = try SkillFileLoader.load(filePath: filePath)
             } catch {
-                fputs("Error parsing \(filePath): \(error.localizedDescription)\n", stderr)
+                fputs("Error loading \(filePath): \(error.localizedDescription)\n", stderr)
                 anyFailed = true
                 continue
             }
@@ -91,6 +133,22 @@ enum CompileCommand {
             if skill.kind == "game" {
                 fputs("Skipping \(skill.name): kind:game is model-interpreted — "
                     + "never compiled to a .compiled.json.\n", stderr)
+                continue
+            }
+
+            if hasCoordinateOnlyTap(skill) {
+                fputs("Refusing to compile \(filePath): it has a tap recorded by coordinates, "
+                    + "which a live run cannot find; recompile it through an MCP client.\n", stderr)
+                anyFailed = true
+                continue
+            }
+
+            // A YAML skill and a SKILL.md of the same stem share one compiled file, and
+            // for the SKILL.md it holds the only replayable copy of its steps.
+            if let owner = CompiledSkillIO.skillMdTwinOwningCompiledFile(for: filePath) {
+                fputs("Refusing to compile \(filePath): \(CompiledSkillIO.compiledPath(for: filePath)) "
+                    + "holds the recorded steps of \(owner), which it would overwrite.\n", stderr)
+                anyFailed = true
                 continue
             }
 
@@ -150,6 +208,13 @@ enum CompileCommand {
             sourceHash = ""
         }
 
+        // Labels come from the skill with `${VAR}` placeholders unresolved, so a value
+        // such as a password never lands in the compiled file.
+        let placeholderSteps = (try? SkillFileLoader.load(
+            filePath: filePath, substitutingEnv: false))?.steps
+        let labelSteps = placeholderSteps?.count == skill.steps.count
+            ? placeholderSteps ?? skill.steps : skill.steps
+
         for (index, step) in skill.steps.enumerated() {
             let startTime = CFAbsoluteTimeGetCurrent()
             let result = executor.execute(step: step, stepIndex: index,
@@ -175,7 +240,9 @@ enum CompileCommand {
             compiledSteps.append(CompiledStep(
                 index: index,
                 type: step.typeKey,
-                label: step.labelValue,
+                // A value no replay form carries (one holding both quote characters)
+                // keeps at least its element text, with its placeholders.
+                label: labelSteps[index].replayValue ?? labelSteps[index].labelValue,
                 hints: hints
             ))
         }
@@ -219,7 +286,8 @@ enum CompileCommand {
                            confidence: match.element.confidence,
                            strategy: match.strategy.rawValue)
             }
-            return .sleep(delayMs: elapsedMs)
+            // No cached match: replay it live. A sleep would pass without tapping.
+            return .passthrough()
 
         case .waitFor:
             return .sleep(delayMs: elapsedMs)
@@ -233,25 +301,16 @@ enum CompileCommand {
             return .scrollSequence(count: scrollCount, direction: direction)
 
         case .measure:
-            // Measure steps compile the observed total time as a sleep
-            return .sleep(delayMs: elapsedMs)
+            // Replayed live: a sleep would pass without running the action or the check.
+            return .passthrough()
 
         case .skipped, .invalid:
             // AI-only steps cannot be compiled
             return nil
 
-        case .longPress(let label, _):
-            // Compile like tap — cached coordinates from OCR
-            if let lastResult = describer.lastResult,
-               let match = ElementMatcher.findMatch(label: label, in: lastResult.elements) {
-                return .tap(x: match.element.tapX, y: match.element.tapY,
-                           confidence: match.element.confidence,
-                           strategy: match.strategy.rawValue)
-            }
-            return .passthrough()
-
-        case .drag:
-            // Drag requires two OCR lookups at runtime — compile as passthrough
+        case .longPress, .drag:
+            // A compiled tap would replay a long press as a short tap, and a drag needs
+            // two OCR lookups at runtime: both replay live through the normal executor.
             return .passthrough()
 
         // Steps that are already OCR-free

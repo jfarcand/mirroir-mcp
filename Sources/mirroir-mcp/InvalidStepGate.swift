@@ -22,10 +22,24 @@ enum InvalidStepGate {
     static func scan(skills: [SkillDefinition]) -> [Finding] {
         skills.flatMap { skill in
             skill.steps.enumerated().compactMap { index, step in
-                guard case .invalid(let stepType, let reason) = step else { return nil }
+                guard let unreadable = unreadable(step) else { return nil }
                 return Finding(skillName: skill.name, filePath: skill.filePath,
-                               stepIndex: index, stepType: stepType, reason: reason)
+                               stepIndex: index, stepType: unreadable.stepType,
+                               reason: unreadable.reason)
             }
+        }
+    }
+
+    /// The type and reason of a step the parser could not read, looking inside a
+    /// measure at the action it times; nil for a readable step.
+    static func unreadable(_ step: SkillStep) -> (stepType: String, reason: String)? {
+        switch step {
+        case .invalid(let stepType, let reason):
+            return (stepType, reason)
+        case .measure(_, let action, _, _):
+            return unreadable(action).map { ("measure", "action \($0.stepType): \($0.reason)") }
+        default:
+            return nil
         }
     }
 

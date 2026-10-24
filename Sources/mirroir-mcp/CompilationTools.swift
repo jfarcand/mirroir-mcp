@@ -20,13 +20,27 @@ final class CompilationSession: @unchecked Sendable {
         steps.append(step)
     }
 
-    /// Return all accumulated steps and clear the session.
+    /// Return the accumulated steps, one per index in step order, and clear the session.
     func finalizeAndClear() -> [CompiledStep] {
         lock.lock()
         defer { lock.unlock() }
-        let result = steps
+        let result = CompiledSkillIO.normalizedSteps(steps)
         steps = []
         return result
+    }
+
+    /// The steps recorded so far, one per index in step order, without clearing them.
+    var recordedSteps: [CompiledStep] {
+        lock.lock()
+        defer { lock.unlock() }
+        return CompiledSkillIO.normalizedSteps(steps)
+    }
+
+    /// Step indices not recorded yet, between 0 and the highest one recorded.
+    var missingIndices: [ClosedRange<Int>] {
+        lock.lock()
+        defer { lock.unlock() }
+        return CompiledSkillIO.missingIndices(CompiledSkillIO.normalizedSteps(steps))
     }
 
     /// Number of steps recorded so far.
@@ -74,11 +88,22 @@ extension MirroirMCP {
                         "description": .string(
                             "Step type (tap, wait_for, launch, type, press_key, swipe, " +
                             "scroll_to, assert_visible, assert_not_visible, home, open_url, " +
-                            "shake, reset_app, set_network, screenshot, switch_target, measure)"),
+                            "shake, reset_app, set_network, screenshot, long_press, drag, " +
+                            "target, measure)"),
                     ]),
                     "label": .object([
                         "type": .string("string"),
-                        "description": .string("Human-readable label from the step. Optional."),
+                        "description": .string(
+                            "The step's value, written as the skill step's value, which replay " +
+                            "rebuilds the step from: the element to tap, wait for or assert, the " +
+                            "app to launch or reset, the text to type, the key to press " +
+                            "(\"l+command\" with modifiers), the swipe direction, the URL, the " +
+                            "network mode, `\"Element\" duration: 1000` for long_press, " +
+                            "`{ from: \"A\", to: \"B\" }` for drag, `{ kind: ios, app: \"Notes\" }` " +
+                            "for target, `{ tap: \"Login\", until: \"Dashboard\", max: 5, " +
+                            "name: \"login_time\" }` for measure. Omit for home and shake. " +
+                            "save_compiled stores a value the skill takes from `${VAR}` as that " +
+                            "placeholder, so secrets stay out of the compiled file."),
                     ]),
                     "tap_x": .object([
                         "type": .string("number"),
@@ -115,11 +140,27 @@ extension MirroirMCP {
                 guard let stepIndex = args["step_index"]?.asInt() else {
                     return .error("Missing required parameter: step_index (integer)")
                 }
-                guard let stepType = args["type"]?.asString() else {
+                guard stepIndex >= 0 else {
+                    return .error("step_index must be 0 or more, got \(stepIndex)")
+                }
+                guard let recordedType = args["type"]?.asString() else {
                     return .error("Missing required parameter: type (string)")
                 }
 
                 let label = args["label"]?.asString()
+                // Replay rebuilds the step from type and label, so refuse a pair the
+                // skill parser cannot read rather than saving a step that cannot run.
+                // Replay rebuilds the step from type and label. A step done with a tool
+                // that has no skill step type (press_back, double_tap, ...) is still
+                // recorded, so an MCP compile completes, but `mirroir test` cannot replay
+                // it and refuses the skill with this reason.
+                let parsed = SkillParser.parseStep(key: recordedType, rawValue: label ?? "")
+                let replayNote = InvalidStepGate.unreadable(parsed).map {
+                    " Note: `mirroir test` cannot replay this step (\($0.reason))."
+                } ?? ""
+                // Store the canonical type (an alias such as press_home becomes home),
+                // so hints and replay agree on what the step is.
+                let stepType = parsed.typeKey
                 let tapX = args["tap_x"]?.asNumber()
                 let tapY = args["tap_y"]?.asNumber()
                 let confidence = args["confidence"]?.asNumber().map { Float($0) }
@@ -145,7 +186,8 @@ extension MirroirMCP {
                 } else {
                     actionDesc = "AI-only (no hints)"
                 }
-                return .text("Recorded step \(stepIndex): \(stepType) '\(label ?? "")' (\(actionDesc))")
+                return .text("Recorded step \(stepIndex): \(stepType) '\(label ?? "")' (\(actionDesc))"
+                    + replayNote)
             }
         ))
     }
@@ -193,6 +235,14 @@ extension MirroirMCP {
                 if stepCount == 0 {
                     return .error("No steps recorded. Call record_step before save_compiled.")
                 }
+                // Replay pairs steps by position, so a gap would shift every later
+                // step onto the wrong hints. The session is kept for the retry.
+                let missing = session.missingIndices
+                if !missing.isEmpty {
+                    return .error("No step recorded at index \(CompiledSkillIO.describe(missing)). "
+                        + "Call record_step for "
+                        + "every step, AI-only ones included, then save_compiled again.")
+                }
 
                 // Resolve skill path
                 let dirs = PermissionPolicy.skillDirs
@@ -233,8 +283,34 @@ extension MirroirMCP {
 
                 let fingerprint = captureScreenFingerprint(target: target)
 
-                // Build compiled skill
-                let steps = session.finalizeAndClear()
+                // A SKILL.md replays only from what was recorded, so each step must hold
+                // what it needs to run (a YAML skill keeps its steps in its own file).
+                // The session is kept so the AI can record the step again.
+                if skillPath.hasSuffix(".md") {
+                    let problems = skillMdReplayProblems(session.recordedSteps)
+                    if !problems.isEmpty {
+                        return .error("Cannot save a SKILL.md that would not replay:\n"
+                            + problems.joined(separator: "\n")
+                            + "\nCall record_step again for these steps, then save_compiled.")
+                    }
+                }
+
+                // A YAML twin's compiled file holds a SKILL.md's only replayable steps.
+                // The session is kept so the AI can save under the right name.
+                if let owner = CompiledSkillIO.skillMdTwinOwningCompiledFile(for: skillPath) {
+                    return .error("\(CompiledSkillIO.compiledPath(for: skillPath)) holds the "
+                        + "recorded steps of \(owner); saving \(skillName) would overwrite them.")
+                }
+
+                // Build compiled skill. Each value the skill takes from a `${VAR}`
+                // placeholder is stored as that placeholder, field by field.
+                let source = (try? String(contentsOfFile: skillPath, encoding: .utf8)) ?? ""
+                let steps = session.finalizeAndClear().map { step in
+                    CompiledStep(
+                        index: step.index, type: step.type,
+                        label: step.label.map { storedLabel($0, type: step.type, source: source) },
+                        hints: step.hints)
+                }
                 let compiled = CompiledSkill(
                     version: CompiledSkill.currentVersion,
                     source: SourceInfo(
@@ -280,6 +356,74 @@ extension MirroirMCP {
 
     // MARK: - Hint Derivation
 
+    /// The label save_compiled writes for a recorded step: each value the skill takes
+    /// from a `${VAR}` in `source` is swapped back for that placeholder. A step that
+    /// rebuilds whole is rewritten field by field into its replay value; any other
+    /// label is kept as recorded, with a whole-value match still swapped.
+    static func storedLabel(_ label: String, type: String, source: String) -> String {
+        let parsed = SkillParser.parseStep(key: type, rawValue: label)
+        guard recordProblem(parsed) == nil,
+              InvalidStepGate.unreadable(parsed) == nil,
+              let rewritten = parsed
+                .mappingValues({ envPlaceholder(resolvingTo: $0, in: source) ?? $0 })
+                .replayValue else {
+            return envPlaceholder(resolvingTo: label, in: source) ?? label
+        }
+        return rewritten
+    }
+
+    /// What keeps recorded steps from replaying as a SKILL.md, one line per step:
+    /// each must rebuild, from its type and label, into a step that can run.
+    /// A tap recorded by coordinates alone needs no label: it replays from its hint.
+    static func skillMdReplayProblems(_ steps: [CompiledStep]) -> [String] {
+        steps.compactMap { step in
+            let parsed = SkillParser.parseStep(key: step.type, rawValue: step.label ?? "")
+            if case .tap(let label) = parsed, label.isEmpty,
+               step.hints?.compiledAction == .tap, step.hints?.tapX != nil, step.hints?.tapY != nil {
+                return nil
+            }
+            return recordProblem(parsed).map { "step \(step.index) (\(step.type)): \($0)" }
+        }
+    }
+
+    /// Why a recorded step cannot be replayed, or nil when it can: the parser could not
+    /// read it, or a measure has no action to run or no element to wait for.
+    static func recordProblem(_ step: SkillStep) -> String? {
+        switch step {
+        case .invalid(_, let reason):
+            // A type with no skill step: recorded for the MCP side, refused by
+            // `mirroir test` with its reason. Re-recording cannot change it. Any
+            // other invalid value (a malformed target selector) can be recorded again.
+            return reason == SkillParser.unknownStepTypeReason ? nil : reason
+        case .skipped(let stepType, let reason):
+            // An AI-only step is recorded without hints; any other skipped step is a
+            // value the parser could not use (e.g. a drag without from/to).
+            return SkillParser.aiOnlyStepTypes.contains(stepType) ? nil : reason
+        case .launch(let value), .tap(let value), .type(let value), .swipe(let value),
+             .waitFor(let value, _), .assertVisible(let value), .assertNotVisible(let value),
+             .openURL(let value), .resetApp(let value), .setNetwork(let value),
+             .scrollTo(let value, _, _), .longPress(let value, _):
+            return value.isEmpty
+                ? "a \(step.typeKey) step needs its value in `label` (the element, app, text, ...)"
+                : nil
+        case .pressKey(let key, _):
+            return key.isEmpty ? "a press_key step needs the key in `label`" : nil
+        case .drag(let fromLabel, let toLabel):
+            return fromLabel.isEmpty || toLabel.isEmpty
+                ? "a drag needs both ends, `{ from: \"A\", to: \"B\" }`" : nil
+        case .measure(_, let action, let until, _):
+            if case .skipped = action {
+                return "a measure needs an action, e.g. `{ tap: \"Login\", until: \"Dashboard\" }`"
+            }
+            if until.isEmpty {
+                return "a measure needs `until:`, the element that ends it"
+            }
+            return recordProblem(action).map { "its action: \($0)" }
+        default:
+            return nil
+        }
+    }
+
     /// Derive compiled hints from the step type and observed data.
     /// Returns nil for AI-only steps that cannot be compiled.
     static func deriveHints(
@@ -300,11 +444,9 @@ extension MirroirMCP {
                     confidence: confidence ?? 0.0,
                     strategy: matchStrategy ?? "unknown")
             }
-            // Tap without coordinates — treat as sleep if we have timing
-            if let ms = elapsedMs {
-                return .sleep(delayMs: ms)
-            }
-            return nil
+            // Tap without coordinates: replay it live, finding the element by OCR.
+            // A sleep would report the step passed without tapping anything.
+            return .passthrough()
 
         case "wait_for":
             return .sleep(delayMs: elapsedMs ?? 500)
@@ -318,11 +460,13 @@ extension MirroirMCP {
             return .scrollSequence(count: count, direction: direction)
 
         case "launch", "type", "press_key", "swipe", "home", "open_url",
-             "shake", "reset_app", "set_network", "screenshot", "switch_target":
+             "shake", "reset_app", "set_network", "screenshot", "target", "switch_target",
+             "long_press", "drag":
             return .passthrough()
 
         case "measure":
-            return .sleep(delayMs: elapsedMs ?? 1000)
+            // Replayed live: a sleep would pass without running the action or the check.
+            return .passthrough()
 
         default:
             return nil

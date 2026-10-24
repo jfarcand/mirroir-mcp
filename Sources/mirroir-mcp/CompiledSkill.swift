@@ -21,7 +21,9 @@ struct CompiledSkill: Codable, Equatable {
     var screenFingerprint: ScreenFingerprint? = nil
 
     /// Current format version. Bump forces recompilation of all existing compiled skills.
-    static let currentVersion = 2
+    /// Version 3: a step's `label` is its replay value, which a SKILL.md's steps are
+    /// rebuilt from, where earlier versions held a free-form display label.
+    static let currentVersion = 3
 }
 
 /// Fingerprint of the app's screen content at compilation time.
@@ -150,7 +152,77 @@ enum CompiledSkillIO {
 
         let data = try Data(contentsOf: URL(fileURLWithPath: path))
         let decoder = JSONDecoder()
-        return try decoder.decode(CompiledSkill.self, from: data)
+        let decoded = try decoder.decode(CompiledSkill.self, from: data)
+        return CompiledSkill(
+            version: decoded.version, source: decoded.source, device: decoded.device,
+            steps: normalizedSteps(decoded.steps),
+            screenFingerprint: decoded.screenFingerprint)
+    }
+
+    /// Compiled steps in step order, one per index. Replay pairs the i-th step of a
+    /// skill with the i-th compiled step, but an AI can record steps out of order or
+    /// record a retried step twice; the last record of an index is the one that ran.
+    static func normalizedSteps(_ steps: [CompiledStep]) -> [CompiledStep] {
+        var latest: [Int: CompiledStep] = [:]
+        for step in steps {
+            latest[step.index] = step
+        }
+        return latest.keys.sorted().compactMap { latest[$0] }
+    }
+
+    /// The SKILL.md beside a YAML skill whose recorded steps fill the compiled file both
+    /// share (`foo.md` and `foo.yaml` both map to `foo.compiled.json`), or nil. Compiling
+    /// the YAML would overwrite the only replayable copy of the SKILL.md's steps.
+    static func skillMdTwinOwningCompiledFile(for skillPath: String) -> String? {
+        guard !skillPath.hasSuffix(".md") else { return nil }
+        let twin = (skillPath as NSString).deletingPathExtension + ".md"
+        guard FileManager.default.fileExists(atPath: twin),
+              let compiled = try? load(for: skillPath),
+              sourceStaleness(compiled: compiled, skillPath: twin) == nil else { return nil }
+        return twin
+    }
+
+    /// Step indices missing from `steps` (already normalized) between 0 and the last
+    /// recorded index. Replay pairs steps by position, so a gap would shift every later
+    /// step onto the wrong hints.
+    /// Gaps are returned as ranges, so a huge recorded index costs nothing to report.
+    static func missingIndices(_ steps: [CompiledStep]) -> [ClosedRange<Int>] {
+        var gaps: [ClosedRange<Int>] = []
+        var expected = 0
+        for index in Set(steps.map(\.index)).sorted() where index >= 0 {
+            if index > expected {
+                gaps.append(expected...(index - 1))
+            }
+            // The largest index has no successor to expect.
+            guard index < Int.max else { break }
+            expected = index + 1
+        }
+        return gaps
+    }
+
+    /// Gaps as `1` or `3...7`, comma-separated, for an error message.
+    static func describe(_ gaps: [ClosedRange<Int>]) -> String {
+        gaps.map { $0.count == 1 ? "\($0.lowerBound)" : "\($0.lowerBound)...\($0.upperBound)" }
+            .joined(separator: ", ")
+    }
+
+    /// Recorded indices below 0, which no step of a skill can have.
+    static func negativeIndices(_ steps: [CompiledStep]) -> [Int] {
+        steps.map(\.index).filter { $0 < 0 }.sorted()
+    }
+
+    /// Why a compiled skill no longer matches its source file, or nil when it does:
+    /// a different compiled-format version, or a source file edited since it was
+    /// compiled. Window size and screen drift are judged separately, against a device.
+    static func sourceStaleness(compiled: CompiledSkill, skillPath: String) -> String? {
+        if compiled.version != CompiledSkill.currentVersion {
+            return "compiled version \(compiled.version) != current \(CompiledSkill.currentVersion)"
+        }
+        if let currentHash = try? sha256(of: skillPath),
+           currentHash != compiled.source.sha256 {
+            return "source file has changed since compilation"
+        }
+        return nil
     }
 
     /// Save a compiled skill to disk alongside its source file.
@@ -184,15 +256,8 @@ enum CompiledSkillIO {
                                 windowWidth: Double,
                                 windowHeight: Double,
                                 liveFingerprint: ScreenFingerprint? = nil) -> StalenessResult {
-        // Version check
-        if compiled.version != CompiledSkill.currentVersion {
-            return .stale(reason: "compiled version \(compiled.version) != current \(CompiledSkill.currentVersion)")
-        }
-
-        // Source hash check
-        if let currentHash = try? sha256(of: skillPath),
-           currentHash != compiled.source.sha256 {
-            return .stale(reason: "source file has changed since compilation")
+        if let reason = sourceStaleness(compiled: compiled, skillPath: skillPath) {
+            return .stale(reason: reason)
         }
 
         // Dimension check

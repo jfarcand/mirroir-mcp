@@ -60,11 +60,13 @@ extension TestRunner {
             case "--no-auto-recompile":
                 noAutoRecompile = true
             case "--agent":
-                // Peek-ahead: if next arg doesn't start with "-" and isn't a .yaml path,
-                // consume it as the model name. Otherwise, bare --agent = deterministic only.
+                // Peek-ahead: if next arg doesn't start with "-" and isn't a skill file
+                // (.md, .yaml, .yml), consume it as the model name. Otherwise, bare
+                // --agent = deterministic only.
                 if i + 1 < args.count {
                     let next = args[i + 1]
-                    if !next.hasPrefix("-") && !next.hasSuffix(".yaml") && !next.hasSuffix(".yml") {
+                    if !next.hasPrefix("-") && !next.hasSuffix(".md")
+                        && !next.hasSuffix(".yaml") && !next.hasSuffix(".yml") {
                         agent = next
                         i += 1
                     } else {
@@ -126,15 +128,13 @@ extension TestRunner {
                 continue
             }
 
-            // Try to resolve as skill name (yamlOnly: deterministic runner needs YAML)
-            let (path, ambiguous) = MirroirMCP.resolveSkill(
-                name: arg, dirs: dirs, yamlOnly: true)
-            if let path = path {
+            switch RunnerSkillResolver.resolve(name: arg, dirs: dirs) {
+            case .run(let path), .unusable(let path):
+                // An unusable file is loaded anyway: its load error says why it cannot run.
                 files.append(path)
-            } else if !ambiguous.isEmpty {
-                let matches = ambiguous.joined(separator: ", ")
-                throw TestRunnerError.ambiguousSkill(name: arg, matches: matches)
-            } else {
+            case .ambiguous(let matches):
+                throw TestRunnerError.ambiguousSkill(name: arg, matches: matches.joined(separator: ", "))
+            case .notFound:
                 throw TestRunnerError.skillNotFound(name: arg)
             }
         }
@@ -142,20 +142,57 @@ extension TestRunner {
         return files
     }
 
-    /// Discover all skill YAML files from default directories.
-    private static func discoverAllSkillFiles() -> [String] {
-        let dirs = PermissionPolicy.skillDirs
-        var files: [String] = []
-        var seenRelPaths = Set<String>()
-
-        for dir in dirs {
-            for relPath in MirroirMCP.findYAMLFiles(in: dir) {
-                if seenRelPaths.contains(relPath) { continue }
-                seenRelPaths.insert(relPath)
-                files.append(dir + "/" + relPath)
+    /// Discover every replayable skill in `dirs`. For each skill, the runner takes the
+    /// copy MCP resolution picks (a SKILL.md before a YAML skill, nearer dir first) or,
+    /// when that one cannot run, the nearest YAML copy (`SkillFileLoader.runnerChoice`). A SKILL.md
+    /// replays only from the steps recorded when it was compiled, so one without a fresh
+    /// compiled file is counted and left out, and one holding a step the runner cannot
+    /// replay is skipped with its reason.
+    static func discoverAllSkillFiles(
+        in dirs: [String] = PermissionPolicy.skillDirs
+    ) -> [String] {
+        // Every copy of each skill, grouped by its path under the skill dir.
+        var stems: [String] = []
+        var copies: [String: [(path: String, isMd: Bool, dirIndex: Int)]] = [:]
+        for (dirIndex, dir) in dirs.enumerated() {
+            for relPath in MirroirMCP.findSkillFiles(in: dir) {
+                let stem = MirroirMCP.skillStem(relPath)
+                if copies[stem] == nil { stems.append(stem) }
+                copies[stem, default: []].append(
+                    (dir + "/" + relPath, relPath.hasSuffix(".md"), dirIndex))
             }
         }
 
+        var files: [String] = []
+        var skippedMd = 0
+        for stem in stems {
+            // MCP resolution's order: every .md before every .yaml, nearer dir first.
+            let ordered = (copies[stem] ?? [])
+                .sorted { ($0.isMd ? 0 : 1, $0.dirIndex) < ($1.isMd ? 0 : 1, $1.dirIndex) }
+                .map(\.path)
+            // A SKILL.md holding a step the runner cannot replay is reported by name;
+            // a YAML copy, if any, runs in its place.
+            var reported = false
+            if let first = ordered.first, SkillFileLoader.isReplayable(filePath: first),
+               let unreadable = SkillFileLoader.unreadableStep(filePath: first) {
+                fputs("Skipping \(first): \(unreadable)\n", stderr)
+                reported = true
+            }
+            let runnable = { (path: String) in
+                SkillFileLoader.isReplayable(filePath: path)
+                    && SkillFileLoader.unreadableStep(filePath: path) == nil
+            }
+            guard let choice = SkillFileLoader.runnerChoice(
+                ordered, accept: runnable, yamlFallback: true) else {
+                if !reported { skippedMd += 1 }
+                continue
+            }
+            files.append(choice)
+        }
+
+        if skippedMd > 0 {
+            fputs("Skipped \(skippedMd) .md file(s) with no fresh compiled file or kind:game\n", stderr)
+        }
         return files
     }
 
@@ -173,7 +210,24 @@ extension TestRunner {
                 files.append(String(cString: path))
             }
         }
-        return files.filter { $0.hasSuffix(".yaml") }.sorted()
+        let skills = files.filter { $0.hasSuffix(".yaml") || $0.hasSuffix(".md") }
+        let loadable = skills.filter { SkillFileLoader.isReplayable(filePath: $0) }
+        let replayable = loadable.filter { path in
+            guard let unreadable = SkillFileLoader.unreadableStep(filePath: path) else { return true }
+            fputs("Skipping \(path): \(unreadable)\n", stderr)
+            return false
+        }
+        let skipped = skills.count - loadable.count
+        if skipped > 0 {
+            fputs("Skipped \(skipped) .md file(s) matching \(pattern) with no fresh compiled "
+                + "file or kind:game\n", stderr)
+        }
+        // A replayable SKILL.md and its YAML twin are one skill: the SKILL.md runs.
+        let replayableMd = Set(replayable.filter { $0.hasSuffix(".md") })
+        return replayable.filter { path in
+            !(path.hasSuffix(".yaml")
+              && replayableMd.contains((path as NSString).deletingPathExtension + ".md"))
+        }.sorted()
     }
 
     /// Print usage information.
@@ -181,11 +235,15 @@ extension TestRunner {
         let usage = """
         Usage: mirroir-mcp test [options] [skill...]
 
-        Run skill YAML files deterministically against iPhone Mirroring.
+        Run skills deterministically against iPhone Mirroring. A YAML skill runs
+        its own steps; a SKILL.md runs the steps recorded in its .compiled.json
+        when it was compiled through an MCP client (get_skill, record_step,
+        save_compiled).
 
         Arguments:
-          <skill>             Skill name or .yaml file path (multiple allowed)
+          <skill>             Skill name, .md or .yaml file path (multiple allowed)
                               If none specified, discovers all from skill dirs
+                              (an uncompiled SKILL.md is skipped)
 
         Options:
           --junit <path>      Write JUnit XML report to <path>
@@ -212,7 +270,7 @@ extension TestRunner {
 
         Examples:
           mirroir-mcp test check-about
-          mirroir-mcp test apps/settings/check-about.yaml
+          mirroir-mcp test apps/settings/check-about.md
           mirroir-mcp test --junit results.xml apps/settings/*.yaml
           mirroir-mcp test --agent skill.yaml           # deterministic diagnosis
           mirroir-mcp test --agent claude-sonnet-5-5 skill.yaml  # AI diagnosis

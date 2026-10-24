@@ -55,7 +55,7 @@ enum TestRunner {
 
         if skillFiles.isEmpty {
             fputs("No skills found.\n", stderr)
-            fputs("Place .yaml files in .mirroir-mcp/skills/ or specify paths.\n", stderr)
+            fputs("Place skills in .mirroir-mcp/skills/ or specify paths.\n", stderr)
             return 1
         }
 
@@ -65,12 +65,22 @@ enum TestRunner {
         var skills: [SkillDefinition] = []
         for filePath in skillFiles {
             do {
-                let skill = try SkillParser.parse(filePath: filePath)
+                let skill = try SkillFileLoader.load(filePath: filePath)
+                if skill.kind == "game" {
+                    fputs("Skipping \(skill.name): kind:game is model-interpreted — "
+                        + "never replayed by the runner.\n", stderr)
+                    continue
+                }
                 skills.append(skill)
             } catch {
-                fputs("Error parsing \(filePath): \(error.localizedDescription)\n", stderr)
+                fputs("Error loading \(filePath): \(error.localizedDescription)\n", stderr)
                 return 1
             }
+        }
+
+        if skills.isEmpty {
+            fputs("No replayable skills: every skill given is kind:game.\n", stderr)
+            return 1
         }
 
         if let refusal = InvalidStepGate.refuse(skills: skills) {
@@ -106,11 +116,13 @@ enum TestRunner {
         )
 
         // The registry resolves `target:` steps; without it the first one fails.
+        // Live, compiled-passthrough and recompile executors all share it.
+        let registry = MirroirMCP.buildTargetRegistry()
         let executor = StepExecutor(
             bridge: bridge, input: input,
             describer: describer, capture: capture,
             config: executorConfig,
-            registry: MirroirMCP.buildTargetRegistry()
+            registry: registry
         )
 
         // Load compiled skills if available
@@ -148,12 +160,18 @@ enum TestRunner {
                         if config.noAutoRecompile {
                             fputs("Warning: \(skill.name): \(reason) — using compiled skill anyway\n", stderr)
                             compiledMap[skill.filePath] = compiled
+                        } else if skill.filePath.hasSuffix(".md") {
+                            // A SKILL.md's steps are what an AI recorded (a coordinate tap on
+                            // an icon, say); a live OCR re-run may not find them again.
+                            fputs("Warning: \(skill.name): \(reason) — using compiled skill; "
+                                + "recompile a SKILL.md by running it through an MCP client\n", stderr)
+                            compiledMap[skill.filePath] = compiled
                         } else {
                             fputs("Warning: \(skill.name): \(reason) — auto-recompiling\n", stderr)
                             if let recompiled = autoRecompile(
                                 skill: skill, bridge: bridge, input: input,
                                 describer: describer, capture: capture,
-                                config: executorConfig) {
+                                config: executorConfig, registry: registry) {
                                 compiledMap[skill.filePath] = recompiled
                             } else {
                                 fputs("  Falling back to original compiled skill\n", stderr)
@@ -177,7 +195,8 @@ enum TestRunner {
                 let compiledExecutor = CompiledStepExecutor(
                     bridge: bridge, input: input,
                     describer: describer, capture: capture,
-                    config: executorConfig
+                    config: executorConfig,
+                    registry: registry
                 )
                 result = executeCompiledSkill(
                     skill: skill, compiled: compiled,

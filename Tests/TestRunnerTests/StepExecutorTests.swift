@@ -38,6 +38,14 @@ final class StepExecutorTests: XCTestCase {
 
     // MARK: - Launch
 
+    func testACoordinateOnlyTapRunLiveSaysWhyItCannot() {
+        let result = executor.execute(step: .tap(label: ""), stepIndex: 0, skillName: "test")
+        XCTAssertEqual(result.status, .failed)
+        XCTAssertTrue(result.message?.contains("recorded by coordinates") ?? false,
+                      result.message ?? "")
+        XCTAssertTrue(input.tapCalls.isEmpty)
+    }
+
     func testLaunchSuccess() {
         input.launchAppResult = nil  // nil = success
         let result = executor.execute(
