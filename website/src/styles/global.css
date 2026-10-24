@@ -39,6 +39,29 @@ body {
   padding: 3rem 1.5rem 4rem;
 }
 
+/* Star banner */
+.star-banner {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  margin: -1.5rem auto 2rem;
+  padding: 0.5rem 1rem;
+  max-width: max-content;
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  background: var(--color-code-bg);
+  color: var(--color-text);
+  font-size: 0.9rem;
+  text-decoration: none;
+  transition: border-color 0.15s, color 0.15s;
+}
+
+.star-banner:hover {
+  border-color: var(--color-accent);
+  color: var(--color-accent);
+}
+
 .logo {
   display: block;
   margin: 0 auto 1rem;
@@ -338,48 +361,6 @@ section > p {
   .security-grid {
     grid-template-columns: 1fr;
   }
-}
-
-/* Client groups */
-.client-group {
-  margin-top: 1.25rem;
-}
-
-.client-group h3 {
-  font-size: 0.75rem;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  color: var(--color-muted);
-  text-align: center;
-  margin-bottom: 0.5rem;
-}
-
-.client-list {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  gap: 0.5rem;
-}
-
-.client-list a {
-  text-decoration: none;
-}
-
-.client-list a:hover span {
-  border-color: var(--color-accent);
-  color: var(--color-accent);
-}
-
-.client-list span {
-  background: var(--color-code-bg);
-  padding: 0.35rem 0.75rem;
-  border-radius: 6px;
-  border: 1px solid var(--color-border);
-  font-size: 0.85rem;
-  font-weight: 500;
-  color: var(--color-text);
-  transition: border-color 0.15s, color 0.15s;
 }
 
 /* FAQ */

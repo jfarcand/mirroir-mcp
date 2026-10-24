@@ -239,6 +239,14 @@ if (!skillsAvailable) {
   title="mirroir-mcp — Give your AI eyes, hands, and a real iPhone"
   description="An MCP server that gives AI agents full control of a real iPhone through macOS iPhone Mirroring — automating apps and games. The agent sees the screen, taps what it needs, and runs QA, tutorial, and end-to-end flows."
 >
+  <!-- Star banner -->
+  <a class="star-banner" href="https://github.com/jfarcand/mirroir-mcp" rel="noopener noreferrer">
+    <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" fill="currentColor">
+      <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/>
+    </svg>
+    <span>Like mirroir-mcp? <strong>Star us on GitHub</strong> &#9733;</span>
+  </a>
+
   <!-- Hero -->
   <header>
     <img src={`${import.meta.env.BASE_URL}mirroir-wordmark.svg`} alt="mirroir-mcp" class="logo" width="80" height="100" />
@@ -392,7 +400,7 @@ if (!skillsAvailable) {
       mirroir is growing archetype-aware coverage for <strong>games</strong>. A game splits into two surfaces. The <strong>shell</strong> &mdash; menu, shop, settings, win/lose screens &mdash; is ordinary text-labelled UI that today's skills already drive. The <strong>scene</strong> &mdash; the playfield &mdash; is a vision-driven loop an agent follows one touch at a time. The honest targets are game <strong>QA smoke tests, tutorial walkthroughs, and scripted demos</strong> &mdash; not real-time play: iPhone Mirroring exposes a single pointer, so twin-stick and twitch games stay out of reach.
     </p>
     <p>
-      Token efficiency makes the scene loop affordable. Screenshots are roughly 90% of an agent's cost, so text-rich shell screens read through <code>describe_screen</code> with no image at all, and a region/scale capture knob trims the per-frame image cost where a screenshot is unavoidable. The cost model is simple &mdash; frames &times; ~2.7k tokens, at about 3 frames per minute.
+      Token efficiency makes the scene loop affordable. Screenshots are roughly 90% of an agent's cost, so text-rich shell screens read through <code>describe_screen</code> with no image at all, and a region/scale capture knob trims the per-frame image cost where a screenshot is unavoidable. On the playfield, <code>describe_screen</code> in vision mode sends the frame to an LLM through embacle &mdash; measured on a live Brawl Stars match, one frame costs ~24k prompt tokens and 3&ndash;14 s, which GitHub Copilot bills as a single premium request on Claude Sonnet 5.5.
     </p>
   </section>
 
@@ -525,14 +533,14 @@ if (!skillsAvailable) {
         <h3>Diagnose</h3>
         <p>When a step fails, <code>--agent</code> compares expected vs. actual OCR and tells you the root cause and fix.</p>
         <div class="pipeline-cmd">
-          <code>mirroir test --agent login</code>
+          <code>mirroir test --agent claude-sonnet-5-5 login</code>
         </div>
       </div>
     </div>
 
     <p>
       Agent diagnosis runs in two tiers: deterministic OCR analysis first (free, no API key), then optionally an AI model for richer analysis.
-      Supports <a href="https://github.com/jfarcand/mirroir-mcp#agent-diagnosis" rel="noopener noreferrer">Anthropic, OpenAI, local Ollama, and CLI agents</a>.
+      Supports <a href="https://github.com/jfarcand/mirroir-mcp#ai-assisted-diagnosis" rel="noopener noreferrer">Anthropic, OpenAI, local Ollama, embacle, and CLI agents</a>.
     </p>
   </section>
 
@@ -540,23 +548,14 @@ if (!skillsAvailable) {
   <section id="mirroir-run">
     <h2>Replay anywhere with <code>mirroir-run</code></h2>
     <p>
-      <strong>mirroir-mcp</strong> drives the iPhone &mdash; AX + OCR + BFS exploration. <strong>mirroir-run</strong> replays <code>.mirroir/</code> SkillStep scenarios against web, process, HTTP, and iOS: web through Playwright, subprocesses and HTTP natively, and each <code>target: &#123; kind: ios &#125;</code> block handed to <code>mirroir-mcp</code> on a Mac with iPhone Mirroring connected. Both read one YAML grammar, so a single scenario can drive a browser and a phone and check that they show the same thing. Web, process, and HTTP scenarios run on Linux CI with no macOS dependency.
-    </p>
-    <p>
-      A single-binary Rust crate (<code>runner/</code> in this repo). Web steps compile to a Playwright <code>.spec.ts</code> and run across chromium, firefox, and webkit &mdash; selectors resolve as raw CSS, Playwright engine prefixes (<code>role=button[name="Save"]</code>, <code>text=Welcome</code>), or <code>data-test</code> + visible text. Process and HTTP steps dispatch natively. An LLM judge step scores agent responses against expected signals; drift detection catches output divergence vs. a baseline.
-    </p>
-    <p>
-      Drop a <code>.mirroir/</code> directory in any repo and a bare <code>mirroir-run</code> discovers it from the working directory, then replays the plan in <code>mirroir.yaml</code>. Each entry points at a <code>local:</code> sample tree or extends a shared <strong>archetype</strong> (<code>archetypes: ["&lt;pack&gt;/&lt;name&gt;@&lt;ver&gt;"]</code>) with per-instance <code>vars:</code> and <code>boot:</code> &mdash; capture a reusable app shape once, parameterize it per app.
-    </p>
-    <p>
-      The <strong>iOS leg</strong> is written by <code>generate_skill … emit=true</code> (on <code>finish</code> or <code>explore</code>): a captured flow becomes a runnable <code>target: &#123; kind: ios &#125;</code> scenario under <code>.mirroir/apps/&lt;app&gt;/</code>, declared in its <code>SAMPLE.md</code> and the plan. <code>mirroir-run</code> hands each <code>ios</code> block to <code>mirroir-mcp test</code> on a Mac with iPhone Mirroring connected. A scenario can hold a web block and an iOS block, and a <code>cross_surface</code> step captures both surfaces live and compares them &mdash; the run that checks the gate produces both halves.
+      <strong>mirroir-run</strong> replays the same scenarios beyond the iPhone: web pages through Playwright (Chromium, Firefox, WebKit), processes and HTTP natively, and iOS blocks through <code>mirroir-mcp</code>. One YAML file can drive a browser and a phone and check that they show the same thing &mdash; and its web, process, and HTTP steps run on Linux CI.
     </p>
 
     <div class="pipeline-grid">
       <div class="pipeline-step">
         <div class="pipeline-icon">1</div>
         <h3>Validate</h3>
-        <p>Parse a scenario YAML against the SkillStep grammar &mdash; gate CI on author quality before anything spawns.</p>
+        <p>Check a scenario against the grammar before anything runs.</p>
         <div class="pipeline-cmd">
           <code>mirroir-run --validate scenario.yaml</code>
         </div>
@@ -564,7 +563,7 @@ if (!skillsAvailable) {
       <div class="pipeline-step">
         <div class="pipeline-icon">2</div>
         <h3>Compile</h3>
-        <p>Write the Playwright spec + config a run would invoke to <code>target/playwright/</code>, without running it &mdash; for review.</p>
+        <p>Write the Playwright spec without running it, for review.</p>
         <div class="pipeline-cmd">
           <code>mirroir-run --emit playwright scenario.yaml</code>
         </div>
@@ -572,7 +571,7 @@ if (!skillsAvailable) {
       <div class="pipeline-step">
         <div class="pipeline-icon">3</div>
         <h3>Run</h3>
-        <p>Execute one scenario end-to-end, in file order: runner-side steps in Rust, the web block in one Playwright run, the iOS block in one <code>mirroir-mcp</code> run.</p>
+        <p>Run one scenario: web in Playwright, iOS through <code>mirroir-mcp</code>.</p>
         <div class="pipeline-cmd">
           <code>mirroir-run --run-scenario scenario.yaml</code>
         </div>
@@ -580,7 +579,7 @@ if (!skillsAvailable) {
       <div class="pipeline-step">
         <div class="pipeline-icon">4</div>
         <h3>Sample</h3>
-        <p>Drive a full <code>SAMPLE.md</code>: boot once, run N scenarios sharing the subprocess, aggregate verdicts.</p>
+        <p>Boot once, run several scenarios, aggregate the verdicts.</p>
         <div class="pipeline-cmd">
           <code>mirroir-run --sample samples/foo</code>
         </div>
@@ -588,7 +587,7 @@ if (!skillsAvailable) {
       <div class="pipeline-step">
         <div class="pipeline-icon">5</div>
         <h3>Diff</h3>
-        <p>Standalone drift check between two text files &mdash; Jaccard fingerprint + Levenshtein, exit-coded for CI.</p>
+        <p>Compare two text outputs for drift, exit-coded for CI.</p>
         <div class="pipeline-cmd">
           <code>mirroir-run --diff-text a.txt b.txt</code>
         </div>
@@ -596,13 +595,7 @@ if (!skillsAvailable) {
     </div>
 
     <p>
-      The reference sample <a href="https://github.com/jfarcand/mirroir-mcp/tree/main/runner/samples/mega-sample" rel="noopener noreferrer"><code>runner/samples/mega-sample/</code></a> exercises every primitive in one run: cross-browser web (chromium + firefox + webkit), HTTP probe, LLM judge against a local Ollama daemon, drift detection vs. a captured baseline, and cross-surface equivalence (a web capture compared against a pre-captured iOS surface fixture). Deterministic at <code>temperature=0</code>, free per run, no remote LLM dependency in CI.
-    </p>
-    <p>
-      <a href="https://github.com/jfarcand/mirroir-mcp/tree/main/runner/samples/ios-fixture" rel="noopener noreferrer"><code>runner/samples/ios-fixture/</code></a> is the iOS counterpart: one <code>ios</code> block run through <code>mirroir-mcp</code>, its final screen captured live and compared against expected text. CI runs it against FakeMirroring on every change to either binary. On a real iPhone, the same web-vs-iOS check &mdash; desktop Chromium against iPhone Safari on one page &mdash; passes when they agree and fails when the page is reworded. How the two binaries meet: <a href="https://github.com/jfarcand/mirroir-mcp/blob/main/docs/web-and-ios.md" rel="noopener noreferrer">Web and iOS in one scenario</a>.
-    </p>
-    <p>
-      Reference docs live under <a href="https://github.com/jfarcand/mirroir-mcp/tree/main/runner/docs" rel="noopener noreferrer"><code>runner/docs/</code></a>: scenario grammar, <code>SAMPLE.md</code> schema, judge profiles, Playwright setup, CI integration.
+      Every primitive in one run: <a href="https://github.com/jfarcand/mirroir-mcp/tree/main/runner/samples/mega-sample" rel="noopener noreferrer"><code>runner/samples/mega-sample/</code></a>. Scenario grammar, judge profiles, and CI setup: <a href="https://github.com/jfarcand/mirroir-mcp/tree/main/runner/docs" rel="noopener noreferrer"><code>runner/docs/</code></a> and <a href="https://github.com/jfarcand/mirroir-mcp/blob/main/docs/web-and-ios.md" rel="noopener noreferrer">Web and iOS in one scenario</a>.
     </p>
 
     <p class="install-hint">Install the runner:</p>
@@ -659,8 +652,8 @@ if (!skillsAvailable) {
       Install the full library as a Claude Code plugin<sup>*</sup>:
     </p>
     <div class="install-block install-block-alt">
-      <code><span class="prompt">$</span> claude plugin add jfarcand/mirroir-skills</code>
-      <button class="copy-btn" data-copy="claude plugin add jfarcand/mirroir-skills">Copy</button>
+      <code><span class="prompt">$</span> claude plugin marketplace add jfarcand/mirroir-skills &amp;&amp; claude plugin install skills@mirroir-skills</code>
+      <button class="copy-btn" data-copy="claude plugin marketplace add jfarcand/mirroir-skills &amp;&amp; claude plugin install skills@mirroir-skills">Copy</button>
     </div>
     <p class="install-hint">
       <sup>*</sup> Also supported by GitHub Copilot.
@@ -779,6 +772,9 @@ if (!skillsAvailable) {
           <li><code>long_press</code> <span>Hold for context menus</span></li>
           <li><code>swipe</code> <span>Quick flick between two points</span></li>
           <li><code>drag</code> <span>Slow drag for sliders and icons</span></li>
+          <li><code>touch</code> <span>Hold a finger across calls for joysticks and press-and-hold</span></li>
+          <li><code>pinch</code> <span>Two-finger pinch to zoom</span></li>
+          <li><code>rotate</code> <span>Two-finger rotation</span></li>
         </ul>
       </div>
       <div class="tool-category cat-input">
@@ -787,13 +783,15 @@ if (!skillsAvailable) {
           <li><code>type_text</code> <span>Type text via virtual keyboard</span></li>
           <li><code>press_key</code> <span>Send special keys with modifiers</span></li>
           <li><code>shake</code> <span>Shake gesture for undo or dev menus</span></li>
+          <li><code>hold_keys</code> <span>Hold keys during a mouse drag for keyboard-and-mouse games</span></li>
         </ul>
       </div>
       <div class="tool-category cat-observe">
         <h3>Observe</h3>
         <ul>
           <li><code>screenshot</code> <span>Capture screen as PNG</span></li>
-          <li><code>describe_screen</code> <span>OCR with tap coordinates</span></li>
+          <li><code>describe_screen</code> <span>OCR or LLM vision with tap coordinates</span></li>
+          <li><code>classify_screen</code> <span>Group screen elements into UI components with an AI model</span></li>
           <li><code>start_recording</code> <span>Begin video recording</span></li>
           <li><code>stop_recording</code> <span>End recording, get file path</span></li>
           <li><code>get_orientation</code> <span>Portrait or landscape</span></li>
@@ -827,30 +825,6 @@ if (!skillsAvailable) {
     </div>
   </section>
 
-  <!-- Integrations -->
-  <section>
-    <h2>Integrations</h2>
-    <p>Any MCP client that supports stdio transport — plug into your editor or build your own agent.</p>
-
-    <div class="client-group">
-      <h3>Agents</h3>
-      <div class="client-list">
-        <a href="https://docs.anthropic.com/en/docs/claude-code" rel="noopener noreferrer"><span>Claude Code</span></a>
-        <a href="https://chatgpt.com" rel="noopener noreferrer"><span>ChatGPT</span></a>
-        <a href="https://cursor.com" rel="noopener noreferrer"><span>Cursor</span></a>
-        <a href="https://github.com/features/copilot" rel="noopener noreferrer"><span>GitHub Copilot</span></a>
-      </div>
-    </div>
-
-    <div class="client-group">
-      <h3>Frameworks</h3>
-      <div class="client-list">
-        <a href="https://github.com/langchain-ai/langgraph" rel="noopener noreferrer"><span>LangGraph</span></a>
-        <a href="https://strandsagents.com" rel="noopener noreferrer"><span>Strands Agents</span></a>
-      </div>
-    </div>
-  </section>
-
   <!-- Security -->
   <section>
     <h2>Security-first by design</h2>
@@ -861,7 +835,7 @@ if (!skillsAvailable) {
     <div class="security-grid">
       <div class="security-layer">
         <h3>Tool permissions</h3>
-        <p>Without a config file, only read-only tools (<code>screenshot</code>, <code>describe_screen</code>) are exposed. Mutating tools are hidden from the MCP client entirely &mdash; it never sees them.</p>
+        <p>Without a config file, only the 12 read-only tools (<code>screenshot</code>, <code>describe_screen</code>, <code>status</code>, <code>list_skills</code>, &hellip;) are exposed. Mutating tools are hidden from the MCP client entirely &mdash; it never sees them.</p>
       </div>
       <div class="security-layer">
         <h3>App blocking</h3>

@@ -18,7 +18,7 @@ The MCP server runs as a regular user process. All input is delivered via the ma
 
 ## Fail-Closed Permissions
 
-Without a config file, only the 11 read-only tools (`screenshot`, `describe_screen`, `status`, etc.) are exposed. Mutating tools (`tap`, `type_text`, `launch_app`, etc.) are hidden from the MCP client entirely — it never sees them unless you explicitly allow them.
+Without a config file, only the 12 read-only tools (`screenshot`, `describe_screen`, `status`, etc.) are exposed. Mutating tools (`tap`, `type_text`, `launch_app`, etc.) are hidden from the MCP client entirely — it never sees them unless you explicitly allow them.
 
 The config loader checks the project-local directory (`<cwd>/.mirroir-mcp/permissions.json`) first, then the global directory (`~/.mirroir-mcp/permissions.json`). A malformed config is treated as no config: the loader logs a warning and falls back to read-only defaults, so a broken file fails closed rather than opening everything up.
 
