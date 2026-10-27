@@ -1,7 +1,7 @@
-# ABOUTME: Pins the runner Rust workspace to the 1.96 toolchain so rustup selects
+# ABOUTME: Pins the runner Rust workspace to the 1.99 toolchain so rustup selects
 # ABOUTME: it automatically (matches rust-version in Cargo.toml) — no PATH overrides.
 
 [toolchain]
-channel = "1.96.0"
+channel = "1.99.1"
 components = ["rustfmt", "clippy"]
 profile = "minimal"

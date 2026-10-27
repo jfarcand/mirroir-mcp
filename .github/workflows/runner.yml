@@ -34,13 +34,13 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  # Pinned to match runner/rust-toolchain.toml (channel = "1.96.0") so the
+  # Pinned to match runner/rust-toolchain.toml (channel = "1.99.1") so the
   # rustup-installed toolchain name lines up with what the toml selects —
   # clippy/rustfmt components land on the exact toolchain cargo uses, and CI
   # stops floating on `stable` (a float once broke clippy via collapsible_if).
   # Bump this and runner/rust-toolchain.toml together; keep Cargo.toml's
   # rust-version (MSRV floor) in step.
-  RUST_TOOLCHAIN: 1.96.0
+  RUST_TOOLCHAIN: 1.99.1
   # Suppress Cargo's interactive progress; CI logs are nicer without it.
   CARGO_TERM_COLOR: always
 

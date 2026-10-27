@@ -23,9 +23,9 @@ permissions:
 
 env:
   CARGO_TERM_COLOR: always
-  # Pinned to match runner/rust-toolchain.toml (channel = "1.96.0"); bump the
+  # Pinned to match runner/rust-toolchain.toml (channel = "1.99.1"); bump the
   # two together. Release binaries must not float on whatever `stable` is.
-  RUST_TOOLCHAIN: 1.96.0
+  RUST_TOOLCHAIN: 1.99.1
 
 jobs:
   version:

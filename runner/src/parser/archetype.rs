@@ -178,8 +178,8 @@ Prose follows.
         let md = "```yaml\nversion: 1\nname: foo/bar\narchetype_version: 0.1.0\nprovides:\n  flows: []\n```";
         let m = parse_archetype_manifest("test", md)?;
         assert_eq!(m.name, "foo/bar");
-        assert!(m.requires.vars.is_empty());
-        assert!(m.provides.flows.is_empty());
+        assert_eq!(m.requires.vars, []);
+        assert_eq!(m.provides.flows, Vec::<String>::new());
         Ok(())
     }
 

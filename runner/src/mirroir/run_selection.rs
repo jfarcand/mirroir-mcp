@@ -209,7 +209,13 @@ mod tests {
         let filtered = set_filtered_entries(&plan, ScenarioSet::MustPass);
         assert_eq!(filtered.len(), 1);
         assert_eq!(filtered[0].name, "extra");
-        assert!(set_filtered_entries(&plan, ScenarioSet::All).is_empty());
-        assert!(set_filtered_entries(&plan, ScenarioSet::NiceToPass).is_empty());
+        assert_eq!(
+            set_filtered_entries(&plan, ScenarioSet::All),
+            &[] as &[PlanEntry]
+        );
+        assert_eq!(
+            set_filtered_entries(&plan, ScenarioSet::NiceToPass),
+            &[] as &[PlanEntry]
+        );
     }
 }

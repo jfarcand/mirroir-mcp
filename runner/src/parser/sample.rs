@@ -208,7 +208,10 @@ session:
         assert!(manifest.session.boot.cwd.is_none());
         assert!(manifest.session.boot.timeout_s.is_none());
         assert!(manifest.session.boot.env.is_empty());
-        assert!(manifest.session.scenarios.nice_to_pass.is_empty());
+        assert_eq!(
+            manifest.session.scenarios.nice_to_pass,
+            Vec::<PathBuf>::new()
+        );
         Ok(())
     }
 

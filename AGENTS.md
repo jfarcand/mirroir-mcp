@@ -110,7 +110,7 @@ AppKit dependencies. See the design gists for the complete specification:
 | Security / license / source audit | `cargo deny check` |
 | Build release (static-musl Linux) | `cargo build --release --target=x86_64-unknown-linux-musl` |
 
-`rust-version = "1.96"` (edition 2024) declared in `runner/Cargo.toml` — a
+`rust-version = "1.99"` (edition 2024) declared in `runner/Cargo.toml` — a
 policy floor tracking current stable (the code's technical minimum is 1.88,
 where let-chains stabilized).
 
