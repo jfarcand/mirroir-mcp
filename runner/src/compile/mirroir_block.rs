@@ -219,8 +219,8 @@ fn comma_free(index: usize, kind: &'static str, value: &str) -> Result<String> {
 mod tests {
     use std::result::Result as StdResult;
 
-    use serde_yaml::Deserializer;
-    use serde_yaml::with::singleton_map_recursive;
+    use serde_norway::Deserializer;
+    use serde_norway::with::singleton_map_recursive;
 
     use super::ios_block_yaml;
     use crate::error::RunnerError;

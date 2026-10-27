@@ -263,14 +263,14 @@ impl<'de> Deserialize<'de> for WaitForArgs {
 mod tests {
     use std::error::Error as StdError;
 
-    use serde_yaml::Deserializer;
-    use serde_yaml::with::singleton_map_recursive;
+    use serde_norway::Deserializer;
+    use serde_norway::with::singleton_map_recursive;
 
     use super::*;
 
     type TestResult = StdResult<(), Box<dyn StdError>>;
 
-    fn parse<T: for<'de> Deserialize<'de>>(yaml: &str) -> StdResult<T, serde_yaml::Error> {
+    fn parse<T: for<'de> Deserialize<'de>>(yaml: &str) -> StdResult<T, serde_norway::Error> {
         singleton_map_recursive::deserialize(Deserializer::from_str(yaml))
     }
 

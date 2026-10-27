@@ -182,7 +182,7 @@ impl JudgeRegistry {
             reason: source.to_string(),
         })?;
         let parsed: ProfilesFile =
-            serde_yaml::from_str(&raw).map_err(|source| OracleError::ProfilesParse {
+            serde_norway::from_str(&raw).map_err(|source| OracleError::ProfilesParse {
                 path: path.to_path_buf(),
                 reason: source.to_string(),
             })?;

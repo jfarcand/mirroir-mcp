@@ -250,7 +250,7 @@ fn report_files_no_capture_writes(args: &CrossSurfaceArgs) {
 mod tests {
     use std::result::Result as StdResult;
 
-    use serde_yaml::from_str;
+    use serde_norway::from_str;
     use tempfile::tempdir;
 
     use super::*;

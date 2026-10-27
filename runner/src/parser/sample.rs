@@ -178,7 +178,7 @@ session:
     nice_to_pass:
       - slow-network.yaml
 "#;
-        let manifest: SampleManifest = serde_yaml::from_str(yaml)?;
+        let manifest: SampleManifest = serde_norway::from_str(yaml)?;
         assert_eq!(manifest.version, SAMPLE_SCHEMA_VERSION);
         assert_eq!(manifest.name.as_deref(), Some("spring-boot-chat"));
         assert_eq!(
@@ -202,7 +202,7 @@ session:
     must_pass:
       - smoke.yaml
 "#;
-        let manifest: SampleManifest = serde_yaml::from_str(yaml)?;
+        let manifest: SampleManifest = serde_norway::from_str(yaml)?;
         assert_eq!(manifest.version, SAMPLE_SCHEMA_VERSION);
         assert!(manifest.name.is_none());
         assert!(manifest.session.boot.cwd.is_none());
@@ -223,7 +223,7 @@ session:
     must_pass: []
 unknown_field: nope
 "#;
-        let Err(err) = serde_yaml::from_str::<SampleManifest>(yaml) else {
+        let Err(err) = serde_norway::from_str::<SampleManifest>(yaml) else {
             return Err("expected deserialize to fail".into());
         };
         let msg = err.to_string();

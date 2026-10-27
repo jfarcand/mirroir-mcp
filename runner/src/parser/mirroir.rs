@@ -188,7 +188,7 @@ struct PlanEntryRaw {
 ///   `archetypes` and `local` are set.
 pub fn parse_mirroir_config(source_label: &str, yaml: &str) -> Result<MirroirConfig> {
     let raw: MirroirConfigRaw =
-        serde_yaml::from_str(yaml).map_err(|source| RunnerError::YamlParse {
+        serde_norway::from_str(yaml).map_err(|source| RunnerError::YamlParse {
             file: source_label.to_owned(),
             source,
         })?;

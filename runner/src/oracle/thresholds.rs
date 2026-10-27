@@ -304,7 +304,7 @@ pub fn load_drift_defaults(path: &Path) -> Result<DriftThresholds> {
 /// * [`RunnerError::UnsupportedVersion`] when its `version:` is out of range.
 pub fn parse_drift_defaults(path: &Path, raw: &str) -> Result<DriftThresholds> {
     let parsed: DriftDefaultsFile =
-        serde_yaml::from_str(raw).map_err(|source| OracleError::ThresholdsParse {
+        serde_norway::from_str(raw).map_err(|source| OracleError::ThresholdsParse {
             path: path.to_path_buf(),
             reason: source.to_string(),
         })?;
@@ -347,7 +347,7 @@ pub fn parse_app_defaults(path: &Path, markdown: &str) -> Result<Option<DriftThr
         return Ok(None);
     };
     let parsed: AppFrontmatter =
-        serde_yaml::from_str(&body).map_err(|source| OracleError::ThresholdsParse {
+        serde_norway::from_str(&body).map_err(|source| OracleError::ThresholdsParse {
             path: path.to_path_buf(),
             reason: source.to_string(),
         })?;

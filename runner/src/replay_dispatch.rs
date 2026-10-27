@@ -170,7 +170,7 @@ pub fn verify_measures(
 mod tests {
     use std::result::Result as StdResult;
 
-    use serde_yaml::from_str;
+    use serde_norway::from_str;
 
     use super::*;
     use crate::oracle::thresholds::DriftPolicy;

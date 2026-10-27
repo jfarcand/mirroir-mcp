@@ -116,7 +116,7 @@ mod tests {
     /// its action is a wait, so the action supplies the stop condition.
     #[test]
     fn a_waiting_action_supplies_its_own_stop_condition() -> Result<()> {
-        let scenario: Scenario = serde_yaml::from_str(
+        let scenario: Scenario = serde_norway::from_str(
             "version: 1\nname: spec measure\nsteps:\n  - measure:\n      \
              name: first_token_latency\n      \
              action: \"wait_visible: streaming-caret\"\n      max_seconds: 5\n",

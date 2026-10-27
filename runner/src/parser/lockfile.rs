@@ -88,10 +88,11 @@ pub struct GitSource {
 /// * [`RunnerError::YamlParse`] on serde failure.
 /// * [`RunnerError::UnsupportedVersion`] when `version` is out of range.
 pub fn parse_lockfile(source_label: &str, yaml: &str) -> Result<Lockfile> {
-    let parsed: Lockfile = serde_yaml::from_str(yaml).map_err(|source| RunnerError::YamlParse {
-        file: source_label.to_owned(),
-        source,
-    })?;
+    let parsed: Lockfile =
+        serde_norway::from_str(yaml).map_err(|source| RunnerError::YamlParse {
+            file: source_label.to_owned(),
+            source,
+        })?;
     if parsed.version != LOCKFILE_SCHEMA_VERSION {
         return Err(RunnerError::UnsupportedVersion {
             artifact: "mirroir.lock".to_owned(),
@@ -115,7 +116,7 @@ pub fn serialize_lockfile(lockfile: &Lockfile) -> Result<String> {
     canonical
         .archetypes
         .sort_by(|a, b| a.reference.cmp(&b.reference));
-    serde_yaml::to_string(&canonical).map_err(|source| RunnerError::YamlParse {
+    serde_norway::to_string(&canonical).map_err(|source| RunnerError::YamlParse {
         file: "mirroir.lock (serialize)".to_owned(),
         source,
     })

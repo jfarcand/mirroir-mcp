@@ -46,9 +46,9 @@ pub enum RunnerError {
     YamlParse {
         /// Path or label of the YAML document that failed.
         file: String,
-        /// Underlying error from `serde_yaml`.
+        /// Underlying error from `serde_norway`.
         #[source]
-        source: serde_yaml::Error,
+        source: serde_norway::Error,
     },
 
     /// Filesystem or other I/O operation failed.

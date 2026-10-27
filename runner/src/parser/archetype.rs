@@ -107,7 +107,7 @@ pub fn parse_archetype_manifest(source_label: &str, markdown: &str) -> Result<Ar
     })?;
 
     let manifest: ArchetypeManifest =
-        serde_yaml::from_str(&body).map_err(|source| RunnerError::YamlParse {
+        serde_norway::from_str(&body).map_err(|source| RunnerError::YamlParse {
             file: source_label.to_owned(),
             source,
         })?;

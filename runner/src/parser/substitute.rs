@@ -1,9 +1,9 @@
-// ABOUTME: Post-parse `${VAR}` substitution on serde_yaml::Value trees — string leaves only.
+// ABOUTME: Post-parse `${VAR}` substitution on serde_norway::Value trees — string leaves only.
 // ABOUTME: Avoids Helm-class footguns (quoting / structural breakage) of pre-parse textual substitution.
 
 use std::collections::HashMap;
 
-use serde_yaml::{Mapping, Value};
+use serde_norway::{Mapping, Value};
 
 use crate::error::Result;
 use crate::parser::env::substitute;
@@ -45,7 +45,7 @@ pub fn substitute_value(value: &mut Value, env: &HashMap<String, String>) -> Res
 
 /// Walk a `Mapping` substituting its values. Keys are deliberately preserved.
 fn substitute_mapping(map: &mut Mapping, env: &HashMap<String, String>) -> Result<()> {
-    // serde_yaml::Mapping doesn't expose iter_mut() over (k, v) pairs that
+    // serde_norway::Mapping doesn't expose iter_mut() over (k, v) pairs that
     // lets us mutate the value while borrowing the key. Collect keys first,
     // then mutate values by key. Keys themselves are not modified.
     let keys: Vec<Value> = map.keys().cloned().collect();
@@ -89,7 +89,7 @@ mod tests {
 
     #[test]
     fn substitutes_string_leaf() -> TestResult {
-        let mut v: Value = serde_yaml::from_str("hello ${NAME}")?;
+        let mut v: Value = serde_norway::from_str("hello ${NAME}")?;
         substitute_value(&mut v, &env(&[("NAME", "world")]))?;
         assert_eq!(v, Value::String("hello world".to_owned()));
         Ok(())
@@ -98,7 +98,7 @@ mod tests {
     #[test]
     fn substitutes_inside_mapping_value() -> TestResult {
         let yaml = "greeting: hello ${NAME}\ncount: 7\n";
-        let mut v: Value = serde_yaml::from_str(yaml)?;
+        let mut v: Value = serde_norway::from_str(yaml)?;
         substitute_value(&mut v, &env(&[("NAME", "world")]))?;
         let m = as_mapping(v)?;
         assert_eq!(get_string(&m, "greeting")?, "hello world");
@@ -112,7 +112,7 @@ mod tests {
 
     #[test]
     fn substitutes_inside_sequence() -> TestResult {
-        let mut v: Value = serde_yaml::from_str("- a/${X}\n- b/${X}\n")?;
+        let mut v: Value = serde_norway::from_str("- a/${X}\n- b/${X}\n")?;
         substitute_value(&mut v, &env(&[("X", "Y")]))?;
         let Value::Sequence(seq) = v else {
             return Err("expected sequence".into());
@@ -125,7 +125,7 @@ mod tests {
     #[test]
     fn keys_are_not_substituted() -> TestResult {
         let yaml = "\"${KEY}\": \"${VAL}\"\n";
-        let mut v: Value = serde_yaml::from_str(yaml)?;
+        let mut v: Value = serde_norway::from_str(yaml)?;
         substitute_value(&mut v, &env(&[("KEY", "should_not_appear"), ("VAL", "ok")]))?;
         let m = as_mapping(v)?;
         // Key still literal "${KEY}"; only the value got substituted.
@@ -138,7 +138,7 @@ mod tests {
     fn helm_class_value_with_colon_is_safe() -> TestResult {
         // Pre-parse substitution would inject a `:` into the YAML and break
         // structure. Post-parse, the value is opaque to the parser.
-        let mut v: Value = serde_yaml::from_str("greeting: \"prefix ${MSG}\"")?;
+        let mut v: Value = serde_norway::from_str("greeting: \"prefix ${MSG}\"")?;
         substitute_value(
             &mut v,
             &env(&[("MSG", "hello: world, line1\nline2, ${literal}")]),
@@ -154,7 +154,7 @@ mod tests {
 
     #[test]
     fn nulls_numbers_bools_untouched() -> TestResult {
-        let mut v: Value = serde_yaml::from_str("a: null\nb: 42\nc: true\n")?;
+        let mut v: Value = serde_norway::from_str("a: null\nb: 42\nc: true\n")?;
         substitute_value(&mut v, &env(&[]))?;
         let m = as_mapping(v)?;
         assert_eq!(m.get(Value::String("a".to_owned())), Some(&Value::Null));
@@ -171,7 +171,7 @@ mod tests {
 
     #[test]
     fn default_fallback_inline() -> TestResult {
-        let mut v: Value = serde_yaml::from_str("cwd: \"${MISSING:-default-path}\"")?;
+        let mut v: Value = serde_norway::from_str("cwd: \"${MISSING:-default-path}\"")?;
         substitute_value(&mut v, &env(&[]))?;
         let m = as_mapping(v)?;
         assert_eq!(get_string(&m, "cwd")?, "default-path");

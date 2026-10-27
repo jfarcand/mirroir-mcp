@@ -127,15 +127,15 @@ mod tests {
     use std::error::Error as StdError;
     use std::result::Result as StdResult;
 
-    use serde_yaml::Deserializer;
-    use serde_yaml::with::singleton_map_recursive;
+    use serde_norway::Deserializer;
+    use serde_norway::with::singleton_map_recursive;
 
     use super::PortState;
     use crate::parser::step::SkillStep;
 
     type TestResult = StdResult<(), Box<dyn StdError>>;
 
-    fn parse(yaml: &str) -> StdResult<SkillStep, serde_yaml::Error> {
+    fn parse(yaml: &str) -> StdResult<SkillStep, serde_norway::Error> {
         singleton_map_recursive::deserialize(Deserializer::from_str(yaml))
     }
 

@@ -287,7 +287,7 @@ src/
 │   ├── mod.rs             # parser index
 │   ├── archetype.rs       # archetype.md manifest (YAML frontmatter + markdown body)
 │   ├── env.rs             # ${VAR} / ${VAR:-default} textual substitution
-│   ├── substitute.rs      # post-parse ${VAR} substitution on serde_yaml::Value trees
+│   ├── substitute.rs      # post-parse ${VAR} substitution on serde_norway::Value trees
 │   ├── local_overrides.rs # mirroir.local.yaml merge (instance wins; arrays replace)
 │   ├── lockfile.rs        # mirroir.lock schema + (de)serializer
 │   ├── mirroir.rs         # .mirroir/mirroir.yaml plan (samples + archetype refs)

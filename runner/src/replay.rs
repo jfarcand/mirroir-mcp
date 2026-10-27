@@ -61,7 +61,7 @@ pub fn load_scenario_with_extras(path: &Path, extras: &[(&str, String)]) -> Resu
     let substituted = substitute(&raw, &environment)?;
 
     let scenario: Scenario =
-        serde_yaml::from_str(&substituted).map_err(|source| RunnerError::YamlParse {
+        serde_norway::from_str(&substituted).map_err(|source| RunnerError::YamlParse {
             file: path.display().to_string(),
             source,
         })?;
@@ -120,7 +120,7 @@ pub fn load_sample_manifest_with_extras(
     let substituted = substitute(&body, &environment)?;
 
     let manifest: SampleManifest =
-        serde_yaml::from_str(&substituted).map_err(|source| RunnerError::YamlParse {
+        serde_norway::from_str(&substituted).map_err(|source| RunnerError::YamlParse {
             file: path.display().to_string(),
             source,
         })?;

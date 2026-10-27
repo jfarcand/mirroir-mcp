@@ -93,7 +93,7 @@ pub struct PlanEntryBootOverride {
 /// * [`RunnerError::UnsupportedVersion`] when `version` mismatches the base.
 pub fn parse_local_overrides(source_label: &str, yaml: &str) -> Result<MirroirLocalOverrides> {
     let parsed: MirroirLocalOverrides =
-        serde_yaml::from_str(yaml).map_err(|source| RunnerError::YamlParse {
+        serde_norway::from_str(yaml).map_err(|source| RunnerError::YamlParse {
             file: source_label.to_owned(),
             source,
         })?;

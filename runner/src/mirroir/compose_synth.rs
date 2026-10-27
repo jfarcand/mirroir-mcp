@@ -66,13 +66,13 @@ pub fn substitute_markdown_with_yaml(raw: &str, env: &HashMap<String, String>) -
 ///
 /// Propagates [`RunnerError::YamlParse`] on parse or serialize failure.
 pub fn substitute_yaml_text(yaml: &str, env: &HashMap<String, String>) -> Result<String> {
-    let mut value: serde_yaml::Value =
-        serde_yaml::from_str(yaml).map_err(|source| RunnerError::YamlParse {
+    let mut value: serde_norway::Value =
+        serde_norway::from_str(yaml).map_err(|source| RunnerError::YamlParse {
             file: "(compose-substitute)".to_owned(),
             source,
         })?;
     substitute_value(&mut value, env)?;
-    serde_yaml::to_string(&value).map_err(|source| RunnerError::YamlParse {
+    serde_norway::to_string(&value).map_err(|source| RunnerError::YamlParse {
         file: "(compose-substitute serialize)".to_owned(),
         source,
     })

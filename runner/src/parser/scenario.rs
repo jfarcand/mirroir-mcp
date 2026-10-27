@@ -39,7 +39,7 @@ pub struct Scenario {
     #[serde(default)]
     pub drift: Option<DriftThresholds>,
     /// Ordered list of steps the runner executes.
-    #[serde(with = "serde_yaml::with::singleton_map_recursive")]
+    #[serde(with = "serde_norway::with::singleton_map_recursive")]
     pub steps: Vec<SkillStep>,
 }
 
@@ -66,7 +66,7 @@ name: smoke
 steps:
   - launch: "App"
 "#;
-        let scenario: Scenario = serde_yaml::from_str(yaml)?;
+        let scenario: Scenario = serde_norway::from_str(yaml)?;
         assert_eq!(scenario.version, SCHEMA_VERSION);
         assert_eq!(scenario.name, "smoke");
         assert_eq!(scenario.steps.len(), 1);
@@ -90,7 +90,7 @@ drift:
 steps:
   - report: pass
 ";
-        let scenario: Scenario = serde_yaml::from_str(yaml)?;
+        let scenario: Scenario = serde_norway::from_str(yaml)?;
         let thresholds = scenario.drift.ok_or("drift block was dropped")?;
         assert_eq!(
             thresholds.get(DriftMetric::FingerprintSimilarity),
@@ -99,7 +99,7 @@ steps:
         assert_eq!(thresholds.get(DriftMetric::JudgeScoreSwing), None);
 
         let bare: Scenario =
-            serde_yaml::from_str("version: 1\nname: plain\nsteps:\n  - report: pass\n")?;
+            serde_norway::from_str("version: 1\nname: plain\nsteps:\n  - report: pass\n")?;
         assert!(bare.drift.is_none());
         Ok(())
     }
@@ -120,7 +120,7 @@ steps:
   - type: "hello"
   - tap: "send"
 "#;
-        let scenario: Scenario = serde_yaml::from_str(yaml)?;
+        let scenario: Scenario = serde_norway::from_str(yaml)?;
         assert_eq!(scenario.app.as_deref(), Some("spring-boot-ai-chat"));
         assert_eq!(
             scenario.tags,

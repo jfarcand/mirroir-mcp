@@ -208,8 +208,8 @@ mod tests {
     use std::fmt::Write as _;
     use std::result::Result as StdResult;
 
-    use serde_yaml::Deserializer;
-    use serde_yaml::with::singleton_map_recursive;
+    use serde_norway::Deserializer;
+    use serde_norway::with::singleton_map_recursive;
 
     use super::{ScenarioPlan, Segment};
     use crate::error::RunnerError;

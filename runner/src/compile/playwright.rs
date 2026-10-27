@@ -117,8 +117,8 @@ mod tests {
     type TestResult = StdResult<(), Box<dyn StdError>>;
 
     fn compile(yaml: &str) -> StdResult<PlaywrightSpec, Box<dyn StdError>> {
-        use serde_yaml::Deserializer;
-        use serde_yaml::with::singleton_map_recursive;
+        use serde_norway::Deserializer;
+        use serde_norway::with::singleton_map_recursive;
         let de = Deserializer::from_str(yaml);
         let scenario: Scenario = singleton_map_recursive::deserialize(de)?;
         let source = ScenarioSource {
