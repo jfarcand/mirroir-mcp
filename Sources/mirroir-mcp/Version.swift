@@ -12,5 +12,5 @@
 /// constant in lockstep with `npm/package.json` and `server.json`.
 enum MirroirVersion {
     /// Semantic version (`X.Y.Z`) reported in the MCP `initialize` handshake.
-    static let current = "0.40.1"
+    static let current = "0.41.0"
 }
