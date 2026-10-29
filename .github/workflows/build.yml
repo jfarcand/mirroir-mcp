@@ -58,6 +58,8 @@ concurrency:
 jobs:
   build:
     runs-on: macos-15
+    # The job takes ~40 min; twice that is a hang, not a slow runner.
+    timeout-minutes: 80
     permissions:
       contents: read
     steps:
@@ -138,7 +140,12 @@ jobs:
           MIRROIR_BUNDLE_ID: com.jfarcand.FakeMirroring
           MIRROIR_PROCESS_NAME: FakeMirroring
         run: |
-          .build/release/mirroir-mcp test --junit test-results.xml --verbose Tests/Fixtures/skills/fake-mirroring-check.yaml
+          set -euo pipefail
+          .build/release/mirroir-mcp test --junit test-results.xml --verbose Tests/Fixtures/skills/fake-mirroring-check.yaml 2>&1 | tee test-runner.log
+          # Every capture must come from ScreenCaptureKit: a fallback to the
+          # screencapture CLI is a degraded capture path, even when steps pass.
+          grep -qE "capture: sck=[1-9][0-9]* fallback=0$" test-runner.log \
+            || { echo "capture fell back to the screencapture CLI:"; grep "capture:" test-runner.log; exit 1; }
 
       - name: Compile skill (FakeMirroring)
         env:
@@ -163,12 +170,18 @@ jobs:
         with:
           toolchain: 1.99.1
 
+      # mirroir-run kills a hung block at the budget its steps earn; the step
+      # bound also covers the runner's own build, so CI can never hang here.
       - name: mirroir-run → mirroir-mcp ios block (FakeMirroring)
+        timeout-minutes: 15
         working-directory: runner
         env:
           MIRROIR_BUNDLE_ID: com.jfarcand.FakeMirroring
           MIRROIR_PROCESS_NAME: FakeMirroring
           MIRROIR_MCP_BIN: ${{ github.workspace }}/.build/release/mirroir-mcp
+          # mirroir-mcp's stderr reaches the log only at debug on a passing
+          # block; the capture summary below is read from it.
+          RUST_LOG: info,mirroir_run::target::ios=debug
         run: |
           set -euo pipefail
           cargo build --locked
@@ -183,6 +196,13 @@ jobs:
               "verdict=pass"; do
             grep -qF "$marker" <<<"$plain" || { echo "missing: $marker"; exit 1; }
           done
+          # Every screen capture went through ScreenCaptureKit: a fallback to
+          # the screencapture CLI is the stall carnet#24 hides behind a pass,
+          # and zero SCK captures would mean the block read no screen at all.
+          # No MCP server runs here, so nothing shares replayd's per-binary
+          # client slot with this run (see WindowShotFailure.handlerDropped).
+          grep -qE "capture: sck=[1-9][0-9]* fallback=0" <<<"$plain" \
+            || { echo "missing: capture: sck=N fallback=0"; exit 1; }
 
       - name: Upload test results
         if: always()

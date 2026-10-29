@@ -215,6 +215,10 @@ enum CompileCommand {
         let labelSteps = placeholderSteps?.count == skill.steps.count
             ? placeholderSteps ?? skill.steps : skill.steps
 
+        // The screen the skill starts from, read before its first step runs: the one
+        // moment every producer of a compiled skill fingerprints.
+        let fingerprint = startScreenFingerprint(describer: recordingDescriber)
+
         for (index, step) in skill.steps.enumerated() {
             let startTime = CFAbsoluteTimeGetCurrent()
             let result = executor.execute(step: step, stepIndex: index,
@@ -250,16 +254,6 @@ enum CompileCommand {
         let formatter = ISO8601DateFormatter()
         let compiledAt = formatter.string(from: Date())
 
-        // Build screen fingerprint from first OCR result for content drift detection
-        let fingerprint: ScreenFingerprint?
-        if let firstResult = recordingDescriber.firstResult {
-            fingerprint = StructuralFingerprint.buildScreenFingerprint(
-                elements: firstResult.elements,
-                icons: firstResult.icons)
-        } else {
-            fingerprint = nil
-        }
-
         return CompiledSkill(
             version: CompiledSkill.currentVersion,
             source: SourceInfo(sha256: sourceHash, compiledAt: compiledAt),
@@ -268,6 +262,13 @@ enum CompileCommand {
             steps: compiledSteps,
             screenFingerprint: fingerprint
         )
+    }
+
+    /// Fingerprint of the screen `describer` shows now, or nil when it reads nothing.
+    static func startScreenFingerprint(describer: ScreenDescribing) -> ScreenFingerprint? {
+        guard let screen = describer.describe() else { return nil }
+        return StructuralFingerprint.buildScreenFingerprint(
+            elements: screen.elements, icons: screen.icons)
     }
 
     /// Build StepHints from the step execution result and the recording describer state.

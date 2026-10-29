@@ -1,9 +1,12 @@
 // ABOUTME: Checks each surface a scenario declares against the executors this binary has, on this host.
 // ABOUTME: The plan layer asks here first, so a plan nothing can execute never reaches a compiler or a run.
 
+use std::ops::Range;
+
 use crate::error::{Result, RunnerError};
+use crate::ios_error::IosError;
 use crate::parser::step::{SkillStep, TargetArgs, TargetKind};
-use crate::parser::surface::step_kind;
+use crate::parser::surface::{is_ai_only, step_kind};
 
 /// Stands in for the first step's kind when the scenario declares no steps.
 const NO_STEPS: &str = "<empty>";
@@ -41,6 +44,30 @@ pub fn check_target(index: usize, target: &TargetArgs) -> Result<()> {
     Ok(())
 }
 
+/// Check the steps of the `ios` block spanning `block`: none may be AI-only
+/// ([`crate::parser::surface::AI_ONLY_STEP_KINDS`]).
+///
+/// A web block compiles a `remember:` to a comment in the spec it emits, but
+/// `mirroir-mcp test` cannot evaluate an AI-only step and fails the skill
+/// holding it — so inside an `ios` block the step is a plan error, not a note.
+///
+/// # Errors
+///
+/// [`IosError::AiOnlyStepInBlock`] naming the first such step.
+pub fn check_ios_block(steps: &[SkillStep], block: Range<usize>) -> Result<()> {
+    let block_start = block.start;
+    let Some(offset) = steps[block].iter().position(is_ai_only) else {
+        return Ok(());
+    };
+    let index = block_start + offset;
+    Err(IosError::AiOnlyStepInBlock {
+        index,
+        kind: step_kind(&steps[index]),
+        block_start,
+    }
+    .into())
+}
+
 /// The error for a scenario whose web steps have no browser to run in, naming
 /// what the scenario opens with and what surface it did declare.
 #[must_use]
@@ -68,9 +95,10 @@ fn declared_targets(steps: &[SkillStep]) -> impl Iterator<Item = (usize, &Target
 mod tests {
     use std::result::Result as StdResult;
 
-    use super::{check_target, no_web_target};
+    use super::{check_ios_block, check_target, no_web_target};
     use crate::error::RunnerError;
-    use crate::parser::step::{SkillStep, TargetArgs, TargetKind};
+    use crate::ios_error::IosError;
+    use crate::parser::step::{SkillStep, TapArgs, TargetArgs, TargetKind};
 
     type TestResult = StdResult<(), String>;
 
@@ -125,6 +153,29 @@ mod tests {
         match check_target(1, &target(TargetKind::Ios)) {
             Err(RunnerError::IosNeedsMacosHost { index: 1 }) => Ok(()),
             other => Err(format!("expected IosNeedsMacosHost, got {other:?}")),
+        }
+    }
+
+    /// `mirroir-mcp test` skips an AI-only step and grades the skill on the
+    /// rest, so one inside an `ios` block is refused, naming the step; the
+    /// same note outside the block's range is not the block's concern.
+    #[test]
+    fn an_ai_only_step_inside_an_ios_block_is_refused_naming_it() -> TestResult {
+        let steps = vec![
+            SkillStep::Target(target(TargetKind::Ios)),
+            SkillStep::Launch("Clock".to_owned()),
+            SkillStep::Remember("the alarm list loaded".to_owned()),
+            SkillStep::Tap(TapArgs::new("Alarmes".to_owned())),
+            SkillStep::Remember("after the block".to_owned()),
+        ];
+        check_ios_block(&steps[..2], 0..2).map_err(|e| format!("clean block refused: {e}"))?;
+        match check_ios_block(&steps, 0..4) {
+            Err(RunnerError::Ios(IosError::AiOnlyStepInBlock {
+                index: 2,
+                kind: "remember",
+                block_start: 0,
+            })) => Ok(()),
+            other => Err(format!("expected AiOnlyStepInBlock, got {other:?}")),
         }
     }
 

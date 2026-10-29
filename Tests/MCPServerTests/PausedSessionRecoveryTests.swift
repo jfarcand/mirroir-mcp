@@ -12,7 +12,7 @@ import HelperLib
 final class PausedSessionRecoveryTests: XCTestCase {
 
     private func makeInput(_ bridge: StubBridge) -> InputSimulation {
-        InputSimulation(bridge: bridge, layoutSubstitution: [:])
+        InputSimulation(bridge: bridge, keyboardLayout: .usQWERTY)
     }
 
     // MARK: - freePausedSession

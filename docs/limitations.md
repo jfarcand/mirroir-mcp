@@ -37,11 +37,11 @@ The MCP client (e.g. the terminal running the server) and the target window **mu
 
 ## Keyboard Layout Gaps
 
-CGEvent keycodes are layout-independent physical keys. When the iPhone uses a non-US keyboard layout (e.g., Canadian-CSA), the server builds a character substitution table (`LayoutMapper`) that maps each character to its US-QWERTY physical-key equivalent before looking up the keycode in `CGKeyMap`. Layout substitution is **off by default**; it activates only when a non-US layout is detected on the Mac, or when you opt in via the `IPHONE_KEYBOARD_LAYOUT` environment variable.
+CGEvent keycodes are layout-independent physical keys, and the iPhone turns them into characters with its own hardware-keyboard layout. When `keyboardLayout` (or `IPHONE_KEYBOARD_LAYOUT`) names a non-US layout such as Canadian-CSA, the server reads macOS's copy of that layout (`LayoutMapper.keyTable`) and types each character with the key and Shift state that produce it there. With it empty or `US`, keystrokes come from the US QWERTY table in `CGKeyMap`.
 
-Characters with no `CGKeyMap` mapping after substitution cannot be typed (e.g. `§` and `±` on the ISO section key of Canadian-CSA, where macOS and iPhone Mirroring disagree on the physical key). These characters are skipped and reported back: `type_text` returns `success: true` with a warning of the form `Skipped N character(s) with no key mapping` — they are not silently dropped.
+From a non-US layout, mirroir takes single keystrokes (unshifted or shifted) and dead-key pairs (`ê` is `^` then `e` on Canadian-CSA). Characters on the Option layer, and characters the layout does not have (`<`, `[`, `|` on Canadian-CSA), are sent through the clipboard with a warning, so they depend on Universal Clipboard.
 
-A layout table that does not match the phone's active keyboard types the wrong character rather than skipping it. On an iPhone whose keyboard differs from the configured `Canadian-CSA` table, `/` has been observed arriving as `é`, which garbles every URL — `type_text` of a URL and a scenario `open_url:` step both fail. Open the page another way (a bookmark, a link, or an address without slashes) until the table matches.
+The setting must match the layout chosen on the iPhone. A mismatch types the wrong character rather than skipping it — with no layout set on a Canadian-CSA iPhone, `/` arrives as `é` and every URL is garbled.
 
 ## Web and iOS Scenarios
 

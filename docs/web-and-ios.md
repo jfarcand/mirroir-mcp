@@ -119,9 +119,9 @@ with a `cross_surface:` step as above.
 - The two blocks run **one after the other**, not at the same time. Parallel lanes, waiting on
   a streaming app's events, and an LLM judge of whether two answers mean the same thing are part
   of the design but not built.
-- Typing a URL on a phone whose keyboard layout differs from `keyboardLayout` can garble it
-  (for example `/` arriving as `é` with `Canadian-CSA`), so an `open_url:` step can fail there.
-  Opening the page another way works.
+- `keyboardLayout` must match the phone's hardware-keyboard layout. A mismatch garbles typed
+  URLs (for example `/` arriving as `é` on a `Canadian-CSA` phone with no layout set), so an
+  `open_url:` step fails there.
 - `macos` window targets are driven by `mirroir-mcp test` directly; `mirroir-run` does not open
   a block for them.
 

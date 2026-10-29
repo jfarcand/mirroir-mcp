@@ -108,12 +108,20 @@ final class NavigationToolHandlerTests: XCTestCase {
         XCTAssertTrue(text?.contains("Missing required parameter") ?? false)
     }
 
-    func testOpenURLBlockedForIPhoneMirroring() {
+    func testOpenURLDrivesSafariOnIPhoneMirroring() {
+        // The tool and a scenario's `open_url:` step take the same path
+        // (InputSimulation.openURL), so they give the same answer.
         input.openURLResult = nil
+        let response = callTool("open_url", args: ["url": .string("https://example.com/a/b")])
+        XCTAssertFalse(isError(response))
+        XCTAssertEqual(extractText(response), "Opened URL: https://example.com/a/b")
+    }
+
+    func testOpenURLReportsInputFailureOnIPhoneMirroring() {
+        input.openURLResult = "Failed to select address bar"
         let response = callTool("open_url", args: ["url": .string("https://example.com")])
         XCTAssertTrue(isError(response))
-        let text = extractText(response)
-        XCTAssertTrue(text?.contains("not supported for iPhone Mirroring") ?? false)
+        XCTAssertEqual(extractText(response), "Failed to select address bar")
     }
 
     func testOpenURLSuccessForGenericWindow() {

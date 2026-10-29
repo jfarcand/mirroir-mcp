@@ -16,18 +16,21 @@ enum ConsoleReporter {
         let stepResults: [StepResult]
         let durationSeconds: Double
 
-        /// A skill passes only when no step failed AND at least one step
-        /// actually passed. A skill whose every step was skipped evaluated
-        /// nothing, so it is not a pass.
+        /// A skill passes only when no step failed, no step went unevaluated, AND
+        /// at least one step actually passed. A skill whose every step was skipped
+        /// evaluated nothing, and one holding an AI-only step the CLI could not
+        /// evaluate checked less than it says, so neither is a pass.
         var passed: Bool {
-            !stepResults.contains { $0.status == .failed }
+            !stepResults.contains { $0.status == .failed || $0.status == .notEvaluated }
                 && stepResults.contains { $0.status == .passed }
         }
 
-        /// Why a skill that did not pass failed: every failed step, named by its
-        /// index in the skill, or why nothing ran.
+        /// Why a skill that did not pass failed: every failed or unevaluated step,
+        /// named by its index in the skill, or why nothing ran.
         var failureReasons: [String] {
-            let failedSteps = stepResults.enumerated().filter { $0.element.status == .failed }
+            let failedSteps = stepResults.enumerated().filter {
+                $0.element.status == .failed || $0.element.status == .notEvaluated
+            }
             if failedSteps.isEmpty {
                 return ["no step executed: every step was skipped"]
             }
@@ -63,15 +66,20 @@ enum ConsoleReporter {
         let passed = result.stepResults.filter { $0.status == .passed }.count
         let failed = result.stepResults.filter { $0.status == .failed }.count
         let skipped = result.stepResults.filter { $0.status == .skipped }.count
+        let notEvaluated = result.stepResults.filter { $0.status == .notEvaluated }.count
         let duration = String(format: "%.1fs", result.durationSeconds)
 
         let overallStatus = result.passed ? "PASS" : "FAIL"
 
-        fputs("  Result: \(overallStatus) (\(duration)) — \(passed) passed, \(failed) failed, \(skipped) skipped\n", stderr)
+        fputs("  Result: \(overallStatus) (\(duration)) — \(passed) passed, \(failed) failed, "
+            + "\(notEvaluated) not evaluated, \(skipped) skipped\n", stderr)
     }
 
-    /// Print a final summary across all skills.
-    static func reportSummary(results: [SkillResult]) {
+    /// Print a final summary across all skills, ending the counts with how the
+    /// run's screens were captured (`captures.summaryLine`), so a ScreenCaptureKit
+    /// path silently degrading to the `screencapture` CLI shows up as
+    /// `fallback=N` rather than only as slow steps.
+    static func reportSummary(results: [SkillResult], captures: CaptureStatsSnapshot) {
         let totalSkills = results.count
         let passedSkills = results.filter(\.passed).count
         let failedSkills = totalSkills - passedSkills
@@ -80,11 +88,15 @@ enum ConsoleReporter {
         let passedSteps = results.flatMap { $0.stepResults }.filter { $0.status == .passed }.count
         let failedSteps = results.flatMap { $0.stepResults }.filter { $0.status == .failed }.count
         let skippedSteps = results.flatMap { $0.stepResults }.filter { $0.status == .skipped }.count
+        let notEvaluatedSteps = results.flatMap { $0.stepResults }
+            .filter { $0.status == .notEvaluated }.count
 
         fputs("\n", stderr)
         fputs("Summary: \(totalSkills) skill(s), \(totalSteps) step(s)\n", stderr)
         fputs("  Skills — PASSED: \(passedSkills), FAILED: \(failedSkills)\n", stderr)
-        fputs("  Steps — PASSED: \(passedSteps), FAILED: \(failedSteps), SKIPPED: \(skippedSteps)\n", stderr)
+        fputs("  Steps — PASSED: \(passedSteps), FAILED: \(failedSteps), "
+            + "NOT EVALUATED: \(notEvaluatedSteps), SKIPPED: \(skippedSteps)\n", stderr)
+        fputs("  \(captures.summaryLine)\n", stderr)
 
         if failedSkills > 0 {
             fputs("\nFailed skills:\n", stderr)

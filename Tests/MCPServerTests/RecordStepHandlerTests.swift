@@ -21,7 +21,8 @@ final class RecordStepHandlerTests: XCTestCase {
             capture: StubCapture(), describer: StubDescriber(), recorder: StubRecorder(),
             capabilities: [])
         let registry = TargetRegistry(targets: ["iphone": context], defaultName: "iphone")
-        MirroirMCP.registerCompilationTools(server: server, registry: registry)
+        MirroirMCP.registerCompilationTools(
+            server: server, registry: registry, session: CompilationSession())
     }
 
     private func recordStep(_ args: [String: JSONValue]) -> (isError: Bool, text: String) {

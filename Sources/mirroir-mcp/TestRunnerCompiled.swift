@@ -153,57 +153,27 @@ extension TestRunner {
         }
     }
 
-    /// Auto-recompile a drifted skill and return the fresh compiled result.
-    /// Returns nil if recompilation fails or is disabled.
-    static func autoRecompile(
-        skill: SkillDefinition,
-        bridge: MirroringBridge,
-        input: InputSimulation,
-        describer: ScreenDescriber,
-        capture: ScreenCapture,
-        config: StepExecutorConfig,
-        registry: TargetRegistry?
-    ) -> CompiledSkill? {
-        if skill.kind == "game" {
-            fputs("  Skipping \(skill.name): kind:game is model-interpreted — "
-                + "never compiled or replayed by the runner.\n", stderr)
-            return nil
+    /// The compiled skill each skill replays from, keyed by skill path: those whose
+    /// compiled file matches the skill source, the format version and the window.
+    /// A stale one is named and left out, so its skill runs on live OCR. The files
+    /// are only read: `mirroir-mcp test` never writes a `.compiled.json`.
+    static func freshCompiledSkills(
+        for skills: [SkillDefinition],
+        windowWidth: Double,
+        windowHeight: Double
+    ) -> [String: CompiledSkill] {
+        var compiledMap: [String: CompiledSkill] = [:]
+        for skill in skills {
+            guard let compiled = try? CompiledSkillIO.load(for: skill.filePath) else { continue }
+            switch CompiledSkillIO.checkStaleness(
+                compiled: compiled, skillPath: skill.filePath,
+                windowWidth: windowWidth, windowHeight: windowHeight) {
+            case .fresh:
+                compiledMap[skill.filePath] = compiled
+            case .stale(let reason):
+                fputs("Warning: compiled skill stale for \(skill.name): \(reason)\n", stderr)
+            }
         }
-        let windowInfo = bridge.getWindowInfo()
-        let windowWidth = windowInfo.map { Double($0.size.width) } ?? 0
-        let windowHeight = windowInfo.map { Double($0.size.height) } ?? 0
-        let orientation = bridge.getOrientation()?.rawValue ?? "portrait"
-
-        let recordingDescriber = RecordingDescriber(wrapping: describer)
-        let executor = StepExecutor(
-            bridge: bridge, input: input,
-            describer: recordingDescriber, capture: capture,
-            config: config,
-            registry: registry
-        )
-
-        fputs("  Auto-recompiling \(skill.name)...\n", stderr)
-
-        guard let compiled = CompileCommand.compileSkill(
-            skill: skill,
-            executor: executor,
-            recordingDescriber: recordingDescriber,
-            filePath: skill.filePath,
-            windowWidth: windowWidth,
-            windowHeight: windowHeight,
-            orientation: orientation
-        ) else {
-            fputs("  Auto-recompile FAILED for \(skill.name)\n", stderr)
-            return nil
-        }
-
-        do {
-            try CompiledSkillIO.save(compiled, for: skill.filePath)
-            fputs("  Auto-recompile OK for \(skill.name)\n", stderr)
-            return compiled
-        } catch {
-            fputs("  Auto-recompile save failed: \(error.localizedDescription)\n", stderr)
-            return nil
-        }
+        return compiledMap
     }
 }

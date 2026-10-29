@@ -46,12 +46,10 @@ enum IPhoneMirroringTarget {
         coordinateSystem: .mobile,
         cursorMode: .direct,
         supportsKeyboardShortcuts: false,
-        supportsDirectURLOpen: false,
-        urlOpenUnsupportedMessage:
-            "open_url is not supported for iPhone Mirroring targets. "
-            + "Keyboard shortcuts (Cmd+L) do not work through iPhone Mirroring. "
-            + "To navigate in Safari: launch Safari, tap the address bar, "
-            + "use type_text to enter the URL, then press_key(key: \"return\").",
+        // Safari implements Cmd+L (verified on-device), so open_url drives it
+        // exactly like a scenario's `open_url:` step: launch, Cmd+L, type, Return.
+        supportsDirectURLOpen: true,
+        urlOpenUnsupportedMessage: nil,
         defaultStrategy: .mobile,
         layoutZones: { orientation in
             orientation == .landscape ? landscapeZones : portraitZones

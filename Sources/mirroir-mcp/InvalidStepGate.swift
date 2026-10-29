@@ -6,7 +6,8 @@
 
 import Foundation
 
-/// Pre-flight gate for steps the parser turned into `.invalid`.
+/// Pre-flight gate for steps the parser turned into `.invalid`, or into a
+/// `.skipped` step it could not use.
 enum InvalidStepGate {
 
     /// One unreadable step, located in its skill.
@@ -32,11 +33,22 @@ enum InvalidStepGate {
 
     /// The type and reason of a step the parser could not read, looking inside a
     /// measure at the action it times; nil for a readable step.
+    ///
+    /// A step the parser could read but not use (a drag naming neither end, a
+    /// measure with no action) is refused too: it would otherwise run as SKIP,
+    /// and a skill can pass beside a step that checked nothing. An AI-only step
+    /// is readable — it reports itself not evaluated — except as the action a
+    /// measure times, where nothing would run before the timer starts.
     static func unreadable(_ step: SkillStep) -> (stepType: String, reason: String)? {
         switch step {
         case .invalid(let stepType, let reason):
             return (stepType, reason)
+        case .skipped(let stepType, let reason) where step.aiOnlyStepType == nil:
+            return (stepType, reason)
         case .measure(_, let action, _, _):
+            if let stepType = action.aiOnlyStepType {
+                return ("measure", "action \(stepType): an AI-only step cannot be timed")
+            }
             return unreadable(action).map { ("measure", "action \($0.stepType): \($0.reason)") }
         default:
             return nil

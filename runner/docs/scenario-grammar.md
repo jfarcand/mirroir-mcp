@@ -162,8 +162,8 @@ second invocation is worse — a fresh context silently discards cookies,
 runner-side step before or after the web run instead.
 
 `remember:` is exempt: it records a note and drives nothing, so it is
-transparent to the run and may sit anywhere — see [Annotation
-step](#annotation-step).
+transparent to the web run and may sit anywhere outside an `ios` block — see
+[Annotation step](#annotation-step).
 
 ### `target`
 
@@ -196,8 +196,22 @@ one-step-per-line dialect (`target/mirroir-ios/<scenario>/ios-block.yaml`) and
 reads back the Playwright-JSON-shaped report `mirroir-mcp test --report-json`
 writes, through the same ingest as a web block. A web-only option in an iOS
 block (`last:`, `into:`, `contains:`, a per-step `timeout_s:` on `tap:` or an
-assert) is refused by name (`IosError::NotExpressible`), never dropped.
+assert) is refused by name (`IosError::NotExpressible`), never dropped. An
+AI-only step (`remember:`) between two steps of an `ios` block is refused at
+plan time (`IosError::AiOnlyStepInBlock`): `mirroir-mcp test` cannot evaluate
+it and would fail the block on it. Place it after the block's last device step.
+The AI-only kinds are pinned on both sides by
+`src/target/fixtures/ai-only-step-kinds.json`.
 `mirroir-mcp` is found through `MIRROIR_MCP_BIN`, else `PATH`.
+
+Each `mirroir-mcp test` run is bounded. Every step of the block earns an
+allowance — 30 s by default, the same ceiling a web step gets — or its own
+longer ceiling (a `wait_for:` `timeout_s`, a `measure:` `max_seconds`, one
+allowance per `scroll_to:` attempt), and the final-screen capture earns one
+more. Past that budget the child's whole process group is killed and the block
+fails with `IosError::BlockTimeout`, naming the elapsed time, the budget and
+the stderr tail. `MIRROIR_IOS_STEP_ALLOWANCE_S` overrides the per-step
+allowance in whole seconds.
 
 ### `tap`, `type`, `wait_for`, `assert_visible`, `assert_not_visible`
 
@@ -312,7 +326,9 @@ position — including after the `kill:` that tears the server down.
 ```
 
 Inside a web run it rides along and reaches the emitted spec as a comment at
-its own position. Anywhere else the runner dispatches it and logs the note.
+its own position. Inside an `ios` block it is refused at plan time
+(`IosError::AiOnlyStepInBlock`), because `mirroir-mcp test` cannot evaluate it.
+Anywhere else the runner dispatches it and logs the note.
 Either way it asserts nothing, so a scenario whose only step is a note still
 fails with `ScenarioNothingEvaluated`.
 
@@ -526,7 +542,7 @@ Errors (`CrossSurfaceError`): `TooFewFiles`, `CaptureTargetNotListed`,
 | `http` | `target::http` (reqwest) | One `HttpClient` per scenario |
 | `target` (kind=web), `tap`, `type`, `wait_for`, `assert_visible`, `assert_not_visible`, `screenshot`, `press_key`, `swipe`, `scroll_to`, `long_press`, `drag`, `open_url`, `measure` — inside a web block | `compile::playwright` + `compile::invoke` | One spec, one `npx playwright test` per web block |
 | `target` (kind=ios), the same interaction verbs, `launch`, `home`, `shake`, `reset_app`, `set_network` — inside an ios block | `compile::mirroir_block` + `target::ios` | One `mirroir-mcp test` per ios block, macOS host only |
-| `remember` | annotation | Neither surface: a comment in the spec when it sits inside the web run, a logged note when it sits outside. Never splits the run. |
+| `remember` | annotation | Neither surface: a comment in the spec when it sits inside the web run, a logged note when it sits outside, refused inside an ios block. Never splits the run. |
 | `judge` | `oracle::judge` | OpenAI-compatible chat completions |
 | `cross_surface` | `oracle::drift` | Jaccard over `Fingerprint` |
 | `report` | `replay_step` | Applies the declared verdict to the scenario. |

@@ -112,7 +112,11 @@ fn step_line(index: usize, step: &SkillStep) -> Result<String> {
         SkillStep::Shake(_) => "shake".to_owned(),
         SkillStep::ResetApp(app) => format!("reset_app: {}", q(app)?),
         SkillStep::SetNetwork(mode) => format!("set_network: {}", q(mode)?),
-        SkillStep::Remember(note) => format!("remember: {}", q(note)?),
+        SkillStep::Remember(_) => {
+            return refuse(
+                "an AI-only step is one `mirroir-mcp test` cannot evaluate, so the block would fail on it",
+            );
+        }
         SkillStep::ScrollTo(args) => {
             if args.direction != SWIPE_SCROLL_DIRECTION || args.max_scrolls != DEFAULT_MAX_SCROLLS {
                 return refuse(
@@ -291,6 +295,17 @@ mod tests {
             if !reason.contains("web-only") {
                 return Err(format!("{step}: wrong reason {reason}"));
             }
+        }
+        Ok(())
+    }
+
+    /// The plan refuses a `remember:` inside an `ios` block first; the writer
+    /// refuses it too, so no path emits a step mirroir-mcp cannot evaluate.
+    #[test]
+    fn an_ai_only_step_is_refused_not_written() -> TestResult {
+        let reason = refused("  - remember: \"the list loaded\"\n")?;
+        if !reason.contains("AI-only") {
+            return Err(format!("wrong reason {reason}"));
         }
         Ok(())
     }

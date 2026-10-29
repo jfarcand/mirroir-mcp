@@ -45,11 +45,16 @@ final class CompiledStepExecutor {
                  stepIndex: Int, skillName: String) -> StepResult {
         let startTime = CFAbsoluteTimeGetCurrent()
 
+        if let stepType = step.aiOnlyStepType {
+            return .notEvaluated(step, stepType: stepType)
+        }
+
         guard let hints = compiledStep.hints else {
-            // No hints (AI-only step) — skip
-            return StepResult(step: step, status: .skipped,
-                              message: "no compiled hints",
-                              durationSeconds: elapsed(startTime))
+            // Nothing was recorded to replay it from, so the step runs live, as
+            // `passthrough` does: the skill is checked by what it says, never
+            // skipped past.
+            return normalExecutor.execute(step: step, stepIndex: stepIndex,
+                                          skillName: skillName)
         }
 
         switch hints.compiledAction {

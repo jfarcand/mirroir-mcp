@@ -21,13 +21,15 @@ extension MirroirMCP {
         registerNavigationTools(server: server, registry: registry,
                                 policy: policy)
         registerInfoTools(server: server, registry: registry)
-        registerSkillTools(server: server)
+        // get_skill marks the start screen of the skill save_compiled then saves.
+        let compilationSession = CompilationSession()
+        registerSkillTools(server: server, registry: registry, session: compilationSession)
         registerScrollToTools(server: server, registry: registry)
         registerAppManagementTools(server: server, registry: registry)
         registerMeasureTools(server: server, registry: registry)
         registerNetworkTools(server: server, registry: registry)
         registerTargetTools(server: server, registry: registry)
-        registerCompilationTools(server: server, registry: registry)
+        registerCompilationTools(server: server, registry: registry, session: compilationSession)
         registerGenerateSkillTools(server: server, registry: registry, policy: policy)
         registerComponentTools(server: server, registry: registry)
     }

@@ -106,10 +106,10 @@ extension InputSimulation {
     /// Type text via CGEvent keyboard events.
     ///
     /// CGEvent keycodes are layout-independent physical keys (same concept as
-    /// USB HID keycodes). When `IPHONE_KEYBOARD_LAYOUT` is set to a non-US
-    /// layout, characters are translated through a layout substitution table
-    /// before mapping to keycodes. Characters with no CGKeyMap mapping are
-    /// skipped and reported in the warning field of the result.
+    /// USB HID keycodes). Each character is typed with the key that produces it
+    /// on the iPhone's layout (`keyboardLayout`, from `keyboardLayout` /
+    /// `IPHONE_KEYBOARD_LAYOUT`). Characters that layout cannot type in one
+    /// keystroke go through the clipboard, with a warning in the result.
     func typeText(_ text: String) -> TypeResult {
         if let keyboardError = prepareKeyboardInput(tag: "typeText") {
             return TypeResult(success: false, warning: nil, error: keyboardError)
@@ -225,27 +225,24 @@ extension InputSimulation {
     }
 
     /// Split text into segments based on whether each character can be typed
-    /// via CGEvent key events (after layout substitution) or must be pasted.
+    /// via CGEvent key events on the iPhone's layout or must be pasted. Both
+    /// kinds carry the original characters: key events look up their keys on
+    /// `keyboardLayout`, and the clipboard carries text verbatim.
     func buildTypeSegments(_ text: String) -> [TypeSegment] {
         var segments: [TypeSegment] = []
         var currentText = ""
         var currentMethod: TypeMethod = .keyEvent
 
         for char in text {
-            let substituted = layoutSubstitution[char] ?? char
-            let method: TypeMethod = CGKeyMap.lookupSequence(substituted) != nil ? .keyEvent : .paste
-            // For key-event segments, use the substituted character (US QWERTY equivalent).
-            // For paste segments, use the original character — the clipboard carries
-            // it verbatim, so no layout substitution applies.
-            let outputChar = method == .keyEvent ? substituted : char
+            let method: TypeMethod = keyboardLayout.keySequence(for: char) != nil ? .keyEvent : .paste
 
             if method == currentMethod {
-                currentText.append(outputChar)
+                currentText.append(char)
             } else {
                 if !currentText.isEmpty {
                     segments.append(TypeSegment(text: currentText, method: currentMethod))
                 }
-                currentText = String(outputChar)
+                currentText = String(char)
                 currentMethod = method
             }
         }
@@ -259,7 +256,7 @@ extension InputSimulation {
     /// Type text by posting CGEvent keyboard events for each character.
     private func typeViaCGEvent(_ text: String) -> TypeResult? {
         for char in text {
-            guard let sequence = CGKeyMap.lookupSequence(char) else {
+            guard let sequence = keyboardLayout.keySequence(for: char) else {
                 return TypeResult(
                     success: false,
                     warning: nil,

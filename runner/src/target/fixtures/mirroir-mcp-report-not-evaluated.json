@@ -1,0 +1,41 @@
+{
+  "suites" : [
+    {
+      "file" : "check-alarms.yaml",
+      "specs" : [
+        {
+          "ok" : false,
+          "tests" : [
+            {
+              "projectName" : "ios",
+              "results" : [
+                {
+                  "attachments" : [
+                    {
+                      "body" : "eyJjcm9zc19zdXJmYWNlIjp7ImlvcyI6IkFsYXJtZXMgQXVjdW5lIGFsYXJtZVxuIn0sIm1ldHJpY3MiOnt9fQ==",
+                      "contentType" : "application\/json",
+                      "name" : "mirroir-captures"
+                    }
+                  ],
+                  "duration" : 1000,
+                  "error" : {
+                    "message" : "step 1 (verify (skipped)): not evaluated: verify needs an AI client"
+                  },
+                  "errors" : [
+                    {
+                      "message" : "step 1 (verify (skipped)): not evaluated: verify needs an AI client"
+                    }
+                  ],
+                  "status" : "failed"
+                }
+              ],
+              "status" : "unexpected"
+            }
+          ],
+          "title" : "check-alarms"
+        }
+      ],
+      "title" : "check-alarms.yaml"
+    }
+  ]
+}

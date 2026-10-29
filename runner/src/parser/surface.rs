@@ -101,6 +101,20 @@ pub const fn is_annotation(step: &SkillStep) -> bool {
     matches!(step_surface(step), StepSurface::Annotation)
 }
 
+/// Step kinds only a model can evaluate. `mirroir-mcp test` has no model, so
+/// it reports each one not evaluated and fails the skill holding it; an `ios`
+/// block therefore refuses them at plan time. Swift's
+/// `SkillParser.aiOnlyStepTypes` holds the same list: both sides are pinned to
+/// `target/fixtures/ai-only-step-kinds.json`, so neither can drift alone.
+pub const AI_ONLY_STEP_KINDS: [&str; 5] =
+    ["condition", "remember", "repeat", "summarize", "verify"];
+
+/// True when `step` is one of [`AI_ONLY_STEP_KINDS`].
+#[must_use]
+pub fn is_ai_only(step: &SkillStep) -> bool {
+    AI_ONLY_STEP_KINDS.contains(&step_kind(step))
+}
+
 /// Short label for a [`SkillStep`] — used in `tracing` fields, error messages,
 /// and the comments the compiler emits for runner-side steps.
 #[must_use]
@@ -141,8 +155,24 @@ pub const fn step_kind(step: &SkillStep) -> &'static str {
 
 #[cfg(test)]
 mod tests {
-    use super::{StepSurface, is_annotation, is_web, step_kind, step_surface};
+    use std::error::Error as StdError;
+    use std::result::Result as StdResult;
+
+    use serde_norway::Deserializer;
+    use serde_norway::with::singleton_map_recursive;
+
+    use super::{
+        AI_ONLY_STEP_KINDS, StepSurface, is_ai_only, is_annotation, is_web, step_kind, step_surface,
+    };
     use crate::parser::step::{AssertArgs, SkillStep, TapArgs, TargetArgs, TargetKind};
+
+    /// The AI-only step kinds `SkillParser.aiOnlyStepTypes` holds on the Swift
+    /// side; `AIOnlyStepKindsContractTests` pins that set to the same file.
+    const AI_ONLY_FIXTURE: &str = include_str!("../target/fixtures/ai-only-step-kinds.json");
+
+    fn parse(yaml: &str) -> StdResult<SkillStep, serde_norway::Error> {
+        singleton_map_recursive::deserialize(Deserializer::from_str(yaml))
+    }
 
     fn target() -> SkillStep {
         SkillStep::Target(TargetArgs {
@@ -194,5 +224,30 @@ mod tests {
             ))),
             "assert_not_visible"
         );
+    }
+
+    /// The runner's AI-only list is the one the shared fixture names, and
+    /// every kind in it either parses to a step `is_ai_only` recognizes or is
+    /// not runner grammar at all, so none can reach an `ios` block unrefused.
+    #[test]
+    fn ai_only_kinds_match_the_shared_fixture() -> StdResult<(), Box<dyn StdError>> {
+        let fixture: Vec<String> = serde_json::from_str(AI_ONLY_FIXTURE)?;
+        assert_eq!(fixture, AI_ONLY_STEP_KINDS.map(str::to_owned).to_vec());
+        let mut parsed_kinds = Vec::new();
+        for kind in AI_ONLY_STEP_KINDS {
+            let value = if kind == "condition" {
+                "{ if_visible: \"x\", then: [] }"
+            } else {
+                "\"x\""
+            };
+            if let Ok(step) = parse(&format!("{kind}: {value}")) {
+                assert_eq!(step_kind(&step), kind);
+                assert!(is_ai_only(&step), "{kind} parsed but is not AI-only");
+                parsed_kinds.push(kind);
+            }
+        }
+        assert_eq!(parsed_kinds, ["condition", "remember"]);
+        assert!(!is_ai_only(&SkillStep::Launch("Clock".to_owned())));
+        Ok(())
     }
 }

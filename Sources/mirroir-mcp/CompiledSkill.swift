@@ -17,7 +17,10 @@ struct CompiledSkill: Codable, Equatable {
     let device: DeviceInfo
     /// Pre-compiled steps with cached coordinates and timing.
     let steps: [CompiledStep]
-    /// OCR-based screen fingerprint captured at compile time for content drift detection.
+    /// OCR-based fingerprint of the screen the skill starts from, captured before its
+    /// first step ran. Every producer (`mirroir-mcp compile`, `save_compiled`) records
+    /// that same moment, so a caller can compare it against the screen a run starts on.
+    /// `mirroir-mcp test` never compares or rewrites it. Nil when no start screen was read.
     var screenFingerprint: ScreenFingerprint? = nil
 
     /// Current format version. Bump forces recompilation of all existing compiled skills.
@@ -26,9 +29,7 @@ struct CompiledSkill: Codable, Equatable {
     static let currentVersion = 3
 }
 
-/// Fingerprint of the app's screen content at compilation time.
-/// Used to detect content drift (e.g. app updates that move elements)
-/// even when the skill YAML and window dimensions haven't changed.
+/// Structural fingerprint of the screen a compiled skill starts from.
 struct ScreenFingerprint: Codable, Equatable {
     /// SHA-256 of sorted structural texts + icon count for fast-path equality.
     let hash: String
@@ -213,7 +214,7 @@ enum CompiledSkillIO {
 
     /// Why a compiled skill no longer matches its source file, or nil when it does:
     /// a different compiled-format version, or a source file edited since it was
-    /// compiled. Window size and screen drift are judged separately, against a device.
+    /// compiled. Window size is judged separately, against a device.
     static func sourceStaleness(compiled: CompiledSkill, skillPath: String) -> String? {
         if compiled.version != CompiledSkill.currentVersion {
             return "compiled version \(compiled.version) != current \(CompiledSkill.currentVersion)"
@@ -249,13 +250,12 @@ enum CompiledSkillIO {
         return digest.map { String(format: "%02x", $0) }.joined()
     }
 
-    /// Check if a compiled skill is stale relative to its source file.
-    /// Optionally compares a live screen fingerprint against the baseline for content drift.
+    /// Check if a compiled skill is stale relative to its source file and the
+    /// window it would replay in. Reading a compiled skill never writes it.
     static func checkStaleness(compiled: CompiledSkill,
                                 skillPath: String,
                                 windowWidth: Double,
-                                windowHeight: Double,
-                                liveFingerprint: ScreenFingerprint? = nil) -> StalenessResult {
+                                windowHeight: Double) -> StalenessResult {
         if let reason = sourceStaleness(compiled: compiled, skillPath: skillPath) {
             return .stale(reason: reason)
         }
@@ -266,16 +266,6 @@ enum CompiledSkillIO {
             return .stale(reason: "window dimensions changed: compiled \(Int(compiled.device.windowWidth))x\(Int(compiled.device.windowHeight)) vs current \(Int(windowWidth))x\(Int(windowHeight))")
         }
 
-        // Content drift check via screen fingerprint
-        if let baseline = compiled.screenFingerprint, let live = liveFingerprint {
-            let similarity = StructuralFingerprint.screenFingerprintSimilarity(baseline, live)
-            if similarity < StructuralFingerprint.similarityThreshold {
-                return .drifted(
-                    similarity: similarity,
-                    reason: "screen content has drifted (similarity: \(String(format: "%.2f", similarity)))")
-            }
-        }
-
         return .fresh
     }
 }
@@ -284,6 +274,4 @@ enum CompiledSkillIO {
 enum StalenessResult: Equatable {
     case fresh
     case stale(reason: String)
-    /// Content has drifted but skill is still usable — warning only.
-    case drifted(similarity: Double, reason: String)
 }

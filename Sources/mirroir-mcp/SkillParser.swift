@@ -74,6 +74,14 @@ enum SkillStep {
         }
     }
 
+    /// The step type when this is an AI-only step (`verify`, `remember`, ...), which
+    /// only an AI client can evaluate; nil for every step the CLI runs itself.
+    var aiOnlyStepType: String? {
+        guard case .skipped(let stepType, _) = self,
+              SkillParser.aiOnlyStepTypes.contains(stepType) else { return nil }
+        return stepType
+    }
+
     /// The primary label/value associated with this step, if any.
     var labelValue: String? {
         switch self {
@@ -272,7 +280,8 @@ enum SkillParser {
     /// Why a step whose type no skill step has (e.g. a tool such as press_back) is invalid.
     static let unknownStepTypeReason = "unknown step type"
 
-    /// Step types only an AI can interpret; the runner skips them.
+    /// Step types only an AI can interpret. `mirroir test` reports each one not
+    /// evaluated, so a skill holding one does not pass.
     static let aiOnlyStepTypes: Set<String> = ["remember", "condition", "repeat", "verify", "summarize"]
 
     /// Parse one step from its type key and raw value, the two halves of

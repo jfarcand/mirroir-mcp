@@ -155,6 +155,9 @@ pointing at the release `mirroir-mcp`. The scenario is one `target: { kind: ios 
 `cross_surface:` step that compares the block's live OCR capture against committed expected
 text. The step fails unless the log shows the hand-off to mirroir-mcp, the capture being
 written, the pairwise comparison, and `verdict=pass`, so a skipped block cannot pass as green.
+It also requires mirroir-mcp's `capture: sck=N fallback=0` summary (N ≥ 1): a capture that fell
+back to the `screencapture` CLI fails the lane. The step is bounded by `timeout-minutes`, and
+mirroir-run itself kills a block that outlives the budget its steps earn.
 It is the one lane where the Swift and Rust sides of that boundary run together; the report
 format itself is also pinned by `PlaywrightReportWriterTests` against the fixture the runner's
 ingest tests read. See [Web and iOS in one scenario](web-and-ios.md).

@@ -45,7 +45,7 @@ All input (touch and keyboard) is delivered via the macOS CGEvent API. CGEvent p
 
 ## Does it work with non-US keyboard layouts?
 
-Yes, with opt-in configuration. Set the `IPHONE_KEYBOARD_LAYOUT` environment variable to your iPhone's hardware keyboard layout, and the server uses `UCKeyTranslate` to map characters to the correct keycodes:
+Yes, with opt-in configuration. Set `keyboardLayout` in `settings.json` (or the `IPHONE_KEYBOARD_LAYOUT` environment variable) to your iPhone's hardware keyboard layout, and the server reads that layout with `UCKeyTranslate` to press the key that types each character on it:
 
 ```bash
 export IPHONE_KEYBOARD_LAYOUT="Canadian-CSA"
@@ -53,7 +53,7 @@ export IPHONE_KEYBOARD_LAYOUT="Canadian-CSA"
 
 Accepted formats: `"Canadian-CSA"` or `"com.apple.keylayout.Canadian-CSA"`. Supported layouts include Canadian-CSA, French (AZERTY), German (QWERTZ), and others. Without this variable, the server sends US QWERTY keycodes (which is correct if your iPhone uses a US keyboard layout).
 
-**Known gap:** Two characters on the ISO section key (`§` and `±` on Canadian-CSA) cannot be typed because macOS and iPhone Mirroring disagree on the key mapping for that physical key. These characters are silently skipped.
+Dead-key compositions such as `ê` on Canadian-CSA are typed as the dead key then the base key. Characters the layout has no keys for, such as `<` on Canadian-CSA, are sent through the clipboard with a warning, which needs Universal Clipboard.
 
 ## What happens if iPhone Mirroring disconnects?
 

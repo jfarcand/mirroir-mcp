@@ -19,7 +19,6 @@ struct TestRunConfig {
     let noCompiled: Bool
     /// Agent mode: nil = no agent, "" = deterministic only, non-empty = AI model name.
     let agent: String?
-    let noAutoRecompile: Bool
     /// Allow steps with real-world consequences to execute. Off by default so a
     /// skill cannot send, delete, or buy anything without an explicit say-so.
     let confirmDestructive: Bool
@@ -35,9 +34,20 @@ struct TestRunConfig {
 /// Orchestrates skill test execution from the CLI.
 enum TestRunner {
 
-    /// Parse CLI arguments and run tests. Returns exit code (0 = all pass, 1 = any fail).
+    /// Exit code for arguments the command refuses (an unknown flag, say), as
+    /// distinct from 1, a run that executed and failed.
+    static let usageExitCode: Int32 = 2
+
+    /// Parse CLI arguments and run tests. Returns exit code (0 = all pass, 1 = any
+    /// fail, 2 = refused arguments).
     static func run(arguments: [String]) -> Int32 {
-        let config = parseArguments(arguments)
+        let config: TestRunConfig
+        do {
+            config = try parseArguments(arguments)
+        } catch {
+            fputs("Error: \(error.localizedDescription)\n", stderr)
+            return usageExitCode
+        }
 
         if config.showHelp {
             printUsage()
@@ -116,7 +126,7 @@ enum TestRunner {
         )
 
         // The registry resolves `target:` steps; without it the first one fails.
-        // Live, compiled-passthrough and recompile executors all share it.
+        // Live and compiled-passthrough executors share it.
         let registry = MirroirMCP.buildTargetRegistry()
         let executor = StepExecutor(
             bridge: bridge, input: input,
@@ -125,62 +135,14 @@ enum TestRunner {
             registry: registry
         )
 
-        // Load compiled skills if available
-        let windowInfo = bridge.getWindowInfo()
+        // Load compiled skills if available. Only read: a test run never writes one.
         var compiledMap: [String: CompiledSkill] = [:]
         if !config.noCompiled {
-            let windowWidth = windowInfo.map { Double($0.size.width) } ?? 0
-            let windowHeight = windowInfo.map { Double($0.size.height) } ?? 0
-
-            // Build a live fingerprint if any compiled skill has a baseline fingerprint
-            let anyHasFingerprint = skills.contains { skill in
-                (try? CompiledSkillIO.load(for: skill.filePath))?.screenFingerprint != nil
-            }
-            let liveFingerprint: ScreenFingerprint?
-            if anyHasFingerprint, let describeResult = describer.describe() {
-                liveFingerprint = StructuralFingerprint.buildScreenFingerprint(
-                    elements: describeResult.elements,
-                    icons: describeResult.icons)
-            } else {
-                liveFingerprint = nil
-            }
-
-            for skill in skills {
-                if let compiled = try? CompiledSkillIO.load(for: skill.filePath) {
-                    let staleness = CompiledSkillIO.checkStaleness(
-                        compiled: compiled, skillPath: skill.filePath,
-                        windowWidth: windowWidth, windowHeight: windowHeight,
-                        liveFingerprint: liveFingerprint)
-                    switch staleness {
-                    case .fresh:
-                        compiledMap[skill.filePath] = compiled
-                    case .stale(let reason):
-                        fputs("Warning: compiled skill stale for \(skill.name): \(reason)\n", stderr)
-                    case .drifted(_, let reason):
-                        if config.noAutoRecompile {
-                            fputs("Warning: \(skill.name): \(reason) — using compiled skill anyway\n", stderr)
-                            compiledMap[skill.filePath] = compiled
-                        } else if skill.filePath.hasSuffix(".md") {
-                            // A SKILL.md's steps are what an AI recorded (a coordinate tap on
-                            // an icon, say); a live OCR re-run may not find them again.
-                            fputs("Warning: \(skill.name): \(reason) — using compiled skill; "
-                                + "recompile a SKILL.md by running it through an MCP client\n", stderr)
-                            compiledMap[skill.filePath] = compiled
-                        } else {
-                            fputs("Warning: \(skill.name): \(reason) — auto-recompiling\n", stderr)
-                            if let recompiled = autoRecompile(
-                                skill: skill, bridge: bridge, input: input,
-                                describer: describer, capture: capture,
-                                config: executorConfig, registry: registry) {
-                                compiledMap[skill.filePath] = recompiled
-                            } else {
-                                fputs("  Falling back to original compiled skill\n", stderr)
-                                compiledMap[skill.filePath] = compiled
-                            }
-                        }
-                    }
-                }
-            }
+            let windowInfo = bridge.getWindowInfo()
+            compiledMap = freshCompiledSkills(
+                for: skills,
+                windowWidth: windowInfo.map { Double($0.size.width) } ?? 0,
+                windowHeight: windowInfo.map { Double($0.size.height) } ?? 0)
         }
 
         // Execute skills
@@ -228,7 +190,8 @@ enum TestRunner {
         }
 
         // Print summary
-        ConsoleReporter.reportSummary(results: allResults)
+        ConsoleReporter.reportSummary(
+            results: allResults, captures: CaptureStats.shared.snapshot())
 
         // Write JUnit XML if requested
         if let junitPath = config.junitPath {

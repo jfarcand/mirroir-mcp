@@ -12,8 +12,8 @@ final class TestRunnerConfigTests: XCTestCase {
 
     // MARK: - Argument Parsing
 
-    func testParseEmptyArgs() {
-        let config = TestRunner.parseArguments([])
+    func testParseEmptyArgs() throws {
+        let config = try TestRunner.parseArguments([])
         XCTAssertTrue(config.skillArgs.isEmpty)
         XCTAssertNil(config.junitPath)
         XCTAssertEqual(config.screenshotDir, "./mirroir-test-results")
@@ -24,53 +24,53 @@ final class TestRunnerConfigTests: XCTestCase {
         XCTAssertFalse(config.showHelp)
     }
 
-    func testParseHelpFlag() {
-        let config = TestRunner.parseArguments(["--help"])
+    func testParseHelpFlag() throws {
+        let config = try TestRunner.parseArguments(["--help"])
         XCTAssertTrue(config.showHelp)
     }
 
-    func testParseHelpShortFlag() {
-        let config = TestRunner.parseArguments(["-h"])
+    func testParseHelpShortFlag() throws {
+        let config = try TestRunner.parseArguments(["-h"])
         XCTAssertTrue(config.showHelp)
     }
 
-    func testParseVerboseFlag() {
-        let config = TestRunner.parseArguments(["--verbose"])
+    func testParseVerboseFlag() throws {
+        let config = try TestRunner.parseArguments(["--verbose"])
         XCTAssertTrue(config.verbose)
     }
 
-    func testParseVerboseShortFlag() {
-        let config = TestRunner.parseArguments(["-v"])
+    func testParseVerboseShortFlag() throws {
+        let config = try TestRunner.parseArguments(["-v"])
         XCTAssertTrue(config.verbose)
     }
 
-    func testParseDryRunFlag() {
-        let config = TestRunner.parseArguments(["--dry-run"])
+    func testParseDryRunFlag() throws {
+        let config = try TestRunner.parseArguments(["--dry-run"])
         XCTAssertTrue(config.dryRun)
     }
 
-    func testParseJUnitPath() {
-        let config = TestRunner.parseArguments(["--junit", "results.xml"])
+    func testParseJUnitPath() throws {
+        let config = try TestRunner.parseArguments(["--junit", "results.xml"])
         XCTAssertEqual(config.junitPath, "results.xml")
     }
 
-    func testParseScreenshotDir() {
-        let config = TestRunner.parseArguments(["--screenshot-dir", "/tmp/shots"])
+    func testParseScreenshotDir() throws {
+        let config = try TestRunner.parseArguments(["--screenshot-dir", "/tmp/shots"])
         XCTAssertEqual(config.screenshotDir, "/tmp/shots")
     }
 
-    func testParseTimeout() {
-        let config = TestRunner.parseArguments(["--timeout", "30"])
+    func testParseTimeout() throws {
+        let config = try TestRunner.parseArguments(["--timeout", "30"])
         XCTAssertEqual(config.timeoutSeconds, 30)
     }
 
-    func testParseSkillArgs() {
-        let config = TestRunner.parseArguments(["check-about", "send-message"])
+    func testParseSkillArgs() throws {
+        let config = try TestRunner.parseArguments(["check-about", "send-message"])
         XCTAssertEqual(config.skillArgs, ["check-about", "send-message"])
     }
 
-    func testParseMixedArgs() {
-        let config = TestRunner.parseArguments([
+    func testParseMixedArgs() throws {
+        let config = try TestRunner.parseArguments([
             "--verbose", "--junit", "out.xml",
             "--timeout", "20", "skill1", "skill2"
         ])
@@ -80,65 +80,119 @@ final class TestRunnerConfigTests: XCTestCase {
         XCTAssertEqual(config.skillArgs, ["skill1", "skill2"])
     }
 
-    func testParseIgnoresUnknownFlags() {
-        let config = TestRunner.parseArguments(["--unknown", "skill1"])
-        // --unknown starts with - so it's treated as a flag, not a skill
-        XCTAssertEqual(config.skillArgs, ["skill1"])
+    /// A flag this command does not know is refused by name, never dropped: a
+    /// caller passing a flag the CLI lacks must hear about it.
+    func testParseRefusesUnknownFlags() {
+        XCTAssertThrowsError(try TestRunner.parseArguments(["--unknown", "skill1"])) { error in
+            XCTAssertEqual(error as? TestRunnerArgumentError, .unknownFlag("--unknown"))
+            XCTAssertTrue(error.localizedDescription.contains("--unknown"))
+        }
+        XCTAssertThrowsError(try TestRunner.parseArguments(["-x"])) { error in
+            XCTAssertEqual(error as? TestRunnerArgumentError, .unknownFlag("-x"))
+        }
+    }
+
+    /// The flag that once disabled the CLI's auto-recompile no longer exists.
+    func testParseRefusesTheRemovedAutoRecompileFlag() {
+        XCTAssertThrowsError(try TestRunner.parseArguments(["--no-auto-recompile", "s.yaml"])) {
+            XCTAssertEqual($0 as? TestRunnerArgumentError, .unknownFlag("--no-auto-recompile"))
+        }
+    }
+
+    func testRunExitsTwoNamingAnUnknownFlag() {
+        XCTAssertEqual(TestRunner.run(arguments: ["--bogus", "skill.yaml"]), TestRunner.usageExitCode)
+        XCTAssertEqual(TestRunner.usageExitCode, 2)
+    }
+
+    func testParseRefusesAFlagMissingItsValue() {
+        XCTAssertThrowsError(try TestRunner.parseArguments(["--report-json"])) {
+            XCTAssertEqual($0 as? TestRunnerArgumentError, .missingValue(flag: "--report-json"))
+        }
+        XCTAssertThrowsError(try TestRunner.parseArguments(["--junit", "--verbose"])) {
+            XCTAssertEqual($0 as? TestRunnerArgumentError, .missingValue(flag: "--junit"))
+        }
+        XCTAssertThrowsError(try TestRunner.parseArguments(["--timeout", "soon"])) {
+            XCTAssertEqual($0 as? TestRunnerArgumentError,
+                           .invalidValue(flag: "--timeout", value: "soon"))
+        }
+    }
+
+    /// A dry run executes nothing, so it must never write a report a caller
+    /// reads as a passing verdict.
+    func testDryRunWithReportJSONIsRefused() {
+        XCTAssertThrowsError(try TestRunner.parseArguments(
+            ["--dry-run", "--report-json", "out.json", "skill.yaml"])) {
+            XCTAssertEqual($0 as? TestRunnerArgumentError, .dryRunWithReport)
+            XCTAssertTrue($0.localizedDescription.contains("--dry-run"))
+        }
+    }
+
+    func testRunRefusesDryRunWithReportJSONAndWritesNoReport() throws {
+        let dir = NSTemporaryDirectory() + "mirroir-dryrun-\(UUID().uuidString)"
+        try FileManager.default.createDirectory(atPath: dir, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(atPath: dir) }
+        let skill = dir + "/s.yaml"
+        try "name: S\nsteps:\n  - home\n".write(toFile: skill, atomically: true, encoding: .utf8)
+        let report = dir + "/report.json"
+
+        XCTAssertEqual(TestRunner.run(arguments: ["--dry-run", "--report-json", report, skill]),
+                       TestRunner.usageExitCode)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: report))
     }
 
     // MARK: - Agent Flag Parsing
 
-    func testParseBareAgentFlag() {
+    func testParseBareAgentFlag() throws {
         // --agent with no model name → deterministic only (empty string)
-        let config = TestRunner.parseArguments(["--agent"])
+        let config = try TestRunner.parseArguments(["--agent"])
         XCTAssertEqual(config.agent, "")
     }
 
-    func testParseAgentWithModelName() {
+    func testParseAgentWithModelName() throws {
         // --agent claude-sonnet-5-5 → AI model name
-        let config = TestRunner.parseArguments(["--agent", "claude-sonnet-5-5", "skill.yaml"])
+        let config = try TestRunner.parseArguments(["--agent", "claude-sonnet-5-5", "skill.yaml"])
         XCTAssertEqual(config.agent, "claude-sonnet-5-5")
         XCTAssertEqual(config.skillArgs, ["skill.yaml"])
     }
 
-    func testParseAgentFollowedByYAML() {
+    func testParseAgentFollowedByYAML() throws {
         // --agent skill.yaml → bare agent, skill.yaml is a skill arg
-        let config = TestRunner.parseArguments(["--agent", "skill.yaml"])
+        let config = try TestRunner.parseArguments(["--agent", "skill.yaml"])
         XCTAssertEqual(config.agent, "")
         XCTAssertEqual(config.skillArgs, ["skill.yaml"])
     }
 
-    func testParseAgentFollowedByYMLFile() {
+    func testParseAgentFollowedByYMLFile() throws {
         // --agent test.yml → bare agent, test.yml is a skill arg
-        let config = TestRunner.parseArguments(["--agent", "test.yml"])
+        let config = try TestRunner.parseArguments(["--agent", "test.yml"])
         XCTAssertEqual(config.agent, "")
         XCTAssertEqual(config.skillArgs, ["test.yml"])
     }
 
-    func testParseAgentFollowedBySkillMd() {
+    func testParseAgentFollowedBySkillMd() throws {
         // --agent login.md → bare agent, login.md is a skill arg
-        let config = TestRunner.parseArguments(["--agent", "login.md"])
+        let config = try TestRunner.parseArguments(["--agent", "login.md"])
         XCTAssertEqual(config.agent, "")
         XCTAssertEqual(config.skillArgs, ["login.md"])
     }
 
-    func testParseAgentFollowedByFlag() {
+    func testParseAgentFollowedByFlag() throws {
         // --agent --verbose → bare agent, verbose flag still parsed
-        let config = TestRunner.parseArguments(["--agent", "--verbose"])
+        let config = try TestRunner.parseArguments(["--agent", "--verbose"])
         XCTAssertEqual(config.agent, "")
         XCTAssertTrue(config.verbose)
     }
 
-    func testParseAgentOllamaModel() {
+    func testParseAgentOllamaModel() throws {
         // --agent ollama:llama3 → Ollama model
-        let config = TestRunner.parseArguments(["--agent", "ollama:llama3", "test.yaml"])
+        let config = try TestRunner.parseArguments(["--agent", "ollama:llama3", "test.yaml"])
         XCTAssertEqual(config.agent, "ollama:llama3")
         XCTAssertEqual(config.skillArgs, ["test.yaml"])
     }
 
-    func testParseNoAgentByDefault() {
+    func testParseNoAgentByDefault() throws {
         // No --agent flag → nil
-        let config = TestRunner.parseArguments(["skill.yaml"])
+        let config = try TestRunner.parseArguments(["skill.yaml"])
         XCTAssertNil(config.agent)
     }
 

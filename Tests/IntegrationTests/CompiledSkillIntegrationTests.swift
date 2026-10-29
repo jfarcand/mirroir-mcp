@@ -272,19 +272,11 @@ final class CompiledSkillIntegrationTests: XCTestCase {
         XCTAssertNotNil(windowInfo)
         guard let windowInfo = windowInfo else { return }
 
-        guard let liveResult = describeWithRetry() else {
-            XCTFail("Live describe() returned nil")
-            return
-        }
-        let liveFP = StructuralFingerprint.buildScreenFingerprint(
-            elements: liveResult.elements, icons: liveResult.icons)
-
         let staleness = CompiledSkillIO.checkStaleness(
             compiled: compiled,
             skillPath: tmpPath,
             windowWidth: Double(windowInfo.size.width),
-            windowHeight: Double(windowInfo.size.height),
-            liveFingerprint: liveFP
+            windowHeight: Double(windowInfo.size.height)
         )
         XCTAssertEqual(staleness, .fresh,
                        "Compiled skill should be fresh when nothing has changed")
@@ -307,7 +299,10 @@ final class CompiledSkillIntegrationTests: XCTestCase {
         }
     }
 
-    func testStalenessCheckReturnsDriftedAfterScenarioSwitch() {
+    /// The compiled file fingerprints the screen the skill started from, and a test
+    /// run never judges a compiled skill by the screen: after the screen changes it
+    /// is still fresh, and its fingerprint still differs from the changed screen.
+    func testCompiledFingerprintIsTheStartScreenAndAScreenChangeKeepsItFresh() {
         let yaml = """
         name: staleness test
         app: FakeMirroring
@@ -320,6 +315,13 @@ final class CompiledSkillIntegrationTests: XCTestCase {
 
         let tmpPath = writeTempYAML(yaml)
         defer { try? FileManager.default.removeItem(atPath: tmpPath) }
+
+        guard let startScreen = describeWithRetry() else {
+            XCTFail("Live describe() returned nil")
+            return
+        }
+        let startFP = StructuralFingerprint.buildScreenFingerprint(
+            elements: startScreen.elements, icons: startScreen.icons)
 
         // Compile on "Settings" scenario
         let recordingDescriber = RecordingDescriber(wrapping: describer)
@@ -341,66 +343,59 @@ final class CompiledSkillIntegrationTests: XCTestCase {
         )
 
         XCTAssertNotNil(compiled, "Skill should compile")
-        guard let compiled = compiled else { return }
-        XCTAssertNotNil(compiled.screenFingerprint, "Should have baseline fingerprint")
+        guard let compiled = compiled, let baseline = compiled.screenFingerprint else {
+            return XCTFail("Should have a start-screen fingerprint")
+        }
+        XCTAssertGreaterThanOrEqual(
+            StructuralFingerprint.screenFingerprintSimilarity(baseline, startFP),
+            StructuralFingerprint.similarityThreshold,
+            "the fingerprint is the screen the skill started from")
 
         // Switch to "Settings (Updated)"
         let switched = bridge.triggerMenuAction(menu: "Scenario", item: "Settings (Updated)")
         XCTAssertTrue(switched, "Should switch scenario")
         usleep(1_000_000)
 
-        // Capture live fingerprint on the updated screen
         guard let liveResult = describeWithRetry() else {
             XCTFail("Live describe() returned nil")
             return
         }
         let liveFP = StructuralFingerprint.buildScreenFingerprint(
             elements: liveResult.elements, icons: liveResult.icons)
+        XCTAssertLessThan(
+            StructuralFingerprint.screenFingerprintSimilarity(baseline, liveFP),
+            StructuralFingerprint.similarityThreshold,
+            "the changed screen differs from the recorded start screen")
 
         let staleness = CompiledSkillIO.checkStaleness(
             compiled: compiled,
             skillPath: tmpPath,
             windowWidth: windowDimensions().width,
-            windowHeight: windowDimensions().height,
-            liveFingerprint: liveFP
+            windowHeight: windowDimensions().height
         )
-
-        switch staleness {
-        case .drifted:
-            // Expected — content has drifted
-            break
-        default:
-            XCTFail("Expected .drifted after scenario switch, got: \(staleness)")
-        }
+        XCTAssertEqual(staleness, .fresh)
     }
 
     // MARK: - RecordingDescriber Tests
 
-    func testRecordingDescriberFirstResultWithRealOCR() {
+    func testRecordingDescriberKeepsTheLatestResultWithRealOCR() {
         let recordingDescriber = RecordingDescriber(wrapping: describer)
 
-        XCTAssertNil(recordingDescriber.firstResult, "firstResult should be nil before any calls")
+        XCTAssertNil(recordingDescriber.lastResult, "lastResult should be nil before any calls")
         XCTAssertEqual(recordingDescriber.callCount, 0)
 
-        // First call
         let result1 = recordingDescriber.describe()
         XCTAssertNotNil(result1, "First describe() should return a result")
-        XCTAssertNotNil(recordingDescriber.firstResult, "firstResult should be set after first call")
         XCTAssertEqual(recordingDescriber.callCount, 1)
 
-        let firstTexts = Set(recordingDescriber.firstResult!.elements.map { $0.text })
-        XCTAssertTrue(firstTexts.contains("Settings") || firstTexts.contains("settings"),
-                      "First result should contain 'Settings' from FakeMirroring")
+        let texts = Set((recordingDescriber.lastResult?.elements ?? []).map { $0.text })
+        XCTAssertTrue(texts.contains("Settings") || texts.contains("settings"),
+                      "lastResult should contain 'Settings' from FakeMirroring")
 
-        // Second call
         let result2 = recordingDescriber.describe()
         XCTAssertNotNil(result2, "Second describe() should return a result")
         XCTAssertEqual(recordingDescriber.callCount, 2)
-
-        // firstResult should still hold the first call's data
-        let firstTextsAfter = Set(recordingDescriber.firstResult!.elements.map { $0.text })
-        XCTAssertEqual(firstTexts, firstTextsAfter,
-                       "firstResult should not be overwritten by subsequent calls")
+        XCTAssertNotNil(recordingDescriber.lastResult)
     }
 
     // MARK: - Helpers

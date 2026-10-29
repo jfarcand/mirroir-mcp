@@ -66,8 +66,8 @@ final class PlaywrightReportWriterTests: XCTestCase {
         XCTAssertEqual(metrics?["open-alarms"], 250)
     }
 
-    func testFlagsParse() {
-        let config = TestRunner.parseArguments(
+    func testFlagsParse() throws {
+        let config = try TestRunner.parseArguments(
             ["--report-json", "out/report.json", "--capture", "3", "flow.yaml"])
         XCTAssertEqual(config.reportJSONPath, "out/report.json")
         XCTAssertEqual(config.captureKey, "3")

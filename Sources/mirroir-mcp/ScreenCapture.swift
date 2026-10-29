@@ -22,9 +22,15 @@ import HelperLib
 /// fallback shells out rather than calling it directly.
 final class ScreenCapture: Sendable {
     private let bridge: any WindowBridging
+    private let windowImages: any WindowImageProviding
+    private let stats: CaptureStats
 
-    init(bridge: any WindowBridging) {
+    init(bridge: any WindowBridging,
+         windowImages: any WindowImageProviding = ScreenCaptureKitProvider(),
+         stats: CaptureStats = .shared) {
         self.bridge = bridge
+        self.windowImages = windowImages
+        self.stats = stats
     }
 
     /// Capture the target window returning both screenshot data and window info.
@@ -35,14 +41,21 @@ final class ScreenCapture: Sendable {
         // Strategy 0: ScreenCaptureKit window capture. It reaches the window on
         // any Space, occluded or not, so it needs no activation and never steals
         // the user's focus. Preferred whenever a valid window ID is known.
-        if info.windowID != 0, let data = ScreenCaptureKitShot.capture(windowID: info.windowID) {
+        let shot: WindowShotOutcome = info.windowID == 0
+            ? .unavailable(.noWindowID)
+            : ScreenCaptureKitShot.capture(windowID: info.windowID, provider: windowImages)
+        switch shot {
+        case .captured(let data):
+            stats.recordSCK()
             return CaptureResult(data: data, info: info)
+        case .unavailable(let reason):
+            stats.recordFallback(reason)
         }
 
         // Fallback to the screencapture CLI, which cannot see another Space, so
         // the target must be activated first. This activation steals focus and
-        // runs only on this fallback path (SCK failed: no permission, window not
-        // shareable, or timeout).
+        // runs only on this fallback path (SCK failed: no window ID, no
+        // permission, window not shareable, handler dropped, or timeout).
         bridge.activate()
         usleep(EnvConfig.cursorSettleUs)
 

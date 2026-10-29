@@ -24,7 +24,7 @@ final class TouchHeldRefusalTests: XCTestCase {
         bridge.state = .notRunning
         poster = RecordingTouchPoster()
         session = TouchSession(poster: poster)
-        input = InputSimulation(bridge: bridge, layoutSubstitution: [:], touchSession: session)
+        input = InputSimulation(bridge: bridge, keyboardLayout: .usQWERTY, touchSession: session)
     }
 
     override func tearDown() {

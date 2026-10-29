@@ -1,20 +1,44 @@
 // Copyright 2026 jfarcand@apache.org
 // Licensed under the Apache License, Version 2.0
 //
-// ABOUTME: Translates characters between keyboard layouts using macOS UCKeyTranslate.
-// ABOUTME: Builds substitution tables so US QWERTY virtual keycodes produce correct characters on non-US layouts.
+// ABOUTME: Reads macOS keyboard layouts with UCKeyTranslate to find which physical key types each character.
+// ABOUTME: Builds the per-layout key table that types text on an iPhone whose hardware keyboard is not US QWERTY.
 
 import Carbon
 import Foundation
 
-/// Translates characters between keyboard layouts.
+/// One keystroke on a keyboard layout: a macOS virtual keycode, with or without Shift.
+public struct LayoutKeyStroke: Equatable, Sendable {
+    /// macOS virtual keycode (the physical key, layout-independent).
+    public let keycode: UInt16
+    /// Whether Shift is held.
+    public let shift: Bool
+
+    public init(keycode: UInt16, shift: Bool) {
+        self.keycode = keycode
+        self.shift = shift
+    }
+}
+
+/// Reads keyboard layouts to find which physical key types each character.
 ///
-/// When the iPhone's hardware keyboard layout differs from US QWERTY, the same
-/// virtual keycode produces different characters. This mapper uses `UCKeyTranslate`
-/// to build a character substitution table: for each physical key, it compares what
-/// US QWERTY produces vs what the target layout produces, then maps target→US so
-/// CGEvent sends the right keycode.
+/// CGEvent keycodes are physical keys. Through iPhone Mirroring, the iPhone
+/// turns each physical key into a character with its own hardware-keyboard
+/// layout, so to type a character the key that produces it *on that layout*
+/// must be pressed. `keyTable(layoutData:)` scans a layout with `UCKeyTranslate`
+/// and records, for each character it can produce in one keystroke, the key
+/// and Shift state that produce it.
 public enum LayoutMapper {
+
+    /// macOS source ID of US QWERTY, the layout `CGKeyMap` already encodes.
+    public static let usSourceID = "com.apple.keylayout.US"
+
+    /// Virtual keycodes scanned for characters: 0-50 cover the main
+    /// alphanumeric and punctuation block, including the ISO section key (0x0A).
+    static let scannedKeycodes: ClosedRange<UInt16> = 0...50
+
+    /// Carbon modifier state for Shift (`shiftKey` 0x200 shifted right by 8).
+    static let shiftModifierState: UInt32 = 2
 
     /// Get the `UCKeyboardLayout` data for a keyboard input source by its TIS source ID.
     /// Example source IDs: "com.apple.keylayout.US", "com.apple.keylayout.Canadian-CSA"
@@ -34,111 +58,100 @@ public enum LayoutMapper {
         return extractLayoutData(from: source)
     }
 
-    /// Find the iPhone's keyboard layout for character translation.
+    /// Full TIS source ID for a layout name: `"Canadian-CSA"` and
+    /// `"com.apple.keylayout.Canadian-CSA"` both give the latter.
+    public static func sourceID(forLayout layout: String) -> String {
+        layout.hasPrefix("com.apple.keylayout.") ? layout : "com.apple.keylayout.\(layout)"
+    }
+
+    /// Whether `layout` names US QWERTY (or nothing), which needs no key table.
+    public static func isUSLayout(_ layout: String) -> Bool {
+        layout.isEmpty || sourceID(forLayout: layout) == usSourceID
+    }
+
+    /// Find the iPhone's keyboard layout when it is not US QWERTY.
     ///
     /// Reads the layout name from `EnvConfig.keyboardLayout` which resolves
     /// from settings.json (set by `mirroir-mcp configure`) or the
     /// `IPHONE_KEYBOARD_LAYOUT` environment variable.
     ///
     /// Pass an explicit `layout` to override config lookup (used by tests).
-    /// Returns nil when the layout is empty or "US" (no substitution needed).
+    /// Returns nil when the layout is empty or US QWERTY, or when macOS has no
+    /// layout by that name.
     public static func findNonUSLayout(layout override: String? = nil) -> (sourceID: String, layoutData: Data)? {
         let layout = override ?? EnvConfig.keyboardLayout
-        guard !layout.isEmpty else { return nil }
-
-        let fullID = layout.hasPrefix("com.apple.keylayout.")
-            ? layout
-            : "com.apple.keylayout.\(layout)"
+        guard !isUSLayout(layout) else { return nil }
+        let fullID = sourceID(forLayout: layout)
         return layoutData(forSourceID: fullID).map { (fullID, $0) }
     }
 
-    /// Build a character substitution table between US QWERTY and a target layout.
+    /// Build the table of single keystrokes that type each character on a layout.
     ///
-    /// For each virtual keycode and modifier state (unshifted / shifted), translates
-    /// the keycode through both layouts. When the characters differ, records
-    /// `targetChar → usChar` so that sending `usChar` via CGEvent produces
-    /// `targetChar` on the iPhone.
-    public static func buildSubstitution(
-        usLayoutData: Data, targetLayoutData: Data
-    ) -> [Character: Character] {
-        var map = [Character: Character]()
-
-        // Modifier states: no modifier and shift.
-        // These match what CGKeyMap supports (unshifted + shifted).
-        let modifierStates: [UInt32] = [
-            0,  // no modifiers
-            2,  // shift (Carbon shiftKey=0x200, shifted right 8 = 2)
-        ]
-
-        // Virtual keycodes 0-50 cover all main keyboard alphanumeric and punctuation keys.
-        for keycode: UInt16 in 0...50 {
-            for modState in modifierStates {
-                guard let usChar = translateKeycode(
-                    keycode, modifiers: modState, layoutData: usLayoutData
-                ),
-                    let targetChar = translateKeycode(
-                        keycode, modifiers: modState, layoutData: targetLayoutData
-                    )
+    /// Scans every key in `scannedKeycodes`, unshifted then shifted, so a
+    /// character reachable both ways is typed with the simpler unshifted key.
+    /// Dead keys (a key that only starts a composition, like `^` on
+    /// Canadian-CSA) are left out: pressing one types nothing by itself and
+    /// changes the next character; `deadKeyCompositions(layoutData:)` covers
+    /// the characters they compose.
+    public static func keyTable(layoutData: Data) -> [Character: LayoutKeyStroke] {
+        var table = [Character: LayoutKeyStroke]()
+        for shift in [false, true] {
+            let modifiers = shift ? shiftModifierState : 0
+            for keycode in scannedKeycodes {
+                guard !isDeadKey(keycode, modifiers: modifiers, layoutData: layoutData),
+                      let char = translateKeycode(
+                          keycode, modifiers: modifiers, layoutData: layoutData),
+                      table[char] == nil
                 else { continue }
+                table[char] = LayoutKeyStroke(keycode: keycode, shift: shift)
+            }
+        }
+        return table
+    }
 
-                if usChar != targetChar {
-                    map[targetChar] = usChar
+    /// Build the table of two-keystroke dead-key compositions on a layout.
+    ///
+    /// A dead key (e.g. `^` on Canadian-CSA, keycode 0x21) types nothing by
+    /// itself; the next key completes the character (`^` then `e` gives `ê`).
+    /// For every dead key, unshifted then shifted, this presses each scanned
+    /// key after it and records the pair when the two compose to exactly one
+    /// character. A pair that does not combine emits the accent and the key
+    /// separately and is left out. The first pair found for a character wins.
+    public static func deadKeyCompositions(layoutData: Data) -> [Character: [LayoutKeyStroke]] {
+        var table = [Character: [LayoutKeyStroke]]()
+        for deadShift in [false, true] {
+            let deadModifiers = deadShift ? shiftModifierState : 0
+            for deadKeycode in scannedKeycodes
+            where isDeadKey(deadKeycode, modifiers: deadModifiers, layoutData: layoutData) {
+                let dead = LayoutKeyStroke(keycode: deadKeycode, shift: deadShift)
+                for baseShift in [false, true] {
+                    for baseKeycode in scannedKeycodes {
+                        let base = LayoutKeyStroke(keycode: baseKeycode, shift: baseShift)
+                        guard let char = composedCharacter(dead: dead, base: base, layoutData: layoutData),
+                              table[char] == nil
+                        else { continue }
+                        table[char] = [dead, base]
+                    }
                 }
             }
         }
-
-        // iOS interprets HID 0x64 (ISO section key) and HID 0x35 (grave accent)
-        // swapped compared to macOS for non-US layouts. Swap the substitution
-        // values for the characters on these two keys so the correct HID keycode
-        // reaches the iPhone.
-        applyISOKeySwap(&map, usLayoutData: usLayoutData,
-                         targetLayoutData: targetLayoutData)
-
-        return map
+        return table
     }
 
-    /// Correct the ISO section key swap between macOS and iOS.
-    ///
-    /// macOS virtual keycode 0x0A (HID 0x64, ISO section key) and 0x32
-    /// (HID 0x35, grave accent) produce different characters on the Mac vs
-    /// the iPhone for non-US layouts. The iPhone effectively swaps these two
-    /// physical keys. This detects substitution entries originating from these
-    /// keycodes and swaps their US QWERTY targets.
-    private static func applyISOKeySwap(
-        _ map: inout [Character: Character],
-        usLayoutData: Data, targetLayoutData: Data
-    ) {
-        let modifierStates: [UInt32] = [0, 2]
-
-        for modState in modifierStates {
-            guard let usSectionChar = translateKeycode(
-                        0x0A, modifiers: modState, layoutData: usLayoutData),
-                  let usGraveChar = translateKeycode(
-                        0x32, modifiers: modState, layoutData: usLayoutData),
-                  let targetSectionChar = translateKeycode(
-                        0x0A, modifiers: modState, layoutData: targetLayoutData),
-                  let targetGraveChar = translateKeycode(
-                        0x32, modifiers: modState, layoutData: targetLayoutData)
-            else { continue }
-
-            // Only swap when both characters are in the substitution table
-            // with the expected values from the Mac layout scan.
-            if map[targetSectionChar] == usSectionChar
-                && map[targetGraveChar] == usGraveChar
-            {
-                map[targetSectionChar] = usGraveChar
-                map[targetGraveChar] = usSectionChar
-            }
-        }
-    }
-
-    /// Apply a substitution table to translate text.
-    /// Characters not in the table pass through unchanged.
-    public static func translate(
-        _ text: String, substitution: [Character: Character]
-    ) -> String {
-        if substitution.isEmpty { return text }
-        return String(text.map { substitution[$0] ?? $0 })
+    /// The single character `dead` followed by `base` composes to, or nil
+    /// when the pair emits anything other than exactly one character.
+    static func composedCharacter(
+        dead: LayoutKeyStroke, base: LayoutKeyStroke, layoutData: Data
+    ) -> Character? {
+        var deadKeyState: UInt32 = 0
+        _ = translatedText(dead.keycode, modifiers: dead.shift ? shiftModifierState : 0,
+                           layoutData: layoutData, options: 0, deadKeyState: &deadKeyState)
+        guard deadKeyState != 0,
+              let text = translatedText(base.keycode, modifiers: base.shift ? shiftModifierState : 0,
+                                        layoutData: layoutData, options: 0, deadKeyState: &deadKeyState),
+              text.count == 1
+        else { return nil }
+        return text.first
     }
 
     /// Translate a single virtual keycode + modifier state to a character
@@ -149,6 +162,40 @@ public enum LayoutMapper {
     public static func translateKeycode(
         _ keycode: UInt16, modifiers: UInt32, layoutData: Data
     ) -> Character? {
+        var deadKeyState: UInt32 = 0
+        return translate(keycode, modifiers: modifiers, layoutData: layoutData,
+                         options: OptionBits(kUCKeyTranslateNoDeadKeysMask),
+                         deadKeyState: &deadKeyState)
+    }
+
+    /// Whether `keycode` with `modifiers` is a dead key on the layout: with
+    /// dead-key processing on, it produces no character and leaves a pending
+    /// composition state.
+    public static func isDeadKey(
+        _ keycode: UInt16, modifiers: UInt32, layoutData: Data
+    ) -> Bool {
+        var deadKeyState: UInt32 = 0
+        let char = translate(keycode, modifiers: modifiers, layoutData: layoutData,
+                             options: 0, deadKeyState: &deadKeyState)
+        return char == nil && deadKeyState != 0
+    }
+
+    // MARK: - Private
+
+    private static func translate(
+        _ keycode: UInt16, modifiers: UInt32, layoutData: Data,
+        options: OptionBits, deadKeyState: inout UInt32
+    ) -> Character? {
+        translatedText(keycode, modifiers: modifiers, layoutData: layoutData,
+                       options: options, deadKeyState: &deadKeyState)?.first
+    }
+
+    /// Every character one key press emits. A dead key followed by a key it
+    /// does not combine with emits two (`^` then `x` gives `"^x"`).
+    private static func translatedText(
+        _ keycode: UInt16, modifiers: UInt32, layoutData: Data,
+        options: OptionBits, deadKeyState: inout UInt32
+    ) -> String? {
         return layoutData.withUnsafeBytes { buffer in
             guard let layoutPtr = buffer.baseAddress?
                 .assumingMemoryBound(to: UCKeyboardLayout.self)
@@ -156,7 +203,6 @@ public enum LayoutMapper {
                 return nil
             }
 
-            var deadKeyState: UInt32 = 0
             var chars = [UniChar](repeating: 0, count: 4)
             var length: Int = 0
 
@@ -169,7 +215,7 @@ public enum LayoutMapper {
                 UInt16(kUCKeyActionDown),
                 modifiers,
                 0,
-                OptionBits(kUCKeyTranslateNoDeadKeysMask),
+                options,
                 &deadKeyState,
                 chars.count,
                 &length,
@@ -177,12 +223,9 @@ public enum LayoutMapper {
             )
 
             guard status == noErr, length > 0 else { return nil }
-            let str = String(utf16CodeUnits: chars, count: length)
-            return str.first
+            return String(utf16CodeUnits: chars, count: length)
         }
     }
-
-    // MARK: - Private
 
     /// Extract UCKeyboardLayout data from a TIS input source.
     private static func extractLayoutData(from source: TISInputSource) -> Data? {

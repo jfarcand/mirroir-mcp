@@ -89,9 +89,15 @@ impl Sandbox {
         let script = format!(
             "#!/bin/sh\nPATH=/bin:/usr/bin\nexport PATH\nexec cp '{canned}' ./playwright-report.json\n"
         );
-        let npx = self.dir.path().join("bin").join("npx");
-        fs::write(&npx, script).map_err(|e| format!("write stub npx: {e}"))?;
-        make_executable(&npx)
+        self.stub_bin("npx", &script).map(|_| ())
+    }
+
+    /// Plant an executable `script` named `name` on the sandbox's `PATH` and
+    /// return its absolute path.
+    pub fn stub_bin(&self, name: &str, script: &str) -> Result<String, String> {
+        let path = self.write(&format!("bin/{name}"), script)?;
+        make_executable(Path::new(&path))?;
+        Ok(path)
     }
 
     /// Invoke the freshly built `mirroir-run` with `args`.

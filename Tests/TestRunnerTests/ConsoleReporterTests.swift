@@ -109,19 +109,37 @@ final class ConsoleReporterTests: XCTestCase {
         XCTAssertFalse(result.passed)
     }
 
-    /// The companion: skipped AI-only steps beside a step that ran and passed
-    /// are still a pass, so the fix does not fail every skill with a skip.
+    /// The companion: a skipped step beside a step that ran and passed is still
+    /// a pass, so the fix does not fail every skill with a skip.
     func testSkippedStepsBesideAPassedStepStillPass() {
         let result = ConsoleReporter.SkillResult(
             name: "Mixed", filePath: "m.yaml",
             stepResults: [
                 StepResult(step: .home, status: .passed, message: nil, durationSeconds: 0.1),
-                StepResult(step: .skipped(stepType: "remember", reason: "AI-only"),
-                           status: .skipped, message: "AI-only", durationSeconds: 0),
+                StepResult(step: .skipped(stepType: "drag", reason: "Missing from/to labels"),
+                           status: .skipped, message: "Missing from/to labels", durationSeconds: 0),
             ],
             durationSeconds: 0.2)
 
         XCTAssertTrue(result.passed)
+    }
+
+    /// An AI-only step the CLI could not evaluate beside a passing step is not a
+    /// pass: the skill checked less than it says.
+    func testNotEvaluatedStepBesideAPassedStepFails() {
+        let verify = SkillStep.skipped(stepType: "verify", reason: "AI-only")
+        let result = ConsoleReporter.SkillResult(
+            name: "Mixed", filePath: "m.yaml",
+            stepResults: [
+                StepResult(step: .home, status: .passed, message: nil, durationSeconds: 0.1),
+                .notEvaluated(verify, stepType: "verify"),
+            ],
+            durationSeconds: 0.2)
+
+        XCTAssertFalse(result.passed)
+        XCTAssertEqual(result.failureReasons,
+                       ["step 1 (verify (skipped)): not evaluated: verify needs an AI client"])
+        XCTAssertEqual(ConsoleReporter.formatStatus(.notEvaluated), "NOT EVALUATED")
     }
 
     func testFailureReasonsNameTheFailedStep() {

@@ -381,18 +381,17 @@ mirroir test --dry-run apps/settings/check-about    # validate without executing
 | `--screenshot-dir <dir>` | Save failure screenshots (default: `./mirroir-test-results/`) |
 | `--timeout <seconds>` | `wait_for` timeout (default: 15) |
 | `--verbose` | Step-by-step detail |
-| `--dry-run` | Parse and validate without executing |
+| `--dry-run` | Parse and validate without executing (refused with `--report-json`: a dry run has no verdict to report) |
 | `--no-compiled` | Skip compiled skills, force full OCR |
-| `--no-auto-recompile` | Skip auto-recompilation of compiled skills that have drifted |
 | `--agent <name>` | AI diagnosis of a failed step (see [AI-Assisted Diagnosis](#ai-assisted-diagnosis)) |
 
-Exit code `0` = all pass, `1` = any failure. A skill whose every step was skipped is a failure, and a skill holding a step the parser cannot read (an unknown verb, a malformed `target:`) is refused before anything runs, `--dry-run` included.
+Exit code `0` = all pass, `1` = any failure, `2` = refused arguments (an unknown option is named, never ignored). A skill whose every step was skipped is a failure, and a skill holding a step the parser cannot read (an unknown verb, a malformed `target:`) or cannot use (a `drag:` naming neither end, a `measure:` with no action) is refused before anything runs, `--dry-run` included. A skill holding an AI-only step (`verify`, `remember`, `condition`, `repeat`, `summarize`) fails with `not evaluated: <step> needs an AI client`: the CLI has no AI to check it, so it never reports that skill as passed.
 
-By default the CLI auto-recompiles a compiled skill whose screen fingerprint has drifted; `--no-auto-recompile` disables that and reuses the stale coordinates.
+`mirroir test` only reads `.compiled.json` files, never rewrites them. A compiled file stale for its source, format version or window size is named and the skill runs on live OCR.
 
 ### Compiled Skills
 
-Compile a skill once to capture coordinates and timing. Replay with zero OCR — a 10-step skill drops from 5+ seconds of OCR to under a second.
+Compile a skill once to capture coordinates and timing. Replay skips OCR for every step with a recorded hint; assertions still re-check the screen, and steps without a hint run live.
 
 ```bash
 mirroir compile apps/settings/check-about        # compile
@@ -402,7 +401,7 @@ mirroir test --no-compiled check-about            # force full OCR
 
 `mirroir compile` re-records coordinates by running a skill's steps on the device. For a SKILL.md those are the steps in its existing `.compiled.json`, so the first compile of a SKILL.md always happens through an MCP client.
 
-AI agents auto-compile skills as a side-effect of the first MCP run. See [Compiled Skills](docs/compiled-skills.md) for details.
+An AI agent compiles a skill on its first MCP run by calling `record_step` after each step and `save_compiled` at the end. See [Compiled Skills](docs/compiled-skills.md) for details.
 
 ### AI-Assisted Diagnosis
 
@@ -599,6 +598,15 @@ Set up your keyboard layout for non-US keyboards:
 ```bash
 mirroir configure
 ```
+
+iPhone Mirroring forwards physical keys, and the iPhone turns them into characters with its own hardware-keyboard layout. `keyboardLayout` names that layout, so `type_text` presses the key that produces each character there — on `Canadian-CSA`, `/` is the key left of `Z`, not US QWERTY's `/` key (which types `é`). Set it in `settings.json` or with the `IPHONE_KEYBOARD_LAYOUT` environment variable; it must match the layout chosen on the iPhone under Settings › General › Keyboard › Hardware Keyboard:
+
+```jsonc
+// .mirroir-mcp/settings.json
+{ "keyboardLayout": "Canadian-CSA" }   // or "com.apple.keylayout.Canadian-CSA"; "" or "US" = US QWERTY
+```
+
+A character the layout types with a dead key (`ê` is `^` then `e` on Canadian-CSA) is typed as that key pair. A character the layout has no keys for (emoji, CJK, `<` on Canadian-CSA) goes through the clipboard, which needs Universal Clipboard.
 
 ## Updating
 

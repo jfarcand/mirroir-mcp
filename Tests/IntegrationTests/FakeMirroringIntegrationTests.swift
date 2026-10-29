@@ -92,6 +92,22 @@ final class FakeMirroringIntegrationTests: XCTestCase {
         XCTAssertGreaterThan(base64.count, 1000, "PNG should be a reasonable size (not a 1px placeholder)")
     }
 
+    /// The real ScreenCaptureKit path answers a blocked synchronous caller —
+    /// the shape of the `mirroir test` CLI — without timing out or falling back
+    /// to the `screencapture` CLI.
+    func testCaptureUsesScreenCaptureKitWithoutFallback() {
+        let stats = CaptureStats()
+        let capture = ScreenCapture(bridge: bridge, stats: stats)
+        let start = Date()
+
+        let result = capture.captureWithInfo()
+
+        XCTAssertNotNil(result, "Should capture the FakeMirroring window")
+        XCTAssertEqual(stats.snapshot().summaryLine, "capture: sck=1 fallback=0")
+        XCTAssertLessThan(Date().timeIntervalSince(start), 2.0,
+                          "an SCK capture answers in well under the fallback timeout")
+    }
+
     // MARK: - OCR Tests
 
     func testDescribeScreen() {

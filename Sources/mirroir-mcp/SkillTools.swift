@@ -8,7 +8,11 @@ import Foundation
 import HelperLib
 
 extension MirroirMCP {
-    static func registerSkillTools(server: MCPServer) {
+    /// Register list_skills and get_skill. get_skill marks the skill's start screen
+    /// on `session`, which save_compiled fingerprints the compiled file with.
+    static func registerSkillTools(
+        server: MCPServer, registry: TargetRegistry, session: CompilationSession
+    ) {
         // list_skills — discover available skills from config directories
         server.registerTool(MCPToolDefinition(
             name: "list_skills",
@@ -76,6 +80,10 @@ extension MirroirMCP {
                     do {
                         var content = try String(contentsOfFile: path, encoding: .utf8)
                         content = substituteEnvVars(in: content)
+
+                        // Read before the AI runs step 1: the screen this skill starts from.
+                        markSkillStart(skillPath: path, content: content,
+                                       session: session, target: registry.activeTarget)
 
                         // Append compilation status for AI decision-making
                         let status = compilationStatus(for: path)

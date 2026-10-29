@@ -9,46 +9,89 @@ import CoreGraphics
 import Foundation
 import ScreenCaptureKit
 
-/// Captures a single window by its `CGWindowID` through ScreenCaptureKit.
+/// Why a window shot produced no image, so the caller falls back to the
+/// `screencapture` CLI. The raw value is the name the capture summary prints.
+enum WindowShotFailure: String, Sendable, CaseIterable {
+    /// The window has no `CGWindowID`, so ScreenCaptureKit cannot address it.
+    case noWindowID = "no_window_id"
+    /// The window is not in ScreenCaptureKit's shareable content.
+    case windowNotShareable = "not_shareable"
+    /// ScreenCaptureKit returned an error.
+    case captureError = "error"
+    /// ScreenCaptureKit released its completion handler without calling it.
+    /// `replayd` keys capture clients by executable path, so two live processes
+    /// of the same binary (the MCP server and a `mirroir-mcp test` run) keep
+    /// interrupting each other's connection; the interrupted request's handler
+    /// is released unanswered (ReplayKit error 4097).
+    case handlerDropped = "handler_dropped"
+    /// No answer arrived within `ScreenCaptureKitShot.timeout`.
+    case timedOut = "timeout"
+}
+
+/// The result of one window shot.
+enum WindowShotOutcome: Sendable {
+    case captured(Data)
+    case unavailable(WindowShotFailure)
+}
+
+/// Captures a single window by its `CGWindowID` through a `WindowImageProviding`
+/// (ScreenCaptureKit in production).
 ///
 /// `SCScreenshotManager.captureImage` (macOS 14+) reaches a window on any Space,
 /// occluded or not, without bringing it forward — unlike the `screencapture` CLI,
 /// which only sees the current Space and so forces an activation that steals the
-/// user's focus. The async API is bridged to the project's synchronous capture
-/// path with a semaphore and a hard timeout: a hang falls back to nil (and the
-/// caller to the CLI), never a deadlock.
+/// user's focus.
+///
+/// The provider's completion API is bridged to the synchronous capture path
+/// with a semaphore and no Swift concurrency in between. A provider that
+/// releases the completion without calling it — what a `mirroir test` run hits
+/// while an MCP server of the same binary is live (see `.handlerDropped`) — is
+/// detected the moment the closure is released (`ReplySentinel`), so that case
+/// returns at once instead of waiting out `timeout`. The timeout bounds only a provider
+/// that keeps the request alive and never answers.
 enum ScreenCaptureKitShot {
 
-    /// How long to wait for the asynchronous capture before giving up and letting
-    /// the caller fall back to the `screencapture` CLI.
+    /// How long to wait for a provider that holds the request but never answers.
     static let timeout: DispatchTimeInterval = .seconds(10)
 
-    /// Capture the window with `windowID` as PNG data, or nil if ScreenCaptureKit
-    /// cannot (no Screen Recording permission, window not shareable, or timeout).
-    static func capture(windowID: CGWindowID) -> Data? {
-        let semaphore = DispatchSemaphore(value: 0)
-        let box = ResultBox()
-
-        Task.detached {
-            let data = await captureAsync(windowID: windowID)
-            box.set(data)
-            semaphore.signal()
+    /// Capture the window with `windowID`, or say why no image was produced.
+    static func capture(
+        windowID: CGWindowID,
+        provider: any WindowImageProviding = ScreenCaptureKitProvider(),
+        timeout: DispatchTimeInterval = timeout
+    ) -> WindowShotOutcome {
+        let latch = ShotLatch()
+        // The sentinel lives only in the closure's capture list: when the
+        // provider releases the closure, the sentinel goes with it.
+        provider.captureWindowImage(windowID: windowID) {
+            [sentinel = ReplySentinel(latch: latch)] reply in
+            sentinel.deliver(reply)
         }
-
-        guard semaphore.wait(timeout: .now() + timeout) == .success else {
-            DebugLog.log("ScreenCaptureKitShot", "capture timed out for window \(windowID)")
-            return nil
+        let outcome = latch.wait(timeout: timeout)
+        if case .unavailable(let failure) = outcome {
+            DebugLog.log("ScreenCaptureKitShot",
+                "no image for window \(windowID): \(failure.rawValue)")
         }
-        return box.take()
+        return outcome
     }
+}
 
-    private static func captureAsync(windowID: CGWindowID) async -> Data? {
-        do {
-            let content = try await SCShareableContent.excludingDesktopWindows(
-                false, onScreenWindowsOnly: false)
+/// Production `WindowImageProviding`: ScreenCaptureKit's completion-handler API.
+struct ScreenCaptureKitProvider: WindowImageProviding {
+
+    func captureWindowImage(
+        windowID: CGWindowID, reply: @escaping @Sendable (WindowImageReply) -> Void
+    ) {
+        SCShareableContent.getExcludingDesktopWindows(
+            false, onScreenWindowsOnly: false
+        ) { content, error in
+            guard let content else {
+                reply(.failed(error.map { "\($0)" } ?? "no shareable content"))
+                return
+            }
             guard let window = content.windows.first(where: { $0.windowID == windowID }) else {
-                DebugLog.log("ScreenCaptureKitShot", "window \(windowID) not in shareable content")
-                return nil
+                reply(.windowNotShareable)
+                return
             }
 
             let filter = SCContentFilter(desktopIndependentWindow: window)
@@ -58,12 +101,15 @@ enum ScreenCaptureKitShot {
             config.showsCursor = false
             config.ignoreShadowsSingleWindow = true
 
-            let image = try await SCScreenshotManager.captureImage(
-                contentFilter: filter, configuration: config)
-            return png(from: image)
-        } catch {
-            DebugLog.log("ScreenCaptureKitShot", "capture failed for window \(windowID): \(error)")
-            return nil
+            SCScreenshotManager.captureImage(
+                contentFilter: filter, configuration: config
+            ) { image, error in
+                guard let image, let png = Self.png(from: image) else {
+                    reply(.failed(error.map { "\($0)" } ?? "no image"))
+                    return
+                }
+                reply(.image(png))
+            }
         }
     }
 
@@ -73,11 +119,54 @@ enum ScreenCaptureKitShot {
     }
 }
 
-/// Carries the capture result out of the detached task to the waiting caller.
-/// The semaphore orders the single write before the single read, so the
-/// unchecked `Sendable` is sound.
-private final class ResultBox: @unchecked Sendable {
-    private var data: Data?
-    func set(_ value: Data?) { data = value }
-    func take() -> Data? { data }
+/// One-shot result slot the capturing thread waits on. The first resolution
+/// wins; later ones (a reply after a timeout, the sentinel after a reply) are
+/// ignored.
+private final class ShotLatch: @unchecked Sendable {
+    private let lock = NSLock()
+    private let semaphore = DispatchSemaphore(value: 0)
+    private var outcome: WindowShotOutcome?
+
+    func resolve(_ value: WindowShotOutcome) {
+        let first: Bool = lock.withLock {
+            guard outcome == nil else { return false }
+            outcome = value
+            return true
+        }
+        if first { semaphore.signal() }
+    }
+
+    func wait(timeout: DispatchTimeInterval) -> WindowShotOutcome {
+        _ = semaphore.wait(timeout: .now() + timeout)
+        return lock.withLock {
+            if let outcome { return outcome }
+            outcome = .unavailable(.timedOut)
+            return .unavailable(.timedOut)
+        }
+    }
+}
+
+/// Rides inside the reply closure handed to the provider. Delivering a reply
+/// resolves the latch; being deallocated without one means the provider
+/// released the closure unanswered, which resolves it as `.handlerDropped`.
+private final class ReplySentinel: @unchecked Sendable {
+    private let latch: ShotLatch
+
+    init(latch: ShotLatch) {
+        self.latch = latch
+    }
+
+    func deliver(_ reply: WindowImageReply) {
+        switch reply {
+        case .image(let data): latch.resolve(.captured(data))
+        case .windowNotShareable: latch.resolve(.unavailable(.windowNotShareable))
+        case .failed(let message):
+            DebugLog.log("ScreenCaptureKitShot", "capture failed: \(message)")
+            latch.resolve(.unavailable(.captureError))
+        }
+    }
+
+    deinit {
+        latch.resolve(.unavailable(.handlerDropped))
+    }
 }

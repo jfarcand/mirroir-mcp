@@ -80,7 +80,7 @@ Env-var names are derived from the camelCase key by inserting `_` before every u
 
 | Setting | Default | Description |
 |---------|---------|-------------|
-| `keyboardLayout` | `""` | iPhone keyboard layout for character substitution (e.g. `"Canadian-CSA"`, `"French"`). Empty = US QWERTY |
+| `keyboardLayout` | `""` | iPhone hardware-keyboard layout; `type_text` presses the key that types each character on it (e.g. `"Canadian-CSA"`, `"French"`). Empty or `"US"` = US QWERTY |
 
 ## App Identity
 

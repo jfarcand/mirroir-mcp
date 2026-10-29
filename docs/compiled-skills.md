@@ -4,7 +4,7 @@ JIT compilation for UI automation. A compiled skill eliminates OCR from navigati
 
 ## The Problem
 
-Each OCR-dependent step costs ~500ms (screencapture + Vision OCR). A 10-step skill touching `tap`, `wait_for`, `scroll_to`, and `assert_visible` makes 10+ OCR calls — that's 5+ seconds of OCR overhead alone, on top of actual UI interaction time.
+Each OCR-dependent step pays for a screen capture plus Vision OCR. Through the MCP server that is about 200ms per screen read. Under `mirroir test` on 2026-10-27, a live screen read on a real device took about 10.8s: ScreenCaptureKit released its completion handler unanswered, and the capture waited out a 10s timeout before falling back to the `screencapture` CLI. A dropped handler now falls back at once, and every run ends with a `capture: sck=N fallback=M` line, so a degraded capture path shows in the output rather than only as slow steps. A 10-step skill touching `tap`, `wait_for`, `scroll_to`, and `assert_visible` makes 10+ screen reads, on top of actual UI interaction time.
 
 For regression suites running dozens of skills, OCR dominates the total runtime. Worse, OCR introduces non-determinism: text recognition confidence varies between runs, and fuzzy matching can find the wrong element if the screen layout shifts slightly.
 
@@ -12,7 +12,7 @@ For regression suites running dozens of skills, OCR dominates the total runtime.
 
 Run the skill once against a real device. The compiler observes everything — which element matched, at what coordinates, with what confidence, how long each `wait_for` took, how many scrolls `scroll_to` needed. It saves all of this into a `.compiled.json` file alongside the source skill file.
 
-On subsequent runs, the test runner detects the compiled file and replays the skill using cached data — zero OCR, zero AI, zero non-determinism.
+On subsequent runs, the test runner detects the compiled file and replays the skill using cached data: no OCR for a step with a recorded hint, no AI. Assertions still re-run OCR, and a step recorded without a hint (`passthrough`) runs live.
 
 ```
 Source:     apps/settings/check-about.md (or .yaml)
@@ -34,7 +34,7 @@ The first AI execution IS the compilation. No separate learning run needed.
 
 **How it works:**
 
-1. AI calls `get_skill("check-about")` — response includes compilation status
+1. AI calls `get_skill("check-about")` before running step 1 — response includes compilation status, and the server fingerprints the current screen (local OCR) as the screen the skill starts from
 2. If `[Not compiled]` or `[Compiled: stale]`, the AI calls `record_step` after each step:
    - **tap** steps: includes `tap_x`, `tap_y`, `confidence`, `match_strategy` from `describe_screen`
    - **wait_for** / **assert** steps: includes `elapsed_ms` (approximate time waited)
@@ -42,7 +42,7 @@ The first AI execution IS the compilation. No separate learning run needed.
    - **launch**, **type**, **press_key**, **target**, **long_press**, **drag**, etc.: just index, type, and label
    - every step's `label` is its value as the skill writes it (`l+command`, `"Photo" duration: 1500`, `{ kind: ios, app: "Notes" }`): a SKILL.md replays from these. `record_step` records every step, and notes when `mirroir test` cannot replay one (a tool with no skill step type, such as `press_back`); that skill is then refused by `mirroir test` with the reason
 3. After all steps succeed, AI calls `save_compiled("check-about")`. It refuses a gap in the recorded step indices, and for a SKILL.md a step that could not replay as recorded (a missing value, a drag without both ends, a measure without an action or `until:`), keeping the session so the AI can record those steps again
-4. Server builds `CompiledSkill`, writes `.compiled.json` next to the source file
+4. Server builds `CompiledSkill` with the start-screen fingerprint `get_skill` read, writes `.compiled.json` next to the source file (a skill saved without that `get_skill` call gets no fingerprint, never the screen the run ended on)
 5. Next `get_skill("check-about")` returns `[Compiled: fresh]` — AI skips compilation
 
 The server derives `compiledAction` from the reported data:
@@ -62,8 +62,9 @@ mirroir compile apps/settings/check-about
 The CLI compiler:
 1. Resolves and parses the skill (YAML or SKILL.md)
 2. Wraps the OCR subsystem in a `RecordingDescriber` that caches every result
-3. Executes each step against the real device, exactly like `mirroir test`
-4. After each step, reads the cached OCR data to build `StepHints`:
+3. Fingerprints the screen before the first step runs: the screen the skill starts from
+4. Executes each step against the real device, exactly like `mirroir test`
+5. After each step, reads the cached OCR data to build `StepHints`:
    - **tap** → captures exact (x, y) coordinates, confidence score, match strategy; a tap with no cached match is marked `passthrough`
    - **long_press** → marked as `passthrough` (a compiled tap would replay it as a short tap)
    - **wait_for** → captures elapsed time until the element appeared (`sleep`)
@@ -73,7 +74,7 @@ The CLI compiler:
    - **drag** → marked as `passthrough` (needs two runtime OCR lookups, so it is not pre-resolved)
    - **launch, type, swipe, press_key, home, shake, open_url, reset_app, set_network, target** → marked as `passthrough` (already OCR-free)
    - **screenshot** → marked as `passthrough` (still captures, useful for verification)
-5. Saves the compiled JSON with a SHA-256 hash of the source skill
+6. Saves the compiled JSON with a SHA-256 hash of the source skill
 
 ### Replay
 
@@ -164,7 +165,7 @@ mirroir test --no-compiled apps/settings/check-about
 }
 ```
 
-The optional `screenFingerprint` field (a SHA-256 hash of sorted structural texts plus an icon count) is captured at compile time and used for content-drift detection (see below).
+The optional `screenFingerprint` field (a SHA-256 hash of sorted structural texts plus an icon count) is the screen the skill starts from, read before its first step. Both producers record that same moment: `mirroir compile` and `get_skill` → `save_compiled`. `mirroir test` never compares or rewrites it; it is the baseline a caller compares the screen a run starts on against.
 
 A step's `label` is its replay value: the step's value written the way the skill parser reads it back (`General`, `l+command`, `"About" timeout: 30`, `{ from: "A", to: "B" }`), keeping any `${VAR}` placeholder. A SKILL.md's steps are rebuilt from `type` and `label` when `mirroir test` replays it.
 
@@ -177,11 +178,10 @@ The compiled file is invalidated when any of these change:
 | Source skill edited | `stale` | SHA-256 mismatch → warning, falls back to full OCR |
 | Window dimensions changed | `stale` | Device mismatch → warning, falls back to full OCR |
 | Format version bumped | `stale` | Version mismatch → warning, falls back to full OCR |
-| Screen content shifted (e.g. app update) | `drifted` | Live screen fingerprint diverges from the recorded baseline → the CLI **auto-recompiles** the skill on the spot, unless `--no-auto-recompile` is passed (in which case it warns and uses the compiled skill anyway) |
 
-Staleness checks return one of three `StalenessResult` values: `fresh`, `stale`, or `drifted`. A `stale` result is a hard mismatch (source/dimensions/version) that always falls back to full OCR. A `drifted` result is a softer signal — the skill structure and device still match, but the screen content has moved enough that cached coordinates may be wrong; here the runner re-learns the coordinates automatically rather than discarding the compiled data.
+Staleness checks return one of two `StalenessResult` values: `fresh` or `stale`. The screen content is not a staleness signal: `mirroir test` reads compiled files and never writes one, so a run cannot quietly re-bless a changed screen.
 
-When a compiled file is stale, the test runner prints a warning and runs the skill with full OCR. Recompile to update — either by running the skill again via AI (which auto-recompiles when it sees `[Compiled: stale]`) or via the CLI:
+When a compiled file is stale, the test runner prints a warning and runs the skill with full OCR. Recompile to update — either by running the skill again via AI (which records the steps again when it sees `[Compiled: stale]`) or via the CLI:
 
 ```bash
 mirroir compile apps/settings/check-about
@@ -190,8 +190,7 @@ mirroir compile apps/settings/check-about
 A SKILL.md is the exception. Its compiled file holds the only replayable copy of its steps, so:
 
 - edited since it was compiled, or compiled by an older format version, it is **refused** rather than run with full OCR, and `mirroir compile` cannot recompile it either: run it again through an MCP client;
-- a window-size change still falls back to full OCR, replaying the recorded steps live;
-- on drift it is **not** auto-recompiled (a live OCR re-run may not find what an AI recorded, such as a coordinate tap on an icon): the runner warns and replays the compiled steps.
+- a window-size change still falls back to full OCR, replaying the recorded steps live.
 
 ## Where Compiled Files Live
 
@@ -215,7 +214,7 @@ Compiled files are device-specific (coordinates depend on window dimensions). If
 
 ## What Cannot Be Compiled
 
-AI-only steps (`remember`, `condition`, `repeat`, `verify`, `summarize`) require human interpretation and cannot be compiled. They are recorded with `hints: null` and skipped during compiled replay — same behavior as the normal test runner.
+AI-only steps (`remember`, `condition`, `repeat`, `verify`, `summarize`) need an AI to interpret them and cannot be compiled. They are recorded with `hints: null`. `mirroir test` has no AI client, so it reports each one as `NOT EVALUATED` (`not evaluated: <step> needs an AI client`) and the skill fails, live or compiled; the steps after it still run.
 
 ## Architecture
 
@@ -269,7 +268,8 @@ mirroir test can now replay with zero OCR
 
 | File | Purpose |
 |------|---------|
-| `Sources/mirroir-mcp/CompilationTools.swift` | MCP tools `record_step` + `save_compiled`, `CompilationSession` state |
+| `Sources/mirroir-mcp/CompilationTools.swift` | MCP tools `record_step` + `save_compiled` |
+| `Sources/mirroir-mcp/CompilationSession.swift` | `CompilationSession`: recorded steps and the start-screen fingerprint `get_skill` reads |
 | `Sources/mirroir-mcp/CompiledSkill.swift` | Data model: `CompiledSkill`, `CompiledStep`, `StepHints`, file I/O, SHA-256 |
 | `Sources/mirroir-mcp/RecordingDescriber.swift` | Decorator that caches OCR results during CLI compilation |
 | `Sources/mirroir-mcp/CompileCommand.swift` | CLI `compile` subcommand orchestration |
@@ -287,6 +287,6 @@ mirroir test can now replay with zero OCR
 
 **Why two compilation paths?** AI-driven compilation eliminates a separate learning run — the first AI execution of a skill IS the compilation. The CLI path (`mirroir compile`) exists for environments where AI is unavailable or when you want to compile without an MCP client. It compiles a YAML skill from its steps; a SKILL.md's body is prose for an AI, so the CLI runners (`mirroir test` and `mirroir compile`) take a SKILL.md's steps from its existing `.compiled.json`, rebuilding each from its recorded type and label. That makes `record_step`'s `label` the step's value (the app to launch, the text to type, the key to press), and the first compile of a SKILL.md always the AI-driven one. A SKILL.md with no compiled file, or one edited since, is refused with that instruction.
 
-**Why auto-recompile on drift but not on hard staleness?** Hard staleness (`stale`) means the source skill, window dimensions, or format version changed — the cached coordinates are no longer trustworthy and the safe move is a full-OCR run. Content drift (`drifted`) is different: the skill and device still match, but the screen content moved. Since the runner is already executing against the real device, it re-learns the coordinates in place (unless `--no-auto-recompile` is passed). AI agents likewise auto-recompile when they detect `[Compiled: stale]` in the `get_skill` response.
+**Why does `mirroir test` never rewrite a compiled file?** A test run that re-recorded its own baseline whenever the screen changed would accept every change it was meant to catch, and the change would never reach the report or the exit code. Hard staleness (`stale`) means the source skill, window dimensions, or format version changed — the cached coordinates are no longer trustworthy and the safe move is a full-OCR run. Recompiling is an explicit act: `mirroir compile`, or an AI that records the steps again when `get_skill` answers `[Compiled: stale]`.
 
 **Why a configurable sleep buffer (default 200ms) instead of adaptive?** Simplicity. The buffer covers minor timing variance between runs and defaults to 200ms, overridable via `compiledSleepBufferMs`. If a particular step needs more time, edit the YAML to add an explicit `wait_for` before the sensitive step and recompile.

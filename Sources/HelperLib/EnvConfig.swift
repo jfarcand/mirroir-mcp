@@ -244,24 +244,31 @@ public enum EnvConfig {
 
     // MARK: - Settings File Loading
 
-    /// Load settings from the first available settings.json file.
-    /// Resolution order: project-local → global → empty dictionary.
+    /// Load settings from the project-local and global settings.json files.
+    /// Resolution is per key: a key in the project-local file overrides the
+    /// same key in the global file, and every global key the project file does
+    /// not set still applies.
     private static func loadSettings() -> [String: Any] {
         let configDirName = ".mirroir-mcp"
         let fileName = "settings.json"
 
         let localPath = FileManager.default.currentDirectoryPath + "/" + configDirName + "/" + fileName
         let globalPath = ("~/" + configDirName + "/" + fileName as NSString).expandingTildeInPath
+        return mergedSettings(localPath: localPath, globalPath: globalPath)
+    }
 
-        let path: String
-        if FileManager.default.fileExists(atPath: localPath) {
-            path = localPath
-        } else if FileManager.default.fileExists(atPath: globalPath) {
-            path = globalPath
-        } else {
-            return [:]
-        }
+    /// Merge the global file under the project-local file, key by key.
+    /// A missing file contributes nothing.
+    static func mergedSettings(localPath: String, globalPath: String) -> [String: Any] {
+        let global = readSettingsFile(atPath: globalPath)
+        let local = readSettingsFile(atPath: localPath)
+        return global.merging(local) { _, projectValue in projectValue }
+    }
 
+    /// Read one settings.json file; a missing or malformed file yields an
+    /// empty dictionary (malformed files warn on stderr).
+    private static func readSettingsFile(atPath path: String) -> [String: Any] {
+        guard FileManager.default.fileExists(atPath: path) else { return [:] }
         do {
             let data = try Data(contentsOf: URL(fileURLWithPath: path))
             guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {

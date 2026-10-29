@@ -224,9 +224,17 @@ final class StepExecutorTests: XCTestCase {
 
     func testSkippedStep() {
         let result = executor.execute(
-            step: .skipped(stepType: "remember", reason: "AI-only"),
+            step: .skipped(stepType: "drag", reason: "Missing from/to labels"),
             stepIndex: 0, skillName: "test")
         XCTAssertEqual(result.status, .skipped)
+    }
+
+    func testAIOnlyStepIsNotEvaluated() {
+        let result = executor.execute(
+            step: .skipped(stepType: "remember", reason: "AI-only"),
+            stepIndex: 0, skillName: "test")
+        XCTAssertEqual(result.status, .notEvaluated)
+        XCTAssertEqual(result.message, "not evaluated: remember needs an AI client")
     }
 
     // MARK: - Dry Run

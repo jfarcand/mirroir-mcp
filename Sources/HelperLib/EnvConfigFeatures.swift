@@ -352,8 +352,8 @@ extension EnvConfig {
 
     // MARK: - Keyboard Layout
 
-    /// iPhone keyboard layout name for character substitution.
-    /// Empty string means US QWERTY (no substitution needed).
+    /// iPhone hardware-keyboard layout name; text is typed with that layout's keys.
+    /// Empty string means US QWERTY.
     /// Set via `mirroir-mcp configure` which saves to settings.json.
     public static var keyboardLayout: String {
         readString("keyboardLayout", envVar: "IPHONE_KEYBOARD_LAYOUT", default: "")

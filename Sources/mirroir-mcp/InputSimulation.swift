@@ -40,11 +40,10 @@ enum CursorMode: Sendable {
 final class InputSimulation: Sendable {
     let bridge: any WindowBridging
     private let cursorMode: CursorMode
-    /// Character substitution table for translating between the iPhone's hardware
-    /// keyboard layout and US QWERTY. Built once at init from the first non-US
-    /// keyboard layout found on the Mac. CGEvent keycodes are physical keys
-    /// (layout-independent), same as HID — substitution is still needed.
-    let layoutSubstitution: [Character: Character]
+    /// The iPhone's hardware keyboard layout: which physical keys type each
+    /// character. CGEvent keycodes are physical keys and the iPhone applies its
+    /// own layout to them, so text is typed through this table.
+    let keyboardLayout: IPhoneKeyboardLayout
     /// The persistent touch contact shared by every target; while it is held,
     /// pointing operations refuse and no escape click is posted.
     let touchSession: TouchSession
@@ -70,7 +69,7 @@ final class InputSimulation: Sendable {
     }
 
     init(bridge: any WindowBridging, cursorMode: CursorMode = .direct,
-         layoutSubstitution override: [Character: Character]? = nil,
+         keyboardLayout override: IPhoneKeyboardLayout? = nil,
          touchSession: TouchSession = .shared,
          gestureDevice: GestureDevice = .live,
          heldInputPoster: any HeldInputPosting = CGEventHeldInputPoster()) {
@@ -79,25 +78,9 @@ final class InputSimulation: Sendable {
         self.touchSession = touchSession
         self.gestureDevice = gestureDevice
         self.heldInputPoster = heldInputPoster
-
-        // Build layout substitution table when the iPhone's hardware keyboard
-        // layout differs from US QWERTY. Option-modified keycodes go through
-        // the iPhone's configured layout, so dead-key sequences (é, è, ç, etc.)
-        // produce wrong characters without substitution.
-        if let explicitSubstitution = override {
-            self.layoutSubstitution = explicitSubstitution
-        } else if let usData = LayoutMapper.layoutData(forSourceID: "com.apple.keylayout.US"),
-           let (targetID, targetData) = LayoutMapper.findNonUSLayout()
-        {
-            self.layoutSubstitution = LayoutMapper.buildSubstitution(
-                usLayoutData: usData, targetLayoutData: targetData
-            )
-            if !self.layoutSubstitution.isEmpty {
-                fputs("LayoutMapper: \(self.layoutSubstitution.count) character substitutions for \(targetID)\n", stderr)
-            }
-        } else {
-            self.layoutSubstitution = [:]
-        }
+        // The configured iPhone layout (settings.json `keyboardLayout` or
+        // IPHONE_KEYBOARD_LAYOUT) unless the caller pins one.
+        self.keyboardLayout = override ?? IPhoneKeyboardLayout.configured()
     }
 
     /// Verify that the target window is connected and accepting input.

@@ -456,7 +456,7 @@ async fn run_ios_block(
         workspace = %dir.display(),
         "dispatching the scenario's ios block to mirroir-mcp"
     );
-    let outcome = runner.run(&yaml, dir).await?;
+    let outcome = runner.run(&yaml, &scenario.steps[block], dir).await?;
     info!(
         passed = outcome.verdict.passed,
         failed = outcome.verdict.failed,

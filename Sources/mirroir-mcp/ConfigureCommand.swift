@@ -2,7 +2,7 @@
 // Licensed under the Apache License, Version 2.0
 //
 // ABOUTME: Interactive CLI command that configures iPhone keyboard layout.
-// ABOUTME: Saves the choice to ~/.mirroir-mcp/settings.json for layout substitution.
+// ABOUTME: Saves the choice to ~/.mirroir-mcp/settings.json so text is typed with that layout's keys.
 
 import Foundation
 import HelperLib
@@ -59,9 +59,7 @@ enum ConfigureCommand {
                 return 1
             }
             // Verify the layout exists on this Mac
-            let fullID = custom.hasPrefix("com.apple.keylayout.")
-                ? custom
-                : "com.apple.keylayout.\(custom)"
+            let fullID = LayoutMapper.sourceID(forLayout: custom)
             if LayoutMapper.layoutData(forSourceID: fullID) == nil {
                 fputs("Warning: layout '\(fullID)' not found on this Mac.\n", stderr)
                 fputs("Saving anyway — it may be available on other systems.\n", stderr)
@@ -76,7 +74,7 @@ enum ConfigureCommand {
         let saved = saveKeyboardLayout(layoutName)
         if saved {
             if layoutName == "US" {
-                fputs("\nSaved: US QWERTY (no layout substitution needed)\n", stderr)
+                fputs("\nSaved: US QWERTY\n", stderr)
             } else {
                 fputs("\nSaved: \(layoutName) → ~/.mirroir-mcp/settings.json\n", stderr)
             }
@@ -111,7 +109,7 @@ enum ConfigureCommand {
             settings = json
         }
 
-        // Update keyboard layout (empty string = US/default = no substitution)
+        // Update keyboard layout (empty string = US QWERTY, the default)
         settings["keyboardLayout"] = layout == "US" ? "" : layout
 
         // Write back

@@ -241,6 +241,28 @@ protocol ScreenCapturing: Sendable {
     func captureBase64() -> String?
 }
 
+/// The answer to one window-image request.
+enum WindowImageReply: Sendable {
+    /// The window's pixels, PNG-encoded.
+    case image(Data)
+    /// The window is not in the shareable content (closed, or not capturable).
+    case windowNotShareable
+    /// The capture API reported an error (no Screen Recording permission, a
+    /// window that cannot start a stream, ...).
+    case failed(String)
+}
+
+/// Abstracts asynchronous capture of a single window's pixels by `CGWindowID`
+/// (ScreenCaptureKit in production).
+///
+/// `reply` is called at most once. A provider that drops `reply` without
+/// calling it is a failure the caller detects the moment the closure is
+/// released, so it must not keep it alive past the request.
+protocol WindowImageProviding: Sendable {
+    func captureWindowImage(
+        windowID: CGWindowID, reply: @escaping @Sendable (WindowImageReply) -> Void)
+}
+
 /// Abstracts video recording of the mirroring window.
 protocol ScreenRecording: Sendable {
     func startRecording(outputPath: String?) -> String?

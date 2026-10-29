@@ -1,13 +1,14 @@
-// ABOUTME: Log-capture plumbing for the process target — stream pumping, group signalling, regex flags.
-// ABOUTME: Pure helpers behind spawn (stdout/stderr capture), kill (SIGTERM/SIGKILL), and assert_log (regex).
+// ABOUTME: Subprocess plumbing for the process and ios targets — stream pumping and draining, group signalling, regex flags.
+// ABOUTME: Pure helpers behind spawn (stdout/stderr capture), kill (SIGTERM/SIGKILL), the ios block's kill, and assert_log (regex).
 
 use std::io;
 use std::path::PathBuf;
 
 use regex::{Regex, RegexBuilder};
 use tokio::fs;
-use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
+use tokio::io::{AsyncBufReadExt, AsyncRead, AsyncReadExt, AsyncWriteExt, BufReader};
 use tokio::process::{Child, ChildStderr, ChildStdout};
+use tokio::task::JoinHandle;
 use tracing::{debug, warn};
 
 #[cfg(unix)]
@@ -164,6 +165,34 @@ pub fn build_regex(pattern: &str, flags: Option<&str>) -> Result<Regex> {
         pattern: pattern.to_owned(),
         source,
     })
+}
+
+/// Read `stream` to its end on a task of its own, so a child that writes more
+/// than a pipe holds never blocks waiting for a reader.
+pub fn drain<R>(stream: Option<R>) -> JoinHandle<Vec<u8>>
+where
+    R: AsyncRead + Unpin + Send + 'static,
+{
+    tokio::spawn(async move {
+        let mut buf = Vec::new();
+        if let Some(mut stream) = stream
+            && let Err(error) = stream.read_to_end(&mut buf).await
+        {
+            warn!(%error, "reading subprocess output failed");
+        }
+        buf
+    })
+}
+
+/// What a [`drain`] task read; empty, with a warning, if the task failed.
+pub async fn joined(task: JoinHandle<Vec<u8>>) -> Vec<u8> {
+    match task.await {
+        Ok(buf) => buf,
+        Err(error) => {
+            warn!(%error, "subprocess output reader did not join");
+            Vec::new()
+        }
+    }
 }
 
 #[cfg(test)]

@@ -15,7 +15,7 @@ enum JUnitReporter {
 
         let totalTests = results.flatMap { $0.stepResults }.count
         let totalFailures = results.flatMap { $0.stepResults }
-            .filter { $0.status == .failed }.count
+            .filter { $0.status == .failed || $0.status == .notEvaluated }.count
         let totalSkipped = results.flatMap { $0.stepResults }
             .filter { $0.status == .skipped }.count
         let totalTime = results.reduce(0.0) { $0 + $1.durationSeconds }
@@ -35,7 +35,9 @@ enum JUnitReporter {
     /// Generate a single testsuite element for a skill.
     private static func generateTestSuite(result: ConsoleReporter.SkillResult) -> String {
         let testCount = result.stepResults.count
-        let failureCount = result.stepResults.filter { $0.status == .failed }.count
+        let failureCount = result.stepResults.filter {
+            $0.status == .failed || $0.status == .notEvaluated
+        }.count
         let skippedCount = result.stepResults.filter { $0.status == .skipped }.count
         let suiteName = xmlEscape(result.name)
 
@@ -65,7 +67,9 @@ enum JUnitReporter {
         switch stepResult.status {
         case .passed:
             xml += " />\n"
-        case .failed:
+        case .failed, .notEvaluated:
+            // An AI-only step the CLI could not evaluate fails the suite, as in
+            // the console summary and the JSON report.
             let message = xmlEscape(stepResult.message ?? "Step failed")
             xml += ">\n"
             xml += "      <failure message=\"\(message)\">\(message)</failure>\n"

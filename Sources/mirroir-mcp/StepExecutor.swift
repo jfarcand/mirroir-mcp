@@ -18,6 +18,17 @@ struct StepResult {
         case passed = "PASS"
         case failed = "FAIL"
         case skipped = "SKIP"
+        /// An AI-only step the CLI cannot run. Nothing was checked, so the skill
+        /// holding it does not pass; later steps still run.
+        case notEvaluated = "NOT EVALUATED"
+    }
+
+    /// The result of an AI-only step (`verify`, `remember`, ...): the CLI has no AI
+    /// client to evaluate it, so the step is reported as not evaluated, never as passed.
+    static func notEvaluated(_ step: SkillStep, stepType: String) -> StepResult {
+        StepResult(step: step, status: .notEvaluated,
+                   message: "not evaluated: \(stepType) needs an AI client",
+                   durationSeconds: 0)
     }
 }
 
@@ -90,6 +101,12 @@ final class StepExecutor {
     /// Execute a single step and return the result.
     func execute(step: SkillStep, stepIndex: Int, skillName: String) -> StepResult {
         let startTime = CFAbsoluteTimeGetCurrent()
+
+        // Before the dry-run shortcut: a dry run must not report as passed a step
+        // that no run of this command can evaluate.
+        if let stepType = step.aiOnlyStepType {
+            return .notEvaluated(step, stepType: stepType)
+        }
 
         if config.dryRun {
             let duration = CFAbsoluteTimeGetCurrent() - startTime

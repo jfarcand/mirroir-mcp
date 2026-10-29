@@ -309,7 +309,7 @@ final class HeldKeysPlaybackTests: XCTestCase {
         // Not running: a missing refusal stops at the state check instead of
         // activating a window on the Mac running the tests.
         bridge.state = .notRunning
-        return InputSimulation(bridge: bridge, layoutSubstitution: [:],
+        return InputSimulation(bridge: bridge, keyboardLayout: .usQWERTY,
                                touchSession: touchSession, heldInputPoster: poster)
     }
 
@@ -347,7 +347,7 @@ final class HeldKeysPlaybackTests: XCTestCase {
         bridge.processRunning = false
         bridge.windowInfo = WindowInfo(windowID: 1, position: CGPoint(x: 100, y: 200),
                                        size: CGSize(width: 410, height: 898), pid: 1)
-        let input = InputSimulation(bridge: bridge, layoutSubstitution: [:],
+        let input = InputSimulation(bridge: bridge, keyboardLayout: .usQWERTY,
                                     touchSession: TouchSession(poster: RecordingTouchPoster()),
                                     heldInputPoster: poster)
         return (input, bridge)

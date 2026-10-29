@@ -515,7 +515,7 @@ if (!skillsAvailable) {
       <div class="pipeline-step">
         <div class="pipeline-icon">3</div>
         <h3>Run</h3>
-        <p>The AI reads the skill via <code>get_skill</code>, executes each step with MCP tools, and auto-compiles coordinates at the end.</p>
+        <p>The AI reads the skill via <code>get_skill</code>, executes each step with MCP tools, records each one with <code>record_step</code>, and saves the coordinates with <code>save_compiled</code>.</p>
         <div class="pipeline-cmd">
           <code>get_skill &rarr; record_step &rarr; save_compiled</code>
         </div>

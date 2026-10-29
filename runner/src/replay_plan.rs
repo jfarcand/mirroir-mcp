@@ -8,7 +8,7 @@ use crate::parser::step::{SkillStep, TargetArgs, TargetKind};
 use crate::parser::step_args::CaptureSurface;
 use crate::parser::surface::{is_annotation, is_device_step, is_web, step_kind};
 use crate::replay_cross_surface::validate_cross_surface;
-use crate::replay_target::{check_target, no_web_target};
+use crate::replay_target::{check_ios_block, check_target, no_web_target};
 
 /// One unit of a scenario's execution, in the order the file reads.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -35,8 +35,9 @@ pub enum Segment {
 /// runner-side step; everything outside a block is a hook, dispatched in Rust
 /// in file order. A hook after a block reads the values the block attached.
 ///
-/// Annotation steps (`remember:`) are transparent: one between two device
-/// steps rides along inside the block, and one anywhere else is a hook.
+/// Annotation steps (`remember:`) are transparent: one between two web steps
+/// rides along inside the web block, and one anywhere else is a hook. Inside
+/// an `ios` block it is refused — `mirroir-mcp test` cannot evaluate it.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ScenarioPlan {
     segments: Vec<Segment>,
@@ -51,6 +52,8 @@ impl ScenarioPlan {
     ///   [`RunnerError::IosNeedsMacosHost`] when a `target:` declares a
     ///   surface nothing here can run.
     /// * [`RunnerError::SurfaceDeclaredTwice`] when a surface opens two blocks.
+    /// * [`crate::ios_error::IosError::AiOnlyStepInBlock`] when an AI-only
+    ///   step (`remember:`) sits between two steps of an `ios` block.
     /// * [`RunnerError::NoWebTarget`] when device steps appear before any
     ///   `target:` opens a block for them.
     /// * [`RunnerError::BlockNotContiguous`] when a device step follows a
@@ -80,6 +83,9 @@ impl ScenarioPlan {
                     });
                 }
                 let end = block_end(steps, index, target.kind);
+                if target.kind == TargetKind::Ios {
+                    check_ios_block(steps, index..end)?;
+                }
                 segments.push(Segment::Block {
                     kind: target.kind,
                     range: index..end,
@@ -313,8 +319,8 @@ steps:
   - target: { kind: ios, app: "Safari" }
   - launch: "Safari"
   - open_url: "http://x/"
-  - remember: "rides along inside the block"
   - home:
+  - remember: "a note after the block is a hook"
   - cross_surface:
       captures:
         - { surface: web, selector: "[data-test=panel]", to: "w.txt" }
@@ -324,7 +330,7 @@ steps:
 "#,
         );
         if cfg!(target_os = "macos") {
-            assert_eq!(plan?, "web 0..2, ios 2..7, hook 7");
+            assert_eq!(plan?, "web 0..2, ios 2..6, hook 6, hook 7");
         } else {
             // Off macOS the iOS block has no executor, and says so by name.
             let error = plan.err().unwrap_or_default();

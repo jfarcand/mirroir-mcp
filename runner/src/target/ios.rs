@@ -5,9 +5,11 @@ use std::env;
 use std::ffi::OsString;
 use std::path::{self, Path, PathBuf};
 use std::process::Stdio;
+use std::time::Duration;
 
 use tokio::fs;
 use tokio::process::Command;
+use tokio::time::{Instant, timeout};
 use tracing::{debug, info, warn};
 
 use crate::compile::invoke::{tail, which_in};
@@ -15,7 +17,12 @@ use crate::compile::report::{ReporterOutcome, parse_report_body};
 use crate::compile::report_error::ReportEngine;
 use crate::error::Result;
 use crate::ios_error::IosError;
+use crate::parser::step::SkillStep;
 use crate::replay_cross_surface::IOS_CAPTURE_KEY;
+use crate::target::ios_budget::{
+    DEFAULT_IOS_STEP_ALLOWANCE, IOS_STEP_ALLOWANCE_ENV, block_budget, step_allowance,
+};
+use crate::target::process_log::{drain, joined, send_group_sigkill};
 
 /// Environment variable naming the `mirroir-mcp` binary, ahead of `PATH`.
 pub const MIRROIR_MCP_BIN_ENV: &str = "MIRROIR_MCP_BIN";
@@ -32,23 +39,37 @@ const REPORT_FILE: &str = "ios-report.json";
 /// Driver for one `mirroir-mcp test` invocation per `ios` block.
 pub struct MirroirMcpRunner {
     binary: PathBuf,
+    /// What each step of a block earns toward its run budget.
+    step_allowance: Duration,
 }
 
 impl MirroirMcpRunner {
-    /// Resolve `mirroir-mcp`: [`MIRROIR_MCP_BIN_ENV`] when set, else `PATH`.
+    /// Resolve `mirroir-mcp`: [`MIRROIR_MCP_BIN_ENV`] when set, else `PATH`;
+    /// the per-step allowance from [`IOS_STEP_ALLOWANCE_ENV`] when set.
     ///
     /// # Errors
     ///
-    /// [`IosError::NotInstalled`] when neither names an executable file.
+    /// * [`IosError::NotInstalled`] when neither names an executable file.
+    /// * [`IosError::InvalidStepAllowance`] when the allowance override is not
+    ///   a whole number of seconds.
     pub fn from_env() -> Result<Self> {
-        Self::resolve(
+        let allowance = step_allowance(env::var_os(IOS_STEP_ALLOWANCE_ENV))?;
+        Ok(Self::resolve(
             env::var_os(MIRROIR_MCP_BIN_ENV),
             &env::var_os("PATH").unwrap_or_default(),
-        )
+        )?
+        .with_step_allowance(allowance))
+    }
+
+    /// Grant each step of a block `allowance` toward its run budget.
+    #[must_use]
+    pub fn with_step_allowance(mut self, allowance: Duration) -> Self {
+        self.step_allowance = allowance;
+        self
     }
 
     /// Resolve from an explicit override and search path, without touching the
-    /// process environment.
+    /// process environment. Steps earn [`DEFAULT_IOS_STEP_ALLOWANCE`].
     ///
     /// # Errors
     ///
@@ -64,29 +85,45 @@ impl MirroirMcpRunner {
                 context: format!("resolve {}", bin.display()),
                 source,
             })?;
-            return Ok(Self { binary });
+            return Ok(Self {
+                binary,
+                step_allowance: DEFAULT_IOS_STEP_ALLOWANCE,
+            });
         }
         which_in(path, MIRROIR_MCP)
-            .map(|binary| Self { binary })
+            .map(|binary| Self {
+                binary,
+                step_allowance: DEFAULT_IOS_STEP_ALLOWANCE,
+            })
             .ok_or_else(|| IosError::NotInstalled.into())
     }
 
-    /// Write `block_yaml` into `workspace`, run it, and ingest the report.
+    /// Write `block_yaml` (the dialect rendering of `steps`) into `workspace`,
+    /// run it, and ingest the report.
     ///
     /// The block's final screen is always captured under
     /// [`IOS_CAPTURE_KEY`]: a `cross_surface` capture reads it, and a block no
     /// capture reads costs one OCR pass. The workspace is left in place so the
     /// block file and the report are there to read after a failure.
     ///
+    /// The child runs inside the budget [`block_budget`] derives from `steps`;
+    /// past it, its whole process group is killed.
+    ///
     /// # Errors
     ///
     /// * [`IosError::Workspace`] when the block can't be written or the report
     ///   can't be read.
+    /// * [`IosError::BlockTimeout`] when `mirroir-mcp test` outlives the budget.
     /// * [`IosError::NoReport`] when `mirroir-mcp test` exits without writing
     ///   the report — it refused the block, or could not reach the device.
     /// * Anything [`parse_report_body`] returns — including per-test failures,
     ///   which name the failing step.
-    pub async fn run(&self, block_yaml: &str, workspace: &Path) -> Result<ReporterOutcome> {
+    pub async fn run(
+        &self,
+        block_yaml: &str,
+        steps: &[SkillStep],
+        workspace: &Path,
+    ) -> Result<ReporterOutcome> {
         fs::create_dir_all(workspace)
             .await
             .map_err(|source| IosError::Workspace {
@@ -121,23 +158,54 @@ impl MirroirMcpRunner {
             .current_dir(workspace)
             .stdin(Stdio::null())
             .stdout(Stdio::piped())
-            .stderr(Stdio::piped());
-        debug!(binary = %self.binary.display(), block = %block.display(), "spawning mirroir-mcp test");
-        let output = cmd.output().await.map_err(|source| IosError::Workspace {
+            .stderr(Stdio::piped())
+            .kill_on_drop(true);
+        // The child leads its own process group, so a kill reaches whatever it
+        // spawned too — and with them every holder of the stderr pipe.
+        #[cfg(unix)]
+        cmd.process_group(0);
+        let budget = block_budget(steps, self.step_allowance);
+        debug!(binary = %self.binary.display(), block = %block.display(), ?budget, "spawning mirroir-mcp test");
+        let mut child = cmd.spawn().map_err(|source| IosError::Workspace {
             context: format!("spawn {} test", self.binary.display()),
             source,
         })?;
+        let stdout = drain(child.stdout.take());
+        let stderr = drain(child.stderr.take());
+        let started = Instant::now();
+        let waited = timeout(budget, child.wait()).await;
+        let Ok(waited) = waited else {
+            send_group_sigkill(MIRROIR_MCP, &child);
+            if let Err(error) = child.kill().await {
+                warn!(%error, "mirroir-mcp test did not die on SIGKILL");
+            }
+            let elapsed = started.elapsed();
+            let stderr_tail = tail(&joined(stderr).await);
+            warn!(?elapsed, ?budget, stderr = %stderr_tail, "mirroir-mcp test outlived its budget; killed");
+            return Err(IosError::BlockTimeout {
+                elapsed,
+                budget,
+                steps: steps.len(),
+                stderr_tail,
+            }
+            .into());
+        };
+        let status = waited.map_err(|source| IosError::Workspace {
+            context: format!("wait for {} test", self.binary.display()),
+            source,
+        })?;
+        joined(stdout).await;
         // mirroir-mcp narrates every step on stderr; keep it for the reader.
-        let stderr_tail = tail(&output.stderr);
-        if output.status.success() {
-            info!(status = ?output.status.code(), "mirroir-mcp test finished");
+        let stderr_tail = tail(&joined(stderr).await);
+        if status.success() {
+            info!(status = ?status.code(), "mirroir-mcp test finished");
             debug!(stderr = %stderr_tail, "mirroir-mcp output");
         } else {
-            warn!(status = ?output.status.code(), stderr = %stderr_tail, "mirroir-mcp test exited non-zero");
+            warn!(status = ?status.code(), stderr = %stderr_tail, "mirroir-mcp test exited non-zero");
         }
         if !report.exists() {
             return Err(IosError::NoReport {
-                status: output.status.code(),
+                status: status.code(),
                 report,
                 stderr_tail,
             }
@@ -166,8 +234,13 @@ mod tests {
     use std::os::unix::fs::PermissionsExt;
     use std::path::{Path, PathBuf};
     use std::result::Result as StdResult;
+    use std::time::Duration;
 
+    use nix::errno::Errno;
+    use nix::sys::signal::kill;
+    use nix::unistd::Pid;
     use tempfile::TempDir;
+    use tokio::time::sleep;
 
     use super::MirroirMcpRunner;
     use crate::compile::report_error::ReportError;
@@ -219,6 +292,7 @@ mod tests {
         let outcome = runner
             .run(
                 "version: 1\nname: \"flow\"\nsteps:\n",
+                &[],
                 &dir.path().join("ws"),
             )
             .await?;
@@ -249,12 +323,82 @@ mod tests {
     async fn exiting_without_a_report_is_an_error() -> TestResult {
         let dir = TempDir::new()?;
         let runner = MirroirMcpRunner::resolve(Some(stub(dir.path(), None, 1)?), &OsString::new())?;
-        match runner.run("version: 1\n", &dir.path().join("ws")).await {
+        match runner
+            .run("version: 1\n", &[], &dir.path().join("ws"))
+            .await
+        {
             Err(RunnerError::Ios(IosError::NoReport {
                 status: Some(1), ..
             })) => Ok(()),
             other => Err(format!("expected NoReport, got {:?}", other.map(|_| ())).into()),
         }
+    }
+
+    /// A `mirroir-mcp test` that never returns — the hang carnet#24's capture
+    /// stall can turn into — is killed at its budget, the stderr it wrote so
+    /// far reaches the error, and neither it nor what it spawned survives.
+    #[tokio::test]
+    async fn a_block_that_never_returns_is_killed_at_its_budget() -> TestResult {
+        let dir = TempDir::new()?;
+        let bin = dir.path().join("mirroir-mcp");
+        let pid = dir.path().join("pid");
+        let grandchild = dir.path().join("grandchild");
+        std_fs::write(
+            &bin,
+            format!(
+                "#!/bin/sh\necho 'step 1 (launch: \"Clock\")' >&2\necho $$ > '{}'\nsleep 1000 &\necho $! > '{}'\nwait\n",
+                pid.display(),
+                grandchild.display()
+            ),
+        )?;
+        std_fs::set_permissions(&bin, std_fs::Permissions::from_mode(0o755))?;
+        // Long enough for the stub to start on a loaded host, so the stderr it
+        // writes first is there to read when the kill lands.
+        let allowance = Duration::from_secs(3);
+        let runner = MirroirMcpRunner::resolve(Some(bin.into_os_string()), &OsString::new())?
+            .with_step_allowance(allowance);
+        match runner
+            .run("version: 1\n", &[], &dir.path().join("ws"))
+            .await
+        {
+            Err(RunnerError::Ios(IosError::BlockTimeout {
+                elapsed,
+                budget,
+                steps: 0,
+                stderr_tail,
+            })) => {
+                assert_eq!(budget, allowance);
+                assert!(elapsed >= budget, "killed early: {elapsed:?}");
+                assert!(
+                    stderr_tail.contains("step 1"),
+                    "stderr {stderr_tail:?} after {elapsed:?}"
+                );
+            }
+            other => {
+                return Err(format!("expected BlockTimeout, got {:?}", other.map(|_| ())).into());
+            }
+        }
+        for file in [pid, grandchild] {
+            let raw: i32 = std_fs::read_to_string(&file)?.trim().parse()?;
+            assert!(
+                gone(raw).await,
+                "{} ({raw}) outlived the kill",
+                file.display()
+            );
+        }
+        Ok(())
+    }
+
+    /// Whether `pid` names no process within a few seconds — an orphan is
+    /// reaped by init, not by us, so it may linger as a zombie briefly.
+    async fn gone(pid: i32) -> bool {
+        for _ in 0..50 {
+            if kill(Pid::from_raw(pid), None) == Err(Errno::ESRCH) {
+                return true;
+            }
+            sleep(Duration::from_millis(100)).await;
+        }
+        false
     }
 
     /// A failing step reaches the error through the shared ingest, named as
@@ -268,7 +412,10 @@ mod tests {
             Some(stub(dir.path(), Some(&failing), 1)?),
             &OsString::new(),
         )?;
-        match runner.run("version: 1\n", &dir.path().join("ws")).await {
+        match runner
+            .run("version: 1\n", &[], &dir.path().join("ws"))
+            .await
+        {
             Err(RunnerError::Report(error @ ReportError::TestFailures { .. })) => {
                 let text = error.to_string();
                 assert!(text.starts_with("mirroir-mcp: 1 of 1"), "{text}");
@@ -290,7 +437,9 @@ mod tests {
         stub(dir.path(), Some(PASSING_REPORT), 0)?;
         let relative = pathdiff_from_cwd(&dir.path().join("mirroir-mcp"))?;
         let runner = MirroirMcpRunner::resolve(Some(relative), &OsString::new())?;
-        let outcome = runner.run("version: 1\n", &dir.path().join("ws")).await?;
+        let outcome = runner
+            .run("version: 1\n", &[], &dir.path().join("ws"))
+            .await?;
         assert_eq!(outcome.verdict.passed, 1);
         Ok(())
     }

@@ -111,6 +111,26 @@ final class TargetSelectorTests: XCTestCase {
         XCTAssertNil(InvalidStepGate.refuse(skills: [skill]))
     }
 
+    /// A step the parser read but could not use would run as SKIP and let the
+    /// skill pass beside it, so the gate refuses it like an invalid one; an
+    /// AI-only step cannot be the action a measure times either.
+    func testGateRefusesStepsThatWouldOnlySkip() {
+        let skill = SkillParser.parse(content: """
+            name: gate
+            steps:
+              - launch: "Clock"
+              - drag: { }
+              - measure: { until: "Done" }
+              - measure: { verify: "Ready", until: "Done" }
+              - verify: "an AI-only step stays readable"
+            """, filePath: "gate.yaml")
+        let findings = InvalidStepGate.scan(skills: [skill])
+        XCTAssertEqual(findings.map(\.stepIndex), [1, 2, 3])
+        XCTAssertEqual(findings.map(\.stepType), ["drag", "measure", "measure"])
+        XCTAssertEqual(findings.last?.reason, "action verify: an AI-only step cannot be timed")
+        XCTAssertEqual(InvalidStepGate.refuse(skills: [skill]), 1)
+    }
+
     // MARK: - Helpers
 
     private func parseError(_ raw: String) -> TargetSelectorError? {

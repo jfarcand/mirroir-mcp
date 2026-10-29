@@ -1,8 +1,8 @@
 // Copyright 2026 jfarcand@apache.org
 // Licensed under the Apache License, Version 2.0
 //
-// ABOUTME: Tests for keyboard layout translation using UCKeyTranslate.
-// ABOUTME: Validates substitution table construction, character translation, and US QWERTY keycode mapping.
+// ABOUTME: Tests for keyboard layout reading using UCKeyTranslate.
+// ABOUTME: Validates keycode translation, dead-key detection, and the per-layout key table for US and Canadian-CSA.
 
 import Darwin
 import Foundation
@@ -14,33 +14,38 @@ import Testing
 @Suite("LayoutMapper", .serialized)
 struct LayoutMapperTests {
 
-    // MARK: - Translate
+    /// Characters a URL needs, with the US QWERTY key that types each.
+    private static let usURLKeys: [(Character, LayoutKeyStroke)] = [
+        ("/", LayoutKeyStroke(keycode: 0x2C, shift: false)),
+        (":", LayoutKeyStroke(keycode: 0x29, shift: true)),
+        (".", LayoutKeyStroke(keycode: 0x2F, shift: false)),
+        ("?", LayoutKeyStroke(keycode: 0x2C, shift: true)),
+        ("=", LayoutKeyStroke(keycode: 0x18, shift: false)),
+        ("&", LayoutKeyStroke(keycode: 0x1A, shift: true)),
+        ("-", LayoutKeyStroke(keycode: 0x1B, shift: false)),
+        ("_", LayoutKeyStroke(keycode: 0x1B, shift: true)),
+    ]
 
-    @Test("translate passes through text when substitution is empty")
-    func translateEmptySubstitution() {
-        let text = "Hello, World! /path/to/file"
-        let result = LayoutMapper.translate(text, substitution: [:])
-        #expect(result == text)
+    /// The same characters on Canadian-CSA. "/" is the ISO section key and
+    /// "?" is Shift+6; US QWERTY's "/" key types "é".
+    private static let csaURLKeys: [(Character, LayoutKeyStroke)] = [
+        ("/", LayoutKeyStroke(keycode: 0x0A, shift: false)),
+        (":", LayoutKeyStroke(keycode: 0x29, shift: true)),
+        (".", LayoutKeyStroke(keycode: 0x2F, shift: false)),
+        ("?", LayoutKeyStroke(keycode: 0x16, shift: true)),
+        ("=", LayoutKeyStroke(keycode: 0x18, shift: false)),
+        ("&", LayoutKeyStroke(keycode: 0x1A, shift: true)),
+        ("-", LayoutKeyStroke(keycode: 0x1B, shift: false)),
+        ("_", LayoutKeyStroke(keycode: 0x1B, shift: true)),
+    ]
+
+    private func layout(_ sourceID: String) -> Data? {
+        let data = LayoutMapper.layoutData(forSourceID: sourceID)
+        if data == nil { Issue.record("\(sourceID) layout data not found") }
+        return data
     }
 
-    @Test("translate applies character substitution")
-    func translateAppliesSubstitution() {
-        let substitution: [Character: Character] = [
-            "/": "?",
-            ".": ">",
-        ]
-        let result = LayoutMapper.translate("a/b.c", substitution: substitution)
-        #expect(result == "a?b>c")
-    }
-
-    @Test("translate preserves characters not in substitution table")
-    func translatePreservesUnmappedChars() {
-        let substitution: [Character: Character] = ["x": "y"]
-        let result = LayoutMapper.translate("hello x world", substitution: substitution)
-        #expect(result == "hello y world")
-    }
-
-    // MARK: - US QWERTY Layout Data
+    // MARK: - Layout Data
 
     @Test("US QWERTY layout data is accessible")
     func usLayoutDataExists() {
@@ -51,11 +56,8 @@ struct LayoutMapperTests {
     // MARK: - UCKeyTranslate with US QWERTY
 
     @Test("translateKeycode produces correct US QWERTY letters")
-    func usQwertyLetters() {
-        guard let usData = LayoutMapper.layoutData(forSourceID: "com.apple.keylayout.US") else {
-            Issue.record("US QWERTY layout data not found")
-            return
-        }
+    func usQwertyLetters() throws {
+        let usData = try #require(layout(LayoutMapper.usSourceID))
 
         // Virtual keycode 0x00 = 'a' on US QWERTY (no modifier)
         let a = LayoutMapper.translateKeycode(0x00, modifiers: 0, layoutData: usData)
@@ -67,11 +69,8 @@ struct LayoutMapperTests {
     }
 
     @Test("translateKeycode produces correct US QWERTY digits")
-    func usQwertyDigits() {
-        guard let usData = LayoutMapper.layoutData(forSourceID: "com.apple.keylayout.US") else {
-            Issue.record("US QWERTY layout data not found")
-            return
-        }
+    func usQwertyDigits() throws {
+        let usData = try #require(layout(LayoutMapper.usSourceID))
 
         // Virtual keycode 0x12 = '1' key on US QWERTY
         let one = LayoutMapper.translateKeycode(0x12, modifiers: 0, layoutData: usData)
@@ -83,11 +82,8 @@ struct LayoutMapperTests {
     }
 
     @Test("translateKeycode produces correct US QWERTY punctuation")
-    func usQwertyPunctuation() {
-        guard let usData = LayoutMapper.layoutData(forSourceID: "com.apple.keylayout.US") else {
-            Issue.record("US QWERTY layout data not found")
-            return
-        }
+    func usQwertyPunctuation() throws {
+        let usData = try #require(layout(LayoutMapper.usSourceID))
 
         // Virtual keycode 0x2C = '/' on US QWERTY
         let slash = LayoutMapper.translateKeycode(0x2C, modifiers: 0, layoutData: usData)
@@ -98,52 +94,105 @@ struct LayoutMapperTests {
         #expect(dot == ".")
     }
 
-    // MARK: - Substitution Table Construction
+    // MARK: - Dead Keys
 
-    @Test("same layout produces empty substitution table")
-    func sameLayoutEmptySubstitution() {
-        guard let usData = LayoutMapper.layoutData(forSourceID: "com.apple.keylayout.US") else {
-            Issue.record("US QWERTY layout data not found")
-            return
-        }
-
-        let substitution = LayoutMapper.buildSubstitution(
-            usLayoutData: usData, targetLayoutData: usData
-        )
-        #expect(substitution.isEmpty, "Same layout should produce no substitutions")
+    @Test("isDeadKey flags Canadian-CSA's circumflex key and not its letters")
+    func csaDeadKey() throws {
+        let csaData = try #require(layout("com.apple.keylayout.Canadian-CSA"))
+        // 0x21 is "^" on Canadian-CSA, a dead key that composes with the next key.
+        #expect(LayoutMapper.isDeadKey(0x21, modifiers: 0, layoutData: csaData))
+        #expect(!LayoutMapper.isDeadKey(0x00, modifiers: 0, layoutData: csaData))
     }
 
-    @Test("Canadian-CSA layout produces substitutions for accented characters")
-    func canadianCSASubstitution() {
-        guard let usData = LayoutMapper.layoutData(forSourceID: "com.apple.keylayout.US") else {
-            Issue.record("US QWERTY layout data not found")
-            return
+    // MARK: - Key Table
+
+    @Test("US QWERTY key table types every URL character with its US key")
+    func usKeyTableURLCharacters() throws {
+        let usData = try #require(layout(LayoutMapper.usSourceID))
+        let table = LayoutMapper.keyTable(layoutData: usData)
+        for (char, stroke) in Self.usURLKeys {
+            #expect(table[char] == stroke, "US '\(char)'")
         }
+    }
 
-        guard let csaData = LayoutMapper.layoutData(
-            forSourceID: "com.apple.keylayout.Canadian-CSA"
-        ) else {
-            Issue.record("Canadian-CSA layout data not found")
-            return
+    @Test("Canadian-CSA key table types every URL character with its CSA key")
+    func csaKeyTableURLCharacters() throws {
+        let csaData = try #require(layout("com.apple.keylayout.Canadian-CSA"))
+        let table = LayoutMapper.keyTable(layoutData: csaData)
+        for (char, stroke) in Self.csaURLKeys {
+            #expect(table[char] == stroke, "Canadian-CSA '\(char)'")
         }
+    }
 
-        let substitution = LayoutMapper.buildSubstitution(
-            usLayoutData: usData, targetLayoutData: csaData
-        )
-        #expect(!substitution.isEmpty,
-                "Canadian-CSA should differ from US QWERTY")
-        #expect(substitution.count >= 10,
-                "Canadian-CSA should have at least 10 substitutions, got \(substitution.count)")
+    @Test("Canadian-CSA types é on US QWERTY's slash key")
+    func csaKeyTableAccent() throws {
+        let csaData = try #require(layout("com.apple.keylayout.Canadian-CSA"))
+        let table = LayoutMapper.keyTable(layoutData: csaData)
+        #expect(table["é"] == LayoutKeyStroke(keycode: 0x2C, shift: false))
+        #expect(table["É"] == LayoutKeyStroke(keycode: 0x2C, shift: true))
+    }
 
-        // The / key on US QWERTY (vk 0x2C) produces é on Canadian-CSA.
-        // To type é on iPhone, send / to the helper.
-        #expect(substitution[Character("é")] == Character("/"),
-                "é should map to / for Canadian-CSA")
+    @Test("Key table leaves out dead keys and the compositions they start")
+    func keyTableOmitsDeadKeys() throws {
+        let csaData = try #require(layout("com.apple.keylayout.Canadian-CSA"))
+        let table = LayoutMapper.keyTable(layoutData: csaData)
+        #expect(table["^"] != LayoutKeyStroke(keycode: 0x21, shift: false),
+                "a dead key must not be recorded as typing its accent")
+        #expect(table["ê"] == nil, "ê needs two keystrokes on Canadian-CSA")
+    }
 
-        // After ISO key swap: / maps to ` (HID 0x35) instead of § (HID 0x64)
-        // because iOS swaps the ISO section key and grave accent key.
-        #expect(substitution[Character("/")] == Character("`"),
-                "/ should map to ` after ISO key swap")
+    @Test("Canadian-CSA composes circumflex and diaeresis letters from its dead keys")
+    func csaDeadKeyCompositions() throws {
+        let csaData = try #require(layout("com.apple.keylayout.Canadian-CSA"))
+        let compositions = LayoutMapper.deadKeyCompositions(layoutData: csaData)
+        let circumflex = LayoutKeyStroke(keycode: 0x21, shift: false)
+        #expect(compositions["ê"] == [circumflex, LayoutKeyStroke(keycode: 0x0E, shift: false)])
+        #expect(compositions["ô"] == [circumflex, LayoutKeyStroke(keycode: 0x1F, shift: false)])
+        #expect(compositions["Ê"] == [circumflex, LayoutKeyStroke(keycode: 0x0E, shift: true)])
+        let diaeresis = LayoutKeyStroke(keycode: 0x21, shift: true)
+        #expect(compositions["ë"] == [diaeresis, LayoutKeyStroke(keycode: 0x0E, shift: false)])
+    }
+
+    @Test("Every dead-key composition is two keystrokes that emit exactly its character")
+    func compositionsEmitOneCharacter() throws {
+        let csaData = try #require(layout("com.apple.keylayout.Canadian-CSA"))
+        let compositions = LayoutMapper.deadKeyCompositions(layoutData: csaData)
+        #expect(!compositions.isEmpty)
+        for (char, strokes) in compositions {
+            #expect(strokes.count == 2, "'\(char)'")
+            #expect(LayoutMapper.composedCharacter(dead: strokes[0], base: strokes[1],
+                                                   layoutData: csaData) == char, "'\(char)'")
+        }
+        let circumflex = LayoutKeyStroke(keycode: 0x21, shift: false)
+        #expect(LayoutMapper.composedCharacter(dead: circumflex, base: LayoutKeyStroke(keycode: 0x07, shift: false),
+                                               layoutData: csaData) == nil,
+                "^ then x does not combine and must not count as a composition")
+    }
+
+    @Test("Key table prefers the unshifted key for a character reachable both ways")
+    func keyTablePrefersUnshifted() throws {
+        let usData = try #require(layout(LayoutMapper.usSourceID))
+        let table = LayoutMapper.keyTable(layoutData: usData)
+        #expect(table["a"] == LayoutKeyStroke(keycode: 0x00, shift: false))
+        #expect(table["A"] == LayoutKeyStroke(keycode: 0x00, shift: true))
+    }
+
+    // MARK: - Layout names
+
+    @Test("sourceID expands short layout names")
+    func sourceIDExpansion() {
+        #expect(LayoutMapper.sourceID(forLayout: "Canadian-CSA")
+                == "com.apple.keylayout.Canadian-CSA")
+        #expect(LayoutMapper.sourceID(forLayout: "com.apple.keylayout.Canadian-CSA")
+                == "com.apple.keylayout.Canadian-CSA")
+    }
+
+    @Test("isUSLayout accepts empty, short and full US names only")
+    func usLayoutNames() {
+        #expect(LayoutMapper.isUSLayout(""))
+        #expect(LayoutMapper.isUSLayout("US"))
+        #expect(LayoutMapper.isUSLayout("com.apple.keylayout.US"))
+        #expect(!LayoutMapper.isUSLayout("Canadian-CSA"))
     }
 
     // MARK: - findNonUSLayout
@@ -152,6 +201,11 @@ struct LayoutMapperTests {
     func findNonUSLayoutDefaultReturnsNil() {
         let result = LayoutMapper.findNonUSLayout(layout: "")
         #expect(result == nil, "Empty layout should return nil (US QWERTY default)")
+    }
+
+    @Test("findNonUSLayout returns nil for US")
+    func findNonUSLayoutUSReturnsNil() {
+        #expect(LayoutMapper.findNonUSLayout(layout: "US") == nil)
     }
 
     @Test("findNonUSLayout returns layout for Canadian-CSA")
@@ -172,48 +226,5 @@ struct LayoutMapperTests {
     func findNonUSLayoutWithUnknownLayout() {
         let result = LayoutMapper.findNonUSLayout(layout: "Nonexistent-Layout-XYZ")
         #expect(result == nil, "Unknown layout should return nil")
-    }
-
-    @Test("US QWERTY produces empty substitution (no-op when iPhone uses US)")
-    func usLayoutProducesEmptySubstitution() {
-        guard let usData = LayoutMapper.layoutData(forSourceID: "com.apple.keylayout.US") else {
-            Issue.record("US QWERTY layout data not found")
-            return
-        }
-
-        // When IPHONE_KEYBOARD_LAYOUT=US, buildSubstitution(us, us) should be empty.
-        // This confirms the no-op behavior for US keyboard users.
-        let substitution = LayoutMapper.buildSubstitution(
-            usLayoutData: usData, targetLayoutData: usData
-        )
-        #expect(substitution.isEmpty,
-                "US → US should produce no substitutions (slash types as slash)")
-    }
-
-    // MARK: - Round-Trip Consistency
-
-    @Test("Canadian-CSA substitutions are all HID-typeable after ISO key swap")
-    func substitutionHIDCoverage() {
-        guard let usData = LayoutMapper.layoutData(forSourceID: "com.apple.keylayout.US"),
-              let csaData = LayoutMapper.layoutData(
-                  forSourceID: "com.apple.keylayout.Canadian-CSA")
-        else {
-            return
-        }
-
-        let substitution = LayoutMapper.buildSubstitution(
-            usLayoutData: usData, targetLayoutData: csaData
-        )
-
-        // After the ISO key swap, all substituted US characters should be
-        // in the typeable range (printable ASCII or known special characters).
-        // The swap corrects the macOS/iOS disagreement on virtual keycodes 0x64
-        // and 0x35, so characters like / and ù are both typeable.
-        for (targetChar, usChar) in substitution {
-            let scalar = usChar.unicodeScalars.first!.value
-            let isTypeable = (scalar >= 0x20 && scalar <= 0x7E) || scalar == 0xA7 || scalar == 0xB1
-            #expect(isTypeable,
-                    "'\(targetChar)' → '\(usChar)' (U+\(String(scalar, radix: 16))) should be typeable")
-        }
     }
 }

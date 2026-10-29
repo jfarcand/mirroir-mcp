@@ -15,8 +15,9 @@ use crate::parser::surface::{is_web, step_kind};
 use crate::replay_plan::{ScenarioPlan, Segment};
 
 /// Ceiling, in milliseconds, for a locator action or assertion whose step
-/// declares no `timeout_s` of its own.
-const DEFAULT_STEP_TIMEOUT_MS: u64 = 30_000;
+/// declares no `timeout_s` of its own. An `ios` block's run budget grants each
+/// of its steps the same ceiling (`target::ios_budget`).
+pub const DEFAULT_STEP_TIMEOUT_MS: u64 = 30_000;
 
 /// The element a bare `type:` writes into when no `tap:` preceded it: whatever
 /// the page has focused. Naming a target with `into:` is always preferable —

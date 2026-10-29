@@ -342,9 +342,40 @@ final class CompiledStepExecutorTests: XCTestCase {
         XCTAssertEqual(result.status, .passed)
     }
 
-    // MARK: - No Hints (AI-only)
+    // MARK: - No Hints
 
-    func testNoHintsSkipsStep() {
+    /// A step compiled without hints has nothing to replay from, so it runs
+    /// live: the launch really happens and its own result is reported.
+    func testNoHintsRunsTheStepLive() {
+        let step = SkillStep.launch(appName: "Clock")
+        let compiledStep = CompiledStep(
+            index: 0, type: "launch", label: "Clock", hints: nil)
+
+        let result = compiledExecutor.execute(
+            step: step, compiledStep: compiledStep,
+            stepIndex: 0, skillName: "test")
+
+        XCTAssertEqual(result.status, .passed)
+        XCTAssertEqual(input.launchAppCalls, ["Clock"])
+    }
+
+    /// Run live, a failing step without hints fails rather than being skipped.
+    func testNoHintsFailingStepFails() {
+        describer.describeResult = ScreenDescriber.DescribeResult(
+            elements: [TapPoint(text: "Cancel", tapX: 100, tapY: 200, confidence: 0.9)],
+            screenshotBase64: "")
+        let step = SkillStep.assertVisible(label: "Alarms")
+        let compiledStep = CompiledStep(
+            index: 0, type: "assert_visible", label: "Alarms", hints: nil)
+
+        let result = compiledExecutor.execute(
+            step: step, compiledStep: compiledStep,
+            stepIndex: 0, skillName: "test")
+
+        XCTAssertEqual(result.status, .failed)
+    }
+
+    func testAIOnlyStepWithoutHintsIsNotEvaluated() {
         let step = SkillStep.skipped(stepType: "remember", reason: "AI-only")
         let compiledStep = CompiledStep(
             index: 0, type: "remember", label: nil, hints: nil)
@@ -353,8 +384,7 @@ final class CompiledStepExecutorTests: XCTestCase {
             step: step, compiledStep: compiledStep,
             stepIndex: 0, skillName: "test")
 
-        XCTAssertEqual(result.status, .skipped)
-        XCTAssertTrue(result.message?.contains("no compiled hints") ?? false)
+        XCTAssertEqual(result.status, .notEvaluated)
     }
 
     // MARK: - RecordingDescriber
@@ -389,7 +419,7 @@ final class CompiledStepExecutorTests: XCTestCase {
         XCTAssertEqual(recording.callCount, 1)
     }
 
-    func testRecordingDescriberCapturesFirstResult() {
+    func testRecordingDescriberKeepsTheLatestResult() {
         let inner = StubDescriber()
         let first = ScreenDescriber.DescribeResult(
             elements: [TapPoint(text: "First", tapX: 100, tapY: 200, confidence: 0.9)],
@@ -400,14 +430,13 @@ final class CompiledStepExecutorTests: XCTestCase {
         inner.describeResults = [first, second]
 
         let recording = RecordingDescriber(wrapping: inner)
-        XCTAssertNil(recording.firstResult)
+        XCTAssertNil(recording.lastResult)
 
         _ = recording.describe()
-        XCTAssertEqual(recording.firstResult?.elements.first?.text, "First")
+        XCTAssertEqual(recording.lastResult?.elements.first?.text, "First")
 
         _ = recording.describe()
-        XCTAssertEqual(recording.firstResult?.elements.first?.text, "First",
-            "firstResult should not change after first capture")
         XCTAssertEqual(recording.lastResult?.elements.first?.text, "Second")
+        XCTAssertEqual(recording.callCount, 2)
     }
 }

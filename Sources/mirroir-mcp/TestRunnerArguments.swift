@@ -13,7 +13,11 @@ extension TestRunner {
     // MARK: - Argument Parsing
 
     /// Parse CLI arguments into TestRunConfig.
-    static func parseArguments(_ args: [String]) -> TestRunConfig {
+    ///
+    /// - Throws: `TestRunnerArgumentError` for a flag this command does not know, a
+    ///   flag missing its value, or `--dry-run` with `--report-json`: a dry run
+    ///   executes nothing, so it must never write a report a caller reads as a verdict.
+    static func parseArguments(_ args: [String]) throws -> TestRunConfig {
         var skillArgs: [String] = []
         var junitPath: String?
         var screenshotDir = "./mirroir-test-results"
@@ -22,11 +26,20 @@ extension TestRunner {
         var dryRun = false
         var noCompiled = false
         var agent: String?
-        var noAutoRecompile = false
         var confirmDestructive = false
         var reportJSONPath: String?
         var captureKey: String?
         var showHelp = false
+
+        /// The value after flag `args[i]`, advancing past it.
+        func value(at i: inout Int) throws -> String {
+            let flag = args[i]
+            i += 1
+            guard i < args.count, !args[i].hasPrefix("-") else {
+                throw TestRunnerArgumentError.missingValue(flag: flag)
+            }
+            return args[i]
+        }
 
         var i = 0
         while i < args.count {
@@ -35,20 +48,19 @@ extension TestRunner {
             case "--help", "-h":
                 showHelp = true
             case "--junit":
-                i += 1
-                if i < args.count { junitPath = args[i] }
+                junitPath = try value(at: &i)
             case "--report-json":
-                i += 1
-                if i < args.count { reportJSONPath = args[i] }
+                reportJSONPath = try value(at: &i)
             case "--capture":
-                i += 1
-                if i < args.count { captureKey = args[i] }
+                captureKey = try value(at: &i)
             case "--screenshot-dir":
-                i += 1
-                if i < args.count { screenshotDir = args[i] }
+                screenshotDir = try value(at: &i)
             case "--timeout":
-                i += 1
-                if i < args.count, let t = Int(args[i]) { timeoutSeconds = t }
+                let raw = try value(at: &i)
+                guard let seconds = Int(raw), seconds > 0 else {
+                    throw TestRunnerArgumentError.invalidValue(flag: arg, value: raw)
+                }
+                timeoutSeconds = seconds
             case "--verbose", "-v":
                 verbose = true
             case "--dry-run":
@@ -57,8 +69,6 @@ extension TestRunner {
                 noCompiled = true
             case "--confirm-destructive":
                 confirmDestructive = true
-            case "--no-auto-recompile":
-                noAutoRecompile = true
             case "--agent":
                 // Peek-ahead: if next arg doesn't start with "-" and isn't a skill file
                 // (.md, .yaml, .yml), consume it as the model name. Otherwise, bare
@@ -76,11 +86,16 @@ extension TestRunner {
                     agent = ""
                 }
             default:
-                if !arg.hasPrefix("-") {
-                    skillArgs.append(arg)
+                if arg.hasPrefix("-") {
+                    throw TestRunnerArgumentError.unknownFlag(arg)
                 }
+                skillArgs.append(arg)
             }
             i += 1
+        }
+
+        if dryRun, reportJSONPath != nil {
+            throw TestRunnerArgumentError.dryRunWithReport
         }
 
         return TestRunConfig(
@@ -92,7 +107,6 @@ extension TestRunner {
             dryRun: dryRun,
             noCompiled: noCompiled,
             agent: agent,
-            noAutoRecompile: noAutoRecompile,
             confirmDestructive: confirmDestructive,
             reportJSONPath: reportJSONPath,
             captureKey: captureKey,
@@ -255,12 +269,12 @@ extension TestRunner {
           --screenshot-dir    Failure screenshot directory (default: ./mirroir-test-results/)
           --timeout <sec>     wait_for timeout in seconds (default: 15)
           --verbose, -v       Show detailed output
-          --dry-run           Parse and validate without executing
+          --dry-run           Parse and validate without executing (refused
+                              with --report-json: a dry run reports no verdict)
           --confirm-destructive
                               Allow steps that send, remove, spend, or reset
                               something on the device. Refused by default.
           --no-compiled       Skip compiled skills (force full OCR)
-          --no-auto-recompile Skip auto-recompilation of drifted compiled skills
           --agent [model]     Diagnose compiled failures. Without model: deterministic OCR only.
                               With model: deterministic + AI diagnosis.
                               Built-in: gpt-5.3, claude-opus-5-5, claude-sonnet-5-5,
@@ -277,6 +291,29 @@ extension TestRunner {
           mirroir-mcp test                    # run all discovered skills
         """
         fputs(usage + "\n", stderr)
+    }
+}
+
+/// Errors in the arguments given to `mirroir test`. The run exits with
+/// `TestRunner.usageExitCode`, naming the offending flag.
+enum TestRunnerArgumentError: LocalizedError, Equatable {
+    case unknownFlag(String)
+    case missingValue(flag: String)
+    case invalidValue(flag: String, value: String)
+    case dryRunWithReport
+
+    var errorDescription: String? {
+        switch self {
+        case .unknownFlag(let flag):
+            return "unknown option '\(flag)' (see mirroir-mcp test --help)"
+        case .missingValue(let flag):
+            return "option '\(flag)' needs a value"
+        case .invalidValue(let flag, let value):
+            return "option '\(flag)' got '\(value)', expected a positive whole number of seconds"
+        case .dryRunWithReport:
+            return "--dry-run cannot be combined with --report-json: a dry run executes "
+                + "no step, so it has no verdict to report"
+        }
     }
 }
 
