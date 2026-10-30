@@ -19,6 +19,20 @@ enum MirroringWindowResolver {
         "ok", "resume", "try again", "reprendre", "continuer", "réessayer", "reessayer",
     ]
 
+    /// Subroles of the window's own traffic-light controls. iPhone Mirroring
+    /// hosts them inside the hosting view, where they surface whenever the
+    /// toolbar is revealed; they are chrome, not an interruption.
+    static let windowControlSubroles: Set<String> = [
+        kAXCloseButtonSubrole as String, kAXZoomButtonSubrole as String,
+        kAXMinimizeButtonSubrole as String, kAXFullScreenButtonSubrole as String,
+    ]
+
+    /// Identifiers of the toolbar's Home and App Switcher buttons. The
+    /// identifiers are locale-independent; their labels are not.
+    static let toolbarControlIdentifiers: Set<String> = [
+        "app.grid.3x3", "iphone.app.switcher",
+    ]
+
     /// Resolve the mirroring window's live geometry.
     ///
     /// The window server's bounds are authoritative: AX geometry can lag after
@@ -51,7 +65,9 @@ enum MirroringWindowResolver {
     /// press (iPhone locked, connecting, iPhone in use) carry labeled text.
     /// Either one reads as paused, so input never goes into a dead session;
     /// the escape plugins then find no resume control and the paused error
-    /// reaches the caller.
+    /// reaches the caller. Revealing the toolbar adds the window controls and
+    /// the Home / App Switcher buttons to the same subtree; those are window
+    /// chrome over a live session and never read as paused.
     static func state(of window: MirroringAXWindow) -> WindowState {
         guard let hosting = window.hostingView else { return .noWindow }
         return hosting.children.contains(where: isInterruption) ? .paused : .connected
@@ -94,13 +110,25 @@ enum MirroringWindowResolver {
     }
 
     /// Whether `node` or a descendant is a button or labeled text: the
-    /// content of an interruption overlay.
+    /// content of an interruption overlay. Toolbar chrome is skipped whole.
     private static func isInterruption(_ node: AXNodeSnapshot) -> Bool {
+        if isToolbarControl(node) { return false }
         if node.role == kAXButtonRole as String { return true }
         if node.role == kAXStaticTextRole as String,
            let label = node.label, !label.trimmingCharacters(in: .whitespaces).isEmpty {
             return true
         }
         return node.children.contains(where: isInterruption)
+    }
+
+    /// Whether `node` is a window control or a toolbar button: chrome that
+    /// shows over a live session when the toolbar is revealed.
+    private static func isToolbarControl(_ node: AXNodeSnapshot) -> Bool {
+        guard node.role == kAXButtonRole as String else { return false }
+        if let subrole = node.subrole, windowControlSubroles.contains(subrole) { return true }
+        if let identifier = node.identifier, toolbarControlIdentifiers.contains(identifier) {
+            return true
+        }
+        return false
     }
 }

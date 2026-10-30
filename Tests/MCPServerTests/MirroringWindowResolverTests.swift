@@ -120,6 +120,52 @@ final class MirroringWindowResolverTests: XCTestCase {
             .paused)
     }
 
+    func testRevealedToolbarOverLiveSessionIsConnected() {
+        // The AX tree captured with the toolbar hovered (issue #78): window
+        // controls and the Home / App Switcher buttons inside the hosting view.
+        let hosting = AXNodeSnapshot(role: "AXGroup", children: [
+            AXNodeSnapshot(role: "AXButton", subrole: "AXCloseButton"),
+            AXNodeSnapshot(role: "AXButton", subrole: "AXZoomButton", children: [
+                AXNodeSnapshot(role: "AXGroup", children: [AXNodeSnapshot(role: "AXGroup")]),
+            ]),
+            AXNodeSnapshot(role: "AXButton", subrole: "AXMinimizeButton"),
+            AXNodeSnapshot(role: "AXGroup", children: [
+                AXNodeSnapshot(role: "AXButton", identifier: "app.grid.3x3", label: "ホーム画面"),
+                AXNodeSnapshot(
+                    role: "AXButton", identifier: "iphone.app.switcher", label: "アプリスイッチャー"),
+            ]),
+        ])
+        XCTAssertEqual(
+            MirroringWindowResolver.state(of: axWindow(frame: nil, hosting: hosting)),
+            .connected)
+    }
+
+    func testRevealedToolbarDoesNotHideAnOverlay() {
+        let hosting = AXNodeSnapshot(role: "AXGroup", children: [
+            AXNodeSnapshot(role: "AXButton", subrole: "AXCloseButton"),
+            AXNodeSnapshot(role: "AXGroup", children: [
+                AXNodeSnapshot(role: "AXButton", identifier: "iphone.app.switcher", label: "App Switcher"),
+            ]),
+            AXNodeSnapshot(role: "AXGroup", children: [
+                AXNodeSnapshot(role: "AXStaticText", label: "iPhone Mirroring Paused"),
+                AXNodeSnapshot(role: "AXButton", label: "Resume"),
+            ]),
+        ])
+        XCTAssertEqual(
+            MirroringWindowResolver.state(of: axWindow(frame: nil, hosting: hosting)),
+            .paused)
+    }
+
+    func testToolbarButtonWithoutSubroleOrIdentifierStillReadsAsOverlay() {
+        // Only known chrome is exempt; an unknown button keeps the safe answer.
+        let hosting = AXNodeSnapshot(role: "AXGroup", children: [
+            AXNodeSnapshot(role: "AXButton", label: "Home Screen"),
+        ])
+        XCTAssertEqual(
+            MirroringWindowResolver.state(of: axWindow(frame: nil, hosting: hosting)),
+            .paused)
+    }
+
     // MARK: - resume control
 
     func testResumeControlAcceptsOnlyKnownTitles() {

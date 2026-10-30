@@ -120,6 +120,8 @@ struct LiveMirroringProbe: MirroringSystemProbing {
         // Static text carries its words in AXValue rather than a title.
         return AXNodeSnapshot(
             role: stringAttribute(element, kAXRoleAttribute),
+            subrole: stringAttribute(element, kAXSubroleAttribute),
+            identifier: stringAttribute(element, kAXIdentifierAttribute),
             label: label(of: element) ?? stringAttribute(element, kAXValueAttribute),
             children: kids)
     }
