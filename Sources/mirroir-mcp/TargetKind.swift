@@ -19,7 +19,7 @@ enum TargetKind {
     /// All registered target builders. Keys are the config-type strings accepted
     /// in `targets.json`. A single target may register multiple aliases (e.g.
     /// macOS-app has the canonical "macos-app" plus legacy "generic-window").
-    nonisolated(unsafe) static let builders: [String: Builder] = [
+    static let builders: [String: Builder] = [
         IPhoneMirroringTarget.configTypeName: IPhoneMirroringTarget.build,
         MacOSAppTarget.configTypeName: MacOSAppTarget.build,
         MacOSAppTarget.legacyConfigTypeName: MacOSAppTarget.build,
@@ -29,7 +29,7 @@ enum TargetKind {
     /// other read-only sites that need the profile without building a full
     /// target. Unknown types fall back to the macOS-app profile (conservative —
     /// no iOS-only safe-zones applied to unfamiliar targets).
-    nonisolated(unsafe) static let profiles: [String: TargetProfile] = [
+    static let profiles: [String: TargetProfile] = [
         IPhoneMirroringTarget.configTypeName: IPhoneMirroringTarget.profile,
         MacOSAppTarget.configTypeName: MacOSAppTarget.profile,
         MacOSAppTarget.legacyConfigTypeName: MacOSAppTarget.profile,
