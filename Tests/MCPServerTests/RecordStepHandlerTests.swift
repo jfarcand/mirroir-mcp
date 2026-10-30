@@ -1,7 +1,7 @@
 // Copyright 2026 jfarcand@apache.org
 // Licensed under the Apache License, Version 2.0
 //
-// ABOUTME: Tests the record_step MCP handler: it refuses a type and label the skill parser cannot rebuild.
+// ABOUTME: Tests the record_step MCP handler: unrebuildable steps, and icon taps replay could not check.
 // ABOUTME: A SKILL.md replays from its recorded steps, so an unreadable record would fail only at replay time.
 
 import XCTest
@@ -107,6 +107,7 @@ final class RecordStepHandlerTests: XCTestCase {
     }
 
     func testACoordinateOnlyTapRecordsTheScreenItLedTo() {
+        startOn(["Alarmes", "Aucune alarme", "Horloges"])
         describer.describeResult = screen(["General", "Privacy", "Battery"])
         let result = recordStep([
             "step_index": .number(0), "type": .string("tap"),
@@ -126,6 +127,14 @@ final class RecordStepHandlerTests: XCTestCase {
             screenshotBase64: "")
     }
 
+    /// The start screen get_skill reads before step 0.
+    private func startOn(_ texts: [String]) {
+        let start = screen(texts)
+        session.markStart(skillPath: "skill.md") {
+            StructuralFingerprint.buildScreenFingerprint(elements: start.elements, icons: [])
+        }
+    }
+
     private func recordIconTap(_ index: Int) -> (isError: Bool, text: String) {
         recordStep([
             "step_index": .number(Double(index)), "type": .string("tap"),
@@ -142,12 +151,56 @@ final class RecordStepHandlerTests: XCTestCase {
     }
 
     func testACoordinateOnlyTapCannotBeReRecordedAfterALaterStep() {
+        startOn(["Alarmes", "Aucune alarme", "Horloges"])
         describer.describeResult = screen(["General", "Privacy", "Battery"])
         XCTAssertFalse(recordIconTap(0).isError)
         XCTAssertFalse(recordStep(["step_index": .number(1), "type": .string("home")]).isError)
         let result = recordIconTap(0)
         XCTAssertTrue(result.isError, "the screen now is not the one tap 0 led to")
         XCTAssertTrue(result.text.contains("Step 1 is already recorded"), result.text)
+    }
+
+    func testACoordinateOnlyTapThatChangedNothingIsRefused() {
+        // The tap was dropped: the screen after it is the start screen.
+        startOn(["Alarmes", "Aucune alarme", "Horloges"])
+        describer.describeResult = screen(["Alarmes", "Aucune alarme", "Horloges"])
+        let result = recordIconTap(0)
+        XCTAssertTrue(result.isError, result.text)
+        XCTAssertTrue(result.text.contains("did not change the screen"), result.text)
+        XCTAssertTrue(session.recordedSteps.isEmpty, "replay could never prove this tap")
+    }
+
+    func testACoordinateOnlyTapIsComparedWithTheScreenTheStepBeforeLeft() {
+        startOn(["Chronomètre", "Démarrer", "Horloges"])
+        describer.describeResult = screen(["Alarmes", "Aucune alarme", "Horloges"])
+        XCTAssertFalse(recordStep([
+            "step_index": .number(0), "type": .string("wait_for"),
+            "label": .string("Aucune alarme"),
+        ]).isError)
+
+        let unchanged = recordIconTap(1)
+        XCTAssertTrue(unchanged.text.contains("did not change the screen"), unchanged.text)
+
+        describer.describeResult = screen(["Annuler", "Enregistrer", "Nouv. alarme", "Sonnerie"])
+        let changed = recordIconTap(1)
+        XCTAssertFalse(changed.isError, changed.text)
+        XCTAssertNotNil(session.recordedSteps.last?.hints?.arrivalFingerprint)
+    }
+
+    func testACoordinateOnlyTapWithNoScreenBeforeItIsRefused() {
+        describer.describeResult = screen(["General", "Privacy", "Battery"])
+        let first = recordIconTap(0)
+        XCTAssertTrue(first.isError, first.text)
+        XCTAssertTrue(first.text.contains("Call get_skill before the first step"), first.text)
+
+        startOn(["Alarmes", "Aucune alarme", "Horloges"])
+        describer.describeResult = nil
+        XCTAssertFalse(recordStep(["step_index": .number(0), "type": .string("home")]).isError,
+                       "an unreadable screen does not block a step that needs no check")
+        describer.describeResult = screen(["General", "Privacy", "Battery"])
+        let next = recordIconTap(1)
+        XCTAssertTrue(next.isError, next.text)
+        XCTAssertTrue(next.text.contains("after step 0 was not read"), next.text)
     }
 
     func testACoordinateOnlyTapIsRefusedWhenItsScreenCannotBeRead() {

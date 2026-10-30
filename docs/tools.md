@@ -41,7 +41,7 @@ All 38 tools exposed by the MCP server. Mutating tools require [permission](perm
 | `list_targets` | — | List all configured automation targets with status and window size |
 | `switch_target` | `target` | Switch active target for subsequent tool calls |
 | `calibrate_component` | `component_path`, `target`?, `scroll`? | Test a component definition (.md) against the current screen and return a diagnostic report |
-| `record_step` | `step_index`, `type`, `label`?, `tap_x`?, `tap_y`?, `match_strategy`?, `elapsed_ms`?, `scroll_count`?, `scroll_direction`? | Record a compiled step during AI-driven skill execution; a tap with coordinates and no label also records the screen it led to, which replay must reach |
+| `record_step` | `step_index`, `type`, `label`?, `tap_x`?, `tap_y`?, `match_strategy`?, `elapsed_ms`?, `scroll_count`?, `scroll_direction`? | Record a compiled step during AI-driven skill execution; a tap with coordinates and no label also records the screen it led to, which replay must reach, and is refused when that screen is the one before the tap |
 | `save_compiled` | `skill_name` | Save accumulated compiled steps as .compiled.json next to the source skill |
 
 ## Coordinates

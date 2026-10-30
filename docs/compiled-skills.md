@@ -27,7 +27,7 @@ There are two ways to compile a skill: AI-driven compilation (recommended) and C
 
 When an AI agent executes a skill via MCP tools, it already has all the data needed for compilation — tap coordinates from `describe_screen`, timing from step execution, scroll counts from `scroll_to`. Two MCP tools let the AI report this data back to the server:
 
-1. **`record_step`** — called after each step with the step index, type, label, and observed data (coordinates, timing, scroll counts). For a tap with coordinates and no label, it also reads the settled screen the tap led to and stores it as the hint's `arrivalFingerprint`; the step is refused when that screen cannot be read, shows fewer than `compiledTapArrivalMinTexts` labels, or a later step is already recorded (the screen on display is then not the tap's destination)
+1. **`record_step`** — called after each step with the step index, type, label, and observed data (coordinates, timing, scroll counts). Each call reads the settled screen the step left, which the next step starts from. For a tap with coordinates and no label, that screen is the tap's destination and is stored as the hint's `arrivalFingerprint`; the step is refused when that screen cannot be read, shows fewer than `compiledTapArrivalMinTexts` labels, still matches the screen before the tap (the one read after the previous step, or by `get_skill` for step 0) because the tap changed nothing, or a later step is already recorded (the screen on display is then not the tap's destination)
 2. **`save_compiled`** — called after all steps complete, writes the `.compiled.json` file
 
 The first AI execution IS the compilation. No separate learning run needed.

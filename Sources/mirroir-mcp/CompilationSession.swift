@@ -13,6 +13,10 @@ final class CompilationSession: @unchecked Sendable {
     private var steps: [CompiledStep] = []
     /// The skill whose start screen was read, and that screen's fingerprint.
     private var start: (skillPath: String, fingerprint: ScreenFingerprint?)?
+    /// The settled screen read right after each recorded step, by step index
+    /// (nil when that read failed). A coordinate-only tap is compared with the
+    /// screen before it, so a tap that changed nothing is refused when recorded.
+    private var screensAfter: [Int: ScreenFingerprint?] = [:]
     private let lock = NSLock()
 
     /// Record the screen `skillPath` starts from, read by `capture`, when no step
@@ -36,6 +40,22 @@ final class CompilationSession: @unchecked Sendable {
         return start.fingerprint
     }
 
+    /// Keep the screen read right after step `index`.
+    func noteScreen(_ fingerprint: ScreenFingerprint?, after index: Int) {
+        lock.lock()
+        defer { lock.unlock() }
+        screensAfter[index] = fingerprint
+    }
+
+    /// The screen step `index` started from: the one read after the step before
+    /// it, or for step 0 the start screen get_skill read. Nil when none was read.
+    func screenBefore(step index: Int) -> ScreenFingerprint? {
+        lock.lock()
+        defer { lock.unlock() }
+        guard index > 0 else { return start?.fingerprint }
+        return screensAfter[index - 1] ?? nil
+    }
+
     private var isIdle: Bool {
         lock.lock()
         defer { lock.unlock() }
@@ -56,6 +76,7 @@ final class CompilationSession: @unchecked Sendable {
         let result = CompiledSkillIO.normalizedSteps(steps)
         steps = []
         start = nil
+        screensAfter = [:]
         return result
     }
 

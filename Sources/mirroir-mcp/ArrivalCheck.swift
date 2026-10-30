@@ -2,7 +2,7 @@
 // Licensed under the Apache License, Version 2.0
 //
 // ABOUTME: Decides whether a coordinate-only tap reached the screen it reached when recorded.
-// ABOUTME: Records that screen at record_step and compares it at replay; screens too bare to tell apart are refused.
+// ABOUTME: Records each step's screen at record_step; a tap to a bare or unchanged screen is refused.
 
 import HelperLib
 
@@ -44,30 +44,58 @@ enum ArrivalCheck {
         let reason: String
     }
 
-    /// The settled screen a coordinate-only tap led to — on screen now, since
-    /// `record_step` follows the action — or why replay could not check it.
-    static func record(
-        stepIndex: Int, session: CompilationSession, target: any Target
-    ) -> Result<ScreenFingerprint, ArrivalRefusal> {
-        if let later = session.recordedSteps.map(\.index).max(), later > stepIndex {
+    /// Read the settled screen a step left on display — on screen now, since
+    /// `record_step` follows the action — and keep it as the screen the next
+    /// step starts from. For a coordinate-only tap it is also the destination
+    /// replay must reach, returned on success; any other step returns nil.
+    /// A tap is refused when replay could not check it: a later step is already
+    /// recorded, its destination is unreadable or too bare, or the screen before
+    /// it is unknown or unchanged (the tap did nothing).
+    static func observe(
+        stepIndex: Int, coordinateOnlyTap: Bool,
+        session: CompilationSession, target: any Target
+    ) -> Result<ScreenFingerprint?, ArrivalRefusal> {
+        if coordinateOnlyTap, let later = session.recordedSteps.map(\.index).max(), later > stepIndex {
             return .failure(ArrivalRefusal(reason:
                 "Step \(later) is already recorded, so the screen on display is not the one " +
                 "coordinate-only tap \(stepIndex) led to. Record it right after the tap."))
         }
-        guard let screen = target.ocrDescriber.describe(
-                settleTimeoutUs: EnvConfig.frameSettleTimeoutUs) else {
+        let fingerprint = target.ocrDescriber.describe(
+            settleTimeoutUs: EnvConfig.frameSettleTimeoutUs).map {
+                StructuralFingerprint.buildScreenFingerprint(elements: $0.elements, icons: $0.icons)
+            }
+        guard coordinateOnlyTap else {
+            session.noteScreen(fingerprint, after: stepIndex)
+            return .success(nil)
+        }
+        guard let fingerprint else {
             return .failure(ArrivalRefusal(reason:
                 "Could not read the screen this coordinate-only tap led to, so replay could " +
                 "not check it. Call record_step again once the screen has settled."))
         }
-        let fingerprint = StructuralFingerprint.buildScreenFingerprint(
-            elements: screen.elements, icons: screen.icons)
-        guard ArrivalCheck.isCheckable(fingerprint) else {
+        guard isCheckable(fingerprint) else {
             return .failure(ArrivalRefusal(reason:
                 "The screen this coordinate-only tap led to shows fewer than " +
                 "\(EnvConfig.compiledTapArrivalMinTexts) readable labels, so replay could not " +
                 "tell it from another screen. Tap a labeled element instead."))
         }
+        guard let before = session.screenBefore(step: stepIndex) else {
+            let source = stepIndex == 0
+                ? "get_skill did not read the start screen. Call get_skill before the first step"
+                : "the screen after step \(stepIndex - 1) was not read. Go back to that screen, " +
+                  "call record_step for step \(stepIndex - 1) again"
+            return .failure(ArrivalRefusal(reason:
+                "Cannot tell whether coordinate-only tap \(stepIndex) changed the screen: " +
+                "\(source), then redo the tap and record it."))
+        }
+        guard !matches(fingerprint, before) else {
+            return .failure(ArrivalRefusal(reason:
+                "Coordinate-only tap \(stepIndex) did not change the screen (similarity " +
+                "\(String(format: "%.2f", similarity(fingerprint, before))) with the screen before it), " +
+                "so replay could never prove it. Tap again until the screen changes, then " +
+                "call record_step."))
+        }
+        session.noteScreen(fingerprint, after: stepIndex)
         return .success(fingerprint)
     }
 }

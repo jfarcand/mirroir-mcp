@@ -30,12 +30,13 @@ extension MirroirMCP {
             name: "record_step",
             description: """
                 Record a compiled step during AI-driven skill execution. \
-                Call this after each skill step with the step index, type, label, \
-                and any observed data (coordinates, timing, scroll count). \
-                For a tap with coordinates and no label, call it right after the tap, \
-                before the next step: the screen the tap led to is recorded, and replay \
-                fails the tap unless it reaches that screen. A destination with too \
-                little text to recognize is refused. \
+                Call this right after each skill step, once the step is done, with the \
+                step index, type, label, and any observed data (coordinates, timing, \
+                scroll count); the screen it leaves is read as the next step's start. \
+                For a tap with coordinates and no label, the screen the tap led to is \
+                recorded, and replay fails the tap unless it reaches that screen. A \
+                destination with too little text to recognize, or a tap that left the \
+                screen unchanged, is refused. \
                 The server accumulates steps for later saving via save_compiled.
                 """,
             inputSchema: [
@@ -124,18 +125,17 @@ extension MirroirMCP {
                 let scrollCount = args["scroll_count"]?.asInt()
                 let scrollDirection = args["scroll_direction"]?.asString()
 
-                // A tap by coordinates alone has no label for replay to check, so the
-                // screen it led to — on screen now, since record_step follows the
-                // action — is recorded for replay to compare against.
+                // The screen this step left on display is kept for the next step to
+                // start from. A tap by coordinates alone has no label for replay to
+                // check, so that screen is also the destination replay must reach.
                 let coordinateOnlyTap = stepType == "tap" && (label ?? "").isEmpty
                     && tapX != nil && tapY != nil
-                var arrival: ScreenFingerprint?
-                if coordinateOnlyTap {
-                    switch ArrivalCheck.record(stepIndex: stepIndex, session: session,
-                                              target: registry.activeTarget) {
-                    case .success(let fingerprint): arrival = fingerprint
-                    case .failure(let refusal): return .error(refusal.reason)
-                    }
+                let arrival: ScreenFingerprint?
+                switch ArrivalCheck.observe(stepIndex: stepIndex,
+                                            coordinateOnlyTap: coordinateOnlyTap,
+                                            session: session, target: registry.activeTarget) {
+                case .success(let fingerprint): arrival = fingerprint
+                case .failure(let refusal): return .error(refusal.reason)
                 }
                 let hints = deriveHints(
                     type: stepType, tapX: tapX, tapY: tapY,
