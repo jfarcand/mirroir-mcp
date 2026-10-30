@@ -341,16 +341,24 @@ jobs:
         working-directory: npm
         run: npm publish --access public --provenance
 
-      - name: Verify published version
+      # npm accepts a publish before the version is readable from the registry
+      # ("Your package is being processed"). publish-mcp-registry validates the
+      # version against npm, so this job must not succeed until npm serves it.
+      - name: Wait for npm to serve the published version
         env:
           VERSION: ${{ github.event.inputs.version }}
         run: |
-          sleep 10
-          PUBLISHED=$(npm view mirroir-mcp version)
-          if [ "$PUBLISHED" != "$VERSION" ]; then
-            echo "WARNING: npm shows $PUBLISHED, expected $VERSION (may need propagation time)"
-          fi
-          echo "npm version: $PUBLISHED"
+          for attempt in $(seq 1 30); do
+            PUBLISHED=$(npm view "mirroir-mcp@$VERSION" version 2>/dev/null || true)
+            if [ "$PUBLISHED" = "$VERSION" ]; then
+              echo "npm serves mirroir-mcp@$VERSION (attempt $attempt)"
+              exit 0
+            fi
+            echo "attempt $attempt: npm does not serve $VERSION yet (latest: $(npm view mirroir-mcp version))"
+            sleep 20
+          done
+          echo "::error::npm never served mirroir-mcp@$VERSION within 10 minutes"
+          exit 1
 
   # Publish server.json to the official MCP Registry. Runs after publish-npm so
   # the npm package referenced in server.json already exists when the registry
