@@ -15,7 +15,7 @@ extension MirroirMCP {
         registry: TargetRegistry,
         session: CompilationSession
     ) {
-        registerRecordStepTool(server: server, session: session)
+        registerRecordStepTool(server: server, session: session, registry: registry)
         registerSaveCompiledTool(server: server, session: session, registry: registry)
     }
 
@@ -23,7 +23,8 @@ extension MirroirMCP {
 
     private static func registerRecordStepTool(
         server: MCPServer,
-        session: CompilationSession
+        session: CompilationSession,
+        registry: TargetRegistry
     ) {
         server.registerTool(MCPToolDefinition(
             name: "record_step",
@@ -31,6 +32,10 @@ extension MirroirMCP {
                 Record a compiled step during AI-driven skill execution. \
                 Call this after each skill step with the step index, type, label, \
                 and any observed data (coordinates, timing, scroll count). \
+                For a tap with coordinates and no label, call it right after the tap, \
+                before the next step: the screen the tap led to is recorded, and replay \
+                fails the tap unless it reaches that screen. A destination with too \
+                little text to recognize is refused. \
                 The server accumulates steps for later saving via save_compiled.
                 """,
             inputSchema: [
@@ -70,17 +75,13 @@ extension MirroirMCP {
                         "type": .string("number"),
                         "description": .string("Tap Y coordinate from describe_screen. Optional."),
                     ]),
-                    "confidence": .object([
-                        "type": .string("number"),
-                        "description": .string("OCR match confidence (0.0-1.0). Optional."),
-                    ]),
                     "match_strategy": .object([
                         "type": .string("string"),
                         "description": .string("How the element was matched (exact, contains, etc.). Optional."),
                     ]),
                     "elapsed_ms": .object([
                         "type": .string("integer"),
-                        "description": .string("Time waited in milliseconds (for wait_for, assert, measure). Optional."),
+                        "description": .string("Time waited in milliseconds before an assert_visible / assert_not_visible passed. Optional."),
                     ]),
                     "scroll_count": .object([
                         "type": .string("integer"),
@@ -105,8 +106,6 @@ extension MirroirMCP {
                 }
 
                 let label = args["label"]?.asString()
-                // Replay rebuilds the step from type and label, so refuse a pair the
-                // skill parser cannot read rather than saving a step that cannot run.
                 // Replay rebuilds the step from type and label. A step done with a tool
                 // that has no skill step type (press_back, double_tap, ...) is still
                 // recorded, so an MCP compile completes, but `mirroir test` cannot replay
@@ -120,17 +119,29 @@ extension MirroirMCP {
                 let stepType = parsed.typeKey
                 let tapX = args["tap_x"]?.asNumber()
                 let tapY = args["tap_y"]?.asNumber()
-                let confidence = args["confidence"]?.asNumber().map { Float($0) }
                 let matchStrategy = args["match_strategy"]?.asString()
                 let elapsedMs = args["elapsed_ms"]?.asInt()
                 let scrollCount = args["scroll_count"]?.asInt()
                 let scrollDirection = args["scroll_direction"]?.asString()
 
+                // A tap by coordinates alone has no label for replay to check, so the
+                // screen it led to — on screen now, since record_step follows the
+                // action — is recorded for replay to compare against.
+                let coordinateOnlyTap = stepType == "tap" && (label ?? "").isEmpty
+                    && tapX != nil && tapY != nil
+                var arrival: ScreenFingerprint?
+                if coordinateOnlyTap {
+                    switch ArrivalCheck.record(stepIndex: stepIndex, session: session,
+                                              target: registry.activeTarget) {
+                    case .success(let fingerprint): arrival = fingerprint
+                    case .failure(let refusal): return .error(refusal.reason)
+                    }
+                }
                 let hints = deriveHints(
                     type: stepType, tapX: tapX, tapY: tapY,
-                    confidence: confidence, matchStrategy: matchStrategy,
+                    matchStrategy: matchStrategy,
                     elapsedMs: elapsedMs, scrollCount: scrollCount,
-                    scrollDirection: scrollDirection)
+                    scrollDirection: scrollDirection, arrival: arrival)
 
                 let step = CompiledStep(
                     index: stepIndex, type: stepType,
@@ -155,7 +166,7 @@ extension MirroirMCP {
     /// Always OCR: it is bookkeeping, not a description the client asked for,
     /// so it never spends a vision call.
     static func captureScreenFingerprint(target: any Target) -> ScreenFingerprint? {
-        CompileCommand.startScreenFingerprint(describer: target.ocrDescriber)
+        CompileCommand.screenFingerprint(describer: target.ocrDescriber)
     }
 
     private static func registerSaveCompiledTool(
@@ -407,26 +418,27 @@ extension MirroirMCP {
         type: String,
         tapX: Double?,
         tapY: Double?,
-        confidence: Float?,
         matchStrategy: String?,
         elapsedMs: Int?,
         scrollCount: Int?,
-        scrollDirection: String?
+        scrollDirection: String?,
+        arrival: ScreenFingerprint? = nil
     ) -> StepHints? {
         switch type {
         case "tap":
             if let x = tapX, let y = tapY {
                 return .tap(
                     x: x, y: y,
-                    confidence: confidence ?? 0.0,
-                    strategy: matchStrategy ?? "unknown")
+                    strategy: matchStrategy ?? "unknown", arrival: arrival)
             }
             // Tap without coordinates: replay it live, finding the element by OCR.
             // A sleep would report the step passed without tapping anything.
             return .passthrough()
 
         case "wait_for":
-            return .sleep(delayMs: elapsedMs ?? 500)
+            // Replayed live: polls the screen until the element shows or its timeout
+            // passes. A recorded delay would pass without looking.
+            return .passthrough()
 
         case "assert_visible", "assert_not_visible":
             return .assertion(delayMs: elapsedMs ?? 500)

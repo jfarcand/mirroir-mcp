@@ -442,7 +442,14 @@ extension MirroirMCP {
     /// Only checks version and source hash — dimension staleness is deferred to the
     /// test runner which has actual window dimensions from the active target.
     static func compilationStatus(for skillPath: String) -> String {
-        guard let compiled = try? CompiledSkillIO.load(for: skillPath) else {
+        let loaded: CompiledSkill?
+        do {
+            loaded = try CompiledSkillIO.load(for: skillPath)
+        } catch {
+            let reason = CompiledSkillIO.unreadableStaleness(skillPath: skillPath, error: error)
+            return "[Compiled: stale \u{2014} \(reason)]"
+        }
+        guard let compiled = loaded else {
             return "[Not compiled \u{2014} use record_step after each step to compile]"
         }
 

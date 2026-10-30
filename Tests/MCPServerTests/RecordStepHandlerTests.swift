@@ -11,18 +11,22 @@ import HelperLib
 final class RecordStepHandlerTests: XCTestCase {
 
     private var server: MCPServer!
+    private var describer: StubDescriber!
+    private var session: CompilationSession!
 
     override func setUp() {
         super.setUp()
         server = MCPServer(policy: PermissionPolicy(skipPermissions: true, config: nil))
+        describer = StubDescriber()
+        session = CompilationSession()
         let context = TargetContext(
             name: "iphone", targetType: "iphone-mirroring", bundleID: nil,
             bridge: StubBridge(), input: StubInput(),
-            capture: StubCapture(), describer: StubDescriber(), recorder: StubRecorder(),
+            capture: StubCapture(), describer: describer, recorder: StubRecorder(),
             capabilities: [])
         let registry = TargetRegistry(targets: ["iphone": context], defaultName: "iphone")
         MirroirMCP.registerCompilationTools(
-            server: server, registry: registry, session: CompilationSession())
+            server: server, registry: registry, session: session)
     }
 
     private func recordStep(_ args: [String: JSONValue]) -> (isError: Bool, text: String) {
@@ -95,19 +99,65 @@ final class RecordStepHandlerTests: XCTestCase {
         // A tap recorded by coordinates alone replays from its hint without a label.
         XCTAssertTrue(MirroirMCP.skillMdReplayProblems([
             CompiledStep(index: 0, type: "tap", label: nil,
-                         hints: .tap(x: 40, y: 880, confidence: 0, strategy: "unknown")),
+                         hints: .tap(x: 40, y: 880, strategy: "unknown")),
         ]).isEmpty)
         // A malformed selector can be recorded again; a tool with no step type cannot.
         XCTAssertFalse(problems("switch_target", "Notes").isEmpty)
         XCTAssertTrue(problems("press_back", nil).isEmpty)
     }
 
-    func testYamlSessionsStillRecordAStepWithoutALabel() {
+    func testACoordinateOnlyTapRecordsTheScreenItLedTo() {
+        describer.describeResult = screen(["General", "Privacy", "Battery"])
         let result = recordStep([
             "step_index": .number(0), "type": .string("tap"),
             "tap_x": .number(120), "tap_y": .number(300),
         ])
         XCTAssertFalse(result.isError, result.text)
+        let recorded = session.recordedSteps.first?.hints?.arrivalFingerprint
+        XCTAssertEqual(recorded?.structuralTexts.isEmpty, false,
+                       "replay compares the screen it reaches against this one")
+    }
+
+    private func screen(_ texts: [String]) -> ScreenDescriber.DescribeResult {
+        ScreenDescriber.DescribeResult(
+            elements: texts.enumerated().map { index, text in
+                TapPoint(text: text, tapX: 100, tapY: Double(200 + 60 * index), confidence: 0.9)
+            },
+            screenshotBase64: "")
+    }
+
+    private func recordIconTap(_ index: Int) -> (isError: Bool, text: String) {
+        recordStep([
+            "step_index": .number(Double(index)), "type": .string("tap"),
+            "tap_x": .number(120), "tap_y": .number(300),
+        ])
+    }
+
+    func testACoordinateOnlyTapToABareScreenIsRefused() {
+        describer.describeResult = screen(["OK"])
+        let result = recordIconTap(0)
+        XCTAssertTrue(result.isError, result.text)
+        XCTAssertTrue(result.text.contains("readable labels"), result.text)
+        XCTAssertTrue(session.recordedSteps.isEmpty)
+    }
+
+    func testACoordinateOnlyTapCannotBeReRecordedAfterALaterStep() {
+        describer.describeResult = screen(["General", "Privacy", "Battery"])
+        XCTAssertFalse(recordIconTap(0).isError)
+        XCTAssertFalse(recordStep(["step_index": .number(1), "type": .string("home")]).isError)
+        let result = recordIconTap(0)
+        XCTAssertTrue(result.isError, "the screen now is not the one tap 0 led to")
+        XCTAssertTrue(result.text.contains("Step 1 is already recorded"), result.text)
+    }
+
+    func testACoordinateOnlyTapIsRefusedWhenItsScreenCannotBeRead() {
+        describer.describeResult = nil
+        let result = recordStep([
+            "step_index": .number(0), "type": .string("tap"),
+            "tap_x": .number(120), "tap_y": .number(300),
+        ])
+        XCTAssertTrue(result.isError, result.text)
+        XCTAssertTrue(session.recordedSteps.isEmpty, "a tap replay could not check is not recorded")
     }
 
     func testMeasureWithAnUnreadableActionGetsTheRunnerNote() {

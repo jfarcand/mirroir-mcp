@@ -13,7 +13,6 @@ import HelperLib
 /// Result of a type or key press operation.
 struct TypeResult {
     let success: Bool
-    let warning: String?
     let error: String?
 }
 
@@ -51,6 +50,14 @@ final class InputSimulation: Sendable {
     let gestureDevice: GestureDevice
     /// The key and button poster behind hold_keys.
     let heldInputPoster: any HeldInputPosting
+    /// Local OCR describer that confirms each `type_text` clipboard paste on
+    /// screen. Nil means no paste can be confirmed, so any text that needs the
+    /// clipboard fails rather than being reported as typed.
+    let pasteVerifier: (any ScreenDescribing)?
+    /// The key event poster behind type_text and press_key.
+    let keyPoster: any KeyEventPosting
+    /// The pasteboard type_text pastes unmappable runs through.
+    let pasteboard: any PasteboardAccessing
     /// The target's PID right now, or nil when the target is not running.
     ///
     /// Resolved on every read rather than captured at init: the target can
@@ -72,8 +79,14 @@ final class InputSimulation: Sendable {
          keyboardLayout override: IPhoneKeyboardLayout? = nil,
          touchSession: TouchSession = .shared,
          gestureDevice: GestureDevice = .live,
-         heldInputPoster: any HeldInputPosting = CGEventHeldInputPoster()) {
+         heldInputPoster: any HeldInputPosting = CGEventHeldInputPoster(),
+         pasteVerifier: (any ScreenDescribing)? = nil,
+         keyPoster: any KeyEventPosting = CGEventKeyPoster(),
+         pasteboard: any PasteboardAccessing = GeneralPasteboard()) {
         self.bridge = bridge
+        self.pasteVerifier = pasteVerifier
+        self.keyPoster = keyPoster
+        self.pasteboard = pasteboard
         self.cursorMode = cursorMode
         self.touchSession = touchSession
         self.gestureDevice = gestureDevice

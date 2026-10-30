@@ -467,9 +467,13 @@ public enum TimingConstants {
 
     // MARK: - Compiled Safety
 
-    /// Minimum confidence threshold for compiled taps (0.0–1.0).
-    /// Taps below this threshold fall back to live OCR.
-    public static let compiledTapMinConfidence: Double = 0.7
+    /// Points a labeled compiled tap's element may drift from its recorded position
+    /// on each axis before replay taps it where OCR finds it now.
+    public static let compiledTapPositionTolerance: Double = 5.0
+
+    /// Fewest multi-character structural texts the screen a coordinate-only tap
+    /// leads to must hold for replay to tell it from another screen.
+    public static let compiledTapArrivalMinTexts: Int = 3
 
     // MARK: - Input Tool Defaults
 

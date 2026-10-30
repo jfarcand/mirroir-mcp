@@ -77,6 +77,67 @@ final class TestRunnerHonestyTests: XCTestCase {
         XCTAssertEqual(CompiledSkillIO.sha256(data: try compiledBytes(for: skill)), before)
     }
 
+    // MARK: - A compiled file that no longer decodes is named stale, not skipped silently
+
+    /// Write `json` as the compiled file of `skillPath`.
+    private func writeCompiled(_ json: String, for skillPath: String) throws {
+        try json.write(toFile: CompiledSkillIO.compiledPath(for: skillPath),
+                       atomically: true, encoding: .utf8)
+    }
+
+    func testAnOlderVersionThatNoLongerDecodesIsReportedStaleLikeAVersionMismatch() throws {
+        let skill = try write("old.yaml", "name: Old\nsteps:\n  - wait_for: \"About\"\n")
+        // Version 3 compiled wait_for to a `sleep` action, which version 4 removed.
+        try writeCompiled("""
+            {"version": 3,
+             "source": {"sha256": "\(try CompiledSkillIO.sha256(of: skill))",
+                        "compiledAt": "2026-10-01T00:00:00Z"},
+             "device": {"windowWidth": 430, "windowHeight": 942, "orientation": "portrait"},
+             "steps": [{"index": 0, "type": "wait_for", "label": "About",
+                        "hints": {"compiledAction": "sleep", "observedDelayMs": 900}}]}
+            """, for: skill)
+        XCTAssertThrowsError(try CompiledSkillIO.load(for: skill), "the old shape must not decode")
+
+        var warnings: [String] = []
+        let selected = TestRunner.freshCompiledSkills(
+            for: [try SkillFileLoader.load(filePath: skill)],
+            windowWidth: 430, windowHeight: 942, warn: { warnings.append($0) })
+
+        XCTAssertNil(selected[skill], "the skill runs on live OCR")
+        XCTAssertEqual(warnings, [
+            "Warning: compiled skill stale for Old: compiled version 3 != current " +
+            "\(CompiledSkill.currentVersion)\n",
+        ])
+    }
+
+    func testACurrentVersionFileThatDoesNotDecodeIsReportedStale() throws {
+        let skill = try write("broken.yaml", "name: Broken\nsteps:\n  - home\n")
+        try writeCompiled("{\"version\": \(CompiledSkill.currentVersion), \"steps\": 7}", for: skill)
+
+        var warnings: [String] = []
+        let selected = TestRunner.freshCompiledSkills(
+            for: [try SkillFileLoader.load(filePath: skill)],
+            windowWidth: 430, windowHeight: 942, warn: { warnings.append($0) })
+
+        XCTAssertNil(selected[skill])
+        XCTAssertEqual(warnings.count, 1)
+        XCTAssertTrue(warnings.first?.hasPrefix(
+            "Warning: compiled skill stale for Broken: compiled file cannot be decoded") ?? false,
+            warnings.first ?? "nil")
+    }
+
+    func testASkillWithNoCompiledFileIsNotWarnedAbout() throws {
+        let skill = try write("plain.yaml", "name: Plain\nsteps:\n  - home\n")
+
+        var warnings: [String] = []
+        let selected = TestRunner.freshCompiledSkills(
+            for: [try SkillFileLoader.load(filePath: skill)],
+            windowWidth: 430, windowHeight: 942, warn: { warnings.append($0) })
+
+        XCTAssertTrue(selected.isEmpty)
+        XCTAssertTrue(warnings.isEmpty)
+    }
+
     // MARK: - AI-only steps are not evaluated, so the skill does not pass
 
     private func executor() -> StepExecutor {

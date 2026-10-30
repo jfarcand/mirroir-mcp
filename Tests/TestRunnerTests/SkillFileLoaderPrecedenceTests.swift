@@ -105,7 +105,7 @@ extension SkillFileLoaderTests {
         let md = try write("icon.md", loginMd)
         try saveCompiled(for: md, steps: [
             CompiledStep(index: 0, type: "tap", label: nil,
-                         hints: .tap(x: 40, y: 880, confidence: 0, strategy: "unknown")),
+                         hints: .tap(x: 40, y: 880, strategy: "unknown")),
         ])
         XCTAssertTrue(CompileCommand.hasCoordinateOnlyTap(try SkillFileLoader.load(filePath: md)))
 

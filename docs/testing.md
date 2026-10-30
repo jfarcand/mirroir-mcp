@@ -108,7 +108,7 @@ All require FakeMirroring to be running. The filter runs the entire `Integration
 | `BFSExplorationIntegrationTests`, `DFSExplorerIntegrationTests` | BFS and DFS exploration drive the simulator's scene graph and backtrack correctly |
 | `GenerateSkillIntegrationTests` | `generate_skill` explore loop produces SKILL.md output against a loaded AppPack |
 | `ComponentE2ETests` | Component classification and calibration against rendered scenes |
-| `CompiledSkillIntegrationTests`, `CompiledTapFlowTests`, `ReplayReliabilityTests` | Compiled-skill replay, confidence-gated tap, and reliability |
+| `CompiledSkillIntegrationTests`, `CompiledTapFlowTests`, `ReplayReliabilityTests` | Compiled-skill replay, OCR-verified tap, and reliability |
 | `TapNavigationTests`, `CoordinateStabilityTests`, `InputPipelineTests` | Tap navigation, coordinate stability, and the input pipeline |
 | `AssertIntegrityTests`, `ExplorationCoverageTests`, `DiagnosisValueTests` | Assertion semantics, exploration coverage, and diagnosis values |
 

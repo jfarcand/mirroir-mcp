@@ -20,8 +20,9 @@ paragraph for the failure mode that comes with it.
 Handoff on both ends, Bluetooth + Wi-Fi, same iCloud account. With it off, the
 paste silently produces nothing; worse, the sync is asynchronous, so a paste
 issued too soon pastes the device's PREVIOUS clipboard value and looks like it
-worked. `type_text` waits `pasteboardSyncUs` (1.5s) and pastes at most once per
-call for exactly this reason.
+worked. `type_text` types every character it has a key for, pastes only the runs it has
+no key for, and OCR-confirms each paste on screen before the next clipboard
+write; a paste it cannot see (or cannot read back, like emoji) fails the call.
 
 **Back navigation.** `press_key(key: "[", modifiers: ["command"])`
 does NOT navigate back: `Cmd+[` is a macOS convention that iOS apps do not

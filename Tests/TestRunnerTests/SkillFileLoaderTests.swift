@@ -62,7 +62,7 @@ final class SkillFileLoaderTests: XCTestCase {
         [
             CompiledStep(index: 0, type: "launch", label: "Example", hints: .passthrough()),
             CompiledStep(index: 1, type: "tap", label: "Sign In",
-                         hints: .tap(x: 215, y: 600, confidence: 0.98, strategy: "exact")),
+                         hints: .tap(x: 215, y: 600, strategy: "exact")),
             CompiledStep(index: 2, type: "type", label: "alice", hints: .passthrough()),
             CompiledStep(index: 3, type: "press_key", label: "return", hints: .passthrough()),
             CompiledStep(index: 4, type: "home", label: nil, hints: .passthrough()),

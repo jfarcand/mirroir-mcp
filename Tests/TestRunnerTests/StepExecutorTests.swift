@@ -99,14 +99,14 @@ final class StepExecutorTests: XCTestCase {
     // MARK: - Type
 
     func testTypeSuccess() {
-        input.typeTextResult = TypeResult(success: true, warning: nil, error: nil)
+        input.typeTextResult = TypeResult(success: true, error: nil)
         let result = executor.execute(
             step: .type(text: "Hello"), stepIndex: 0, skillName: "test")
         XCTAssertEqual(result.status, .passed)
     }
 
     func testTypeFailure() {
-        input.typeTextResult = TypeResult(success: false, warning: nil, error: "Helper unavailable")
+        input.typeTextResult = TypeResult(success: false, error: "Helper unavailable")
         let result = executor.execute(
             step: .type(text: "Hello"), stepIndex: 0, skillName: "test")
         XCTAssertEqual(result.status, .failed)
@@ -115,7 +115,7 @@ final class StepExecutorTests: XCTestCase {
     // MARK: - Press Key
 
     func testPressKeySuccess() {
-        input.pressKeyResult = TypeResult(success: true, warning: nil, error: nil)
+        input.pressKeyResult = TypeResult(success: true, error: nil)
         let result = executor.execute(
             step: .pressKey(keyName: "return", modifiers: []),
             stepIndex: 0, skillName: "test")
@@ -189,7 +189,7 @@ final class StepExecutorTests: XCTestCase {
     // MARK: - Shake
 
     func testShakeSuccess() {
-        input.shakeResult = TypeResult(success: true, warning: nil, error: nil)
+        input.shakeResult = TypeResult(success: true, error: nil)
         let result = executor.execute(
             step: .shake, stepIndex: 0, skillName: "test")
         XCTAssertEqual(result.status, .passed)

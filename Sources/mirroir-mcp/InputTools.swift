@@ -253,7 +253,15 @@ extension MirroirMCP {
                 iPhone Mirroring window if needed (one-time Space switch). \
                 A text field must be active on the iPhone. \
                 Sends keystrokes through the CGEvent keyboard interface \
-                with automatic keyboard layout translation for non-US layouts.
+                with automatic keyboard layout translation for non-US layouts. \
+                Characters with no key on the iPhone's layout (emoji, CJK, \
+                symbols the layout lacks) are pasted one run at a time through \
+                Universal Clipboard, and each paste is confirmed by OCR before \
+                the next. A paste not seen on screen fails the call and names \
+                what was not confirmed. Emoji and pictographic symbols cannot \
+                be read back by OCR, so text containing them always returns an \
+                error even when the paste landed — check the screen. Non-Latin \
+                scripts are confirmed only when ocrLanguages includes them.
                 """,
             inputSchema: [
                 "type": .string("object"),
@@ -277,10 +285,6 @@ extension MirroirMCP {
                 let result = input.typeText(text)
                 guard result.success else {
                     return .error(result.error ?? "Failed to type text")
-                }
-
-                if let warning = result.warning {
-                    return .text("Typed \(text.count) characters. Warning: \(warning)")
                 }
                 return .text("Typed \(text.count) characters")
             }

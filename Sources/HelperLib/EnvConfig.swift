@@ -61,8 +61,16 @@ public enum EnvConfig {
         readUInt32("pasteboardSyncUs", default: TimingConstants.pasteboardSyncUs)
     }
 
-    public static var pasteCommitUs: UInt32 {
-        readUInt32("pasteCommitUs", default: TimingConstants.pasteCommitUs)
+    public static var pasteVerifyTimeoutUs: UInt32 {
+        readUInt32("pasteVerifyTimeoutUs", default: TimingConstants.pasteVerifyTimeoutUs)
+    }
+
+    public static var pasteVerifyPollUs: UInt32 {
+        readUInt32("pasteVerifyPollUs", default: TimingConstants.pasteVerifyPollUs)
+    }
+
+    public static var pasteVerifyWindowChars: Int {
+        readInt("pasteVerifyWindowChars", default: TimingConstants.pasteVerifyWindowChars)
     }
 
     public static var frameSettlePollUs: UInt32 {

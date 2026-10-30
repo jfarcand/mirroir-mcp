@@ -192,7 +192,6 @@ final class ComponentE2ETests: XCTestCase {
         if let tapHints = tapSteps.first?.hints {
             XCTAssertNotNil(tapHints.tapX, "Compiled tap should have cached X coordinate")
             XCTAssertNotNil(tapHints.tapY, "Compiled tap should have cached Y coordinate")
-            XCTAssertNotNil(tapHints.confidence, "Compiled tap should have confidence score")
         }
 
         // Assertion steps should have .assertion action

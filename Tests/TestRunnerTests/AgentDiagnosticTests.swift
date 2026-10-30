@@ -2,7 +2,7 @@
 // Licensed under the Apache License, Version 2.0
 //
 // ABOUTME: Tests for AgentDiagnostic — compiled skill failure diagnosis.
-// ABOUTME: Verifies tap drift detection, sleep timing analysis, scroll recommendations, and report formatting.
+// ABOUTME: Verifies tap drift detection, assertion timing analysis, scroll recommendations, and report formatting.
 
 import Foundation
 import Testing
@@ -45,7 +45,7 @@ struct AgentDiagnosticTests {
 
     @Test("Returns capture-failed diagnosis when OCR returns nil")
     func ocrFailureReturnsDiagnosis() {
-        let hints = StepHints.tap(x: 100, y: 200, confidence: 0.9, strategy: "exact")
+        let hints = StepHints.tap(x: 100, y: 200, strategy: "exact")
         let compiled = CompiledStep(index: 0, type: "tap", label: "AirDrop", hints: hints)
         let step = SkillStep.tap(label: "AirDrop")
 
@@ -64,7 +64,7 @@ struct AgentDiagnosticTests {
 
     @Test("Detects element that moved to different coordinates")
     func tapElementMoved() {
-        let hints = StepHints.tap(x: 100, y: 200, confidence: 0.9, strategy: "exact")
+        let hints = StepHints.tap(x: 100, y: 200, strategy: "exact")
         let compiled = CompiledStep(index: 2, type: "tap", label: "AirDrop", hints: hints)
         let step = SkillStep.tap(label: "AirDrop")
 
@@ -91,7 +91,7 @@ struct AgentDiagnosticTests {
 
     @Test("Reports 'tap absorbed' when element is at compiled position")
     func tapAbsorbedAtSamePosition() {
-        let hints = StepHints.tap(x: 100, y: 200, confidence: 0.9, strategy: "exact")
+        let hints = StepHints.tap(x: 100, y: 200, strategy: "exact")
         let compiled = CompiledStep(index: 0, type: "tap", label: "AirDrop", hints: hints)
         let step = SkillStep.tap(label: "AirDrop")
 
@@ -109,7 +109,7 @@ struct AgentDiagnosticTests {
 
     @Test("Reports element not found with visible elements list")
     func tapElementNotFound() {
-        let hints = StepHints.tap(x: 100, y: 200, confidence: 0.9, strategy: "exact")
+        let hints = StepHints.tap(x: 100, y: 200, strategy: "exact")
         let compiled = CompiledStep(index: 0, type: "tap", label: "AirDrop", hints: hints)
         let step = SkillStep.tap(label: "AirDrop")
 
@@ -128,11 +128,11 @@ struct AgentDiagnosticTests {
         #expect(result.patches.isEmpty)
     }
 
-    // MARK: - Sleep Diagnosis (wait_for / assert_visible)
+    // MARK: - Assertion Diagnosis (assert_visible / assert_not_visible)
 
-    @Test("wait_for with a timeout: matches the element, not the compiled replay value")
+    @Test("wait_for with a timeout: reports the element, not the compiled replay value")
     func waitForWithTimeoutMatchesTheElementText() {
-        let hints = StepHints.sleep(delayMs: 500)
+        let hints = StepHints.passthrough()
         let compiled = CompiledStep(index: 1, type: "wait_for",
                                     label: "\"General\" timeout: 30", hints: hints)
         let step = SkillStep.waitFor(label: "General", timeoutSeconds: 30)
@@ -146,7 +146,7 @@ struct AgentDiagnosticTests {
             failureMessage: nil, describer: describer)
 
         #expect(result?.label == "General")
-        #expect(result?.diagnosis.contains("not found") == false)
+        #expect(result?.diagnosis.contains("Passthrough step failed") == true)
     }
 
     @Test("A failed step's report keeps the ${VAR} placeholder, never the resolved value")
@@ -165,9 +165,9 @@ struct AgentDiagnosticTests {
 
     @Test("Matches the screen against the resolved value, reports the placeholder")
     func matchesResolvedReportsPlaceholder() {
-        let compiled = CompiledStep(index: 2, type: "wait_for",
-                                    label: "${ACCOUNT}", hints: .sleep(delayMs: 500))
-        let step = SkillStep.waitFor(label: "Alice Smith", timeoutSeconds: nil)
+        let compiled = CompiledStep(index: 2, type: "assert_visible",
+                                    label: "${ACCOUNT}", hints: .assertion(delayMs: 500))
+        let step = SkillStep.assertVisible(label: "Alice Smith")
 
         let result = AgentDiagnostic.diagnose(
             step: step, compiledStep: compiled, failureMessage: nil,
@@ -187,11 +187,11 @@ struct AgentDiagnosticTests {
         #expect(result?.label == nil)
     }
 
-    @Test("wait_for: element visible suggests increasing delay")
-    func waitForElementVisibleSuggestsLongerDelay() {
-        let hints = StepHints.sleep(delayMs: 500)
-        let compiled = CompiledStep(index: 1, type: "wait_for", label: "General", hints: hints)
-        let step = SkillStep.waitFor(label: "General", timeoutSeconds: nil)
+    @Test("assert_visible: element visible now suggests increasing delay")
+    func assertVisibleElementVisibleSuggestsLongerDelay() {
+        let hints = StepHints.assertion(delayMs: 500)
+        let compiled = CompiledStep(index: 1, type: "assert_visible", label: "General", hints: hints)
+        let step = SkillStep.assertVisible(label: "General")
 
         let describer = makeDescriber(elements: [
             makeTapPoint("General", x: 200, y: 340)
@@ -211,7 +211,7 @@ struct AgentDiagnosticTests {
 
     @Test("assert_visible: element not visible reports wrong screen")
     func assertVisibleElementMissing() {
-        let hints = StepHints.sleep(delayMs: 200)
+        let hints = StepHints.assertion(delayMs: 200)
         let compiled = CompiledStep(
             index: 3, type: "assert_visible", label: "Model Name", hints: hints)
         let step = SkillStep.assertVisible(label: "Model Name")
@@ -231,7 +231,7 @@ struct AgentDiagnosticTests {
 
     @Test("assert_not_visible: element correctly absent")
     func assertNotVisibleCorrectlyAbsent() {
-        let hints = StepHints.sleep(delayMs: 200)
+        let hints = StepHints.assertion(delayMs: 200)
         let compiled = CompiledStep(
             index: 0, type: "assert_not_visible", label: "Error", hints: hints)
         let step = SkillStep.assertNotVisible(label: "Error")
@@ -250,7 +250,7 @@ struct AgentDiagnosticTests {
 
     @Test("assert_not_visible: element unexpectedly visible")
     func assertNotVisibleButPresent() {
-        let hints = StepHints.sleep(delayMs: 200)
+        let hints = StepHints.assertion(delayMs: 200)
         let compiled = CompiledStep(
             index: 0, type: "assert_not_visible", label: "Error", hints: hints)
         let step = SkillStep.assertNotVisible(label: "Error")

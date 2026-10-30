@@ -93,7 +93,7 @@ final class CompiledSkillIntegrationTests: XCTestCase {
         XCTAssertNotNil(compiled, "Skill should compile successfully against FakeMirroring")
         guard let compiled = compiled else { return }
 
-        // Verify assertion steps got .assertion hints (not .sleep)
+        // Verify assertion steps got .assertion hints, which re-check the screen live
         let assertionSteps = compiled.steps.filter {
             $0.hints?.compiledAction == .assertion
         }

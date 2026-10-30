@@ -123,14 +123,14 @@ final class InputToolHandlerTests: XCTestCase {
     }
 
     func testTypeTextHelperFailure() {
-        input.typeTextResult = TypeResult(success: false, warning: nil, error: "Helper unavailable")
+        input.typeTextResult = TypeResult(success: false, error: "Helper unavailable")
         let response = callTool("type_text", args: ["text": .string("hello")])
         XCTAssertTrue(isError(response))
         XCTAssertEqual(extractText(response), "Helper unavailable")
     }
 
     func testTypeTextSuccess() {
-        input.typeTextResult = TypeResult(success: true, warning: nil, error: nil)
+        input.typeTextResult = TypeResult(success: true, error: nil)
         let response = callTool("type_text", args: ["text": .string("hello")])
         XCTAssertFalse(isError(response))
         XCTAssertEqual(extractText(response), "Typed 5 characters")
@@ -146,7 +146,7 @@ final class InputToolHandlerTests: XCTestCase {
     }
 
     func testPressKeyWithModifiers() {
-        input.pressKeyResult = TypeResult(success: true, warning: nil, error: nil)
+        input.pressKeyResult = TypeResult(success: true, error: nil)
         let response = callTool("press_key", args: [
             "key": .string("l"),
             "modifiers": .array([.string("command")]),
@@ -156,7 +156,7 @@ final class InputToolHandlerTests: XCTestCase {
     }
 
     func testPressKeyWithoutModifiers() {
-        input.pressKeyResult = TypeResult(success: true, warning: nil, error: nil)
+        input.pressKeyResult = TypeResult(success: true, error: nil)
         let response = callTool("press_key", args: ["key": .string("return")])
         XCTAssertFalse(isError(response))
         XCTAssertEqual(extractText(response), "Pressed return")
@@ -190,13 +190,13 @@ final class InputToolHandlerTests: XCTestCase {
     // MARK: - shake
 
     func testShakeHelperUnavailable() {
-        input.shakeResult = TypeResult(success: false, warning: nil, error: "Helper unavailable")
+        input.shakeResult = TypeResult(success: false, error: "Helper unavailable")
         let response = callTool("shake")
         XCTAssertTrue(isError(response))
     }
 
     func testShakeSuccess() {
-        input.shakeResult = TypeResult(success: true, warning: nil, error: nil)
+        input.shakeResult = TypeResult(success: true, error: nil)
         let response = callTool("shake")
         XCTAssertFalse(isError(response))
         XCTAssertEqual(extractText(response), "Triggered shake gesture (Ctrl+Cmd+Z)")

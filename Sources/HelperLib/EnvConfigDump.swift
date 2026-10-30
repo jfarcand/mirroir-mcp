@@ -20,6 +20,10 @@ extension EnvConfig {
                 ("dragModeHoldUs", "\(dragModeHoldUs)"),
                 ("focusSettleUs", "\(focusSettleUs)"),
                 ("keystrokeDelayUs", "\(keystrokeDelayUs)"),
+                ("pasteboardSyncUs", "\(pasteboardSyncUs)"),
+                ("pasteVerifyTimeoutUs", "\(pasteVerifyTimeoutUs)"),
+                ("pasteVerifyPollUs", "\(pasteVerifyPollUs)"),
+                ("pasteVerifyWindowChars", "\(pasteVerifyWindowChars)"),
             ]),
             ("App Switching", [
                 ("statusBarTapY", "\(statusBarTapY)"),
@@ -159,8 +163,8 @@ extension EnvConfig {
                 ("agentTransport", agentTransport),
             ]),
             ("Compiled Safety", [
-                ("compiledTapMinConfidence", "\(compiledTapMinConfidence)"),
-                ("verifyTaps", "\(verifyTaps)"),
+                ("compiledTapPositionTolerance", "\(compiledTapPositionTolerance)"),
+                ("compiledTapArrivalMinTexts", "\(compiledTapArrivalMinTexts)"),
             ]),
             ("Component Detection", [
                 ("componentDetection", componentDetection),

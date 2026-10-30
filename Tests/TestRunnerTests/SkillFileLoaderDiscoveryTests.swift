@@ -107,7 +107,7 @@ extension SkillFileLoaderTests {
 
     func testSwitchTargetWithABareNameStillReplaysLive() {
         XCTAssertEqual(MirroirMCP.deriveHints(
-            type: "switch_target", tapX: nil, tapY: nil, confidence: nil, matchStrategy: nil,
+            type: "switch_target", tapX: nil, tapY: nil, matchStrategy: nil,
             elapsedMs: nil, scrollCount: nil, scrollDirection: nil)?.compiledAction, .passthrough)
     }
 
@@ -130,7 +130,7 @@ extension SkillFileLoaderTests {
         let step = SkillParser.parseStep(key: "switch_target", rawValue: "{ kind: ios, app: \"Notes\" }")
         XCTAssertEqual(step.typeKey, "target")
         XCTAssertEqual(MirroirMCP.deriveHints(
-            type: step.typeKey, tapX: nil, tapY: nil, confidence: nil, matchStrategy: nil,
+            type: step.typeKey, tapX: nil, tapY: nil, matchStrategy: nil,
             elapsedMs: nil, scrollCount: nil, scrollDirection: nil)?.compiledAction, .passthrough)
     }
 
@@ -167,12 +167,12 @@ extension SkillFileLoaderTests {
         let md = try write("login.md", loginMd)
         try saveCompiled(for: md, steps: [
             CompiledStep(index: 0, type: "tap", label: "General",
-                         hints: .tap(x: 1, y: 1, confidence: 1, strategy: "exact")),
+                         hints: .tap(x: 1, y: 1, strategy: "exact")),
             CompiledStep(index: 2, type: "tap", label: "About",
-                         hints: .tap(x: 3, y: 3, confidence: 1, strategy: "exact")),
-            CompiledStep(index: 1, type: "wait_for", label: "General", hints: .sleep(delayMs: 200)),
+                         hints: .tap(x: 3, y: 3, strategy: "exact")),
+            CompiledStep(index: 1, type: "wait_for", label: "General", hints: .passthrough()),
             CompiledStep(index: 2, type: "tap", label: "About",
-                         hints: .tap(x: 4, y: 4, confidence: 1, strategy: "exact")),
+                         hints: .tap(x: 4, y: 4, strategy: "exact")),
         ])
 
         let compiled = try XCTUnwrap(CompiledSkillIO.load(for: md))
@@ -214,7 +214,7 @@ extension SkillFileLoaderTests {
         try saveCompiled(for: md, steps: [
             CompiledStep(index: 0, type: "press_key", label: "l+command", hints: .passthrough()),
             CompiledStep(index: 1, type: "wait_for", label: "\"Address\" timeout: 30",
-                         hints: .sleep(delayMs: 300)),
+                         hints: .passthrough()),
             CompiledStep(index: 2, type: "long_press", label: "\"Photo\" duration: 1500",
                          hints: .passthrough()),
         ])

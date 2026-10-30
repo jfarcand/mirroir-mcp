@@ -19,10 +19,10 @@ All 38 tools exposed by the MCP server. Mutating tools require [permission](perm
 | `pinch` | `x`, `y`, `scale`, `duration_ms`? | Two-finger pinch centred at (x, y): `scale` > 1 spreads the fingers (zoom in), < 1 pinches them (zoom out); the spread ends at exactly `scale` times its start (0.1-10, 100-5000ms, default 500ms). Reaches iOS as a UIKit two-finger gesture (Maps, Photos); games that read raw touches may ignore it. Needs a Mac with a built-in trackpad or a Magic Trackpad; refused while a touch is held |
 | `rotate` | `x`, `y`, `degrees`, `duration_ms`? | Two-finger rotation centred at (x, y) by `degrees`: positive counter-clockwise, negative clockwise (non-zero, up to 360 either way, 100-5000ms, default 500ms). Same delivery and trackpad requirement as `pinch` |
 | `hold_keys` | `keys`, `duration_ms`?, `drag`? | Hold 1-6 keys for `duration_ms` (100-10000ms, default 1000ms), then release everything in reverse order. Keys are single unshifted characters (`w`), modifiers (`shift`, `command`, `option`, `control`), or named keys (`space`, `up`, ...). Plain keys re-post key-down every 50ms like a held physical key; modifiers are held without repeating. Optional `drag` `{from_x, from_y, to_x, to_y, button: left\|right}` holds that mouse button across the same duration. For games that switch to mouse/keyboard controls (e.g. Roblox: `w` walks while a right drag turns the camera); touch-only games ignore keys. Refused while a touch is held or when the mirroring window is not the frontmost app; stops early and releases everything if focus leaves it mid-hold |
-| `type_text` | `text` | Type text — activates iPhone Mirroring and sends keystrokes |
+| `type_text` | `text` | Type text — activates iPhone Mirroring and sends keystrokes. Characters with no key are pasted one run at a time and each paste is confirmed by OCR; one not seen (or unreadable, like emoji) returns an error ([limitations](limitations.md#clipboard-paste-is-confirmed-by-ocr)) |
 | `press_key` | `key`, `modifiers`? | Send a special key (return, escape, tab, delete, space, arrows) with optional modifiers (command, shift, option, control) |
 | `shake` | — | Trigger shake gesture (Ctrl+Cmd+Z) for undo/dev menus |
-| `launch_app` | `name` | Open app by name via Spotlight search |
+| `launch_app` | `name` | Open app by name via Spotlight search; fails without pressing Return when the typed name never appears on screen |
 | `open_url` | `url` | Open URL in Safari |
 | `press_home` | — | Go to home screen |
 | `press_app_switcher` | — | Open app switcher |
@@ -41,7 +41,7 @@ All 38 tools exposed by the MCP server. Mutating tools require [permission](perm
 | `list_targets` | — | List all configured automation targets with status and window size |
 | `switch_target` | `target` | Switch active target for subsequent tool calls |
 | `calibrate_component` | `component_path`, `target`?, `scroll`? | Test a component definition (.md) against the current screen and return a diagnostic report |
-| `record_step` | `step_index`, `type`, `label`?, `tap_x`?, `tap_y`?, `confidence`?, `match_strategy`?, `elapsed_ms`?, `scroll_count`?, `scroll_direction`? | Record a compiled step during AI-driven skill execution |
+| `record_step` | `step_index`, `type`, `label`?, `tap_x`?, `tap_y`?, `match_strategy`?, `elapsed_ms`?, `scroll_count`?, `scroll_direction`? | Record a compiled step during AI-driven skill execution; a tap with coordinates and no label also records the screen it led to, which replay must reach |
 | `save_compiled` | `skill_name` | Save accumulated compiled steps as .compiled.json next to the source skill |
 
 ## Coordinates

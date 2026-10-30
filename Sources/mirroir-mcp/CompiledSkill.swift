@@ -2,12 +2,12 @@
 // Licensed under the Apache License, Version 2.0
 //
 // ABOUTME: Data model for compiled skills — pre-recorded coordinates, timing, and scroll sequences.
-// ABOUTME: Eliminates OCR during replay by storing all decision data from a learning run.
+// ABOUTME: Replay acts on these hints and checks each labeled step against the live screen.
 
 import CommonCrypto
 import Foundation
 
-/// A compiled skill ready for OCR-free replay.
+/// A compiled skill ready for replay from its recorded hints.
 struct CompiledSkill: Codable, Equatable {
     /// Format version for forward compatibility.
     let version: Int
@@ -26,10 +26,15 @@ struct CompiledSkill: Codable, Equatable {
     /// Current format version. Bump forces recompilation of all existing compiled skills.
     /// Version 3: a step's `label` is its replay value, which a SKILL.md's steps are
     /// rebuilt from, where earlier versions held a free-form display label.
-    static let currentVersion = 3
+    /// Version 4: `wait_for` compiles to `passthrough` (it polls the screen live), and
+    /// the `sleep` action, which passed without looking at the screen, is gone.
+    /// Version 5: a tap recorded by coordinates alone carries `arrivalFingerprint`, the
+    /// screen it led to, and replay fails it without one.
+    static let currentVersion = 5
 }
 
-/// Structural fingerprint of the screen a compiled skill starts from.
+/// Structural fingerprint of a screen: the one a compiled skill starts from, or the
+/// one a coordinate-only tap leads to.
 struct ScreenFingerprint: Codable, Equatable {
     /// SHA-256 of sorted structural texts + icon count for fast-path equality.
     let hash: String
@@ -62,11 +67,11 @@ struct CompiledStep: Codable, Equatable {
     let type: String
     /// Human-readable label from the original step.
     let label: String?
-    /// Compiled hints for OCR-free replay. Nil for AI-only steps that cannot be compiled.
+    /// Compiled hints for replay. Nil for AI-only steps that cannot be compiled.
     let hints: StepHints?
 }
 
-/// Cached data from the learning run that enables OCR-free replay.
+/// Cached data from the learning run that compiled replay acts on.
 struct StepHints: Codable, Equatable {
     /// The action to perform during compiled replay.
     let compiledAction: CompiledAction
@@ -74,7 +79,6 @@ struct StepHints: Codable, Equatable {
     // Tap hints
     let tapX: Double?
     let tapY: Double?
-    let confidence: Float?
     let matchStrategy: String?
 
     // Timing hints
@@ -84,53 +88,53 @@ struct StepHints: Codable, Equatable {
     let scrollCount: Int?
     let scrollDirection: String?
 
-    /// Create hints for a tap action.
-    static func tap(x: Double, y: Double, confidence: Float, strategy: String) -> StepHints {
-        StepHints(compiledAction: .tap, tapX: x, tapY: y,
-                  confidence: confidence, matchStrategy: strategy,
-                  observedDelayMs: nil, scrollCount: nil, scrollDirection: nil)
-    }
+    /// The screen a tap recorded by coordinates alone (an icon with no text) led
+    /// to. Replay has no label to look for before such a tap, so it checks after:
+    /// the screen the tap reaches must match this one.
+    var arrivalFingerprint: ScreenFingerprint? = nil
 
-    /// Create hints for a sleep action (wait_for, measure).
-    static func sleep(delayMs: Int) -> StepHints {
-        StepHints(compiledAction: .sleep, tapX: nil, tapY: nil,
-                  confidence: nil, matchStrategy: nil,
-                  observedDelayMs: delayMs, scrollCount: nil, scrollDirection: nil)
+    /// Create hints for a tap action. `arrival` is the screen a coordinate-only
+    /// tap led to; a labeled tap is checked by its label instead and records none.
+    static func tap(x: Double, y: Double, strategy: String,
+                    arrival: ScreenFingerprint? = nil) -> StepHints {
+        StepHints(compiledAction: .tap, tapX: x, tapY: y,
+                  matchStrategy: strategy,
+                  observedDelayMs: nil, scrollCount: nil, scrollDirection: nil,
+                  arrivalFingerprint: arrival)
     }
 
     /// Create hints for an assertion action — sleeps observed delay, then performs real OCR.
     static func assertion(delayMs: Int) -> StepHints {
         StepHints(compiledAction: .assertion, tapX: nil, tapY: nil,
-                  confidence: nil, matchStrategy: nil,
+                  matchStrategy: nil,
                   observedDelayMs: delayMs, scrollCount: nil, scrollDirection: nil)
     }
 
     /// Create hints for a scroll sequence.
     static func scrollSequence(count: Int, direction: String) -> StepHints {
         StepHints(compiledAction: .scrollSequence, tapX: nil, tapY: nil,
-                  confidence: nil, matchStrategy: nil,
+                  matchStrategy: nil,
                   observedDelayMs: nil, scrollCount: count, scrollDirection: direction)
     }
 
-    /// Create hints for a passthrough action (already OCR-free).
+    /// Create hints for a passthrough action: the step runs live through `StepExecutor`.
     static func passthrough() -> StepHints {
         StepHints(compiledAction: .passthrough, tapX: nil, tapY: nil,
-                  confidence: nil, matchStrategy: nil,
+                  matchStrategy: nil,
                   observedDelayMs: nil, scrollCount: nil, scrollDirection: nil)
     }
 }
 
 /// The type of action to perform during compiled replay.
 enum CompiledAction: String, Codable, Equatable {
-    /// Direct tap at cached coordinates.
+    /// Tap at cached coordinates once OCR finds a labeled step's element there; an
+    /// element found elsewhere is tapped where it is, one not found fails the step.
     case tap
-    /// Sleep for observed delay (used for wait_for, measure).
-    case sleep
     /// Sleep observed delay then delegate to normal StepExecutor for real OCR assertion.
     case assertion
-    /// Replay a sequence of scroll/swipe gestures.
+    /// Replay a sequence of scroll/swipe gestures, then require the target on screen.
     case scrollSequence = "scroll_sequence"
-    /// Delegate to normal StepExecutor (step is already OCR-free).
+    /// Delegate to normal StepExecutor, which runs the step live.
     case passthrough
 }
 
@@ -217,13 +221,36 @@ enum CompiledSkillIO {
     /// compiled. Window size is judged separately, against a device.
     static func sourceStaleness(compiled: CompiledSkill, skillPath: String) -> String? {
         if compiled.version != CompiledSkill.currentVersion {
-            return "compiled version \(compiled.version) != current \(CompiledSkill.currentVersion)"
+            return versionMismatch(compiled.version)
         }
         if let currentHash = try? sha256(of: skillPath),
            currentHash != compiled.source.sha256 {
             return "source file has changed since compilation"
         }
         return nil
+    }
+
+    /// Why a compiled file that exists did not decode. A file whose `version` still
+    /// reads is named by that version, exactly as `sourceStaleness` names a version
+    /// mismatch: an older format need not decode under the current shape (a version 3
+    /// file can hold a `sleep` action version 4 no longer has).
+    static func unreadableStaleness(skillPath: String, error: any Error) -> String {
+        if let data = try? Data(contentsOf: URL(fileURLWithPath: compiledPath(for: skillPath))),
+           let probe = try? JSONDecoder().decode(VersionProbe.self, from: data),
+           probe.version != CompiledSkill.currentVersion {
+            return versionMismatch(probe.version)
+        }
+        return "compiled file cannot be decoded (\(error.localizedDescription))"
+    }
+
+    /// The staleness reason for a compiled file written in another format version.
+    private static func versionMismatch(_ version: Int) -> String {
+        "compiled version \(version) != current \(CompiledSkill.currentVersion)"
+    }
+
+    /// The one field every compiled-format version shares.
+    private struct VersionProbe: Decodable {
+        let version: Int
     }
 
     /// Save a compiled skill to disk alongside its source file.

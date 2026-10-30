@@ -375,14 +375,20 @@ extension EnvConfig {
 
     // MARK: - Compiled Safety
 
-    /// Minimum confidence threshold for compiled taps. Below this, fall back to live OCR.
-    public static var compiledTapMinConfidence: Double {
-        readDouble("compiledTapMinConfidence", default: TimingConstants.compiledTapMinConfidence)
+    /// Points a labeled compiled tap's element may sit from its recorded position on
+    /// each axis and still be tapped at the recorded coordinates. Farther away, replay
+    /// taps the element where OCR finds it now.
+    public static var compiledTapPositionTolerance: Double {
+        readDouble("compiledTapPositionTolerance",
+                   default: TimingConstants.compiledTapPositionTolerance)
     }
 
-    /// When true, compiled taps are followed by a verification OCR call.
-    public static var verifyTaps: Bool {
-        readBool("verifyTaps", envVar: "MIRROIR_VERIFY_TAPS", default: false)
+    /// Fewest multi-character structural texts the screen a coordinate-only tap
+    /// leads to must hold. A barer screen cannot prove the tap worked, so
+    /// `record_step` refuses it and replay fails it.
+    public static var compiledTapArrivalMinTexts: Int {
+        readInt("compiledTapArrivalMinTexts",
+                default: TimingConstants.compiledTapArrivalMinTexts)
     }
 
     // MARK: - Calibration Validation

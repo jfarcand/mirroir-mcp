@@ -16,7 +16,7 @@ extension InputSimulation {
     /// Sends Ctrl+Cmd+Z via CGEvent which triggers shake-to-undo in iOS apps.
     func shake() -> TypeResult {
         if let keyboardError = prepareKeyboardInput(tag: "shake") {
-            return TypeResult(success: false, warning: nil, error: keyboardError)
+            return TypeResult(success: false, error: keyboardError)
         }
 
         DebugLog.log("shake", "sending shake gesture via CGEvent")
@@ -25,9 +25,9 @@ extension InputSimulation {
         let result = CGEventInput.shake()
         DebugLog.log("shake", "CGEvent=\(result ? "OK" : "FAILED")")
         if result {
-            return TypeResult(success: true, warning: nil, error: nil)
+            return TypeResult(success: true, error: nil)
         }
-        return TypeResult(success: false, warning: nil, error: "CGEvent shake failed")
+        return TypeResult(success: false, error: "CGEvent shake failed")
     }
 
     /// Launch an app by name using Spotlight search.
@@ -47,13 +47,25 @@ extension InputSimulation {
         }
         usleep(EnvConfig.spotlightAppearanceUs)
 
-        // Step 2: Type the app name
+        // Step 2: Type the app name, and confirm Spotlight shows it before Return.
+        // Spotlight can reopen holding the previous query in a state that swallows
+        // keystrokes; Return would then launch the previous result.
+        guard let before = screenLines() else {
+            return "Could not read the screen after opening Spotlight, so the search " +
+                "for '\(name)' could not be confirmed; Return was not pressed."
+        }
         let typeResult = typeText(name)
         guard typeResult.success else {
             DebugLog.log("launchApp", "ERROR: failed to type app name")
             return typeResult.error ?? "Failed to type app name"
         }
         usleep(EnvConfig.searchResultsPopulateUs)
+        guard spotlightShows(name, comparedTo: before) else {
+            DebugLog.log("launchApp", "ERROR: '\(name)' never appeared in Spotlight")
+            return "Typed '\(name)' into Spotlight but it never appeared on screen, so " +
+                "Return was not pressed. Spotlight may be holding a previous query, or " +
+                "keystrokes are not reaching the iPhone."
+        }
 
         // Step 3: Press Return to launch the top result
         let keyResult = pressKey(keyName: "return")
@@ -64,6 +76,29 @@ extension InputSimulation {
 
         DebugLog.log("launchApp", "launched '\(name)' OK")
         return nil
+    }
+
+    /// Every text line on screen, read once through `pasteVerifier`. Nil when
+    /// there is no reader or the screen cannot be read.
+    private func screenLines() -> [String]? {
+        guard let result = pasteVerifier?.describe(settleTimeoutUs: 0),
+              result.ocrFailure == nil else { return nil }
+        return result.elements.map(\.text)
+    }
+
+    /// Whether `name` shows up on screen more often than in `before`, polling
+    /// for up to `pasteVerifyTimeoutUs`.
+    private func spotlightShows(_ name: String, comparedTo before: [String]) -> Bool {
+        let poll = max(1, EnvConfig.pasteVerifyPollUs)
+        let attempts = max(1, Int(EnvConfig.pasteVerifyTimeoutUs / poll))
+        for attempt in 0 ..< attempts {
+            if attempt > 0 { usleep(poll) }
+            if let lines = screenLines(),
+               PasteNeedle.appearedAgain(name, before: before, after: lines) {
+                return true
+            }
+        }
+        return false
     }
 
     /// Open a URL on the mirrored iPhone by launching Safari and navigating to it.
@@ -103,118 +138,73 @@ extension InputSimulation {
         return nil
     }
 
-    /// Type text via CGEvent keyboard events.
+    /// Type text via CGEvent keyboard events, pasting only what has no key.
     ///
     /// CGEvent keycodes are layout-independent physical keys (same concept as
     /// USB HID keycodes). Each character is typed with the key that produces it
     /// on the iPhone's layout (`keyboardLayout`, from `keyboardLayout` /
-    /// `IPHONE_KEYBOARD_LAYOUT`). Characters that layout cannot type in one
-    /// keystroke go through the clipboard, with a warning in the result.
+    /// `IPHONE_KEYBOARD_LAYOUT`). Runs that layout cannot type go through the
+    /// clipboard one run at a time, and `VerifiedTextEntry` confirms each paste
+    /// on screen with `pasteVerifier` before the next clipboard write: Universal
+    /// Clipboard is asynchronous, and two unconfirmed writes race so the device
+    /// re-pastes the stale value. A paste that is not seen — or cannot be read
+    /// back, like emoji — fails the call instead of passing silently.
     func typeText(_ text: String) -> TypeResult {
         if let keyboardError = prepareKeyboardInput(tag: "typeText") {
-            return TypeResult(success: false, warning: nil, error: keyboardError)
+            return TypeResult(success: false, error: keyboardError)
         }
 
         DebugLog.log("typeText", "typing \(text.count) char(s)")
         ensureTargetFrontmost()
 
-        // Split text into segments: typeable via keycodes vs pasted via clipboard.
         let segments = buildTypeSegments(text)
+        let saved = pasteboard.string()
+        let pastes = segments.contains { $0.method == .paste }
 
-        // One clipboard round-trip per call, never one per segment. Universal
-        // Clipboard propagates asynchronously and slower than a keystroke, so
-        // two writes in quick succession race: the second Cmd+V fires while the
-        // device still holds the first value and pastes it AGAIN. Observed
-        // on-device — "\u{3053}\u{3093}\u{306b}\u{3061}\u{306f}\u{4e16}\u{754c} \u{1f389}" arrived as the Japanese run twice with the
-        // emoji missing. Pasting the whole string once cannot race itself, and a
-        // wrong-but-plausible result is worse than a warned-about empty field.
-        let unmappable = segments.filter { $0.method == .paste }
-        if !unmappable.isEmpty {
-            let result = pasteText(text)
-            guard result.success else { return result }
-            let count = unmappable.reduce(0) { $0 + $1.text.count }
-            return TypeResult(success: true, warning: Self.pasteDependencyWarning(count),
-                              error: nil)
-        }
+        let entry = VerifiedTextEntry(
+            typeKeys: { [self] run in typeViaCGEvent(run) },
+            paste: { [self] run in pasteRun(run) },
+            readScreen: { [self] in screenLines() },
+            sleep: { usleep($0) },
+            verifyTimeoutUs: EnvConfig.pasteVerifyTimeoutUs,
+            verifyPollUs: EnvConfig.pasteVerifyPollUs,
+            windowChars: EnvConfig.pasteVerifyWindowChars
+        )
+        let result = entry.enter(segments)
 
-        for segment in segments {
-            if let error = typeViaCGEvent(segment.text) {
-                return error
-            }
+        // Restored once, after every paste is confirmed or abandoned, so the
+        // restore is never a clipboard write racing a paste still in flight.
+        // Only the plain-text flavor survives — the restore is a courtesy.
+        if pastes, let saved {
+            _ = pasteboard.replaceContents(with: saved)
         }
-        return TypeResult(success: true, warning: nil, error: nil)
+        return result
     }
 
-    /// Warning attached whenever some of the text had to go through the clipboard.
-    ///
-    /// The keystroke path is self-contained, but the clipboard path is not: it
-    /// relies on Universal Clipboard to carry the Mac pasteboard to the device.
-    /// Cmd+V itself is reliable — verified on-device to paste the *iPhone's*
-    /// clipboard — so when the field ends up empty, the missing piece is the
-    /// Mac-to-iPhone sync, not the keystroke. There is no API to read the
-    /// device's pasteboard back, so this cannot be verified from here; saying so
-    /// is better than reporting a success the caller cannot trust.
-    static func pasteDependencyWarning(_ count: Int) -> String {
-        """
-        \(count) character(s) have no key mapping and were sent through the \
-        clipboard with Cmd+V. That path needs Universal Clipboard: Handoff \
-        enabled on both the Mac and the iPhone, Bluetooth and Wi-Fi on, and both \
-        signed into the same iCloud account. If the field is still empty, \
-        Handoff is the thing to check — verify before relying on this text.
-        """
-    }
-
-    /// Enter text that has no keycode mapping by routing it through the shared
-    /// pasteboard and pressing Cmd+V.
+    /// Put one unmappable run on the pasteboard and press Cmd+V.
     ///
     /// CJK, emoji, and most non-Latin characters have no macOS virtual keycode:
     /// they are composed through an input method, which CGEvent cannot drive.
     /// The pasteboard is therefore the only path that enters them at all.
     /// iOS handles Cmd+V as a standard text-editing shortcut in a focused field
-    /// — verified on-device, along with Cmd+A and Cmd+C, so Cmd-modified keys do
-    /// reach iOS text fields through mirroring.
-    ///
-    /// What is NOT guaranteed is that the Mac pasteboard reaches the device at
-    /// all: that is Universal Clipboard, which needs Handoff enabled on both
-    /// ends. With Handoff off, Cmd+V still fires and still pastes — but it
-    /// pastes the iPhone's own clipboard, so the text written here never
-    /// arrives. The device pasteboard cannot be read back from here, so callers
-    /// are warned rather than given a success they cannot trust.
-    ///
-    /// The previous pasteboard contents are restored afterwards so automation
-    /// does not clobber what the user had copied. Only the plain-text
-    /// representation is preserved — richer flavors (RTF, images) are lost, so
-    /// the restore is a courtesy, not a guarantee.
-    ///
-    /// Requires a focused text field on the device; with nothing focused, iOS
-    /// has nowhere to paste and the text is silently dropped.
-    func pasteText(_ text: String) -> TypeResult {
-        let pasteboard = NSPasteboard.general
-        let saved = pasteboard.string(forType: .string)
-
-        pasteboard.clearContents()
-        guard pasteboard.setString(text, forType: .string) else {
+    /// — verified on-device, along with Cmd+A and Cmd+C. What Cmd+V pastes is
+    /// the *iPhone's* clipboard: the Mac pasteboard written here only gets there
+    /// through Universal Clipboard, which is why the caller verifies the result
+    /// on screen rather than trusting this keystroke.
+    private func pasteRun(_ run: String) -> TypeResult {
+        guard pasteboard.replaceContents(with: run) else {
             return TypeResult(
-                success: false, warning: nil,
-                error: "Failed to place \(text.count) character(s) on the pasteboard")
+                success: false,
+                error: "Failed to place \(run.count) character(s) on the pasteboard")
         }
         usleep(EnvConfig.pasteboardSyncUs)
 
-        DebugLog.log("pasteText", "pasting \(text.count) char(s) via Cmd+V")
+        DebugLog.log("typeText", "pasting \(run.count) char(s) via Cmd+V")
         let result = pressKey(keyName: "v", modifiers: ["command"])
-        usleep(EnvConfig.pasteCommitUs)
-
-        if let saved {
-            pasteboard.clearContents()
-            _ = pasteboard.setString(saved, forType: .string)
-        }
-
         guard result.success else {
-            return TypeResult(
-                success: false, warning: nil,
-                error: result.error ?? "Cmd+V paste failed")
+            return TypeResult(success: false, error: result.error ?? "Cmd+V paste failed")
         }
-        return TypeResult(success: true, warning: nil, error: nil)
+        return TypeResult(success: true, error: nil)
     }
 
     /// A segment of text to be typed, with the method to use.
@@ -259,14 +249,12 @@ extension InputSimulation {
             guard let sequence = keyboardLayout.keySequence(for: char) else {
                 return TypeResult(
                     success: false,
-                    warning: nil,
                     error: "No key mapping for character '\(char)'"
                 )
             }
-            guard CGEventInput.postKeySequence(sequence) else {
+            guard keyPoster.postKeySequence(sequence) else {
                 return TypeResult(
                     success: false,
-                    warning: nil,
                     error: "CGEvent key post failed for '\(char)'"
                 )
             }
@@ -280,7 +268,7 @@ extension InputSimulation {
     /// (e.g., Cmd+L for Safari address bar).
     func pressKey(keyName: String, modifiers: [String] = []) -> TypeResult {
         if let keyboardError = prepareKeyboardInput(tag: "pressKey") {
-            return TypeResult(success: false, warning: nil, error: keyboardError)
+            return TypeResult(success: false, error: keyboardError)
         }
 
         let modStr = modifiers.isEmpty ? "" : " modifiers=\(modifiers.joined(separator: "+"))"
@@ -296,7 +284,7 @@ extension InputSimulation {
             keycode = mapping.keycode
         } else {
             return TypeResult(
-                success: false, warning: nil,
+                success: false,
                 error: "Unknown key '\(keyName)'. Supported: \(AppleScriptKeyMap.supportedKeys.joined(separator: ", ")), or a single character.")
         }
 
@@ -305,17 +293,17 @@ extension InputSimulation {
         for mod in modifiers {
             guard let flag = CGEventInput.modifierFlag(named: mod.lowercased()) else {
                 return TypeResult(
-                    success: false, warning: nil,
+                    success: false,
                     error: "Unknown modifier '\(mod)'. Supported: \(CGEventInput.modifierNames.joined(separator: ", ")).")
             }
             flags.insert(flag)
         }
 
-        let result = CGEventInput.postKey(keycode: keycode, flags: flags)
+        let result = keyPoster.postKey(keycode: keycode, flags: flags)
         DebugLog.log("pressKey", "CGEvent=\(result ? "OK" : "FAILED")")
         if result {
-            return TypeResult(success: true, warning: nil, error: nil)
+            return TypeResult(success: true, error: nil)
         }
-        return TypeResult(success: false, warning: nil, error: "CGEvent press_key failed")
+        return TypeResult(success: false, error: "CGEvent press_key failed")
     }
 }

@@ -19,9 +19,9 @@ final class CompiledSkillTests: XCTestCase {
             steps: [
                 CompiledStep(index: 0, type: "launch", label: "Settings", hints: .passthrough()),
                 CompiledStep(index: 1, type: "tap", label: "General",
-                             hints: .tap(x: 205.0, y: 340.5, confidence: 0.98, strategy: "exact")),
+                             hints: .tap(x: 205.0, y: 340.5, strategy: "exact")),
                 CompiledStep(index: 2, type: "wait_for", label: "About",
-                             hints: .sleep(delayMs: 1200)),
+                             hints: .passthrough()),
                 CompiledStep(index: 3, type: "scroll_to", label: "Model",
                              hints: .scrollSequence(count: 3, direction: "up")),
                 CompiledStep(index: 4, type: "remember", label: nil, hints: nil),
@@ -45,7 +45,7 @@ final class CompiledSkillTests: XCTestCase {
             device: DeviceInfo(windowWidth: 410, windowHeight: 898, orientation: "portrait"),
             steps: [
                 CompiledStep(index: 0, type: "tap", label: "OK",
-                             hints: .tap(x: 100, y: 200, confidence: 0.95, strategy: "exact"))
+                             hints: .tap(x: 100, y: 200, strategy: "exact"))
             ]
         )
 
@@ -209,7 +209,7 @@ final class CompiledSkillTests: XCTestCase {
             device: DeviceInfo(windowWidth: 410, windowHeight: 898, orientation: "portrait"),
             steps: [
                 CompiledStep(index: 0, type: "tap", label: "OK",
-                             hints: .tap(x: 100, y: 200, confidence: 0.95, strategy: "exact"))
+                             hints: .tap(x: 100, y: 200, strategy: "exact"))
             ]
         )
 
@@ -227,20 +227,12 @@ final class CompiledSkillTests: XCTestCase {
     // MARK: - StepHints Factory Methods
 
     func testTapHints() {
-        let hints = StepHints.tap(x: 100, y: 200, confidence: 0.95, strategy: "exact")
+        let hints = StepHints.tap(x: 100, y: 200, strategy: "exact")
         XCTAssertEqual(hints.compiledAction, .tap)
         XCTAssertEqual(hints.tapX, 100)
         XCTAssertEqual(hints.tapY, 200)
-        XCTAssertEqual(hints.confidence, 0.95)
         XCTAssertEqual(hints.matchStrategy, "exact")
         XCTAssertNil(hints.observedDelayMs)
-    }
-
-    func testSleepHints() {
-        let hints = StepHints.sleep(delayMs: 1200)
-        XCTAssertEqual(hints.compiledAction, .sleep)
-        XCTAssertEqual(hints.observedDelayMs, 1200)
-        XCTAssertNil(hints.tapX)
     }
 
     func testScrollSequenceHints() {

@@ -32,16 +32,31 @@ The MCP client (e.g. the terminal running the server) and the target window **mu
 | Approach | Why It Fails |
 |----------|-------------|
 | Accessibility API actions | AX actions can trigger menu items (Home, App Switcher) but cannot simulate touch input on the mirrored display. The mirrored content is an opaque video surface: when mirroring is active, the window's hosting view exposes **zero** child AX elements, so the AX tree cannot read or drive iOS UI. This is why the server relies on screenshots + OCR for screen content. |
-| Clipboard paste (`Cmd+V`) | iPhone Mirroring does not bridge the Mac clipboard when paste is triggered programmatically. Tested with HID, AppleScript, and `CGEvent` — none work. |
 | `NSRunningApplication.activate()` | Deprecated in macOS 14 with no replacement for cross-Space activation. Cannot reliably bring iPhone Mirroring to front. |
 
 ## Keyboard Layout Gaps
 
 CGEvent keycodes are layout-independent physical keys, and the iPhone turns them into characters with its own hardware-keyboard layout. When `keyboardLayout` (or `IPHONE_KEYBOARD_LAYOUT`) names a non-US layout such as Canadian-CSA, the server reads macOS's copy of that layout (`LayoutMapper.keyTable`) and types each character with the key and Shift state that produce it there. With it empty or `US`, keystrokes come from the US QWERTY table in `CGKeyMap`.
 
-From a non-US layout, mirroir takes single keystrokes (unshifted or shifted) and dead-key pairs (`ê` is `^` then `e` on Canadian-CSA). Characters on the Option layer, and characters the layout does not have (`<`, `[`, `|` on Canadian-CSA), are sent through the clipboard with a warning, so they depend on Universal Clipboard.
+From a non-US layout, mirroir takes single keystrokes (unshifted or shifted) and dead-key pairs (`ê` is `^` then `e` on Canadian-CSA). Characters on the Option layer, and characters the layout does not have (`<`, `[`, `|` on Canadian-CSA), are pasted through the clipboard, so they depend on Universal Clipboard (see below).
 
 The setting must match the layout chosen on the iPhone. A mismatch types the wrong character rather than skipping it — with no layout set on a Canadian-CSA iPhone, `/` arrives as `é` and every URL is garbled.
+
+### Clipboard paste is confirmed by OCR
+
+`type_text` types every character it has a key for and pastes only the runs it has none for (emoji, CJK, symbols the layout lacks), one `Cmd+V` per run. `Cmd+V` pastes the *iPhone's* clipboard; the Mac pasteboard reaches it only through Universal Clipboard (Handoff on both ends, Bluetooth and Wi-Fi, same iCloud account), asynchronously. With Handoff off nothing arrives; with a lagging sync the device pastes its previous clipboard value.
+
+So each paste is read back from the screen with local OCR before the next clipboard write: the last `pasteVerifyWindowChars` readable characters of the line — the pasted run plus the text typed just before it — must appear one more time than before the paste, within `pasteVerifyTimeoutUs`. A paste not seen stops the call with an error that names what was confirmed and what was not; the MCP tool returns `isError`, and a skill step fails. What this means in practice:
+
+- **Emoji and pictographic symbols are never confirmed.** OCR has no glyph to read for them, so a run made only of them is still pasted but the call returns an error saying it is unverified. Check the screen yourself before relying on it.
+- **Non-Latin scripts need `ocrLanguages`.** With the default `["en-US"]`, Vision does not read CJK, so a CJK paste that landed is reported as not seen. Add the script (e.g. `["ja-JP","en-US"]`).
+- **Secure fields hide what was pasted.** A password field shows dots, so a paste into one cannot be confirmed; keyed characters are unaffected.
+- **The confirmed text must sit on one visible line.** A field that wraps the pasted tail across lines, or scrolls it out of view, fails the check.
+- **A mixed run is judged as a whole.** A pasted run holding both readable characters and emoji is reported unverified: a stale clipboard holding only the readable part would otherwise pass.
+
+### Spotlight can hold a previous query
+
+After an app is launched from Spotlight, iOS can reopen Spotlight showing that query in an inactive state that ignores keystrokes; Return then launches the previous result. `launch_app` (and a skill's `launch` step) therefore reads the screen after typing the name and presses Return only when the name appeared one more time than before. Otherwise it fails without pressing Return, including when the held query happens to be the same app. Clear the Spotlight field on the device (its ✕ button) to recover.
 
 ## Web and iOS Scenarios
 

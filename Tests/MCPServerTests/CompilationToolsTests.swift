@@ -33,10 +33,10 @@ final class CompilationToolsTests: XCTestCase {
             index: 0, type: "launch", label: "Settings", hints: .passthrough()))
         session.record(CompiledStep(
             index: 1, type: "tap", label: "General",
-            hints: .tap(x: 205, y: 340, confidence: 0.98, strategy: "exact")))
+            hints: .tap(x: 205, y: 340, strategy: "exact")))
         session.record(CompiledStep(
             index: 2, type: "wait_for", label: "About",
-            hints: .sleep(delayMs: 1200)))
+            hints: .passthrough()))
 
         XCTAssertEqual(session.stepCount, 3)
     }
@@ -47,7 +47,7 @@ final class CompilationToolsTests: XCTestCase {
             index: 0, type: "launch", label: "App", hints: .passthrough()))
         session.record(CompiledStep(
             index: 1, type: "tap", label: "OK",
-            hints: .tap(x: 100, y: 200, confidence: 0.95, strategy: "exact")))
+            hints: .tap(x: 100, y: 200, strategy: "exact")))
 
         let steps = session.finalizeAndClear()
         XCTAssertEqual(steps.count, 2)
@@ -65,21 +65,28 @@ final class CompilationToolsTests: XCTestCase {
     func testDeriveHintsTapWithCoordinates() {
         let hints = MirroirMCP.deriveHints(
             type: "tap", tapX: 205, tapY: 340,
-            confidence: 0.98, matchStrategy: "exact",
+            matchStrategy: "exact",
             elapsedMs: nil, scrollCount: nil, scrollDirection: nil)
 
         XCTAssertNotNil(hints)
         XCTAssertEqual(hints?.compiledAction, .tap)
         XCTAssertEqual(hints?.tapX, 205)
         XCTAssertEqual(hints?.tapY, 340)
-        XCTAssertEqual(hints?.confidence, 0.98)
         XCTAssertEqual(hints?.matchStrategy, "exact")
+    }
+
+    func testDeriveHintsTapCarriesTheScreenACoordinateTapReached() {
+        let arrival = ScreenFingerprint(hash: "h", structuralTexts: ["General"], iconCount: 2)
+        let hints = MirroirMCP.deriveHints(
+            type: "tap", tapX: 40, tapY: 880, matchStrategy: nil,
+            elapsedMs: nil, scrollCount: nil, scrollDirection: nil, arrival: arrival)
+        XCTAssertEqual(hints?.arrivalFingerprint, arrival)
     }
 
     func testDeriveHintsTapWithoutCoordinatesButElapsed() {
         let hints = MirroirMCP.deriveHints(
             type: "tap", tapX: nil, tapY: nil,
-            confidence: nil, matchStrategy: nil,
+            matchStrategy: nil,
             elapsedMs: 500, scrollCount: nil, scrollDirection: nil)
 
         // A sleep would pass without tapping: replay it live instead.
@@ -89,39 +96,29 @@ final class CompilationToolsTests: XCTestCase {
     func testDeriveHintsTapWithoutAnything() {
         let hints = MirroirMCP.deriveHints(
             type: "tap", tapX: nil, tapY: nil,
-            confidence: nil, matchStrategy: nil,
+            matchStrategy: nil,
             elapsedMs: nil, scrollCount: nil, scrollDirection: nil)
 
         // Replayed live: the element is found by OCR.
         XCTAssertEqual(hints?.compiledAction, .passthrough)
     }
 
-    func testDeriveHintsWaitFor() {
+    /// A wait_for replays live, polling for its element: a recorded delay would pass
+    /// without looking at the screen.
+    func testDeriveHintsWaitForReplaysLive() {
         let hints = MirroirMCP.deriveHints(
             type: "wait_for", tapX: nil, tapY: nil,
-            confidence: nil, matchStrategy: nil,
+            matchStrategy: nil,
             elapsedMs: 2000, scrollCount: nil, scrollDirection: nil)
 
-        XCTAssertNotNil(hints)
-        XCTAssertEqual(hints?.compiledAction, .sleep)
-        XCTAssertEqual(hints?.observedDelayMs, 2000)
-    }
-
-    func testDeriveHintsWaitForDefaultDelay() {
-        let hints = MirroirMCP.deriveHints(
-            type: "wait_for", tapX: nil, tapY: nil,
-            confidence: nil, matchStrategy: nil,
-            elapsedMs: nil, scrollCount: nil, scrollDirection: nil)
-
-        XCTAssertNotNil(hints)
-        XCTAssertEqual(hints?.compiledAction, .sleep)
-        XCTAssertEqual(hints?.observedDelayMs, 500)
+        XCTAssertEqual(hints?.compiledAction, .passthrough)
+        XCTAssertNil(hints?.observedDelayMs)
     }
 
     func testDeriveHintsAssertVisible() {
         let hints = MirroirMCP.deriveHints(
             type: "assert_visible", tapX: nil, tapY: nil,
-            confidence: nil, matchStrategy: nil,
+            matchStrategy: nil,
             elapsedMs: 300, scrollCount: nil, scrollDirection: nil)
 
         XCTAssertNotNil(hints)
@@ -132,7 +129,7 @@ final class CompilationToolsTests: XCTestCase {
     func testDeriveHintsAssertNotVisible() {
         let hints = MirroirMCP.deriveHints(
             type: "assert_not_visible", tapX: nil, tapY: nil,
-            confidence: nil, matchStrategy: nil,
+            matchStrategy: nil,
             elapsedMs: 100, scrollCount: nil, scrollDirection: nil)
 
         XCTAssertNotNil(hints)
@@ -143,7 +140,7 @@ final class CompilationToolsTests: XCTestCase {
     func testDeriveHintsScrollTo() {
         let hints = MirroirMCP.deriveHints(
             type: "scroll_to", tapX: nil, tapY: nil,
-            confidence: nil, matchStrategy: nil,
+            matchStrategy: nil,
             elapsedMs: nil, scrollCount: 3, scrollDirection: "up")
 
         XCTAssertNotNil(hints)
@@ -155,7 +152,7 @@ final class CompilationToolsTests: XCTestCase {
     func testDeriveHintsScrollToDefaults() {
         let hints = MirroirMCP.deriveHints(
             type: "scroll_to", tapX: nil, tapY: nil,
-            confidence: nil, matchStrategy: nil,
+            matchStrategy: nil,
             elapsedMs: nil, scrollCount: nil, scrollDirection: nil)
 
         XCTAssertNotNil(hints)
@@ -174,7 +171,7 @@ final class CompilationToolsTests: XCTestCase {
         for stepType in passthroughTypes {
             let hints = MirroirMCP.deriveHints(
                 type: stepType, tapX: nil, tapY: nil,
-                confidence: nil, matchStrategy: nil,
+                matchStrategy: nil,
                 elapsedMs: nil, scrollCount: nil, scrollDirection: nil)
 
             XCTAssertNotNil(hints, "Expected passthrough hints for type '\(stepType)'")
@@ -186,7 +183,7 @@ final class CompilationToolsTests: XCTestCase {
     func testDeriveHintsMeasure() {
         let hints = MirroirMCP.deriveHints(
             type: "measure", tapX: nil, tapY: nil,
-            confidence: nil, matchStrategy: nil,
+            matchStrategy: nil,
             elapsedMs: 3500, scrollCount: nil, scrollDirection: nil)
 
         // Replayed live: a sleep would pass without running the action or the check.
@@ -196,7 +193,7 @@ final class CompilationToolsTests: XCTestCase {
     func testDeriveHintsUnknownType() {
         let hints = MirroirMCP.deriveHints(
             type: "remember", tapX: nil, tapY: nil,
-            confidence: nil, matchStrategy: nil,
+            matchStrategy: nil,
             elapsedMs: nil, scrollCount: nil, scrollDirection: nil)
 
         XCTAssertNil(hints, "Unknown/AI-only types should return nil hints")
@@ -217,7 +214,7 @@ final class CompilationToolsTests: XCTestCase {
                 CompiledStep(index: 0, type: "launch", label: "Settings",
                              hints: .passthrough()),
                 CompiledStep(index: 1, type: "tap", label: "General",
-                             hints: .tap(x: 205, y: 340, confidence: 0.98, strategy: "exact")),
+                             hints: .tap(x: 205, y: 340, strategy: "exact")),
             ]
         )
 
@@ -237,7 +234,7 @@ final class CompilationToolsTests: XCTestCase {
             index: 0, type: "launch", label: "App", hints: .passthrough()))
         session.record(CompiledStep(
             index: 1, type: "tap", label: "OK",
-            hints: .tap(x: 100, y: 200, confidence: 0.9, strategy: "exact")))
+            hints: .tap(x: 100, y: 200, strategy: "exact")))
 
         XCTAssertEqual(session.stepCount, 2)
 
@@ -341,6 +338,24 @@ final class CompilationToolsTests: XCTestCase {
             "Expected stale for version mismatch, got: \(status)")
         XCTAssertTrue(status.contains("version"),
             "Expected reason to mention version, got: \(status)")
+    }
+
+    func testCompilationStatusReportsAnUndecodableOldFileAsStale() throws {
+        // A version-3 file using the removed "sleep" action no longer decodes;
+        // get_skill must say it is stale, not that the skill was never compiled.
+        let skillPath = createSkillFile("old.md", content: "# Old\nBody")
+        let json = """
+            {"version": 3, "source": {"sha256": "x", "compiledAt": "2026-02-21T10:00:00Z"},
+             "device": {"windowWidth": 410, "windowHeight": 898, "orientation": "portrait"},
+             "steps": [{"index": 0, "type": "wait_for", "label": "Home",
+                        "hints": {"compiledAction": "sleep", "observedDelayMs": 500}}]}
+            """
+        try json.write(toFile: CompiledSkillIO.compiledPath(for: skillPath),
+                       atomically: true, encoding: .utf8)
+
+        let status = MirroirMCP.compilationStatus(for: skillPath)
+        XCTAssertTrue(status.contains("[Compiled: stale"), "got: \(status)")
+        XCTAssertTrue(status.contains("version 3"), "got: \(status)")
     }
 
     func testCompiledPathForMdMatchesYamlPattern() {

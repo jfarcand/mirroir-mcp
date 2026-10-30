@@ -43,8 +43,7 @@ final class DiagnosisValueTests: XCTestCase {
             index: 0,
             type: "tap",
             label: element.text,
-            hints: .tap(x: element.tapX + 50, y: element.tapY + 50,
-                       confidence: 0.9, strategy: "exact")
+            hints: .tap(x: element.tapX + 50, y: element.tapY + 50, strategy: "exact")
         )
         let skillStep = SkillStep.tap(label: element.text)
 
@@ -100,7 +99,7 @@ final class DiagnosisValueTests: XCTestCase {
             index: 0,
             type: "tap",
             label: "NonexistentElement12345",
-            hints: .tap(x: 100, y: 200, confidence: 0.9, strategy: "exact")
+            hints: .tap(x: 100, y: 200, strategy: "exact")
         )
         let skillStep = SkillStep.tap(label: "NonexistentElement12345")
 

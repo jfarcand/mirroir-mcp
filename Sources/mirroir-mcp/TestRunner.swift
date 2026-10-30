@@ -105,8 +105,8 @@ enum TestRunner {
         // Initialize subsystems (skip for dry run — no system access needed)
         let bridge = MirroringBridge()
         let capture = ScreenCapture(bridge: bridge)
-        let input = InputSimulation(bridge: bridge)
         let describer = ScreenDescriber(bridge: bridge, capture: capture)
+        let input = InputSimulation(bridge: bridge, pasteVerifier: describer)
 
         // Pre-flight check: verify mirroring is connected (unless dry run)
         if !config.dryRun {
@@ -186,7 +186,7 @@ enum TestRunner {
         }
 
         if totalCompiledSteps > 0 {
-            fputs("\nCompiled: \(totalCompiledSteps) step(s) OCR-free, \(totalNormalSteps) normal\n", stderr)
+            fputs("\nCompiled: \(totalCompiledSteps) step(s) from compiled hints, \(totalNormalSteps) normal\n", stderr)
         }
 
         // Print summary

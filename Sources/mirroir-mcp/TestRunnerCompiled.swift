@@ -9,7 +9,7 @@ import HelperLib
 
 extension TestRunner {
 
-    /// Execute a skill using compiled hints for OCR-free replay.
+    /// Execute a skill from its compiled hints, each step verified on the live screen.
     /// When `agent` is non-nil, failed steps trigger a diagnostic OCR call.
     /// When `agent` is a non-empty model name, AI diagnosis runs after deterministic analysis.
     static func executeCompiledSkill(
@@ -155,25 +155,40 @@ extension TestRunner {
 
     /// The compiled skill each skill replays from, keyed by skill path: those whose
     /// compiled file matches the skill source, the format version and the window.
-    /// A stale one is named and left out, so its skill runs on live OCR. The files
-    /// are only read: `mirroir-mcp test` never writes a `.compiled.json`.
+    /// A stale one — including one that no longer decodes, like an older format
+    /// version — is named through `warn` and left out, so its skill runs on live
+    /// OCR. The files are only read: `mirroir-mcp test` never writes a `.compiled.json`.
     static func freshCompiledSkills(
         for skills: [SkillDefinition],
         windowWidth: Double,
-        windowHeight: Double
+        windowHeight: Double,
+        warn: (String) -> Void = { fputs($0, stderr) }
     ) -> [String: CompiledSkill] {
         var compiledMap: [String: CompiledSkill] = [:]
         for skill in skills {
-            guard let compiled = try? CompiledSkillIO.load(for: skill.filePath) else { continue }
+            let compiled: CompiledSkill?
+            do {
+                compiled = try CompiledSkillIO.load(for: skill.filePath)
+            } catch {
+                warn(staleWarning(skill.name, reason: CompiledSkillIO.unreadableStaleness(
+                    skillPath: skill.filePath, error: error)))
+                continue
+            }
+            guard let compiled else { continue }
             switch CompiledSkillIO.checkStaleness(
                 compiled: compiled, skillPath: skill.filePath,
                 windowWidth: windowWidth, windowHeight: windowHeight) {
             case .fresh:
                 compiledMap[skill.filePath] = compiled
             case .stale(let reason):
-                fputs("Warning: compiled skill stale for \(skill.name): \(reason)\n", stderr)
+                warn(staleWarning(skill.name, reason: reason))
             }
         }
         return compiledMap
+    }
+
+    /// The notice for a compiled skill left out of replay, one line.
+    private static func staleWarning(_ skillName: String, reason: String) -> String {
+        "Warning: compiled skill stale for \(skillName): \(reason)\n"
     }
 }

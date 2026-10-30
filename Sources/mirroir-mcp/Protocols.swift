@@ -162,6 +162,26 @@ protocol HeldInputPosting: PointerEngaging {
     func pause(microseconds: UInt32)
 }
 
+/// Posts the key events of type_text and press_key to the HID event tap.
+protocol KeyEventPosting: Sendable {
+    /// Post one key press (down then up) carrying `flags`. Returns false when
+    /// the event could not be created.
+    func postKey(keycode: UInt16, flags: CGEventFlags) -> Bool
+    /// Post every key press that types one character (a dead key and its
+    /// base, for accents). Returns false when one could not be created.
+    func postKeySequence(_ sequence: CGKeySequence) -> Bool
+}
+
+/// The Mac's general pasteboard: type_text carries unmappable runs through it,
+/// and Universal Clipboard carries it to the iPhone.
+protocol PasteboardAccessing: Sendable {
+    /// The plain-text contents, or nil when the pasteboard holds no text.
+    func string() -> String?
+    /// Replace the contents with `text`. Returns false when the pasteboard
+    /// refused the write.
+    func replaceContents(with text: String) -> Bool
+}
+
 /// Posts the CGEvents of a two-finger trackpad gesture (pinch, rotate) that
 /// iPhone Mirroring forwards to iOS as a UIKit two-finger gesture. Points are
 /// screen-absolute; `targetPID` routes events to one process (cursor-free

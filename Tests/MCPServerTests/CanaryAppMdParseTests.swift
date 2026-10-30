@@ -1,7 +1,7 @@
 // Copyright 2026 jfarcand@apache.org
 // Licensed under the Apache License, Version 2.0
 //
-// ABOUTME: Smoke tests that load the canary APP.md files (Settings, Weather) and assert the simulator block parses.
+// ABOUTME: Smoke tests that load the canary APP.md files (Settings, Weather, Clock) and assert the simulator block parses.
 // ABOUTME: Catches drift between the schema and the on-disk files that ship with mirroir-skills.
 
 import XCTest
@@ -108,6 +108,95 @@ final class CanaryAppMdParseTests: XCTestCase {
         XCTAssertNotNil(description.simulator?.screens["composer"])
     }
 
+    // MARK: - Clock golden-journey pack
+
+    func testClockAppMdParses() throws {
+        let description = try loadAppMd(app: "clock")
+
+        XCTAssertEqual(description.appName, "Clock")
+        XCTAssertEqual(description.tabs, ["World Clock", "Alarms", "Stopwatch", "Timers"])
+        XCTAssertTrue(description.skipElements.contains("Delete Alarm"))
+
+        let sim = try XCTUnwrap(description.simulator,
+            "Clock APP.md must declare a Simulator block")
+        XCTAssertEqual(sim.spotlightName, "Clock")
+        XCTAssertEqual(sim.icon, "⏰")
+        XCTAssertEqual(sim.rootScreenID, "alarms")
+        XCTAssertEqual(Set(sim.screens.keys),
+            ["alarms", "add_alarm", "world_clock", "stopwatch", "timers"])
+        XCTAssertTrue(sim.obstacles.isEmpty, "Clock declares no simulator obstacle")
+
+        // Golden journey: Alarms → Add Alarm → Save → Alarms, no tab-bar tap.
+        let alarms = try XCTUnwrap(sim.screens["alarms"])
+        XCTAssertEqual(alarms.title, "Alarms")
+        XCTAssertTrue(alarms.hasTabBar)
+        XCTAssertNil(alarms.backTo)
+        XCTAssertTrue(alarms.elements.contains(.button(text: "Add Alarm", leadsTo: "add_alarm")))
+        for label in ["6:30 AM", "Alarm, every weekday", "7:45 AM", "Gym"] {
+            XCTAssertTrue(alarms.elements.contains(.text(label)),
+                "alarms screen must list '\(label)'")
+        }
+
+        let addAlarm = try XCTUnwrap(sim.screens["add_alarm"])
+        XCTAssertEqual(addAlarm.title, "Add Alarm")
+        XCTAssertFalse(addAlarm.hasTabBar)
+        XCTAssertTrue(addAlarm.elements.contains(.button(text: "Save", leadsTo: "alarms")))
+        XCTAssertTrue(addAlarm.elements.contains(.button(text: "Cancel", leadsTo: "alarms")))
+        XCTAssertEqual(
+            addAlarm.elements.compactMap { element -> String? in
+                if case .row(let text, _) = element { return text }
+                return nil
+            },
+            ["Repeat", "Label", "Sound", "Snooze"])
+
+        // Every tab-bar screen carries the same four tabs.
+        for (id, screen) in sim.screens where screen.hasTabBar {
+            let tabs = screen.elements.compactMap { element -> String? in
+                if case .tab(let text, _) = element { return text }
+                return nil
+            }
+            XCTAssertEqual(tabs, ["World Clock", "Alarms", "Stopwatch", "Timers"],
+                "screen '\(id)' must carry the four Clock tabs")
+        }
+    }
+
+    /// The "Clock (Drift)" fixture is the Clock scene graph with exactly one
+    /// label changed, so a replay recorded against Clock must report one drift.
+    /// It is loaded the way FakeMirroring loads packs (sectioning + simulator
+    /// parser), since the fixture carries only simulator sections.
+    func testClockDriftFixtureDiffersByOneLabel() throws {
+        let base = try XCTUnwrap(try loadAppMd(app: "clock").simulator)
+        let drift = try loadSimulatorSpec(app: "test_fixtures/clock_drift")
+
+        XCTAssertEqual(drift.appName, "Clock (Drift)")
+        XCTAssertEqual(drift.spotlightName, "Clock (Drift)")
+        XCTAssertEqual(drift.icon, base.icon)
+        XCTAssertEqual(drift.rootScreenID, base.rootScreenID)
+        XCTAssertEqual(drift.tabBarStyle, base.tabBarStyle)
+        XCTAssertEqual(drift.obstacles, base.obstacles)
+        XCTAssertEqual(Set(drift.screens.keys), Set(base.screens.keys))
+
+        var differences: [(screen: String, base: SimulatorElement, drift: SimulatorElement)] = []
+        for (id, baseScreen) in base.screens {
+            let driftScreen = try XCTUnwrap(drift.screens[id])
+            XCTAssertEqual(driftScreen.title, baseScreen.title, "[\(id)] title")
+            XCTAssertEqual(driftScreen.backTo, baseScreen.backTo, "[\(id)] back")
+            XCTAssertEqual(driftScreen.hasTabBar, baseScreen.hasTabBar, "[\(id)] tab_bar")
+            XCTAssertEqual(driftScreen.elements.count, baseScreen.elements.count,
+                "[\(id)] element count")
+            for (baseElement, driftElement) in zip(baseScreen.elements, driftScreen.elements)
+                where baseElement != driftElement {
+                differences.append((id, baseElement, driftElement))
+            }
+        }
+
+        XCTAssertEqual(differences.count, 1, "exactly one label must differ: \(differences)")
+        let only = try XCTUnwrap(differences.first)
+        XCTAssertEqual(only.screen, "alarms")
+        XCTAssertEqual(only.base, .text("Gym"))
+        XCTAssertEqual(only.drift, .text("Swim"))
+    }
+
     // MARK: - Drift checker
 
     /// Walk every APP.md in the skills directory and assert structural integrity:
@@ -169,5 +258,22 @@ final class CanaryAppMdParseTests: XCTestCase {
             throw NSError(domain: "test", code: 1)
         }
         return description
+    }
+
+    /// Parse only the simulator sections of a pack, exactly as FakeMirroring's
+    /// `AppPackLoader` does — for fixtures that carry no guidance sections.
+    private func loadSimulatorSpec(app slug: String) throws -> SimulatorSpec {
+        let cwd = FileManager.default.currentDirectoryPath
+        let appMdPath = "\(cwd)/../mirroir-skills/patterns/apps/\(slug)/APP.md"
+        let content = try String(contentsOfFile: appMdPath, encoding: .utf8)
+        let extracted = AppMdSectioning.extract(content: content)
+        let appName = try XCTUnwrap(extracted.frontMatter["app"],
+            "\(slug) APP.md must declare app: in its front matter")
+        return try XCTUnwrap(
+            SimulatorSpecParser.parse(
+                sections: extracted.sections,
+                frontMatter: extracted.frontMatter,
+                appName: appName),
+            "\(slug) APP.md must declare a Simulator block")
     }
 }

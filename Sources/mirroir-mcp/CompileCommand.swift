@@ -92,8 +92,8 @@ enum CompileCommand {
         }
 
         let capture = ScreenCapture(bridge: bridge)
-        let input = InputSimulation(bridge: bridge)
         let realDescriber = ScreenDescriber(bridge: bridge, capture: capture)
+        let input = InputSimulation(bridge: bridge, pasteVerifier: realDescriber)
         let recordingDescriber = RecordingDescriber(wrapping: realDescriber)
 
         let executorConfig = StepExecutorConfig(
@@ -217,7 +217,7 @@ enum CompileCommand {
 
         // The screen the skill starts from, read before its first step runs: the one
         // moment every producer of a compiled skill fingerprints.
-        let fingerprint = startScreenFingerprint(describer: recordingDescriber)
+        let fingerprint = screenFingerprint(describer: recordingDescriber)
 
         for (index, step) in skill.steps.enumerated() {
             let startTime = CFAbsoluteTimeGetCurrent()
@@ -265,7 +265,7 @@ enum CompileCommand {
     }
 
     /// Fingerprint of the screen `describer` shows now, or nil when it reads nothing.
-    static func startScreenFingerprint(describer: ScreenDescribing) -> ScreenFingerprint? {
+    static func screenFingerprint(describer: ScreenDescribing) -> ScreenFingerprint? {
         guard let screen = describer.describe() else { return nil }
         return StructuralFingerprint.buildScreenFingerprint(
             elements: screen.elements, icons: screen.icons)
@@ -284,14 +284,15 @@ enum CompileCommand {
             if let lastResult = describer.lastResult,
                let match = ElementMatcher.findMatch(label: label, in: lastResult.elements) {
                 return .tap(x: match.element.tapX, y: match.element.tapY,
-                           confidence: match.element.confidence,
                            strategy: match.strategy.rawValue)
             }
             // No cached match: replay it live. A sleep would pass without tapping.
             return .passthrough()
 
         case .waitFor:
-            return .sleep(delayMs: elapsedMs)
+            // Replayed live: polls the screen until the element shows or its timeout
+            // passes. A recorded delay would pass without looking.
+            return .passthrough()
 
         case .assertVisible, .assertNotVisible:
             return .assertion(delayMs: elapsedMs)
@@ -314,7 +315,7 @@ enum CompileCommand {
             // two OCR lookups at runtime: both replay live through the normal executor.
             return .passthrough()
 
-        // Steps that are already OCR-free
+        // Steps with no screen lookup to pre-resolve: they replay live
         case .launch, .type, .pressKey, .swipe, .home, .openURL, .shake,
              .resetApp, .setNetwork, .screenshot, .switchTarget:
             return .passthrough()
@@ -378,7 +379,7 @@ enum CompileCommand {
         Usage: mirroir-mcp compile [options] <skill...>
 
         Run skills against a real device to capture coordinates and timing.
-        Produces .compiled.json files for OCR-free replay via `test`.
+        Produces .compiled.json files that `test` replays without AI, verifying each step.
 
         Arguments:
           <skill>             Skill name or .yaml file path (multiple allowed)

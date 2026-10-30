@@ -100,14 +100,14 @@ final class MockExplorerInput: InputProviding, @unchecked Sendable {
               durationMs: Int, cursorMode: CursorMode?) -> String? { nil }
     func longPress(x: Double, y: Double, durationMs: Int, cursorMode: CursorMode?) -> String? { nil }
     func doubleTap(x: Double, y: Double, cursorMode: CursorMode?) -> String? { nil }
-    func shake() -> TypeResult { TypeResult(success: true, warning: nil, error: nil) }
-    func typeText(_ text: String) -> TypeResult { TypeResult(success: true, warning: nil, error: nil) }
+    func shake() -> TypeResult { TypeResult(success: true, error: nil) }
+    func typeText(_ text: String) -> TypeResult { TypeResult(success: true, error: nil) }
 
     func pressKey(keyName: String, modifiers: [String]) -> TypeResult {
         lock.lock()
         defer { lock.unlock() }
         keyLog.append((key: keyName, modifiers: modifiers))
-        return TypeResult(success: true, warning: nil, error: nil)
+        return TypeResult(success: true, error: nil)
     }
 
     func launchApp(name: String) -> String? {

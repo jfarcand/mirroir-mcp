@@ -41,6 +41,10 @@ Env-var names are derived from the camelCase key by inserting `_` before every u
 | Setting | Default | Description |
 |---------|---------|-------------|
 | `keystrokeDelayUs` | `15000` | Delay between keystrokes in microseconds |
+| `pasteboardSyncUs` | `1500000` | Wait after writing the Mac pasteboard before `type_text` presses Cmd+V, so Universal Clipboard can carry it to the iPhone (microseconds) |
+| `pasteVerifyTimeoutUs` | `2000000` | Longest wait after Cmd+V for a pasted run to appear on screen; past it `type_text` fails instead of reporting success (microseconds) |
+| `pasteVerifyPollUs` | `250000` | Gap between OCR reads while waiting for a pasted run (microseconds) |
+| `pasteVerifyWindowChars` | `6` | Trailing OCR-readable characters of the entered line, ending with the pasted run, that must appear on screen to count a paste as delivered |
 | `clickHoldUs` | `80000` | Click hold duration in microseconds |
 | `doubleTapHoldUs` | `40000` | Hold duration per tap in a double-tap gesture (microseconds) |
 | `doubleTapGapUs` | `50000` | Gap between taps in a double-tap (microseconds) |
@@ -73,8 +77,8 @@ Env-var names are derived from the camelCase key by inserting `_` before every u
 | `componentDetection` | `"llm_first_screen"` | Component detection mode: `"heuristic"`, `"llm_first_screen"`, `"llm_every_screen"`, `"llm_fallback"` |
 | `calibrationStrict` | `false` | Fail exploration if too many elements are unclassified after calibration |
 | `calibrationUnclassifiedThreshold` | `0.5` | Maximum fraction of unclassified content elements (0.0–1.0) before calibration fails |
-| `compiledTapMinConfidence` | `0.7` | Minimum confidence for compiled taps (below this, falls back to live OCR) |
-| `verifyTaps` | `false` | Follow compiled taps with a verification OCR call |
+| `compiledTapArrivalMinTexts` | `3` | Fewest multi-character structural texts the screen a coordinate-only (icon) tap leads to must hold. `record_step` refuses a barer destination and replay fails it, since such a screen cannot prove the tap worked |
+| `compiledTapPositionTolerance` | `5.0` | Points (per axis) a labeled compiled tap's element may sit from its recorded position and still be tapped there; farther away, replay taps the element where OCR finds it now. An element OCR cannot find fails the step |
 
 ## Keyboard Layout
 

@@ -46,10 +46,23 @@ extension TimingConstants {
     /// pasteboard back and confirm, so waiting is the only lever.
     public static let pasteboardSyncUs: UInt32 = 1_500_000
 
-    /// Delay after Cmd+V before the previous pasteboard contents are restored,
-    /// so the paste is consumed before the clipboard changes underneath it
-    /// (microseconds).
-    public static let pasteCommitUs: UInt32 = 250_000
+    /// Longest wait, after Cmd+V, for a pasted run to appear on screen before
+    /// `type_text` reports it undelivered (microseconds). The pasteboard sync
+    /// has already been waited for, so a paste that lands shows up within a
+    /// frame or two; one still missing after this has not landed.
+    public static let pasteVerifyTimeoutUs: UInt32 = 2_000_000
+
+    /// Gap between OCR reads while waiting for a pasted run (microseconds).
+    /// Each read is a full capture plus text recognition, so polling faster
+    /// than this mostly re-reads the same frame.
+    public static let pasteVerifyPollUs: UInt32 = 250_000
+
+    /// How many trailing OCR-readable characters of the entered line — ending
+    /// with the pasted run — must appear on screen to count a paste as
+    /// delivered. Long enough that a lone glyph like `<` is checked with the
+    /// text before it, short enough to stay inside a field that scrolls or a
+    /// line that wraps.
+    public static let pasteVerifyWindowChars: Int = 6
 
     /// Gap between successive captures while waiting for the screen to settle
     /// (microseconds). One mirroring frame at 60fps is ~16ms; polling slower

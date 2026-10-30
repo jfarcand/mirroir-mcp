@@ -113,7 +113,7 @@ mirroir-mcp/
 │   │   │
 │   │   │── # ── Compiled Skills (zero-OCR replay) ──
 │   │   ├── CompiledSkill.swift      # Compiled skill data model + SHA-256
-│   │   ├── CompiledStepExecutor.swift # Replay compiled steps (zero OCR)
+│   │   ├── CompiledStepExecutor.swift # Replay compiled steps (OCR-verified)
 │   │   ├── TestRunnerCompiled.swift # Test compiled skills
 │   │   │
 │   │   │── # ── Test Runner & Recording ──

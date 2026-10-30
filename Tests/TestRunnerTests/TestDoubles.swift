@@ -63,9 +63,9 @@ final class StubInput: InputProviding, @unchecked Sendable {
     var dragResult: String?
     var longPressResult: String?
     var doubleTapResult: String?
-    var shakeResult = TypeResult(success: true, warning: nil, error: nil)
-    var typeTextResult = TypeResult(success: true, warning: nil, error: nil)
-    var pressKeyResult = TypeResult(success: true, warning: nil, error: nil)
+    var shakeResult = TypeResult(success: true, error: nil)
+    var typeTextResult = TypeResult(success: true, error: nil)
+    var pressKeyResult = TypeResult(success: true, error: nil)
     var launchAppResult: String?
     var openURLResult: String?
     var tapCalls: [(x: Double, y: Double)] = []

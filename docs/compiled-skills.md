@@ -1,6 +1,6 @@
 # Compiled Skills
 
-JIT compilation for UI automation. A compiled skill eliminates OCR from navigation by capturing coordinates, timing, and scroll sequences during a learning run. The compiled file is self-contained — executable without AI, pure input injection plus timing. The one exception is assertion steps, which re-run a real OCR check on replay to actually verify the screen state. Like compiling source to machine code. Compilation works with both YAML and SKILL.md skill formats.
+JIT compilation for UI automation. A compiled skill captures coordinates, timing, and scroll sequences during a learning run, so replay needs no AI and no element search beyond one check per step. Replay is never blind: a step that did not do what it says fails. A labeled tap checks its element by OCR before tapping, a tap recorded by coordinates alone must reach the screen it reached when recorded, `wait_for` polls the screen live, `scroll_to` requires its target on screen after the recorded swipes, and assertions re-run their OCR check. Compilation works with both YAML and SKILL.md skill formats.
 
 ## The Problem
 
@@ -10,9 +10,9 @@ For regression suites running dozens of skills, OCR dominates the total runtime.
 
 ## The Solution: Compile Once, Replay Forever
 
-Run the skill once against a real device. The compiler observes everything — which element matched, at what coordinates, with what confidence, how long each `wait_for` took, how many scrolls `scroll_to` needed. It saves all of this into a `.compiled.json` file alongside the source skill file.
+Run the skill once against a real device. The compiler observes everything — which element matched, at what coordinates, how long each `wait_for` took, how many scrolls `scroll_to` needed. It saves all of this into a `.compiled.json` file alongside the source skill file.
 
-On subsequent runs, the test runner detects the compiled file and replays the skill using cached data: no OCR for a step with a recorded hint, no AI. Assertions still re-run OCR, and a step recorded without a hint (`passthrough`) runs live.
+On subsequent runs, the test runner detects the compiled file and replays the skill using cached data, with no AI. Every step is still checked against the screen: a labeled tap or `scroll_to` makes one OCR read to verify its element, assertions re-run OCR, and `wait_for` and every `passthrough` step run live.
 
 ```
 Source:     apps/settings/check-about.md (or .yaml)
@@ -27,7 +27,7 @@ There are two ways to compile a skill: AI-driven compilation (recommended) and C
 
 When an AI agent executes a skill via MCP tools, it already has all the data needed for compilation — tap coordinates from `describe_screen`, timing from step execution, scroll counts from `scroll_to`. Two MCP tools let the AI report this data back to the server:
 
-1. **`record_step`** — called after each step with the step index, type, label, and observed data (coordinates, timing, scroll counts)
+1. **`record_step`** — called after each step with the step index, type, label, and observed data (coordinates, timing, scroll counts). For a tap with coordinates and no label, it also reads the settled screen the tap led to and stores it as the hint's `arrivalFingerprint`; the step is refused when that screen cannot be read, shows fewer than `compiledTapArrivalMinTexts` labels, or a later step is already recorded (the screen on display is then not the tap's destination)
 2. **`save_compiled`** — called after all steps complete, writes the `.compiled.json` file
 
 The first AI execution IS the compilation. No separate learning run needed.
@@ -36,8 +36,9 @@ The first AI execution IS the compilation. No separate learning run needed.
 
 1. AI calls `get_skill("check-about")` before running step 1 — response includes compilation status, and the server fingerprints the current screen (local OCR) as the screen the skill starts from
 2. If `[Not compiled]` or `[Compiled: stale]`, the AI calls `record_step` after each step:
-   - **tap** steps: includes `tap_x`, `tap_y`, `confidence`, `match_strategy` from `describe_screen`
-   - **wait_for** / **assert** steps: includes `elapsed_ms` (approximate time waited)
+   - **tap** steps: includes `tap_x`, `tap_y`, `match_strategy` from `describe_screen`
+   - **assert** steps: includes `elapsed_ms` (approximate time waited)
+   - **wait_for** steps: just index, type, and label (they replay live, polling for the element)
    - **scroll_to** steps: includes `scroll_count` and `scroll_direction`
    - **launch**, **type**, **press_key**, **target**, **long_press**, **drag**, etc.: just index, type, and label
    - every step's `label` is its value as the skill writes it (`l+command`, `"Photo" duration: 1500`, `{ kind: ios, app: "Notes" }`): a SKILL.md replays from these. `record_step` records every step, and notes when `mirroir test` cannot replay one (a tool with no skill step type, such as `press_back`); that skill is then refused by `mirroir test` with the reason
@@ -46,11 +47,11 @@ The first AI execution IS the compilation. No separate learning run needed.
 5. Next `get_skill("check-about")` returns `[Compiled: fresh]` — AI skips compilation
 
 The server derives `compiledAction` from the reported data:
-- `tap` + coordinates → `.tap` (direct coordinate replay)
-- `wait_for` + elapsed time → `.sleep` (timed delay)
+- `tap` + coordinates → `.tap` (a labeled tap is checked by OCR finding its element; a tap with no label records `arrivalFingerprint`, the screen it led to, which replay must reach)
+- `wait_for` → `.passthrough` (polls the screen live until the element shows or its timeout passes)
 - `assert_visible` / `assert_not_visible` → `.assertion` (timed delay **plus** a real re-OCR verification)
 - `scroll_to` + count/direction → `.scrollSequence` (replayed swipes)
-- `launch`, `type`, `press_key`, etc. → `.passthrough` (already OCR-free)
+- `launch`, `type`, `press_key`, etc. → `.passthrough` (run live; these need no OCR)
 - `tap` without coordinates, `target`, `long_press`, `drag` → `.passthrough` (run live by the normal executor)
 
 ### CLI Compilation (Alternative)
@@ -65,14 +66,14 @@ The CLI compiler:
 3. Fingerprints the screen before the first step runs: the screen the skill starts from
 4. Executes each step against the real device, exactly like `mirroir test`
 5. After each step, reads the cached OCR data to build `StepHints`:
-   - **tap** → captures exact (x, y) coordinates, confidence score, match strategy; a tap with no cached match is marked `passthrough`
+   - **tap** → captures exact (x, y) coordinates and match strategy; a tap with no cached match is marked `passthrough`
    - **long_press** → marked as `passthrough` (a compiled tap would replay it as a short tap)
-   - **wait_for** → captures elapsed time until the element appeared (`sleep`)
-   - **measure** → marked as `passthrough` (a sleep would pass without running its action or its `until` check)
+   - **wait_for** → marked as `passthrough` (a recorded delay would pass without looking at the screen; live, it polls until the element shows or its timeout passes)
+   - **measure** → marked as `passthrough` (a recorded delay would pass without running its action or its `until` check)
    - **assert_visible** / **assert_not_visible** → compiles to an `assertion` (records the observed delay, then re-runs real OCR verification on replay)
    - **scroll_to** → captures number of scrolls and direction used
    - **drag** → marked as `passthrough` (needs two runtime OCR lookups, so it is not pre-resolved)
-   - **launch, type, swipe, press_key, home, shake, open_url, reset_app, set_network, target** → marked as `passthrough` (already OCR-free)
+   - **launch, type, swipe, press_key, home, shake, open_url, reset_app, set_network, target** → marked as `passthrough` (nothing to pre-resolve; a `type` that pastes still OCR-confirms each paste)
    - **screenshot** → marked as `passthrough` (still captures, useful for verification)
 6. Saves the compiled JSON with a SHA-256 hash of the source skill
 
@@ -86,13 +87,14 @@ The test runner auto-detects `check-about.compiled.json` and uses it:
 
 | Compiled Action | What Happens on Replay |
 |----------------|----------------------|
-| `tap` | Direct `input.tap(x, y)` at cached coordinates — no OCR. If the cached confidence is below `compiledTapMinConfidence`, replay falls back to live OCR for that step |
-| `sleep` | `usleep(observedDelayMs + sleep buffer)` — no polling |
+| `tap` | A labeled tap reads the screen once. Its element within `compiledTapPositionTolerance` points (per axis) of the recorded spot → `input.tap(x, y)` at the cached coordinates. Found elsewhere → tapped where it is now, and the step message names both positions. Not found → the step **fails** without tapping. A tap recorded by coordinates alone (an icon with no text) has nothing to find before it, so it is checked after: replay reads the screen first and does not tap when it already matches `arrivalFingerprint` (the screen the tap reached when recorded), since then even a dropped tap would look right. Otherwise it taps the cached coordinates and polls until the screen matches `arrivalFingerprint`, up to the `wait_for` timeout, else the step **fails**. Screens are compared on their multi-character structural texts (keyboard letters do not count); a destination with fewer than `compiledTapArrivalMinTexts` of them, or no recorded `arrivalFingerprint`, fails without tapping |
 | `assertion` | `usleep(observedDelayMs + sleep buffer)`, then delegates to the normal `StepExecutor` for a real OCR `assert_visible` / `assert_not_visible` check |
-| `scroll_sequence` | Replay exact N swipes in the recorded direction |
-| `passthrough` | Delegate to normal `StepExecutor` (step was already OCR-free) |
+| `scroll_sequence` | Replay exact N swipes in the recorded direction, then read the screen: the target visible → pass. Missing → one extra swipe in the same direction and another read; still missing → the step **fails** |
+| `passthrough` | Delegate to normal `StepExecutor`, which runs the step live (`wait_for` polls until its element shows or its timeout passes) |
 
-The sleep buffer defaults to 200ms but is configurable via `compiledSleepBufferMs` in `EnvConfig`.
+A `tap` or `scroll_sequence` hint paired with a different kind of step (a compiled file that no longer describes its skill) fails that step and asks for a recompile.
+
+The assertion sleep buffer defaults to 200ms but is configurable via `compiledSleepBufferMs` in `EnvConfig`.
 
 To force full OCR and ignore compiled files:
 
@@ -104,7 +106,7 @@ mirroir test --no-compiled apps/settings/check-about
 
 ```json
 {
-  "version": 3,
+  "version": 5,
   "source": {
     "sha256": "a1b2c3...",
     "compiledAt": "2026-02-19T14:30:00Z"
@@ -129,7 +131,6 @@ mirroir test --no-compiled apps/settings/check-about
         "compiledAction": "tap",
         "tapX": 205.0,
         "tapY": 340.5,
-        "confidence": 0.98,
         "matchStrategy": "exact"
       }
     },
@@ -137,10 +138,7 @@ mirroir test --no-compiled apps/settings/check-about
       "index": 2,
       "type": "wait_for",
       "label": "About",
-      "hints": {
-        "compiledAction": "sleep",
-        "observedDelayMs": 1200
-      }
+      "hints": { "compiledAction": "passthrough" }
     },
     {
       "index": 3,
@@ -231,7 +229,7 @@ After all steps → AI calls save_compiled(skill_name)
   ↓
 Server builds CompiledSkill, writes .compiled.json next to source
   ↓
-mirroir test can now replay with zero OCR
+mirroir test can now replay without AI, verifying each step
 ```
 
 ### CLI Compilation (via mirroir compile)
@@ -254,13 +252,12 @@ mirroir test can now replay with zero OCR
 │  mirroir test (with compiled)                   │
 │                                                 │
 │  CompiledStepExecutor                           │
-│    tap        → input.tap(x, y)                 │
-│    sleep      → usleep(ms + buffer)             │
+│    tap        → OCR check, then input.tap(x, y) │
 │    assertion  → usleep + StepExecutor (re-OCR)  │
-│    scroll_seq → N × input.swipe(...)            │
-│    passthrough→ StepExecutor (normal)           │
+│    scroll_seq → N × input.swipe + OCR check     │
+│    passthrough→ StepExecutor (live, wait_for)   │
 │                                                 │
-│  Zero AI. Zero OCR except assertion re-checks.  │
+│  Zero AI. A step the screen does not show fails.│
 └─────────────────────────────────────────────────┘
 ```
 
@@ -274,10 +271,11 @@ mirroir test can now replay with zero OCR
 | `Sources/mirroir-mcp/RecordingDescriber.swift` | Decorator that caches OCR results during CLI compilation |
 | `Sources/mirroir-mcp/CompileCommand.swift` | CLI `compile` subcommand orchestration |
 | `Sources/mirroir-mcp/SkillFileLoader.swift` | Loads a skill for `test`/`compile`: YAML from its steps, SKILL.md from its `.compiled.json` |
-| `Sources/mirroir-mcp/CompiledStepExecutor.swift` | Replays compiled steps with zero OCR |
+| `Sources/mirroir-mcp/CompiledStepExecutor.swift` | Replays compiled steps from their hints, verifying each on the live screen |
 | `Tests/MCPServerTests/CompilationToolsTests.swift` | AI-driven compilation session, hint derivation, I/O tests |
 | `Tests/TestRunnerTests/CompiledSkillTests.swift` | JSON round-trip, staleness, path derivation tests |
-| `Tests/TestRunnerTests/CompiledStepExecutorTests.swift` | Compiled tap, sleep, scroll, passthrough tests |
+| `Tests/TestRunnerTests/CompiledStepExecutorTests.swift` | Coordinate-only tap, assertion, scroll, passthrough tests |
+| `Tests/TestRunnerTests/CompiledReplayVerificationTests.swift` | Replay verification: labeled tap at spot / moved / absent, live `wait_for`, `scroll_to` target check |
 
 ## Design Rationale
 
@@ -289,4 +287,6 @@ mirroir test can now replay with zero OCR
 
 **Why does `mirroir test` never rewrite a compiled file?** A test run that re-recorded its own baseline whenever the screen changed would accept every change it was meant to catch, and the change would never reach the report or the exit code. Hard staleness (`stale`) means the source skill, window dimensions, or format version changed — the cached coordinates are no longer trustworthy and the safe move is a full-OCR run. Recompiling is an explicit act: `mirroir compile`, or an AI that records the steps again when `get_skill` answers `[Compiled: stale]`.
 
-**Why a configurable sleep buffer (default 200ms) instead of adaptive?** Simplicity. The buffer covers minor timing variance between runs and defaults to 200ms, overridable via `compiledSleepBufferMs`. If a particular step needs more time, edit the YAML to add an explicit `wait_for` before the sensitive step and recompile.
+**Why a configurable assertion sleep buffer (default 200ms) instead of adaptive?** Simplicity. The buffer covers minor timing variance between runs and defaults to 200ms, overridable via `compiledSleepBufferMs`. If a particular step needs more time, edit the YAML to add an explicit `wait_for` before the sensitive step and recompile: a `wait_for` polls live, so it waits exactly as long as the screen needs.
+
+**Why does replay still read the screen?** A replay that taps recorded coordinates and sleeps recorded delays passes whether or not the app did anything: a moved button, a slow screen, or a different page all pass silently. One OCR read per labeled tap and per `scroll_to` is the price of a step that fails when the screen does not show what it says. Compiled replay still saves the search: no AI, no scrolling hunt, and no waiting longer than the screen needs.

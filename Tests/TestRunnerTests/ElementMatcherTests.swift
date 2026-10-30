@@ -194,4 +194,24 @@ final class ElementMatcherTests: XCTestCase {
         XCTAssertEqual(result?.element.tapX, 150.0)
         XCTAssertEqual(result?.element.tapY, 300.0)
     }
+
+    // MARK: - Nearest to an anchor
+
+    func testAnchorPicksTheNearestOfSeveralMatches() {
+        let elements = [makeTapPoint(text: "Alarmes", x: 93, y: 155),
+                        makeTapPoint(text: "Alarmes", x: 164, y: 857)]
+        XCTAssertEqual(ElementMatcher.findMatch(label: "Alarmes", in: elements)?.element.tapY, 155,
+                       "without an anchor the first match in reading order wins")
+        XCTAssertEqual(ElementMatcher.findMatch(label: "Alarmes", in: elements,
+                                                nearestTo: (164, 850))?.element.tapY, 857)
+    }
+
+    func testAnchorNeverPromotesAWeakerStrategy() {
+        // An exact match far away still beats a substring match at the anchor.
+        let elements = [makeTapPoint(text: "Alarmes", x: 93, y: 155),
+                        makeTapPoint(text: "Alarmes du matin", x: 164, y: 857)]
+        let result = ElementMatcher.findMatch(label: "Alarmes", in: elements, nearestTo: (164, 857))
+        XCTAssertEqual(result?.element.tapY, 155)
+        XCTAssertEqual(result?.strategy, .exact)
+    }
 }

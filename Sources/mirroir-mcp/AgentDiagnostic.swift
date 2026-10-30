@@ -69,8 +69,8 @@ enum AgentDiagnostic {
             return diagnoseTap(compiledStep: compiledStep, matchLabel: matchLabel, hints: hints,
                                screen: screen, failureMessage: failureMessage,
                                screenshot: screenshot)
-        case .sleep, .assertion:
-            return diagnoseSleep(compiledStep: compiledStep, matchLabel: matchLabel, hints: hints,
+        case .assertion:
+            return diagnoseAssertion(compiledStep: compiledStep, matchLabel: matchLabel, hints: hints,
                                  screen: screen, failureMessage: failureMessage,
                                  screenshot: screenshot)
         case .scrollSequence:
@@ -99,11 +99,13 @@ enum AgentDiagnostic {
         let compiledY = hints.tapY ?? 0
 
         // Check if the target element is still on screen but at different coordinates
-        if let match = ElementMatcher.findMatch(label: matchLabel, in: screen.elements) {
+        if let match = ElementMatcher.findMatch(label: matchLabel, in: screen.elements,
+                                               nearestTo: (compiledX, compiledY)) {
             let dx = abs(match.element.tapX - compiledX)
             let dy = abs(match.element.tapY - compiledY)
 
-            if dx < 5 && dy < 5 {
+            let tolerance = EnvConfig.compiledTapPositionTolerance
+            if dx <= tolerance && dy <= tolerance {
                 return Recommendation(
                     stepIndex: compiledStep.index,
                     stepType: compiledStep.type,
@@ -139,9 +141,9 @@ enum AgentDiagnostic {
         )
     }
 
-    // MARK: - Sleep Diagnosis (wait_for / assert_visible)
+    // MARK: - Assertion Diagnosis (assert_visible / assert_not_visible)
 
-    private static func diagnoseSleep(
+    private static func diagnoseAssertion(
         compiledStep: CompiledStep,
         matchLabel: String,
         hints: StepHints,
@@ -151,15 +153,15 @@ enum AgentDiagnostic {
     ) -> Recommendation {
         let label = compiledStep.label ?? ""
 
-        // For assert_visible compiled as sleep — check if element is actually visible
-        if compiledStep.type == "assert_visible" || compiledStep.type == "wait_for" {
+        // An assert_visible that failed: is the element on screen now?
+        if compiledStep.type == "assert_visible" {
             if ElementMatcher.isVisible(label: matchLabel, in: screen.elements) {
                 let delayMs = hints.observedDelayMs ?? 0
                 return Recommendation(
                     stepIndex: compiledStep.index,
                     stepType: compiledStep.type,
                     label: label,
-                    diagnosis: "Element \"\(label)\" IS visible — compiled sleep (\(delayMs)ms) may be too short. Increase observedDelayMs.",
+                    diagnosis: "Element \"\(label)\" IS visible — compiled assertion delay (\(delayMs)ms) may be too short. Increase observedDelayMs.",
                     patches: [
                         Patch(field: "observedDelayMs", was: "\(delayMs)",
                               shouldBe: "\(delayMs + 1000)")
@@ -173,7 +175,7 @@ enum AgentDiagnostic {
                 stepIndex: compiledStep.index,
                 stepType: compiledStep.type,
                 label: label,
-                diagnosis: "Element \"\(label)\" not visible after compiled sleep. Screen shows: \(visible.joined(separator: ", ")). Previous step may have navigated to wrong screen.",
+                diagnosis: "Element \"\(label)\" not visible after compiled assertion delay. Screen shows: \(visible.joined(separator: ", ")). Previous step may have navigated to wrong screen.",
                 patches: [],
                 screenshotBase64: screenshot
             )
@@ -205,7 +207,7 @@ enum AgentDiagnostic {
             stepIndex: compiledStep.index,
             stepType: compiledStep.type,
             label: label,
-            diagnosis: failureMessage ?? "Sleep step failed",
+            diagnosis: failureMessage ?? "Assertion step failed",
             patches: [],
             screenshotBase64: screenshot
         )
