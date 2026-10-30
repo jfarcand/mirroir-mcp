@@ -14,6 +14,9 @@ import Vision
 /// using a YOLO CoreML model via `VNCoreMLRequest`. Class labels become the `text`
 /// field of `RawTextElement`, enabling element-type detection alongside Vision OCR.
 struct CoreMLElementDetector: Sendable {
+    /// The model's class label for an icon, carried as the element's `text`.
+    static let iconLabel = "icon"
+
     private let modelURL: URL
     private let confidenceThreshold: Float
 

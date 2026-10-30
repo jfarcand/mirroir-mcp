@@ -135,6 +135,7 @@ mod tests {
     use super::*;
     use crate::parser::lockfile::{LockedArchetype, LockedOrigin, ResolvedRecord};
     use crate::parser::mirroir::parse_mirroir_config;
+    use crate::parser::version::ArtifactKind;
 
     type TestResult = StdResult<(), Box<dyn StdError>>;
 
@@ -154,7 +155,7 @@ plan:
 
     fn empty_lockfile() -> Lockfile {
         Lockfile {
-            version: 1,
+            version: ArtifactKind::Lockfile.current(),
             generated_at: Utc::now(),
             generated_by: "test".to_owned(),
             archetypes: Vec::new(),

@@ -2,7 +2,8 @@
 
 This document is the canonical reference for the YAML grammar `mirroir-run`
 parses. Every `SkillStep` variant is listed below with the YAML shape and its
-dispatch target (process / http / web / oracle / unwired). Which run path
+dispatch target (process / http / web / ios / oracle), or the plan-time
+refusal for a step no target can run. Which run path
 exercises a step end-to-end depends on the invocation flag
 (`--sample` / `--validate` / `--run-scenario` / `--emit playwright` /
 `--diff-text`).
@@ -41,6 +42,37 @@ other metric falls through to the sample's `APP.md` `drift_defaults:` block and
 then to the `drift-defaults.yaml` on the search path. A metric no layer
 declares fails the run by name rather than defaulting — see the README's
 "The three verdicts" section.
+
+### Versioning
+
+Every artifact the runner loads carries a root `version:` — scenarios,
+`SAMPLE.md`, `mirroir.yaml`, `mirroir.local.yaml`, `mirroir.lock`,
+`archetype.md`, `drift-defaults.yaml`, `oracles/profiles.yaml`, the `APP.md`
+block read for `drift_defaults:`, `.harness/last-green.json`, and the compose
+cache's `.compose-manifest.json`. One seam gates them all
+(`runner/src/parser/version.rs`):
+
+- `version: 1` (an integer) is the canonical form and means major 1, minor 0.
+  A quoted `"MAJOR.MINOR"` string such as `"1.2"` carries a minor. A bare
+  YAML float (`1.2`) is refused, because `1.10` would read back as `1.1`.
+- The binary supports majors `1..=1` for every artifact. Any other major is a
+  hard `UnsupportedVersion` error naming the artifact, the file, the version
+  found, and the supported range. The version is read *before* the rest of
+  the file, so a newer major that also adds keys reports the version, not the
+  keys.
+- At a minor this binary knows (`1`, `"1.0"`), a key the schema does not
+  define is an `UnknownFields` error that lists every unknown key by its
+  dotted path (`steps.2.tap.lable`) — nested keys included. Typos fail loudly.
+- At a newer minor (`"1.1"` read by a binary that knows `1.0`), unknown keys
+  are what that minor added: they are ignored and logged as a warning.
+- `APP.md` shares its root with other tools (`app`, `archetype`, `locale`, …),
+  so its unknown top-level keys are not the runner's to judge; keys under
+  `drift_defaults:` are still checked.
+- The compose cache is rebuilt, not refused, when its manifest is from an
+  unsupported major.
+- The run summary the runner *writes* and the Playwright report JSON it reads
+  are not gated: the first is never loaded back, the second is Playwright's
+  shape and carries no version key.
 
 ---
 
@@ -337,8 +369,11 @@ fails with `ScenarioNothingEvaluated`.
 ## Device-level steps (inside an `ios` block)
 
 Inside an `ios` block these run on the phone, through `mirroir-mcp test`.
-Anywhere else they have nothing to drive: they parse, are logged as "no replay
-dispatch for this step kind; skipping", and count toward no verdict.
+Anywhere else there is no device to drive, so the plan refuses the scenario
+before anything runs: a phone-only step before any `ios` block opens is
+`IosError::DeviceStepOutsideIosBlock`, and one after the `ios` block has ended
+is `RunnerError::BlockNotContiguous`. Move the step inside the block, after its
+`target:`.
 
 ```yaml
 - launch: "Expo Go"
@@ -396,8 +431,10 @@ both.
 
 ### `condition`
 
-Branch on visibility of a label. The runner does **not** yet dispatch
-condition; it parses for grammar compatibility.
+Branch on visibility of a label. The grammar parses it, but no executor in
+the runner checks `if_visible`, so neither branch could run: the plan refuses
+any scenario holding one with `RunnerError::ConditionHasNoEvaluator`. Write the
+branch the run must take as plain steps.
 
 ```yaml
 - condition:
@@ -546,4 +583,4 @@ Errors (`CrossSurfaceError`): `TooFewFiles`, `CaptureTargetNotListed`,
 | `judge` | `oracle::judge` | OpenAI-compatible chat completions |
 | `cross_surface` | `oracle::drift` | Jaccard over `Fingerprint` |
 | `report` | `replay_step` | Applies the declared verdict to the scenario. |
-| `launch`, `home`, `shake`, `reset_app`, `set_network` outside an ios block, `condition` | unwired | Parse and skip; logged. |
+| `launch`, `home`, `shake`, `reset_app`, `set_network` outside an ios block, `condition` | none | Refused at plan time: `DeviceStepOutsideIosBlock` (before the ios block), `BlockNotContiguous` (after it ended), `ConditionHasNoEvaluator` (`condition`). |

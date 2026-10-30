@@ -24,6 +24,9 @@ mod accept;
 mod baseline_coverage;
 mod compile;
 mod cross_surface_error;
+/// Test-only: the emitter → runner seam with mirroir-mcp's `generate_skill`.
+#[cfg(test)]
+mod emitted_scenario_contract;
 mod error;
 mod ios_error;
 mod mirroir;

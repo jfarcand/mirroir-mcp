@@ -79,7 +79,8 @@ enum GraphPathFinder {
                 actionType: nil,
                 arrivedVia: nil,
                 displayLabel: nil,
-                screenshotBase64: rootNode.screenshotBase64
+                screenshotBase64: rootNode.screenshotBase64,
+                scrolledElementCount: rootNode.scrolledElementCount
             ))
         }
 
@@ -93,7 +94,8 @@ enum GraphPathFinder {
                     actionType: edge.actionType,
                     arrivedVia: edge.elementText,
                     displayLabel: edge.displayLabel,
-                    screenshotBase64: node.screenshotBase64
+                    screenshotBase64: node.screenshotBase64,
+                    scrolledElementCount: node.scrolledElementCount
                 ))
             }
         }

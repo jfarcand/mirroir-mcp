@@ -211,14 +211,15 @@ mod tests {
     use std::result::Result as StdResult;
 
     use super::*;
-    use crate::parser::sample::{Boot, SAMPLE_SCHEMA_VERSION, Scenarios, Session};
+    use crate::parser::sample::{Boot, Scenarios, Session};
+    use crate::parser::version::ArtifactKind;
     use crate::replay::load_sample_manifest_with_extras;
 
     type TestResult = StdResult<(), Box<dyn StdError>>;
 
     fn manifest_with_boot(boot: Boot) -> SampleManifest {
         SampleManifest {
-            version: SAMPLE_SCHEMA_VERSION,
+            version: ArtifactKind::Sample.current(),
             name: None,
             description: None,
             session: Session {

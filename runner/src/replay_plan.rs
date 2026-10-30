@@ -6,9 +6,11 @@ use std::ops::Range;
 use crate::error::{Result, RunnerError};
 use crate::parser::step::{SkillStep, TargetArgs, TargetKind};
 use crate::parser::step_args::CaptureSurface;
-use crate::parser::surface::{is_annotation, is_device_step, is_web, step_kind};
+use crate::parser::surface::{is_annotation, is_device_step, is_web};
 use crate::replay_cross_surface::validate_cross_surface;
-use crate::replay_target::{check_ios_block, check_target, no_web_target};
+use crate::replay_target::{
+    block_not_contiguous, check_hook, check_ios_block, check_target, no_web_target,
+};
 
 /// One unit of a scenario's execution, in the order the file reads.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -34,6 +36,8 @@ pub enum Segment {
 /// steps of its surface that follow the `target:` and ends at the first
 /// runner-side step; everything outside a block is a hook, dispatched in Rust
 /// in file order. A hook after a block reads the values the block attached.
+/// A step that only a device block can run, or that nothing here evaluates,
+/// is never a hook: the plan refuses it instead of letting it pass unrun.
 ///
 /// Annotation steps (`remember:`) are transparent: one between two web steps
 /// rides along inside the web block, and one anywhere else is a hook. Inside
@@ -56,6 +60,11 @@ impl ScenarioPlan {
     ///   step (`remember:`) sits between two steps of an `ios` block.
     /// * [`RunnerError::NoWebTarget`] when device steps appear before any
     ///   `target:` opens a block for them.
+    /// * [`crate::ios_error::IosError::DeviceStepOutsideIosBlock`] when a
+    ///   phone-only step (`launch:`, `home:`, `shake:`, `reset_app:`,
+    ///   `set_network:`) appears before any `ios` block opens.
+    /// * [`RunnerError::ConditionHasNoEvaluator`] for a `condition:`: nothing
+    ///   here checks `if_visible`, so its branches would never run.
     /// * [`RunnerError::BlockNotContiguous`] when a device step follows a
     ///   runner-side step that already ended its block — re-entering the
     ///   surface would mean a second invocation with a fresh session, its
@@ -75,10 +84,10 @@ impl ScenarioPlan {
             let step = &steps[index];
             if let SkillStep::Target(target) = step {
                 check_target(index, target)?;
-                if let Some(first) = opening_index(&segments, target.kind) {
+                if let Some(first) = opened_block(&segments, target.kind) {
                     return Err(RunnerError::SurfaceDeclaredTwice {
                         surface: target.kind,
-                        first,
+                        first: first.start,
                         index,
                     });
                 }
@@ -96,6 +105,7 @@ impl ScenarioPlan {
             if is_web(step) {
                 return Err(device_step_outside_a_block(steps, &segments, index));
             }
+            check_hook(steps, index, opened_block(&segments, TargetKind::Ios))?;
             segments.push(Segment::Hook(index));
             index += 1;
         }
@@ -158,10 +168,10 @@ impl ScenarioPlan {
     }
 }
 
-/// Index of the `target:` that already opened a `kind` block, if one did.
-fn opening_index(segments: &[Segment], kind: TargetKind) -> Option<usize> {
+/// The range of the `kind` block already planned, if one opened.
+fn opened_block(segments: &[Segment], kind: TargetKind) -> Option<Range<usize>> {
     segments.iter().find_map(|segment| match segment {
-        Segment::Block { kind: k, range } if *k == kind => Some(range.start),
+        Segment::Block { kind: k, range } if *k == kind => Some(range.clone()),
         _ => None,
     })
 }
@@ -194,303 +204,15 @@ fn device_step_outside_a_block(
     index: usize,
 ) -> RunnerError {
     let last_block = segments.iter().rev().find_map(|segment| match segment {
-        Segment::Block { kind, range } => Some((*kind, range.end)),
+        Segment::Block { kind, range } => Some((*kind, range.clone())),
         Segment::Hook(_) => None,
     });
     match last_block {
-        Some((surface, end)) => RunnerError::BlockNotContiguous {
-            index,
-            kind: step_kind(&steps[index]),
-            surface,
-            block_end: end - 1,
-            separator_kind: steps.get(end).map_or("<end>", step_kind),
-        },
+        Some((surface, block)) => block_not_contiguous(steps, index, surface, &block),
         None => no_web_target(steps),
     }
 }
 
 #[cfg(test)]
-mod tests {
-    use std::fmt::Write as _;
-    use std::result::Result as StdResult;
-
-    use serde_norway::Deserializer;
-    use serde_norway::with::singleton_map_recursive;
-
-    use super::{ScenarioPlan, Segment};
-    use crate::error::RunnerError;
-    use crate::parser::scenario::Scenario;
-    use crate::parser::step::TargetKind;
-
-    type TestResult = StdResult<(), String>;
-
-    fn steps(yaml: &str) -> StdResult<Scenario, String> {
-        singleton_map_recursive::deserialize(Deserializer::from_str(yaml))
-            .map_err(|e| format!("parse: {e}"))
-    }
-
-    /// The plan as `hook 0, web 1..3, …` — one assertion per scenario shape.
-    fn render(yaml: &str) -> StdResult<String, String> {
-        let scenario = steps(yaml)?;
-        let plan = ScenarioPlan::build(&scenario.steps).map_err(|e| format!("build: {e}"))?;
-        let mut out = String::new();
-        for segment in plan.segments() {
-            if !out.is_empty() {
-                out.push_str(", ");
-            }
-            match segment {
-                Segment::Hook(i) => write!(out, "hook {i}"),
-                Segment::Block { kind, range } => {
-                    write!(out, "{kind} {}..{}", range.start, range.end)
-                }
-            }
-            .map_err(|e| e.to_string())?;
-        }
-        Ok(out)
-    }
-
-    fn build_error(yaml: &str) -> StdResult<RunnerError, String> {
-        let scenario = steps(yaml)?;
-        match ScenarioPlan::build(&scenario.steps) {
-            Err(error) => Ok(error),
-            Ok(plan) => Err(format!("expected a refusal, got {:?}", plan.segments())),
-        }
-    }
-
-    /// Each shape and the plan it builds: hooks around the web block, a
-    /// scenario of hooks only, `launch:` outside an iOS block staying a hook,
-    /// and `remember:` riding inside a block or standing as a hook at either
-    /// end, never splitting the block.
-    #[test]
-    fn each_shape_builds_its_plan() -> TestResult {
-        let web = "  - target: { kind: web, url: \"http://x/\" }\n";
-        let cases = [
-            (
-                format!(
-                    "  - spawn: {{ id: s, command: \"echo hi\" }}\n{web}  - tap: \"Go\"\n  - http: {{ method: GET, url: \"http://x/\" }}\n  - kill: {{ id: s }}\n"
-                ),
-                "hook 0, web 1..3, hook 3, hook 4",
-            ),
-            (
-                "  - http: { method: GET, url: \"http://x/\" }\n  - report: pass\n".to_owned(),
-                "hook 0, hook 1",
-            ),
-            (
-                format!("  - launch: \"Acme\"\n{web}  - tap: \"Go\"\n"),
-                "hook 0, web 1..3",
-            ),
-            (
-                format!(
-                    "{web}  - assert_visible: \"Dashboard\"\n  - http: {{ method: GET, url: \"http://x/\" }}\n  - remember: \"done\"\n"
-                ),
-                "web 0..2, hook 2, hook 3",
-            ),
-            (
-                format!(
-                    "{web}  - remember: \"about to look\"\n  - assert_visible: \"Dashboard\"\n  - report: pass\n"
-                ),
-                "web 0..3, hook 3",
-            ),
-            (
-                format!("  - remember: \"first\"\n{web}  - assert_visible: \"Sign in\"\n"),
-                "hook 0, web 1..3",
-            ),
-        ];
-        for (body, expected) in cases {
-            let plan = render(&format!("version: 1\nname: shape\nsteps:\n{body}"))?;
-            if plan != expected {
-                return Err(format!("{body}\nplanned `{plan}`, expected `{expected}`"));
-            }
-        }
-        Ok(())
-    }
-
-    /// The shape the plan exists for: a web block, an iOS block carrying the
-    /// device-level verbs only a phone has, and the parity gate reading both.
-    #[test]
-    fn a_web_block_then_an_ios_block_then_the_gate() -> TestResult {
-        let plan = render(
-            r#"
-version: 1
-name: two surfaces
-steps:
-  - target: { kind: web, url: "http://x/" }
-  - assert_visible: "panel"
-  - target: { kind: ios, app: "Safari" }
-  - launch: "Safari"
-  - open_url: "http://x/"
-  - home:
-  - remember: "a note after the block is a hook"
-  - cross_surface:
-      captures:
-        - { surface: web, selector: "[data-test=panel]", to: "w.txt" }
-        - { surface: ios, to: "i.txt" }
-      response_files: ["w.txt", "i.txt"]
-      min_similarity: 0.5
-"#,
-        );
-        if cfg!(target_os = "macos") {
-            assert_eq!(plan?, "web 0..2, ios 2..6, hook 6, hook 7");
-        } else {
-            // Off macOS the iOS block has no executor, and says so by name.
-            let error = plan.err().unwrap_or_default();
-            if !error.contains("macOS host") {
-                return Err(format!("expected the macOS-host refusal, got {error}"));
-            }
-        }
-        Ok(())
-    }
-
-    #[test]
-    fn a_split_web_block_is_rejected_naming_the_offending_step() -> TestResult {
-        let error = build_error(
-            r#"
-version: 1
-name: split
-steps:
-  - target: { kind: web, url: "http://x/" }
-  - assert_visible: "Dashboard"
-  - http: { method: GET, url: "http://x/" }
-  - tap: "Again"
-"#,
-        )?;
-        match error {
-            RunnerError::BlockNotContiguous {
-                index: 3,
-                kind: "tap",
-                surface: TargetKind::Web,
-                block_end: 1,
-                separator_kind: "http",
-            } => Ok(()),
-            other => Err(format!("expected BlockNotContiguous, got {other:?}")),
-        }
-    }
-
-    /// A note between a runner step and a later web step does not launder the
-    /// web step back into the block.
-    #[test]
-    fn a_remember_does_not_launder_a_trailing_screenshot() -> TestResult {
-        let error = build_error(
-            "version: 1\nname: launder\nsteps:\n  - target: { kind: web, url: \"http://x/\" }\n  - assert_visible: \"Dashboard\"\n  - report: pass\n  - remember: \"note\"\n  - screenshot: \"after\"\n",
-        )?;
-        match error {
-            RunnerError::BlockNotContiguous {
-                index: 4,
-                kind: "screenshot",
-                ..
-            } => Ok(()),
-            other => Err(format!("expected BlockNotContiguous, got {other:?}")),
-        }
-    }
-
-    #[test]
-    fn a_target_kind_with_no_executor_is_rejected_naming_the_kind() -> TestResult {
-        let error = build_error(
-            "version: 1\nname: process\nsteps:\n  - target: { kind: process }\n  - report: pass\n",
-        )?;
-        match error {
-            RunnerError::NoExecutorForTargetKind {
-                index: 0,
-                kind: TargetKind::Process,
-            } => Ok(()),
-            other => Err(format!("expected NoExecutorForTargetKind, got {other:?}")),
-        }
-    }
-
-    #[test]
-    fn a_second_block_of_one_surface_is_rejected() -> TestResult {
-        let error = build_error(
-            "version: 1\nname: twice\nsteps:\n  - target: { kind: web, url: \"http://x/\" }\n  - tap: \"A\"\n  - report: pass\n  - target: { kind: web, url: \"http://y/\" }\n  - tap: \"B\"\n",
-        )?;
-        match error {
-            RunnerError::SurfaceDeclaredTwice {
-                surface: TargetKind::Web,
-                first: 0,
-                index: 3,
-            } => Ok(()),
-            other => Err(format!("expected SurfaceDeclaredTwice, got {other:?}")),
-        }
-    }
-
-    #[test]
-    fn web_steps_with_no_target_are_rejected() -> TestResult {
-        match build_error("version: 1\nname: no-target\nsteps:\n  - tap: \"Send\"\n")? {
-            RunnerError::NoWebTarget {
-                first_step: "tap",
-                declared: "none",
-            } => Ok(()),
-            other => Err(format!("expected NoWebTarget, got {other:?}")),
-        }
-    }
-
-    /// The `target:` opens the block: a device step before it would run before
-    /// the page is navigated.
-    #[test]
-    fn a_web_step_before_the_target_is_rejected() -> TestResult {
-        let error = build_error(
-            "version: 1\nname: late\nsteps:\n  - assert_visible: \"Dashboard\"\n  - target: { kind: web, url: \"http://x/\" }\n",
-        )?;
-        match error {
-            RunnerError::NoWebTarget {
-                first_step: "assert_visible",
-                declared: "web",
-            } => Ok(()),
-            other => Err(format!("expected NoWebTarget, got {other:?}")),
-        }
-    }
-
-    /// A capture from a surface the scenario never opens is refused at plan
-    /// time — `--validate` sees it, not only a run.
-    #[test]
-    fn a_capture_from_a_surface_with_no_block_is_a_plan_error() -> TestResult {
-        let error = build_error(
-            r#"
-version: 1
-name: no ios block
-steps:
-  - target: { kind: web, url: "http://x/" }
-  - assert_visible: "panel"
-  - cross_surface:
-      captures:
-        - { surface: ios, to: "i.txt" }
-      response_files: ["w.txt", "i.txt"]
-      min_similarity: 0.5
-"#,
-        )?;
-        if !error
-            .to_string()
-            .contains("opens no `target: { kind: ios }` block")
-        {
-            return Err(format!("wrong refusal: {error}"));
-        }
-        Ok(())
-    }
-
-    #[test]
-    fn the_plan_hands_the_compiler_the_target_that_opens_the_block() -> TestResult {
-        let scenario = steps(
-            "version: 1\nname: resolved\nsteps:\n  - spawn: { id: s, command: \"echo hi\" }\n  - target: { kind: web, url: \"http://x/\" }\n  - assert_visible: \"Dashboard\"\n",
-        )?;
-        let plan = ScenarioPlan::build(&scenario.steps).map_err(|e| format!("build: {e}"))?;
-        let target = plan
-            .web_target(&scenario.steps)
-            .map_err(|e| format!("web_target: {e}"))?;
-        assert_eq!(target.kind, TargetKind::Web);
-        assert_eq!(target.url.as_deref(), Some("http://x/"));
-        Ok(())
-    }
-
-    #[test]
-    fn a_scenario_with_no_web_block_has_no_target_to_compile() -> TestResult {
-        let scenario = steps(
-            "version: 1\nname: no-web\nsteps:\n  - http: { method: GET, url: \"http://x/\" }\n",
-        )?;
-        let plan = ScenarioPlan::build(&scenario.steps).map_err(|e| format!("build: {e}"))?;
-        match plan.web_target(&scenario.steps) {
-            Err(RunnerError::NoWebTarget {
-                first_step: "http", ..
-            }) => Ok(()),
-            other => Err(format!("expected NoWebTarget, got {:?}", other.map(|_| ()))),
-        }
-    }
-}
+#[path = "replay_plan_tests.rs"]
+mod tests;

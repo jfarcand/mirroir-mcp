@@ -10,11 +10,13 @@ use std::time::SystemTime;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
+use tracing::info;
 
 use crate::error::{Result, RunnerError};
 use crate::mirroir::compose::build_dir_for;
 use crate::mirroir::resolve::{ArchetypeOrigin, ResolvedArchetype};
 use crate::parser::mirroir::PlanEntry;
+use crate::parser::version::{self, ArtifactKind, SchemaVersion};
 
 /// Filename of the per-sample compose-provenance manifest.
 pub const COMPOSE_MANIFEST_FILE: &str = ".compose-manifest.json";
@@ -48,9 +50,24 @@ pub fn compose_needed(
         context: format!("read compose manifest {}", manifest_path.display()),
         source,
     })?;
-    let Ok(manifest) = serde_json::from_str::<ComposeManifest>(&raw) else {
-        // Corrupt manifest → recompose.
-        return Ok(true);
+    let label = manifest_path.display().to_string();
+    let manifest = match version::from_json_str::<ComposeManifest>(
+        ArtifactKind::ComposeManifest,
+        &label,
+        &raw,
+        |source| RunnerError::Io {
+            context: format!("parse compose manifest {label}"),
+            source: source.into(),
+        },
+    ) {
+        Ok(manifest) => manifest,
+        Err(err @ RunnerError::UnsupportedVersion { .. }) => {
+            // A cache another binary wrote: rebuild it rather than trust it.
+            info!(%err, "compose manifest is from an unsupported major; recomposing");
+            return Ok(true);
+        }
+        // Unreadable or unknown keys at a known minor → corrupt → recompose.
+        Err(_) => return Ok(true),
     };
 
     if manifest.instance.plan_entry_sha256 != hash_plan_entry(entry) {
@@ -201,8 +218,8 @@ fn optional_number<T: fmt::Display>(value: Option<T>) -> String {
 /// Provenance manifest emitted under `.build/<sample>/.compose-manifest.json`.
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ComposeManifest {
-    /// Manifest schema version.
-    pub version: u32,
+    /// Manifest schema version, gated by [`ArtifactKind::ComposeManifest`].
+    pub version: SchemaVersion,
     /// Timestamp the sample was composed at (fast-path mtime comparison anchor).
     pub composed_at: DateTime<Utc>,
     /// Archetype-side provenance (reference, version, source-file checksums).

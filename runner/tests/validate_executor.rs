@@ -198,3 +198,27 @@ fn a_web_block_then_an_ios_block_never_compiles_the_phone_into_the_browser() -> 
     }
     Ok(())
 }
+
+/// The emitter's shape with its `launch:` moved above the `target:`: the step
+/// has no `ios` block to carry it, so it would drive nothing. `--validate`
+/// refuses it naming the step, on every host — the refusal is the plan's, not
+/// the executor's.
+#[test]
+fn validate_rejects_a_launch_outside_the_ios_block() -> Result<(), String> {
+    let sandbox = Sandbox::new()?;
+    let scenario = sandbox.scenario(
+        "launch-first.yaml",
+        &IOS_SCENARIO
+            .replacen("  - launch: \"Acme\"\n", "", 1)
+            .replacen("steps:\n", "steps:\n  - launch: \"Acme\"\n", 1),
+    )?;
+    let validated = sandbox.run(&["--validate", &scenario])?;
+    let output = validated.output();
+    if !validated.is_failure() || !output.contains("step 0 (`launch`) drives an iPhone") {
+        return Err(format!(
+            "validate did not refuse the launch outside the ios block (exit {:?}).\n{output}",
+            validated.code
+        ));
+    }
+    Ok(())
+}

@@ -162,8 +162,9 @@ final class FakeMirroringIntegrationTests: XCTestCase {
     }
 
     func testTabBarLabelsGetTapOffset() {
-        // Switch to a scenario with a tab bar — Settings root has none.
-        IntegrationTestHelper.resetScenario(bridge: bridge, to: "Feed")
+        // Switch to a scenario with a tab bar — Settings root has none. Clock's
+        // pack declares four tabs, and the bar draws their names.
+        IntegrationTestHelper.resetScenario(bridge: bridge, to: "Clock")
         let describer = ScreenDescriber(bridge: bridge, capture: ScreenCapture(bridge: bridge))
         guard let result = describer.describe() else {
             XCTFail("describe() returned nil")
@@ -177,11 +178,14 @@ final class FakeMirroringIntegrationTests: XCTestCase {
         }
         let windowHeight = Double(info.size.height)
 
-        // FakeMirroring renders 5 tab bar labels ("Home", "Search", "Feed", "Chat", "Profile")
-        // in the bottom zone. TapPointCalculator classifies them as an icon row with
+        // FakeMirroring renders Clock's 4 tab labels in the bottom zone.
+        // TapPointCalculator classifies them as an icon row with
         // bottomZoneOffset (default 0), targeting textTopY directly.
-        let tabBarNames = Set(["Home", "Search", "Feed", "Chat", "Profile"])
-        let tabBarElements = result.elements.filter { tabBarNames.contains($0.text) }
+        let tabBarNames = Set(["World Clock", "Alarms", "Stopwatch", "Timers"])
+        // "Alarms" is also the screen title; only the bottom band is the bar.
+        let tabBarElements = result.elements.filter {
+            tabBarNames.contains($0.text) && $0.tapY > Double(info.size.height) * 0.8
+        }
 
         XCTAssertGreaterThanOrEqual(
             tabBarElements.count, 3,

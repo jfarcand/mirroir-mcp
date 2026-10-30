@@ -58,7 +58,7 @@ judge.response_drift (per step)
    ↓ falls back to
 scenario.yaml `drift:` block
    ↓ falls back to
-<sample>/APP.md `drift_defaults:` block
+<sample>/APP.md `drift_defaults:` block (the APP.md block needs `version: 1`)
    ↓ falls back to
 drift-defaults.yaml
 ```

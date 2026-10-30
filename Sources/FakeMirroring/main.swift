@@ -109,7 +109,7 @@ final class FakeScreenView: NSView {
 
         // Status bar and tab bar are fixed (not scrolled)
         drawStatusBar()
-        if content.hasTabBar { drawTabBar(style: content.tabBarStyle) }
+        if content.hasTabBar { drawTabBar(style: content.tabBarStyle, labels: content.tabLabels) }
 
         // Scrollable content area
         let ctx = NSGraphicsContext.current!.cgContext
@@ -205,6 +205,20 @@ final class FakeScreenView: NSView {
                 appSwitcherOverlay != nil ? "switcher" : "<home>")
         )
 
+        // App Switcher overlay: a swipe up from a card force-quits the underlying
+        // pack. Checked before drag and long-press handling: a swipe arrives as a
+        // held drag, and those paths would swallow it.
+        if let switcher = appSwitcherOverlay {
+            let upwardDelta = mouseDownPoint.y - clickPoint.y
+            if upwardDelta > 50, switcher.handleSwipeUp(at: mouseDownPoint) {
+                needsDisplay = true
+                return
+            }
+            // Tapping outside any card closes the overlay
+            switcher.close()
+            return
+        }
+
         // If actual mouseDragged events were received, finalize slider and exit.
         // Only use isDragging (set by mouseDragged handler), NOT distance heuristics.
         // In CI, mouseDown coordinates from convert(event.locationInWindow) can be
@@ -242,19 +256,6 @@ final class FakeScreenView: NSView {
 
         // Adjust click point for scroll offset (content coordinates)
         let contentPoint = CGPoint(x: clickPoint.x, y: clickPoint.y + scrollOffset)
-
-        // App Switcher overlay: a tap on a card with an upward delta force-quits
-        // the underlying pack; tap without delta is a no-op (could highlight in future).
-        if let switcher = appSwitcherOverlay {
-            let upwardDelta = mouseDownPoint.y - clickPoint.y
-            if upwardDelta > 50, switcher.handleSwipeUp(at: mouseDownPoint) {
-                needsDisplay = true
-                return
-            }
-            // Tapping outside any card closes the overlay
-            switcher.close()
-            return
-        }
 
         // AppPack-driven path: resolve the tapped element via the active screen
         // (or active obstacle) and let the pack update its state. This fully

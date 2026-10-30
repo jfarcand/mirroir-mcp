@@ -6,6 +6,8 @@ use std::result::Result as StdResult;
 
 use serde::Deserialize;
 
+use crate::parser::shorthand::ShorthandOr;
+
 /// Arguments for `judge` — LLM oracle step. Captured at scenario time; evaluated by the Rust post-hook.
 #[derive(Debug, Clone, Deserialize, PartialEq)]
 pub struct JudgeArgs {
@@ -116,7 +118,6 @@ pub enum ReportVerdict {
 /// Unknown keys are refused: a misspelt `captures:` would otherwise leave the
 /// step comparing whatever stale files sit at the listed paths.
 #[derive(Debug, Clone, Deserialize, PartialEq)]
-#[serde(deny_unknown_fields)]
 pub struct CrossSurfaceArgs {
     /// Filesystem paths whose contents are compared pairwise.
     pub response_files: Vec<String>,
@@ -133,7 +134,6 @@ pub struct CrossSurfaceArgs {
 
 /// One surface's capture, written to `to` during replay.
 #[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
-#[serde(deny_unknown_fields)]
 pub struct CrossSurfaceCapture {
     /// The block whose run produces the text.
     pub surface: CaptureSurface,
@@ -179,15 +179,15 @@ impl<'de> Deserialize<'de> for ReportArgs {
         D: serde::Deserializer<'de>,
     {
         #[derive(Deserialize)]
-        #[serde(untagged)]
-        enum Repr {
-            Shorthand(ReportVerdict),
-            Full { verdict: ReportVerdict },
+        struct Full {
+            verdict: ReportVerdict,
         }
-        Ok(match Repr::deserialize(deserializer)? {
-            Repr::Shorthand(v) => Self { verdict: v },
-            Repr::Full { verdict } => Self { verdict },
-        })
+        Ok(
+            match ShorthandOr::<ReportVerdict, Full>::deserialize(deserializer)? {
+                ShorthandOr::Shorthand(v) => Self { verdict: v },
+                ShorthandOr::Record(Full { verdict }) => Self { verdict },
+            },
+        )
     }
 }
 

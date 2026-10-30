@@ -206,21 +206,33 @@ extension MirroirMCP {
         var text = ExplorationResultFormatter.formatBundle(
             bundle, preamble: "Generated \(bundle.skills.count) skills from exploration:")
 
-        if emit {
-            text += ExplorationLoopRunner.emitNote(
-                appName: data.appName, flow: data.goal, screens: data.screens, outputDir: outputDir)
-        }
-
+        // finalize() has already advanced the goal queue, so the next-goal
+        // guidance closes every result — a failed emit included — or the agent
+        // would retry finish on a session that moved on.
+        var goalNote = AppDescriptionLoader.load(appName: data.appName).refusalNote
+            .map { "\n\n---\n\($0)" } ?? ""
         if !remaining.isEmpty {
-            text += "\n\n---\nGoal \(goalNum)/\(totalGoals) complete. "
-            text += "Next goal: \"\(remaining[0])\". "
-            text += "Session auto-advanced \u{2014} call capture to continue, or finish again when done."
+            goalNote += "\n\n---\nGoal \(goalNum)/\(totalGoals) complete. "
+            goalNote += "Next goal: \"\(remaining[0])\". "
+            goalNote += "Session auto-advanced \u{2014} call capture to continue, or finish again when done."
             if remaining.count > 1 {
-                text += "\nRemaining after next: " +
+                goalNote += "\nRemaining after next: " +
                     remaining.dropFirst().map { "\"\($0)\"" }.joined(separator: ", ")
             }
         }
-        return .text(text)
+
+        if emit {
+            do {
+                text += try ExplorationLoopRunner.emitNote(
+                    appName: data.appName,
+                    flows: [MirroirAppTreeEmitter.Flow(name: data.goal, screens: data.screens)],
+                    outputDir: outputDir)
+            } catch {
+                return ExplorationLoopRunner.emitFailure(
+                    resultText: text, error: error, trailer: goalNote)
+            }
+        }
+        return .text(text + goalNote)
     }
 
     // MARK: - Explore Handler
@@ -230,7 +242,8 @@ extension MirroirMCP {
         session: ExplorationSession,
         registry: TargetRegistry,
         server: MCPServer,
-        policy: PermissionPolicy
+        policy: PermissionPolicy,
+        appMdSearchPaths: [String] = AppDescriptionLoader.searchPaths()
     ) -> MCPToolResult {
         guard let appName = args["app_name"]?.asString(), !appName.isEmpty else {
             return .error("Missing required parameter: app_name (for explore action)")
@@ -261,17 +274,19 @@ extension MirroirMCP {
         }
 
         // Load APP.md description — needed below to check reset_before_explore.
-        let appDesc = AppDescriptionLoader.load(appName: appName)
+        // Every result from here on carries the refused-APP.md note, if any.
+        let appMd = AppDescriptionLoader.load(appName: appName, searchPaths: appMdSearchPaths)
+        let appDesc = appMd.description
 
         // A playable game is never BFS-explored: driving a scene starts matches
         // and burns frames, and a game scene is scripted by a kind:game skill,
         // not discovered. Only ordinary and observe-only apps are explorable.
         // Runs before any force-quit/launch so the game app is left untouched.
         if let appDesc, !appDesc.allowsExploration {
-            return .text(
+            return ExplorationLoopRunner.appendingNote(appMd.refusalNote, to: .text(
                 "Exploration skipped: '\(appName)' is declared playable "
                 + "(\(appDesc.playable ?? "")) in its APP.md — a game is driven "
-                + "by a kind:game skill, not the explorer. App left untouched.")
+                + "by a kind:game skill, not the explorer. App left untouched."))
         }
 
         // Force-quit the app before launching if APP.md requests it.
@@ -309,7 +324,7 @@ extension MirroirMCP {
         case .success(let result):
             firstResult = result
         case .failure(let failure):
-            return .error(failure.message)
+            return ExplorationLoopRunner.appendingNote(appMd.refusalNote, to: .error(failure.message))
         }
 
         // Budget + skip-list merge. Built-ins, the global permissions.json list,
@@ -422,12 +437,11 @@ extension MirroirMCP {
         }
         explorer.markStarted()
 
-        return ExplorationLoopRunner.run(
+        let result = ExplorationLoopRunner.run(
             explorer: explorer,
             strategyChoice: strategyChoice,
             ctx: ctx,
             appName: appName,
-            goal: goal,
             emit: emit,
             outputDir: outputDir,
             initialLines: [
@@ -435,6 +449,7 @@ extension MirroirMCP {
                 "Budget: depth=\(maxDepth), screens=\(maxScreens), time=\(maxTime)s",
             ]
         )
+        return ExplorationLoopRunner.appendingNote(appMd.refusalNote, to: result)
     }
 
     /// Merge three layers of skip patterns with duplicate collapsing.

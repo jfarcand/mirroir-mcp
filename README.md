@@ -382,6 +382,7 @@ mirroir test --dry-run apps/settings/check-about    # validate without executing
 | `--timeout <seconds>` | `wait_for` timeout (default: 15) |
 | `--verbose` | Step-by-step detail |
 | `--dry-run` | Parse and validate without executing (refused with `--report-json`: a dry run has no verdict to report) |
+| `--confirm-destructive` | Run steps that send, remove, spend, or reset something on the device. Without it, a run holding one is refused before any step executes, naming each. `reset_app:` counts as destructive except when the very next step is a `launch:` of the same app (exact name, case-sensitive after trimming): that pair only returns the app about to be driven to its root, the way every emitted `.ios.yaml` flow opens |
 | `--no-compiled` | Skip compiled skills, force full OCR |
 | `--agent <name>` | AI diagnosis of a failed step (see [AI-Assisted Diagnosis](#ai-assisted-diagnosis)) |
 

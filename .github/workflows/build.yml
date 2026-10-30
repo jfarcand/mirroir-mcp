@@ -204,6 +204,145 @@ jobs:
           grep -qE "capture: sck=[1-9][0-9]* fallback=0" <<<"$plain" \
             || { echo "missing: capture: sck=N fallback=0"; exit 1; }
 
+      # The emitter → runner contract, end to end: explore the Clock pack on
+      # FakeMirroring with emit=true into a scratch consumer repo, then replay
+      # what was written through mirroir-run → mirroir-mcp. ios-fixture above is
+      # hand-written; this is the one lane where an EMITTED scenario — tap and
+      # wait_for included — crosses both binaries. The Clock pack is read from
+      # mirroir-skills' default branch, so a pack edit there can turn this red.
+      #
+      # Determinism: heuristic component detection (no LLM classifier), the
+      # embedded embacle runner off (so the BFS advisor is the heuristic one,
+      # not a vision model), local OCR as the describer, and a fixed seed.
+      - name: generate_skill emits the Clock scenario (FakeMirroring)
+        timeout-minutes: 10
+        env:
+          MIRROIR_BUNDLE_ID: com.jfarcand.FakeMirroring
+          MIRROIR_PROCESS_NAME: FakeMirroring
+          MIRROIR_COMPONENT_DETECTION: heuristic
+          MIRROIR_AGENT_TRANSPORT: http
+          MIRROIR_SCREEN_DESCRIBER_MODE: ocr
+          CONTRACT_DIR: ${{ runner.temp }}/clock-contract
+        run: |
+          set -euo pipefail
+          CONSUMER="$CONTRACT_DIR/consumer"
+          mkdir -p "$CONSUMER/.mirroir"
+          BIN="$PWD/.build/release/mirroir-mcp"
+          call() {  # call <id> <tool> <arguments-json>
+            python3 -c 'import json,sys; print(json.dumps({"jsonrpc":"2.0","id":int(sys.argv[1]),"method":"tools/call","params":{"name":sys.argv[2],"arguments":json.loads(sys.argv[3])}}))' "$@"
+          }
+          init='{"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}'
+          # press_home first: the Settings fixture above leaves Settings in
+          # the foreground, and the exploration must start from a cold Clock.
+          explore_args=$(python3 -c 'import json,sys; print(json.dumps({"action":"explore","app_name":"Clock","emit":True,"output_dir":sys.argv[1],"max_depth":2,"max_screens":4,"max_time":120,"seed":42,"fresh":True}))' "$CONSUMER")
+          # stdin closes after the last request, so the server answers the
+          # explore and exits: the pipeline below returns only once it has.
+          printf '%s\n' "$init" "$(call 2 press_home '{}')" "$(call 3 generate_skill "$explore_args")" \
+            | "$BIN" --dangerously-skip-permissions 2>"$CONTRACT_DIR/explore-server.log" \
+            > "$CONTRACT_DIR/explore-responses.jsonl"
+          python3 - "$CONTRACT_DIR/explore-responses.jsonl" <<'EOF'
+          import json, sys
+          replies = {m.get("id"): m for m in map(json.loads, filter(str.strip, open(sys.argv[1])))}
+          for rid, tool in ((2, "press_home"), (3, "generate_skill")):
+              reply = replies.get(rid)
+              assert reply and "result" in reply, f"{tool}: no result: {reply}"
+              text = "\n".join(c.get("text", "") for c in reply["result"]["content"])
+              print(f"--- {tool} ---\n{text}")
+              assert not reply["result"].get("isError"), f"{tool} returned isError"
+          assert "Emitted .mirroir/ iOS leg" in text, "explore finished without emitting the .mirroir/ leg"
+          EOF
+          APP_DIR="$CONSUMER/.mirroir/apps/clock"
+          test -f "$APP_DIR/SAMPLE.md" || { echo "no SAMPLE.md under $APP_DIR"; exit 1; }
+          scenarios=$(find "$APP_DIR/scenarios" -name '*.ios.yaml' 2>/dev/null | sort)
+          [ -n "$scenarios" ] || { echo "no scenario written under $APP_DIR/scenarios"; exit 1; }
+          for scenario in $scenarios; do echo "=== $scenario ==="; cat "$scenario"; done
+          # shellcheck disable=SC2086
+          grep -qE '^  - tap: ' $scenarios || { echo "no emitted scenario carries a tap: step"; exit 1; }
+          # replayd keys ScreenCaptureKit clients by executable path: a server
+          # of this binary still alive would knock the replay's captures off
+          # (carnet#24). The pipeline above waited for it; prove it.
+          if pgrep -fl "$BIN"; then echo "mirroir-mcp server still running"; exit 1; fi
+          # A launch of a running app resumes where it was left, so every
+          # emitted flow opens `reset_app: Clock` then `launch: Clock` and
+          # replays from the root screen it was recorded from — the explore
+          # above leaves Clock running wherever it stopped.
+          for scenario in $scenarios; do
+            grep -qzE '\n  - reset_app: "Clock"\n  - launch: "Clock"\n' "$scenario" \
+              || { echo "$scenario does not open with reset_app then launch of Clock"; exit 1; }
+          done
+
+      - name: mirroir-run replays the emitted Clock scenario (FakeMirroring)
+        timeout-minutes: 10
+        working-directory: runner
+        env:
+          MIRROIR_BUNDLE_ID: com.jfarcand.FakeMirroring
+          MIRROIR_PROCESS_NAME: FakeMirroring
+          MIRROIR_MCP_BIN: ${{ github.workspace }}/.build/release/mirroir-mcp
+          # mirroir-mcp's stderr — the step counts and the capture summary —
+          # reaches the log only at debug on a passing block.
+          RUST_LOG: info,mirroir_run::target::ios=debug
+          CONTRACT_DIR: ${{ runner.temp }}/clock-contract
+        run: |
+          set -euo pipefail
+          APP_DIR="$CONTRACT_DIR/consumer/.mirroir/apps/clock"
+          # The ios blocks land under target/mirroir-ios/<sample>/<scenario>/.
+          BLOCKS=target/mirroir-ios/clock
+          rm -rf "$BLOCKS"
+          ./target/debug/mirroir-run --sample "$APP_DIR" 2>&1 | tee "$CONTRACT_DIR/clock-replay.log"
+          plain=$(sed 's/\x1b\[[0-9;]*m//g' "$CONTRACT_DIR/clock-replay.log")
+          for marker in \
+              "dispatching the scenario's ios block to mirroir-mcp" \
+              "verdict=pass"; do
+            grep -qF "$marker" <<<"$plain" || { echo "missing: $marker"; exit 1; }
+          done
+          grep -qE "capture: sck=[1-9][0-9]* fallback=0" <<<"$plain" \
+            || { echo "missing: capture: sck=N fallback=0"; exit 1; }
+          grep -E "capture: sck=[0-9]+ fallback=[1-9]" <<<"$plain" \
+            && { echo "a block fell back to the screencapture CLI"; exit 1; }
+          # Every emitted step ran and passed: the Playwright report carries
+          # no per-step results, so the proof is mirroir-mcp's own summary —
+          # one per scenario, every step PASSED (the opening target: and the
+          # own-app reset_app: included, both steps mirroir-mcp executes; the
+          # reset needs no --confirm-destructive), none failed, skipped or left
+          # unevaluated — and an ios block that kept the reset, tap and wait_for.
+          python3 - "$CONTRACT_DIR/clock-replay.log" "$APP_DIR/scenarios" "$BLOCKS" <<'EOF'
+          import pathlib, re, sys
+          log, scenarios_dir, blocks_dir = sys.argv[1], pathlib.Path(sys.argv[2]), pathlib.Path(sys.argv[3])
+          text = re.sub(r"\x1b\[[0-9;]*m", "", open(log, encoding="utf-8", errors="replace").read())
+          step = re.compile(r"^  - ", re.M)
+          scenarios = sorted(scenarios_dir.glob("*.ios.yaml"))
+          emitted = sum(len(step.findall(s.read_text())) for s in scenarios)
+          summaries = re.findall(
+              r"Steps — PASSED: (\d+), FAILED: (\d+), NOT EVALUATED: (\d+), SKIPPED: (\d+)", text)
+          print(f"{len(scenarios)} emitted scenario(s), {emitted} step(s); summaries: {summaries}")
+          assert len(summaries) == len(scenarios), \
+              f"expected one mirroir-mcp summary per scenario, found {len(summaries)}"
+          for passed, failed, not_evaluated, skipped in summaries:
+              assert (failed, not_evaluated, skipped) == ("0", "0", "0"), \
+                  f"a step did not pass: FAILED {failed}, NOT EVALUATED {not_evaluated}, SKIPPED {skipped}"
+          passed = sum(int(s[0]) for s in summaries)
+          assert passed == emitted, f"PASSED {passed} != emitted steps {emitted}"
+          blocks = sorted(blocks_dir.glob("*/ios-block.yaml"))
+          assert len(blocks) == len(scenarios), f"{len(blocks)} ios block(s) for {len(scenarios)} scenario(s)"
+          rendered = "".join(b.read_text() for b in blocks)
+          for verb in ("reset_app:", "tap:", "wait_for:"):
+              assert f"  - {verb} " in rendered, f"no ios block carried a {verb} step across the bridge"
+          print("emitted Clock scenarios replayed: every step passed, reset_app, tap and wait_for crossed")
+          EOF
+
+      - name: Upload emitted Clock contract
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: clock-emit-contract
+          # The emitted tree lives under .mirroir/, which upload-artifact
+          # leaves out unless hidden files are asked for.
+          include-hidden-files: true
+          if-no-files-found: ignore
+          path: |
+            ${{ runner.temp }}/clock-contract/
+            runner/target/mirroir-ios/clock/
+
       - name: Upload test results
         if: always()
         uses: actions/upload-artifact@v7

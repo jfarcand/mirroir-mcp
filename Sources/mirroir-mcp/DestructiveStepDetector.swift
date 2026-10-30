@@ -49,6 +49,11 @@ enum DestructiveStepDetector {
     ]
 
     /// Step types that are destructive by their nature, whatever their text says.
+    ///
+    /// One exemption applies: a `reset_app` immediately followed by a `launch`
+    /// of the same app (see `isOwnAppReset`). That pair only returns the app the
+    /// skill is about to drive to its root screen — the shape every emitted
+    /// scenario flow starts with — so it needs no say-so.
     private static let inherentlyDestructiveTypes: Set<String> = ["reset_app"]
 
     /// Find every step across `skills` that needs confirmation.
@@ -58,7 +63,9 @@ enum DestructiveStepDetector {
     static func scan(skills: [SkillDefinition], patterns: [String]) -> [Match] {
         skills.flatMap { skill in
             skill.steps.enumerated().compactMap { index, step in
-                guard let reason = reasonForConfirmation(step, patterns: patterns) else {
+                let next = skill.steps.indices.contains(index + 1) ? skill.steps[index + 1] : nil
+                guard let reason = reasonForConfirmation(
+                    step, followedBy: next, patterns: patterns) else {
                     return nil
                 }
                 return Match(
@@ -72,13 +79,32 @@ enum DestructiveStepDetector {
     }
 
     /// Why a step needs confirmation, or `nil` when it does not.
-    static func reasonForConfirmation(_ step: SkillStep, patterns: [String]) -> String? {
+    ///
+    /// `next` is the step that runs right after `step` in the same skill, or
+    /// `nil` when `step` is the last one; it decides the own-app reset exemption.
+    static func reasonForConfirmation(
+        _ step: SkillStep, followedBy next: SkillStep?, patterns: [String]
+    ) -> String? {
+        if isOwnAppReset(step, followedBy: next) { return nil }
         if inherentlyDestructiveTypes.contains(step.typeKey) {
             return "\(step.typeKey) erases app state"
         }
         guard let text = consequentialText(of: step) else { return nil }
         guard let pattern = firstMatch(in: text, patterns: patterns) else { return nil }
         return "matches '\(pattern)'"
+    }
+
+    /// Whether `step` is a `reset_app` of exactly the app the next step launches.
+    ///
+    /// Names are compared case-sensitively after trimming surrounding
+    /// whitespace: a reset of any other app, a reset not followed by a launch,
+    /// or a reset followed by a launch of a different app stays destructive.
+    static func isOwnAppReset(_ step: SkillStep, followedBy next: SkillStep?) -> Bool {
+        guard case .resetApp(let resetName) = step,
+              case .launch(let launchName) = next else { return false }
+        let reset = resetName.trimmingCharacters(in: .whitespacesAndNewlines)
+        let launch = launchName.trimmingCharacters(in: .whitespacesAndNewlines)
+        return !reset.isEmpty && reset == launch
     }
 
     /// The user-visible text of a step that could cause an effect, or `nil` for

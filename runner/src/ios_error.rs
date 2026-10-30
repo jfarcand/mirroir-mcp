@@ -41,6 +41,20 @@ pub enum IosError {
         block_start: usize,
     },
 
+    /// A phone-only step (`launch:`, `home:`, `shake:`, `reset_app:`,
+    /// `set_network:`) sits where no `ios` block carries it. Outside a block
+    /// there is no device to drive, so as a runner-side step it would run
+    /// nothing; the plan refuses it instead.
+    #[error(
+        "step {index} (`{kind}`) drives an iPhone but no `target: {{ kind: ios }}` block carries it. Move it inside the ios block, after its `target:`"
+    )]
+    DeviceStepOutsideIosBlock {
+        /// Index of the step, as the scenario file reads.
+        index: usize,
+        /// Step kind at `index`.
+        kind: &'static str,
+    },
+
     /// No `mirroir-mcp` binary to run the block with.
     #[error(
         "mirroir-mcp is not installed: set MIRROIR_MCP_BIN or put `mirroir-mcp` on PATH (brew install jfarcand/tap/mirroir-mcp)"

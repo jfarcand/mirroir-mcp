@@ -37,6 +37,7 @@ enum SceneRenderer {
         var rows: [(String, CGPoint)] = []
         var plainTexts: [(String, CGPoint)] = []
         var buttons: [(String, CGRect)] = []
+        var tabLabels: [String] = []
         var placeholders: [CGRect] = []
         var textFieldRects: [CGRect] = []
         var sliderTrack: (label: String, rect: CGRect)?
@@ -62,10 +63,10 @@ enum SceneRenderer {
                            width: buttonWidth, height: buttonHeight)
                 ))
                 buttonX += buttonWidth + buttonGap
-            case .tab:
-                // Tabs render in the existing FakeScreenView tab bar; we don't
-                // emit them here. hasTabBar drives bar visibility.
-                continue
+            case .tab(let text, _):
+                // Tabs render in the FakeScreenView tab bar, one column each;
+                // hasTabBar drives bar visibility.
+                tabLabels.append(text)
             case .textField(let placeholder, _):
                 let rect = CGRect(
                     x: textPadding, y: textFieldY, width: 370, height: 36)
@@ -95,6 +96,7 @@ enum SceneRenderer {
             rows: rows,
             hasTabBar: screen.hasTabBar,
             tabBarStyle: tabBarStyle,
+            tabLabels: tabLabels,
             plainTexts: plainTexts,
             buttons: buttons,
             placeholders: placeholders,

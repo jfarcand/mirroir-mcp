@@ -56,7 +56,15 @@ So each paste is read back from the screen with local OCR before the next clipbo
 
 ### Spotlight can hold a previous query
 
-After an app is launched from Spotlight, iOS can reopen Spotlight showing that query in an inactive state that ignores keystrokes; Return then launches the previous result. `launch_app` (and a skill's `launch` step) therefore reads the screen after typing the name and presses Return only when the name appeared one more time than before. Otherwise it fails without pressing Return, including when the held query happens to be the same app. Clear the Spotlight field on the device (its ✕ button) to recover.
+After an app is launched from Spotlight, iOS can reopen Spotlight still showing that query. In that state the iPhone ignores typed keys and Return — the Mac's own keyboard included — while taps still land, and on an iPhone XR (iOS 26) the keyboard stayed dead until iPhone Mirroring was quit and relaunched. Two Spotlight launches in a row hit it every time, which is exactly a `reset_app` followed by `launch`.
+
+`launch_app` (and a skill's `launch` step) therefore works like this:
+
+- It waits for Spotlight to appear, and opens it once more if a Home transition closed it.
+- When Spotlight already shows the app as a tile (its name with an app icon above it: the held query's top hit, or a Siri suggestion), it taps that label instead of typing, then confirms Spotlight closed.
+- Otherwise it types the name and presses Return only when the name appeared one more time than before; if it did not, it looks for the app's tile once more before failing without pressing Return.
+
+A held query for a *different* app still fails the launch. Recover by quitting and relaunching iPhone Mirroring.
 
 ## Web and iOS Scenarios
 

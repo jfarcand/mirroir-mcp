@@ -70,8 +70,9 @@ pub const fn is_web(step: &SkillStep) -> bool {
 ///
 /// A web block runs the steps Playwright compiles. An iOS block runs those
 /// same interaction verbs plus the device-level ones only a phone has —
-/// `launch:`, `home:`, `shake:`, `reset_app:`, `set_network:` — which outside
-/// an iOS block are runner-side steps with nothing to drive.
+/// `launch:`, `home:`, `shake:`, `reset_app:`, `set_network:` — which the
+/// plan refuses outside an iOS block (`DeviceStepOutsideIosBlock` before the
+/// block opens, `BlockNotContiguous` after it ends).
 #[must_use]
 pub const fn is_device_step(step: &SkillStep, kind: TargetKind) -> bool {
     match kind {

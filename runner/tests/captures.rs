@@ -105,6 +105,7 @@ fn judge_response_arrives_through_the_playwright_attachment() -> Result<(), Stri
         ".mirroir/oracles/profiles.yaml",
         &format!(
             concat!(
+                "version: 1\n",
                 "profiles:\n",
                 "  - name: stub-oracle\n",
                 "    base_url: \"http://127.0.0.1:{port}/v1/chat/completions\"\n",

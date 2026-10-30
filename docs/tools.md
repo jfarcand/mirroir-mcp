@@ -114,7 +114,10 @@ Steps:
 3. Drag the centered card upward to dismiss it (touch drag, not scroll-wheel swipe — iOS only accepts touch events for card dismiss).
 4. Return to the home screen.
 
-Use before `launch_app` to ensure a fresh app state. Tunable via `appSwitcherCardXFraction`, `appSwitcherCardYFraction`, `appSwitcherSwipeDistance`, and `appSwitcherSwipeDurationMs` if your iPhone model places the centered card differently.
+Use before `launch_app` to ensure a fresh app state. In a skill run by `mirroir test`,
+`reset_app:` is a destructive step that needs `--confirm-destructive`, except when the very next
+step is a `launch:` of the same app (exact name, case-sensitive after trimming) — the pair every
+emitted `.ios.yaml` flow opens with. Tunable via `appSwitcherCardXFraction`, `appSwitcherCardYFraction`, `appSwitcherSwipeDistance`, and `appSwitcherSwipeDurationMs` if your iPhone model places the centered card differently.
 
 ## Measure
 

@@ -11,12 +11,10 @@ use tracing::info;
 use crate::error::{Result, RunnerError};
 use crate::oracle::error::OracleError;
 use crate::parser::sample::extract_yaml_block;
+use crate::parser::version::{self, ArtifactKind};
 
 /// Filename of the global drift threshold file, at every layer of the search.
 pub const DRIFT_DEFAULTS_FILE: &str = "drift-defaults.yaml";
-
-/// Highest `drift-defaults.yaml` schema version this binary understands.
-pub const DRIFT_DEFAULTS_SCHEMA_VERSION: u32 = 1;
 
 /// The drift metrics the runner compares against a last-green baseline.
 ///
@@ -69,7 +67,6 @@ impl fmt::Display for DriftMetric {
 
 /// A floor threshold — observations below `min` are drift.
 #[derive(Debug, Clone, Copy, Deserialize, PartialEq)]
-#[serde(deny_unknown_fields)]
 pub struct MinThreshold {
     /// Lowest acceptable observation.
     pub min: f64,
@@ -77,7 +74,6 @@ pub struct MinThreshold {
 
 /// A ceiling threshold — observations above `max` are drift.
 #[derive(Debug, Clone, Copy, Deserialize, PartialEq)]
-#[serde(deny_unknown_fields)]
 pub struct MaxThreshold {
     /// Highest acceptable observation.
     pub max: f64,
@@ -85,7 +81,6 @@ pub struct MaxThreshold {
 
 /// A ceiling on absolute change — swings above `max_delta` are drift.
 #[derive(Debug, Clone, Copy, Deserialize, PartialEq)]
-#[serde(deny_unknown_fields)]
 pub struct MaxDeltaThreshold {
     /// Highest acceptable absolute change from the baseline.
     pub max_delta: f64,
@@ -124,18 +119,10 @@ impl DriftThresholds {
     }
 }
 
-/// Top-level shape of a `drift-defaults.yaml` file: a version gate plus the
-/// thresholds themselves at the document root.
-#[derive(Debug, Clone, Copy, Deserialize)]
-struct DriftDefaultsFile {
-    version: u32,
-    #[serde(flatten)]
-    thresholds: DriftThresholds,
-}
-
-/// Top-level shape of an `APP.md` frontmatter block, read for its
-/// `drift_defaults:` key alone. Every other key an APP.md carries — `app`,
-/// `surface`, `archetype`, `url`, `locale` — is prose for other tools.
+/// Top-level shape of an `APP.md` frontmatter block, read for its `version:`
+/// gate and its `drift_defaults:` key. Every other key an APP.md carries —
+/// `app`, `surface`, `archetype`, `url`, `locale` — belongs to other tools, which
+/// is why [`ArtifactKind::AppMd`] shares its root.
 #[derive(Debug, Clone, Copy, Deserialize)]
 struct AppFrontmatter {
     #[serde(default)]
@@ -301,21 +288,25 @@ pub fn load_drift_defaults(path: &Path) -> Result<DriftThresholds> {
 /// # Errors
 ///
 /// * [`OracleError::ThresholdsParse`] when the body isn't a threshold document.
-/// * [`RunnerError::UnsupportedVersion`] when its `version:` is out of range.
+/// * [`RunnerError::UnsupportedVersion`] when its `version:` major is unsupported.
+/// * [`RunnerError::UnknownFields`] for keys the threshold schema does not define.
 pub fn parse_drift_defaults(path: &Path, raw: &str) -> Result<DriftThresholds> {
-    let parsed: DriftDefaultsFile =
-        serde_norway::from_str(raw).map_err(|source| OracleError::ThresholdsParse {
-            path: path.to_path_buf(),
-            reason: source.to_string(),
-        })?;
-    if parsed.version != DRIFT_DEFAULTS_SCHEMA_VERSION {
-        return Err(RunnerError::UnsupportedVersion {
-            artifact: DRIFT_DEFAULTS_FILE.to_owned(),
-            found: parsed.version,
-            expected: DRIFT_DEFAULTS_SCHEMA_VERSION..=DRIFT_DEFAULTS_SCHEMA_VERSION,
-        });
+    // The document root *is* the threshold layer; its `version:` is the
+    // seam's, so the typed shape needs no wrapper to hold it.
+    version::from_yaml_str(
+        ArtifactKind::DriftDefaults,
+        &path.display().to_string(),
+        raw,
+        |source| thresholds_parse(path, &source),
+    )
+}
+
+fn thresholds_parse(path: &Path, source: &serde_norway::Error) -> RunnerError {
+    OracleError::ThresholdsParse {
+        path: path.to_path_buf(),
+        reason: source.to_string(),
     }
-    Ok(parsed.thresholds)
+    .into()
 }
 
 /// Read an `APP.md`'s `drift_defaults:` block, if the file has one.
@@ -341,15 +332,19 @@ pub fn load_app_defaults(path: &Path) -> Result<Option<DriftThresholds>> {
 ///
 /// # Errors
 ///
-/// [`OracleError::ThresholdsParse`] when the frontmatter can't be deserialized.
+/// * [`OracleError::ThresholdsParse`] when the frontmatter can't be deserialized
+///   or carries no `version:`.
+/// * [`RunnerError::UnsupportedVersion`] when its `version:` major is unsupported.
+/// * [`RunnerError::UnknownFields`] for unknown keys inside `drift_defaults:`.
 pub fn parse_app_defaults(path: &Path, markdown: &str) -> Result<Option<DriftThresholds>> {
     let Some(body) = extract_yaml_block(markdown) else {
         return Ok(None);
     };
-    let parsed: AppFrontmatter =
-        serde_norway::from_str(&body).map_err(|source| OracleError::ThresholdsParse {
-            path: path.to_path_buf(),
-            reason: source.to_string(),
-        })?;
+    let parsed: AppFrontmatter = version::from_yaml_str(
+        ArtifactKind::AppMd,
+        &path.display().to_string(),
+        &body,
+        |source| thresholds_parse(path, &source),
+    )?;
     Ok(parsed.drift_defaults)
 }

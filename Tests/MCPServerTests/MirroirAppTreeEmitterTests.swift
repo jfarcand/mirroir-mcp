@@ -48,26 +48,37 @@ final class MirroirAppTreeEmitterTests: XCTestCase {
         defer { try? FileManager.default.removeItem(at: root.deletingLastPathComponent()) }
 
         let result = try MirroirAppTreeEmitter.emit(
-            appName: "Settings", flow: "check software version", screens: sampleScreens(), root: root)
+            appName: "Settings", flows: [.init(name: "check software version", screens: sampleScreens())], root: root)
 
         let fm = FileManager.default
-        XCTAssertTrue(fm.fileExists(atPath: result.scenarioPath.path))
+        XCTAssertTrue(fm.fileExists(atPath: result.scenarioPaths.first?.path ?? ""))
         XCTAssertTrue(fm.fileExists(atPath: result.appDir.appendingPathComponent("APP.md").path))
         XCTAssertFalse(fm.fileExists(atPath: result.appDir.appendingPathComponent("baselines").path),
                        "the iOS block's live capture replaces a committed baseline")
+        XCTAssertEqual(result.scenarioPaths.count, 1)
+        let scenarioPath = try XCTUnwrap(result.scenarioPaths.first)
         let scenarios = try fm.contentsOfDirectory(
-            atPath: result.scenarioPath.deletingLastPathComponent().path)
+            atPath: scenarioPath.deletingLastPathComponent().path)
         XCTAssertEqual(scenarios, ["check-software-version.ios.yaml"])
 
-        // Scenario carries the iOS target, launch, the taps, and is well-formed.
-        let scenario = try String(contentsOf: result.scenarioPath, encoding: .utf8)
-        XCTAssertTrue(scenario.hasPrefix("version: 1\nname: \"check-software-version\"\n"))
-        XCTAssertTrue(scenario.contains("- target: { kind: ios, app: \"Settings\" }"))
-        XCTAssertTrue(scenario.contains("- launch: \"Settings\""))
+        // Scenario carries the ownership header, the iOS target, launch, the
+        // taps with a wait for each arrival, and is well-formed.
+        let scenario = try String(contentsOf: scenarioPath, encoding: .utf8)
+        XCTAssertTrue(scenario.hasPrefix(
+            ScenarioStepFormatter.generatedHeader + "\nversion: 1\nname: \"check-software-version\"\n"))
+        // The flow starts from the app's root: a reset of the app right before
+        // its launch, the one reset_app the destructive-step gate exempts.
+        XCTAssertTrue(scenario.contains(
+            "  - target: { kind: ios, app: \"Settings\" }\n" +
+            "  - reset_app: \"Settings\"\n  - launch: \"Settings\"\n"), scenario)
+
         XCTAssertTrue(scenario.contains("- tap: \"General\""))
         XCTAssertTrue(scenario.contains("- tap: \"About\""))
-        // Destination landmark = the longest label on the final screen.
-        XCTAssertTrue(scenario.contains("- assert_visible: \"Software Version 17.5.1\""))
+        // Each tap waits for the longest label its arrival screen added; the
+        // destination assertion would repeat the last wait, so it is not written.
+        XCTAssertTrue(scenario.contains("- tap: \"General\"\n  - wait_for: \"Software Update\""))
+        XCTAssertTrue(scenario.contains("- tap: \"About\"\n  - wait_for: \"Software Version 17.5.1\""))
+        XCTAssertFalse(scenario.contains("- assert_visible:"))
 
         // SAMPLE.md declares the scenario under must_pass.
         let sample = try String(
@@ -84,34 +95,39 @@ final class MirroirAppTreeEmitterTests: XCTestCase {
 
         // The parsed file is a runnable skill for mirroir-mcp too: its target
         // is the iPhone, and no step is unreadable.
-        let skill = SkillParser.parse(content: scenario, filePath: result.scenarioPath.path)
+        let skill = SkillParser.parse(content: scenario, filePath: scenarioPath.path)
         XCTAssertNil(InvalidStepGate.refuse(skills: [skill]))
+        XCTAssertNil(DestructiveStepGate.refuse(skills: [skill], dryRun: false, confirmed: false),
+                     "an emitted flow's own-app reset runs without --confirm-destructive")
         guard case .switchTarget(let selector) = skill.steps.first else {
             return XCTFail("the scenario must open with its target: \(skill.steps)")
         }
         XCTAssertEqual(selector, .ios(app: "Settings"))
     }
 
-    /// A second flow of the same app joins a SAMPLE.md a human may have
-    /// edited: the emitter returns the line to add instead of rewriting it.
-    func testASecondFlowReturnsASampleSnippet() throws {
+    /// A second flow of the same app joins the SAMPLE.md the first emit
+    /// created and owns: both stay declared, the first one first.
+    func testASecondFlowJoinsTheSampleTheEmitterOwns() throws {
         let root = tmpRoot()
         defer { try? FileManager.default.removeItem(at: root.deletingLastPathComponent()) }
         _ = try MirroirAppTreeEmitter.emit(
-            appName: "Settings", flow: "first", screens: sampleScreens(), root: root)
+            appName: "Settings", flows: [.init(name: "first", screens: sampleScreens())], root: root)
         let second = try MirroirAppTreeEmitter.emit(
-            appName: "Settings", flow: "second", screens: sampleScreens(), root: root)
-        XCTAssertTrue(second.sampleNote.contains("      - scenarios/second.ios.yaml"),
-                      "expected a snippet for the second flow: \(second.sampleNote)")
+            appName: "Settings", flows: [.init(name: "second", screens: sampleScreens())], root: root)
+        let sample = try String(
+            contentsOf: second.appDir.appendingPathComponent("SAMPLE.md"), encoding: .utf8)
+        XCTAssertTrue(sample.contains(
+            "    must_pass:\n      - scenarios/first.ios.yaml\n      - scenarios/second.ios.yaml\n"),
+            sample)
     }
 
     func testReEmitIsIdempotentForPlan() throws {
         let root = tmpRoot()
         defer { try? FileManager.default.removeItem(at: root.deletingLastPathComponent()) }
         _ = try MirroirAppTreeEmitter.emit(
-            appName: "Settings", flow: "v", screens: sampleScreens(), root: root)
+            appName: "Settings", flows: [.init(name: "v", screens: sampleScreens())], root: root)
         let second = try MirroirAppTreeEmitter.emit(
-            appName: "Settings", flow: "v", screens: sampleScreens(), root: root)
+            appName: "Settings", flows: [.init(name: "v", screens: sampleScreens())], root: root)
         XCTAssertTrue(second.planNote.contains("already present"),
             "second emit should not duplicate the plan entry: \(second.planNote)")
     }
@@ -127,7 +143,7 @@ final class MirroirAppTreeEmitterTests: XCTestCase {
             name: "verb-coverage", appName: "TestApp", screens: [
                 screen(index: 0, action: nil, via: nil, elements: ["Start"]),
                 screen(index: 1, action: "type", via: "Email", elements: ["Field"]),
-                screen(index: 2, action: "scroll_to", via: "Bottom", elements: ["Welcome Home Page"]),
+                screen(index: 2, action: "scroll_to", via: "Bottom", elements: ["Bottom", "Welcome Home Page"]),
             ])
         XCTAssertTrue(yaml.contains("- target: { kind: ios, app: \"TestApp\" }"))
         XCTAssertTrue(yaml.contains("- type: \"Email\""))
@@ -140,7 +156,7 @@ final class MirroirAppTreeEmitterTests: XCTestCase {
     func testAssertionsKeepTheirVerb() throws {
         let yaml = try ScenarioStepFormatter.scenarioYAML(
             name: "asserts", appName: "TestApp", screens: [
-                screen(index: 0, action: nil, via: nil, elements: ["Start"]),
+                screen(index: 0, action: nil, via: nil, elements: ["Start", "Inbox"]),
                 screen(index: 1, action: "assert_visible", via: "inbox", elements: ["Inbox"]),
                 screen(index: 2, action: "assert_not_visible", via: "Error", elements: ["Inbox"]),
             ])
@@ -166,13 +182,14 @@ final class MirroirAppTreeEmitterTests: XCTestCase {
         XCTAssertTrue(yaml.contains("- open_url: \"https://example.com\""))
     }
 
-    /// Element-targeting actions still resolve to the element's exact casing.
+    /// Element-targeting actions resolve to the element's exact casing on the
+    /// screen they acted on — the screen before the one they reached.
     func testElementActionsResolveToTheOnScreenLabel() throws {
         let yaml = try ScenarioStepFormatter.scenarioYAML(
             name: "elements", appName: "TestApp", screens: [
-                screen(index: 0, action: nil, via: nil, elements: ["Start"]),
-                screen(index: 1, action: "tap", via: "general", elements: ["General"]),
-                screen(index: 2, action: "long_press", via: "photo", elements: ["Photo"]),
+                screen(index: 0, action: nil, via: nil, elements: ["General"]),
+                screen(index: 1, action: "tap", via: "general", elements: ["Photo"]),
+                screen(index: 2, action: "long_press", via: "photo", elements: ["Done"]),
             ])
         XCTAssertTrue(yaml.contains("- tap: \"General\""))
         XCTAssertTrue(yaml.contains("- long_press: \"Photo\""))
@@ -187,13 +204,13 @@ final class MirroirAppTreeEmitterTests: XCTestCase {
         ]
         XCTAssertThrowsError(try ScenarioStepFormatter.scenarioYAML(
             name: "pinch", appName: "Maps", screens: screens)) { error in
-            XCTAssertEqual(error as? ScenarioStepFormatter.FormatError, .unsupportedAction("pinch"))
+            XCTAssertEqual(error as? ScenarioStepFormatter.FormatError, .unsupportedAction(index: 1, action: "pinch"))
         }
 
         let root = tmpRoot()
         defer { try? FileManager.default.removeItem(at: root.deletingLastPathComponent()) }
         XCTAssertThrowsError(try MirroirAppTreeEmitter.emit(
-            appName: "Maps", flow: "zoom", screens: screens, root: root))
+            appName: "Maps", flows: [.init(name: "zoom", screens: screens)], root: root))
     }
 
     func testEmitRoutesToOutputDir() throws {
@@ -203,9 +220,10 @@ final class MirroirAppTreeEmitterTests: XCTestCase {
         defer { try? FileManager.default.removeItem(at: base) }
 
         let result = try MirroirAppTreeEmitter.emit(
-            appName: "Demo", flow: "f", screens: sampleScreens(), outputDir: base.path)
-        XCTAssertTrue(result.scenarioPath.path.hasPrefix(base.appendingPathComponent(".mirroir").path))
-        XCTAssertTrue(FileManager.default.fileExists(atPath: result.scenarioPath.path))
+            appName: "Demo", flows: [.init(name: "f", screens: sampleScreens())], outputDir: base.path)
+        let scenarioPath = try XCTUnwrap(result.scenarioPaths.first)
+        XCTAssertTrue(scenarioPath.path.hasPrefix(base.appendingPathComponent(".mirroir").path))
+        XCTAssertTrue(FileManager.default.fileExists(atPath: scenarioPath.path))
     }
 
     func testRootLocatorRefusesHomeAndHonorsExplicitDir() {

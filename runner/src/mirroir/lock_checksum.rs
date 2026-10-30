@@ -94,6 +94,7 @@ mod tests {
 
     use super::*;
     use crate::parser::lockfile::LockedArchetype;
+    use crate::parser::version::ArtifactKind;
 
     type TestResult = StdResult<(), Box<dyn StdError>>;
 
@@ -105,7 +106,7 @@ mod tests {
         fs::write(dir.join("archetype.md"), "the archetype body\n")?;
         let checksum = checksum_directory(&dir)?;
         Ok(Lockfile {
-            version: 1,
+            version: ArtifactKind::Lockfile.current(),
             generated_at: Utc::now(),
             generated_by: "test".to_owned(),
             archetypes: vec![LockedArchetype {
@@ -188,7 +189,7 @@ mod tests {
     #[test]
     fn a_pack_record_without_a_version_is_reported_as_malformed() -> TestResult {
         let lock = Lockfile {
-            version: 1,
+            version: ArtifactKind::Lockfile.current(),
             generated_at: Utc::now(),
             generated_by: "test".to_owned(),
             archetypes: vec![LockedArchetype {
@@ -226,7 +227,7 @@ mod tests {
         fs::write(dir.join("archetype.md"), "console\n")?;
         let checksum = checksum_directory(&dir)?;
         let mut lock = Lockfile {
-            version: 1,
+            version: ArtifactKind::Lockfile.current(),
             generated_at: Utc::now(),
             generated_by: "test".to_owned(),
             archetypes: vec![LockedArchetype {

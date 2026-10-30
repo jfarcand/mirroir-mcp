@@ -6,13 +6,16 @@ use std::ops::Range;
 use crate::error::{Result, RunnerError};
 use crate::ios_error::IosError;
 use crate::parser::step::{SkillStep, TargetArgs, TargetKind};
-use crate::parser::surface::{is_ai_only, step_kind};
+use crate::parser::surface::{is_ai_only, is_device_step, is_web, step_kind};
 
 /// Stands in for the first step's kind when the scenario declares no steps.
 const NO_STEPS: &str = "<empty>";
 
 /// Stands in for the declared surface when the scenario declares no `target:`.
 const NO_TARGET: &str = "none";
+
+/// Stands in for the step after a block when the block ends the scenario.
+const END_OF_SCENARIO: &str = "<end>";
 
 /// Whether this host can run an `ios` block: mirroir-mcp drives iPhone
 /// Mirroring, a macOS application.
@@ -66,6 +69,69 @@ pub fn check_ios_block(steps: &[SkillStep], block: Range<usize>) -> Result<()> {
         block_start,
     }
     .into())
+}
+
+/// Check a step the plan is about to make a runner-side hook: only steps the
+/// runner evaluates may become one.
+///
+/// A phone-only step outside an `ios` block has no device to drive, and a
+/// `condition:` has no evaluator for `if_visible` anywhere — the runner,
+/// Playwright and `mirroir-mcp test` all lack one. Either, as a hook, would
+/// run nothing and let the scenario pass on its other steps, so the plan
+/// refuses both by name.
+///
+/// `ios_block` is the range of the `ios` block already planned, if one opened.
+///
+/// # Errors
+///
+/// * [`RunnerError::BlockNotContiguous`] for a phone-only step after the
+///   `ios` block already ended — a second block would be a fresh session.
+/// * [`IosError::DeviceStepOutsideIosBlock`] for a phone-only step before any
+///   `ios` block opens.
+/// * [`RunnerError::ConditionHasNoEvaluator`] for a `condition:`.
+pub fn check_hook(
+    steps: &[SkillStep],
+    index: usize,
+    ios_block: Option<Range<usize>>,
+) -> Result<()> {
+    let step = &steps[index];
+    if let SkillStep::Condition(condition) = step {
+        return Err(RunnerError::ConditionHasNoEvaluator {
+            index,
+            if_visible: condition.if_visible.clone(),
+        });
+    }
+    if !is_device_step(step, TargetKind::Ios) || is_web(step) {
+        return Ok(());
+    }
+    Err(ios_block.map_or_else(
+        || {
+            IosError::DeviceStepOutsideIosBlock {
+                index,
+                kind: step_kind(step),
+            }
+            .into()
+        },
+        |block| block_not_contiguous(steps, index, TargetKind::Ios, &block),
+    ))
+}
+
+/// The error for a device step at `index` that belongs to the `surface` block
+/// spanning `block`, which a runner-side step already ended.
+#[must_use]
+pub fn block_not_contiguous(
+    steps: &[SkillStep],
+    index: usize,
+    surface: TargetKind,
+    block: &Range<usize>,
+) -> RunnerError {
+    RunnerError::BlockNotContiguous {
+        index,
+        kind: step_kind(&steps[index]),
+        surface,
+        block_end: block.end - 1,
+        separator_kind: steps.get(block.end).map_or(END_OF_SCENARIO, step_kind),
+    }
 }
 
 /// The error for a scenario whose web steps have no browser to run in, naming

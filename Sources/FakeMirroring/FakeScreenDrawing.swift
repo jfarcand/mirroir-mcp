@@ -192,8 +192,12 @@ extension FakeScreenView {
     /// Draw the bottom tab bar. `.labels` renders icon glyphs with text labels
     /// beneath (OCR-anchored tapping); `.icons` renders the same glyphs at the
     /// same positions with NO text, so OCR finds nothing in the bar and only
-    /// Vision saliency / icon detection can locate the tab targets.
-    func drawTabBar(style: SimulatorTabBarStyle) {
+    /// Vision saliency / icon detection can locate the tab targets. `labels` are
+    /// the screen's own tab names: they label the first columns, in order, and the
+    /// generic names fill the rest, so every column keeps an icon and a label.
+    func drawTabBar(style: SimulatorTabBarStyle, labels: [String]) {
+        let names = Array(labels.prefix(tabBarIconXPositions.count))
+            + tabBarLabels.dropFirst(min(labels.count, tabBarLabels.count))
         let barY = bounds.height - tabBarHeight
         NSColor.white.setFill()
         NSRect(x: 0, y: barY, width: bounds.width, height: tabBarHeight).fill()
@@ -216,7 +220,7 @@ extension FakeScreenView {
             .font: labelFont, .foregroundColor: iconColor,
         ]
         let labelY = iconY + iconSize + 4
-        for (idx, label) in tabBarLabels.enumerated() {
+        for (idx, label) in names.enumerated() {
             let size = (label as NSString).size(withAttributes: labelAttrs)
             let x = tabBarIconXPositions[idx] - size.width / 2
             (label as NSString).draw(at: NSPoint(x: x, y: labelY), withAttributes: labelAttrs)

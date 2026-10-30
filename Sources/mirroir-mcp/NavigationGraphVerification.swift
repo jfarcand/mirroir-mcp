@@ -67,7 +67,8 @@ extension NavigationGraph {
             screenshotBase64: node.screenshotBase64,
             visitedElements: node.visitedElements,
             navBarTitle: node.navBarTitle,
-            visualHash: node.visualHash
+            visualHash: node.visualHash,
+            scrolledElementCount: node.scrolledElementCount + novel.count
         )
         return novel.count
     }

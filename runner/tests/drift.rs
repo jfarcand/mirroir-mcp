@@ -93,6 +93,7 @@ fn run_scenario(
         ".mirroir/oracles/profiles.yaml",
         &format!(
             concat!(
+                "version: 1\n",
                 "profiles:\n",
                 "  - name: byte-stable\n",
                 "    base_url: \"http://127.0.0.1:{port}/v1/chat/completions\"\n",

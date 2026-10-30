@@ -5,23 +5,17 @@ use serde::Deserialize;
 
 use crate::oracle::thresholds::DriftThresholds;
 use crate::parser::step::SkillStep;
-
-/// Highest version of the `Scenario` schema this binary understands.
-///
-/// Major-version mismatch is a hard load error (per the design doc — load-bearing
-/// `version: 1` field). Minor versions stay forward-tolerant by adding `#[serde(default)]`
-/// to new optional fields rather than bumping the major.
-pub const SCHEMA_VERSION: u32 = 1;
+use crate::parser::version::SchemaVersion;
 
 /// Top-level shape of a scenario YAML file.
 ///
 /// Mirrors the `name / app / description / tags / steps` keys mirroir emits, plus the
-/// `version` integer the runner gates on.
+/// `version` the runner gates on. Unknown keys are refused at a known minor and
+/// ignored at a newer one — [`crate::parser::version`] decides which.
 #[derive(Debug, Clone, Deserialize, PartialEq)]
-#[serde(deny_unknown_fields)]
 pub struct Scenario {
-    /// Schema major version. Currently always `1`.
-    pub version: u32,
+    /// Schema version, gated by [`crate::parser::version::ArtifactKind::Scenario`].
+    pub version: SchemaVersion,
     /// Human-readable scenario title.
     pub name: String,
     /// Optional app identifier — typically references an `APP.md` filename slug.
@@ -51,6 +45,7 @@ mod tests {
     use super::*;
     use crate::oracle::thresholds::DriftMetric;
     use crate::parser::step::SkillStep;
+    use crate::parser::version::ArtifactKind;
 
     type TestResult = StdResult<(), Box<dyn StdError>>;
 
@@ -67,7 +62,7 @@ steps:
   - launch: "App"
 "#;
         let scenario: Scenario = serde_norway::from_str(yaml)?;
-        assert_eq!(scenario.version, SCHEMA_VERSION);
+        assert_eq!(scenario.version, ArtifactKind::Scenario.current());
         assert_eq!(scenario.name, "smoke");
         assert_eq!(scenario.steps.len(), 1);
         let SkillStep::Launch(app) = &scenario.steps[0] else {

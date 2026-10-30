@@ -28,6 +28,9 @@ struct ScenarioData {
     let hasTabBar: Bool
     /// How the tab bar renders when `hasTabBar` is true (labels vs icon-only).
     var tabBarStyle: SimulatorTabBarStyle = .labels
+    /// The screen's own tab names, labelling the tab bar's first columns in
+    /// declaration order; the generic labels fill the remaining columns.
+    var tabLabels: [String] = []
     /// Free text labels without chevrons (captions, stats, links).
     var plainTexts: [(String, CGPoint)] = []
     /// Pill-shaped buttons with centered text.

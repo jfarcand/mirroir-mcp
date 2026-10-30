@@ -27,29 +27,29 @@ final class DestructiveStepDetectorTests: XCTestCase {
 
     func testTapSendRequiresConfirmation() {
         let reason = DestructiveStepDetector.reasonForConfirmation(
-            .tap(label: "Send"), patterns: patterns)
+            .tap(label: "Send"), followedBy: nil, patterns: patterns)
         XCTAssertEqual(reason, "matches 'send'")
     }
 
     func testTapDeleteRequiresConfirmation() {
         XCTAssertNotNil(DestructiveStepDetector.reasonForConfirmation(
-            .tap(label: "Delete Message"), patterns: patterns))
+            .tap(label: "Delete Message"), followedBy: nil, patterns: patterns))
     }
 
     func testMatchIsCaseInsensitive() {
         XCTAssertNotNil(DestructiveStepDetector.reasonForConfirmation(
-            .tap(label: "UNINSTALL"), patterns: patterns))
+            .tap(label: "UNINSTALL"), followedBy: nil, patterns: patterns))
     }
 
     func testLongPressIsGatedLikeTap() {
         XCTAssertNotNil(DestructiveStepDetector.reasonForConfirmation(
-            .longPress(label: "Archive All", durationMs: nil), patterns: patterns))
+            .longPress(label: "Archive All", durationMs: nil), followedBy: nil, patterns: patterns))
     }
 
     func testResetAppIsGatedRegardlessOfPatterns() {
         // Its text says nothing destructive; the step type is what makes it so.
         let reason = DestructiveStepDetector.reasonForConfirmation(
-            .resetApp(appName: "Notes"), patterns: [])
+            .resetApp(appName: "Notes"), followedBy: nil, patterns: [])
         XCTAssertEqual(reason, "reset_app erases app state")
     }
 
@@ -60,13 +60,14 @@ final class DestructiveStepDetectorTests: XCTestCase {
             until: "Delivered",
             maxSeconds: nil)
         XCTAssertNotNil(
-            DestructiveStepDetector.reasonForConfirmation(step, patterns: patterns),
+            DestructiveStepDetector.reasonForConfirmation(
+                step, followedBy: nil, patterns: patterns),
             "A destructive action does not become safe by being timed")
     }
 
     func testDragUsesBothEndpoints() {
         XCTAssertNotNil(DestructiveStepDetector.reasonForConfirmation(
-            .drag(fromLabel: "Photo", toLabel: "Trash"), patterns: patterns))
+            .drag(fromLabel: "Photo", toLabel: "Trash"), followedBy: nil, patterns: patterns))
     }
 
     // MARK: - Steps that must NOT be gated
@@ -85,14 +86,15 @@ final class DestructiveStepDetectorTests: XCTestCase {
         ]
         for step in readOnly {
             XCTAssertNil(
-                DestructiveStepDetector.reasonForConfirmation(step, patterns: patterns),
+                DestructiveStepDetector.reasonForConfirmation(
+                    step, followedBy: nil, patterns: patterns),
                 "\(step.typeKey) only observes and must not be gated")
         }
     }
 
     func testOrdinaryTapIsNotGated() {
         XCTAssertNil(DestructiveStepDetector.reasonForConfirmation(
-            .tap(label: "Settings"), patterns: patterns))
+            .tap(label: "Settings"), followedBy: nil, patterns: patterns))
     }
 
     // MARK: - Scanning whole skills
@@ -139,19 +141,19 @@ final class DestructiveStepDetectorTests: XCTestCase {
     func testConfigPatternExtendsTheBuiltIns() {
         let extended = patterns + ["schedule pickup"]
         XCTAssertNil(DestructiveStepDetector.reasonForConfirmation(
-            .tap(label: "Schedule pickup"), patterns: patterns))
+            .tap(label: "Schedule pickup"), followedBy: nil, patterns: patterns))
         XCTAssertNotNil(DestructiveStepDetector.reasonForConfirmation(
-            .tap(label: "Schedule pickup"), patterns: extended))
+            .tap(label: "Schedule pickup"), followedBy: nil, patterns: extended))
     }
 
     func testSlashWrappedPatternIsTreatedAsRegex() {
         let reason = DestructiveStepDetector.reasonForConfirmation(
-            .tap(label: "Wipe device now"), patterns: ["/wipe\\s+device/"])
+            .tap(label: "Wipe device now"), followedBy: nil, patterns: ["/wipe\\s+device/"])
         XCTAssertEqual(reason, "matches '/wipe\\s+device/'")
     }
 
     func testInvalidRegexIsSkippedRatherThanCrashing() {
         XCTAssertNil(DestructiveStepDetector.reasonForConfirmation(
-            .tap(label: "anything"), patterns: ["/[unclosed/"]))
+            .tap(label: "anything"), followedBy: nil, patterns: ["/[unclosed/"]))
     }
 }

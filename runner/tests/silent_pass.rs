@@ -13,6 +13,7 @@ use std::fmt::Write as _;
 use std::fs;
 
 use common::Sandbox;
+use common::oracle_stub::stub_oracle;
 
 /// `- report: fail` is the scenario author saying "this run failed". Skipping
 /// it turns a declared failure into a green run, so the runner must exit
@@ -91,9 +92,9 @@ fn web_target_on_dead_port_has_no_skip_escape_hatch() -> Result<(), String> {
 }
 
 /// A scenario whose only assertion sits inside a `condition:` evaluates
-/// nothing at all: the runner has no live-surface evaluator for `if_visible`,
-/// so the branch — and the `assert_visible` inside it — is skipped. Reporting
-/// that as a pass is the same lie as skipping the web block.
+/// nothing at all: nothing here evaluates `if_visible`, so the branch — and
+/// the `assert_visible` inside it — would never run. The plan refuses the
+/// step by name, and `--validate` reaches the same verdict as a run.
 #[test]
 fn assertion_buried_in_a_condition_is_not_a_pass() -> Result<(), String> {
     let sandbox = Sandbox::new()?;
@@ -112,13 +113,51 @@ fn assertion_buried_in_a_condition_is_not_a_pass() -> Result<(), String> {
         ),
     )?;
 
-    let run = sandbox.run(&["--run-scenario", &scenario])?;
-    if !run.is_failure() {
-        return Err(format!(
-            "condition-only scenario exited {:?}; nothing was evaluated, so it is not a pass.\n{}",
-            run.code,
-            run.output()
-        ));
+    for mode in ["--run-scenario", "--validate"] {
+        let run = sandbox.run(&[mode, &scenario])?;
+        if !run.is_failure()
+            || !run
+                .output()
+                .contains("(`condition` on \"Cookie banner\") has no evaluator")
+        {
+            return Err(format!(
+                "{mode} on a condition-only scenario exited {:?} without naming the condition.\n{}",
+                run.code,
+                run.output()
+            ));
+        }
+    }
+    Ok(())
+}
+
+/// One real check beside a phone-only step with no `ios` block is the partial
+/// vacuous pass: the `http:` passes, the `launch:` drives nothing. The same
+/// `http:` alone passes, so the refusal is the `launch:`'s, by name.
+#[test]
+fn a_launch_outside_an_ios_block_fails_beside_a_passing_check() -> Result<(), String> {
+    let sandbox = Sandbox::new()?;
+    let mut scenarios = Vec::new();
+    for (name, extra) in [
+        ("http-only.yaml", ""),
+        ("http-launch.yaml", "  - launch: \"Acme\"\n"),
+    ] {
+        let server = stub_oracle("ok")?;
+        let body = format!(
+            "version: 1\nname: {name}\nsteps:\n  - http: {{ method: GET, url: \"http://127.0.0.1:{}/\", expect_status: 200 }}\n{extra}",
+            server.port
+        );
+        scenarios.push((sandbox.scenario(name, &body)?, extra.is_empty(), server));
+    }
+    for (scenario, passes, _server) in &scenarios {
+        let run = sandbox.run(&["--run-scenario", scenario])?;
+        let named = run.output().contains("step 1 (`launch`) drives an iPhone");
+        if run.is_failure() == *passes || (!passes && !named) {
+            return Err(format!(
+                "{scenario} exited {:?}.\n{}",
+                run.code,
+                run.output()
+            ));
+        }
     }
     Ok(())
 }

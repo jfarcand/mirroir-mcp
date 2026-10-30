@@ -7,9 +7,7 @@ use serde::Deserialize;
 
 use crate::error::{Result, RunnerError};
 use crate::parser::sample::extract_yaml_block;
-
-/// Highest version of the `archetype.md` frontmatter this binary understands.
-pub const ARCHETYPE_SCHEMA_VERSION: u32 = 1;
+use crate::parser::version::{self, ArtifactKind, SchemaVersion};
 
 /// Parsed frontmatter of an `archetype.md` file.
 ///
@@ -18,10 +16,9 @@ pub const ARCHETYPE_SCHEMA_VERSION: u32 = 1;
 /// markdown body is human documentation; the runner reads only the
 /// frontmatter.
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
-#[serde(deny_unknown_fields)]
 pub struct ArchetypeManifest {
-    /// Frontmatter schema version. Currently always `1`.
-    pub version: u32,
+    /// Frontmatter schema version, gated by [`ArtifactKind::Archetype`].
+    pub version: SchemaVersion,
     /// Fully-qualified archetype name within its pack (e.g., `atmosphere/ai-console`).
     pub name: String,
     /// Semver of this archetype revision.
@@ -41,7 +38,6 @@ pub struct ArchetypeManifest {
 
 /// Declared inputs an instance plan entry may need to supply.
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, Default)]
-#[serde(deny_unknown_fields)]
 pub struct ArchetypeRequires {
     /// Variable declarations consumed via `${VAR}` in archetype-sourced files.
     #[serde(default)]
@@ -53,7 +49,6 @@ pub struct ArchetypeRequires {
 
 /// One required-or-optional variable an archetype declares.
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
-#[serde(deny_unknown_fields)]
 pub struct ArchetypeRequiredVar {
     /// Variable name (referenced as `${name}` in source files).
     pub name: String,
@@ -70,7 +65,6 @@ pub struct ArchetypeRequiredVar {
 
 /// One environment variable an archetype's boot process expects.
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
-#[serde(deny_unknown_fields)]
 pub struct ArchetypeRequiredEnv {
     /// Environment variable name.
     pub name: String,
@@ -84,7 +78,6 @@ pub struct ArchetypeRequiredEnv {
 
 /// What the archetype offers — flows that instances can opt into.
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
-#[serde(deny_unknown_fields)]
 pub struct ArchetypeProvides {
     /// Names of flows defined under the archetype's `scenarios/` directory.
     pub flows: Vec<String>,
@@ -100,27 +93,19 @@ pub struct ArchetypeProvides {
 ///
 /// * [`RunnerError::SampleMissingYaml`] when no fenced yaml block is present.
 /// * [`RunnerError::YamlParse`] when the frontmatter fails deserialization.
-/// * [`RunnerError::UnsupportedVersion`] when `version` is out of range.
+/// * [`RunnerError::UnsupportedVersion`] when the `version:` major is unsupported.
+/// * [`RunnerError::UnknownFields`] for keys the manifest schema does not define.
 pub fn parse_archetype_manifest(source_label: &str, markdown: &str) -> Result<ArchetypeManifest> {
     let body = extract_yaml_block(markdown).ok_or_else(|| RunnerError::SampleMissingYaml {
         path: source_label.to_owned(),
     })?;
 
-    let manifest: ArchetypeManifest =
-        serde_norway::from_str(&body).map_err(|source| RunnerError::YamlParse {
+    version::from_yaml_str(ArtifactKind::Archetype, source_label, &body, |source| {
+        RunnerError::YamlParse {
             file: source_label.to_owned(),
             source,
-        })?;
-
-    if manifest.version != ARCHETYPE_SCHEMA_VERSION {
-        return Err(RunnerError::UnsupportedVersion {
-            artifact: "archetype.md".to_owned(),
-            found: manifest.version,
-            expected: ARCHETYPE_SCHEMA_VERSION..=ARCHETYPE_SCHEMA_VERSION,
-        });
-    }
-
-    Ok(manifest)
+        }
+    })
 }
 
 #[cfg(test)]
@@ -207,7 +192,7 @@ Prose follows.
         let md = "```yaml\nversion: 1\nname: x/y\narchetype_version: 1.0.0\nprovides:\n  flows: []\nrogue_field: nope\n```";
         assert!(matches!(
             parse_archetype_manifest("test", md),
-            Err(RunnerError::YamlParse { .. })
+            Err(RunnerError::UnknownFields { keys, .. }) if keys == ["rogue_field"]
         ));
     }
 }

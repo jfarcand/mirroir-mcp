@@ -107,11 +107,12 @@ mod tests {
 
     use super::{ScenarioSet, select_scenarios};
     use crate::error::RunnerError;
-    use crate::parser::sample::{Boot, SAMPLE_SCHEMA_VERSION, SampleManifest, Scenarios, Session};
+    use crate::parser::sample::{Boot, SampleManifest, Scenarios, Session};
+    use crate::parser::version::ArtifactKind;
 
     fn manifest(must_pass: &[&str], nice_to_pass: &[&str]) -> SampleManifest {
         SampleManifest {
-            version: SAMPLE_SCHEMA_VERSION,
+            version: ArtifactKind::Sample.current(),
             name: None,
             description: None,
             session: Session {

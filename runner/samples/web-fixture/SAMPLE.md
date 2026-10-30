@@ -102,7 +102,7 @@ one of the two files the same step compares.
 `baselines/parity.ios.txt` is the other half: the same screen as an iPhone's OCR
 reads it, whitespace-joined visible labels including the `Back` / `Orders` chrome
 the web page has no equivalent of. It is committed rather than produced, standing
-in for what `mirroir-mcp`'s `generate_skill` writes from a connected device.
+in for what an iOS block's `cross_surface` capture writes from a connected device.
 
 The two token sets score **0.875**; against `parity-reworded.html` they score
 **0.125**. `min_similarity: 0.5` bisects that gap. `parity.web.txt` is written by

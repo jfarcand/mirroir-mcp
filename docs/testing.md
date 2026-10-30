@@ -162,6 +162,24 @@ It is the one lane where the Swift and Rust sides of that boundary run together;
 format itself is also pinned by `PlaywrightReportWriterTests` against the fixture the runner's
 ingest tests read. See [Web and iOS in one scenario](web-and-ios.md).
 
+Two more steps hold the emitter to the runner. The first pipes JSON-RPC into the release
+`mirroir-mcp` to run `generate_skill(action: "explore", app_name: "Clock", emit: true)` against
+the Clock pack on FakeMirroring, writing into a scratch consumer repo under `$RUNNER_TEMP`. The
+budget is small (depth 2, 4 screens, 120 s), the seed is fixed, and
+`MIRROIR_COMPONENT_DETECTION=heuristic`, `MIRROIR_AGENT_TRANSPORT=http` and
+`MIRROIR_SCREEN_DESCRIBER_MODE=ocr` keep models out of the walk. It fails on an error result, a
+result with no emitted `.mirroir/` leg, a tree with no `tap:` step, or a flow that does not open
+`reset_app: "Clock"` then `launch: "Clock"` — that pair, not the lane, returns Clock to its root
+before each replay. It also confirms no server of that binary is still holding
+ScreenCaptureKit's per-binary slot. The second runs `mirroir-run --sample` on the emitted
+`apps/clock/`. It requires the hand-off, `verdict=pass` and `capture: sck=N fallback=0`, plus
+one mirroir-mcp `Steps — PASSED: N, FAILED: 0, NOT EVALUATED: 0, SKIPPED: 0` summary per
+scenario, with the PASSED counts summing to the emitted step count (the opening `target:` and
+`reset_app:` included, since mirroir-mcp executes both; the own-app reset needs no
+`--confirm-destructive`). It also checks that the rendered `ios-block.yaml` files carried a
+`reset_app:`, a `tap:` and a `wait_for:` across the bridge. The emitted tree and both logs are
+uploaded as the `clock-emit-contract` artifact.
+
 ## CI Workflow: `installers.yml`
 
 Three parallel jobs test each installation method end-to-end on `macos-15` runners. Each job installs the embacle FFI dependency (`brew install embacle-ffi`, symlink `libembacle.a`), clones `mirroir-skills` as a sibling and symlinks it into `.mirroir-mcp/skills` so FakeMirroring has AppPacks to load, then runs the full `IntegrationTests` target. After building, the workflow verifies the FFI is statically linked (`nm .build/release/mirroir-mcp | grep embacle_init`).

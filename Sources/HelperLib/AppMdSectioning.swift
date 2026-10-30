@@ -17,6 +17,10 @@ public enum AppMdSectioning {
 
     /// Walk `content` line-by-line, populating frontmatter (between `---` delimiters)
     /// and a dictionary of H2 section bodies keyed by their heading text.
+    ///
+    /// Front matter follows YAML comment rules: a line starting with `#` is a
+    /// comment, and a `#` preceded by whitespace outside quotes ends the value —
+    /// `version: 1   # schema major` reads as `1`.
     public static func extract(content: String) -> Result {
         var frontMatter: [String: String] = [:]
         var sections: [String: String] = [:]
@@ -40,10 +44,12 @@ public enum AppMdSectioning {
             }
 
             if inFrontMatter {
+                if trimmed.hasPrefix("#") { continue }
                 let parts = trimmed.split(separator: ":", maxSplits: 1)
                 if parts.count == 2 {
                     let key = parts[0].trimmingCharacters(in: .whitespaces)
-                    let value = parts[1].trimmingCharacters(in: .whitespaces)
+                    let value = stripInlineComment(String(parts[1]))
+                        .trimmingCharacters(in: .whitespaces)
                     frontMatter[key] = value
                 }
                 continue
@@ -65,5 +71,27 @@ public enum AppMdSectioning {
             sections[section] = currentBody.joined(separator: "\n")
         }
         return Result(frontMatter: frontMatter, sections: sections)
+    }
+
+    /// `value` up to its YAML inline comment: the first `#` that opens the
+    /// value or follows whitespace, outside single or double quotes.
+    /// A `#` inside a word (`C#`) or inside quotes is part of the value.
+    static func stripInlineComment(_ value: String) -> String {
+        var quote: Character?
+        var previous: Character = " "
+        var end = value.endIndex
+        for index in value.indices {
+            let character = value[index]
+            if let open = quote {
+                if character == open { quote = nil }
+            } else if character == "\"" || character == "'" {
+                quote = character
+            } else if character == "#" && previous.isWhitespace {
+                end = index
+                break
+            }
+            previous = character
+        }
+        return String(value[..<end])
     }
 }

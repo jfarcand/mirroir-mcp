@@ -5,6 +5,8 @@ use std::result::Result as StdResult;
 
 use serde::Deserialize;
 
+use crate::parser::shorthand::ShorthandOr;
+
 /// Arguments for `tap`. Accepts the string shorthand `- tap: "send"` or the
 /// record form `- tap: { label, last?, timeout_s? }`.
 ///
@@ -40,29 +42,27 @@ impl<'de> Deserialize<'de> for TapArgs {
         D: serde::Deserializer<'de>,
     {
         #[derive(Deserialize)]
-        #[serde(untagged)]
-        enum Repr {
-            Shorthand(String),
-            Full {
-                label: String,
-                #[serde(default)]
-                last: bool,
-                #[serde(default)]
-                timeout_s: Option<u32>,
-            },
+        struct Full {
+            label: String,
+            #[serde(default)]
+            last: bool,
+            #[serde(default)]
+            timeout_s: Option<u32>,
         }
-        Ok(match Repr::deserialize(deserializer)? {
-            Repr::Shorthand(label) => Self::new(label),
-            Repr::Full {
-                label,
-                last,
-                timeout_s,
-            } => Self {
-                label,
-                last,
-                timeout_s,
+        Ok(
+            match ShorthandOr::<String, Full>::deserialize(deserializer)? {
+                ShorthandOr::Shorthand(label) => Self::new(label),
+                ShorthandOr::Record(Full {
+                    label,
+                    last,
+                    timeout_s,
+                }) => Self {
+                    label,
+                    last,
+                    timeout_s,
+                },
             },
-        })
+        )
     }
 }
 
@@ -105,33 +105,31 @@ impl<'de> Deserialize<'de> for TypeArgs {
         D: serde::Deserializer<'de>,
     {
         #[derive(Deserialize)]
-        #[serde(untagged)]
-        enum Repr {
-            Shorthand(String),
-            Full {
-                text: String,
-                #[serde(default)]
-                into: Option<String>,
-                #[serde(default)]
-                last: bool,
-                #[serde(default)]
-                timeout_s: Option<u32>,
-            },
+        struct Full {
+            text: String,
+            #[serde(default)]
+            into: Option<String>,
+            #[serde(default)]
+            last: bool,
+            #[serde(default)]
+            timeout_s: Option<u32>,
         }
-        Ok(match Repr::deserialize(deserializer)? {
-            Repr::Shorthand(text) => Self::new(text),
-            Repr::Full {
-                text,
-                into,
-                last,
-                timeout_s,
-            } => Self {
-                text,
-                into,
-                last,
-                timeout_s,
+        Ok(
+            match ShorthandOr::<String, Full>::deserialize(deserializer)? {
+                ShorthandOr::Shorthand(text) => Self::new(text),
+                ShorthandOr::Record(Full {
+                    text,
+                    into,
+                    last,
+                    timeout_s,
+                }) => Self {
+                    text,
+                    into,
+                    last,
+                    timeout_s,
+                },
             },
-        })
+        )
     }
 }
 
@@ -173,33 +171,31 @@ impl<'de> Deserialize<'de> for AssertArgs {
         D: serde::Deserializer<'de>,
     {
         #[derive(Deserialize)]
-        #[serde(untagged)]
-        enum Repr {
-            Shorthand(String),
-            Full {
-                label: String,
-                #[serde(default)]
-                contains: Option<String>,
-                #[serde(default)]
-                last: bool,
-                #[serde(default)]
-                timeout_s: Option<u32>,
-            },
+        struct Full {
+            label: String,
+            #[serde(default)]
+            contains: Option<String>,
+            #[serde(default)]
+            last: bool,
+            #[serde(default)]
+            timeout_s: Option<u32>,
         }
-        Ok(match Repr::deserialize(deserializer)? {
-            Repr::Shorthand(label) => Self::new(label),
-            Repr::Full {
-                label,
-                contains,
-                last,
-                timeout_s,
-            } => Self {
-                label,
-                contains,
-                last,
-                timeout_s,
+        Ok(
+            match ShorthandOr::<String, Full>::deserialize(deserializer)? {
+                ShorthandOr::Shorthand(label) => Self::new(label),
+                ShorthandOr::Record(Full {
+                    label,
+                    contains,
+                    last,
+                    timeout_s,
+                }) => Self {
+                    label,
+                    contains,
+                    last,
+                    timeout_s,
+                },
             },
-        })
+        )
     }
 }
 
@@ -233,29 +229,27 @@ impl<'de> Deserialize<'de> for WaitForArgs {
         D: serde::Deserializer<'de>,
     {
         #[derive(Deserialize)]
-        #[serde(untagged)]
-        enum Repr {
-            Shorthand(String),
-            Full {
-                label: String,
-                #[serde(default)]
-                timeout_s: Option<u32>,
-                #[serde(default)]
-                last: bool,
-            },
+        struct Full {
+            label: String,
+            #[serde(default)]
+            timeout_s: Option<u32>,
+            #[serde(default)]
+            last: bool,
         }
-        Ok(match Repr::deserialize(deserializer)? {
-            Repr::Shorthand(label) => Self::new(label),
-            Repr::Full {
-                label,
-                timeout_s,
-                last,
-            } => Self {
-                label,
-                timeout_s,
-                last,
+        Ok(
+            match ShorthandOr::<String, Full>::deserialize(deserializer)? {
+                ShorthandOr::Shorthand(label) => Self::new(label),
+                ShorthandOr::Record(Full {
+                    label,
+                    timeout_s,
+                    last,
+                }) => Self {
+                    label,
+                    timeout_s,
+                    last,
+                },
             },
-        })
+        )
     }
 }
 

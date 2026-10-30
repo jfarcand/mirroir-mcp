@@ -254,6 +254,8 @@ mod tests {
     use tempfile::tempdir;
 
     use super::*;
+    use crate::parser::scenario::Scenario;
+    use crate::parser::version::{self, ArtifactKind};
 
     type TestResult = StdResult<(), String>;
 
@@ -442,12 +444,20 @@ mod tests {
     /// rather than dropped, which would compare stale files.
     #[test]
     fn the_singular_capture_key_is_refused() -> TestResult {
-        match from_str::<CrossSurfaceArgs>(
-            "response_files: [a.txt, b.txt]\nmin_similarity: 0.5\ncapture:\n  selector: main\n  to: b.txt\n",
-        ) {
-            Err(e) if e.to_string().contains("capture") => Ok(()),
+        let raw = "version: 1\nname: s\nsteps:\n  - cross_surface:\n      response_files: [a.txt, b.txt]\n      min_similarity: 0.5\n      capture:\n        selector: main\n        to: b.txt\n";
+        match version::from_yaml_str::<Scenario>(ArtifactKind::Scenario, "s", raw, |source| {
+            RunnerError::YamlParse {
+                file: "s".to_owned(),
+                source,
+            }
+        }) {
+            Err(RunnerError::UnknownFields { keys, .. })
+                if keys == ["steps.0.cross_surface.capture"] =>
+            {
+                Ok(())
+            }
             Err(e) => Err(format!("rejected for the wrong reason: {e}")),
-            Ok(args) => Err(format!("an unknown key parsed: {args:?}")),
+            Ok(scenario) => Err(format!("an unknown key parsed: {scenario:?}")),
         }
     }
 

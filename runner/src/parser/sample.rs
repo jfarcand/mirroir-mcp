@@ -6,12 +6,7 @@ use std::path::PathBuf;
 
 use serde::Deserialize;
 
-/// Highest version of the `SAMPLE.md` schema this binary understands.
-///
-/// Bumps work the same way as [`crate::parser::scenario::SCHEMA_VERSION`]:
-/// major-version mismatch is a hard load error; new optional fields stay
-/// forward-tolerant via `#[serde(default)]`.
-pub const SAMPLE_SCHEMA_VERSION: u32 = 1;
+use crate::parser::version::SchemaVersion;
 
 /// Top-level shape of a `SAMPLE.md` manifest (the fenced YAML block inside it).
 ///
@@ -20,10 +15,9 @@ pub const SAMPLE_SCHEMA_VERSION: u32 = 1;
 /// into this struct. The rest of the markdown is prose for human readers and
 /// is ignored at parse time.
 #[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
-#[serde(deny_unknown_fields)]
 pub struct SampleManifest {
-    /// Schema major version. Currently always `1`.
-    pub version: u32,
+    /// Schema version, gated by [`crate::parser::version::ArtifactKind::Sample`].
+    pub version: SchemaVersion,
     /// Session block — how the runner boots the sample and which scenarios to drive.
     pub session: Session,
     /// Optional human-readable name.
@@ -36,7 +30,6 @@ pub struct SampleManifest {
 
 /// `session:` block inside a [`SampleManifest`].
 #[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
-#[serde(deny_unknown_fields)]
 pub struct Session {
     /// How to boot the sample's process. Used to fill `spawn:` step defaults
     /// when a scenario writes `from: SAMPLE.md`.
@@ -63,7 +56,6 @@ pub struct Session {
 
 /// `session.boot:` — the canonical command to start the sample under test.
 #[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
-#[serde(deny_unknown_fields)]
 pub struct Boot {
     /// Shell-words-tokenized command line (e.g. `"java -jar target/foo.jar"`).
     pub command: String,
@@ -81,7 +73,6 @@ pub struct Boot {
 
 /// `session.scenarios:` — scenario YAML files grouped by result tier.
 #[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
-#[serde(deny_unknown_fields)]
 pub struct Scenarios {
     /// Scenarios that must pass for the sample to be considered green.
     /// Paths are relative to the sample dir.
@@ -125,6 +116,8 @@ mod tests {
     use std::result::Result as StdResult;
 
     use super::*;
+    use crate::error::RunnerError;
+    use crate::parser::version::{self, ArtifactKind};
 
     type TestResult = StdResult<(), Box<dyn StdError>>;
 
@@ -179,7 +172,7 @@ session:
       - slow-network.yaml
 "#;
         let manifest: SampleManifest = serde_norway::from_str(yaml)?;
-        assert_eq!(manifest.version, SAMPLE_SCHEMA_VERSION);
+        assert_eq!(manifest.version, ArtifactKind::Sample.current());
         assert_eq!(manifest.name.as_deref(), Some("spring-boot-chat"));
         assert_eq!(
             manifest.session.boot.command,
@@ -203,7 +196,7 @@ session:
       - smoke.yaml
 "#;
         let manifest: SampleManifest = serde_norway::from_str(yaml)?;
-        assert_eq!(manifest.version, SAMPLE_SCHEMA_VERSION);
+        assert_eq!(manifest.version, ArtifactKind::Sample.current());
         assert!(manifest.name.is_none());
         assert!(manifest.session.boot.cwd.is_none());
         assert!(manifest.session.boot.timeout_s.is_none());
@@ -226,13 +219,19 @@ session:
     must_pass: []
 unknown_field: nope
 "#;
-        let Err(err) = serde_norway::from_str::<SampleManifest>(yaml) else {
-            return Err("expected deserialize to fail".into());
+        let parsed = version::from_yaml_str::<SampleManifest>(
+            ArtifactKind::Sample,
+            "SAMPLE.md",
+            yaml,
+            |source| RunnerError::YamlParse {
+                file: "SAMPLE.md".to_owned(),
+                source,
+            },
+        );
+        let Err(RunnerError::UnknownFields { keys, .. }) = parsed else {
+            return Err(format!("expected UnknownFields, got {parsed:?}").into());
         };
-        let msg = err.to_string();
-        if !(msg.contains("unknown_field") || msg.contains("unknown field")) {
-            return Err(format!("expected unknown-field error, got: {msg}").into());
-        }
+        assert_eq!(keys, vec!["unknown_field".to_owned()]);
         Ok(())
     }
 }

@@ -25,6 +25,17 @@ struct ExploredScreen: Sendable {
     var displayLabel: String? = nil
     /// Base64-encoded PNG screenshot of the screen.
     let screenshotBase64: String
+    /// How many trailing entries of `elements` were found only by scrolling
+    /// after the screen was reached; the leading ones are the viewport seen on
+    /// arrival. A live capture holds none; a graph walk carries the node's
+    /// `ScreenNode.scrolledElementCount`.
+    var scrolledElementCount: Int = 0
+
+    /// The viewport this screen showed on arrival: `elements` without the rows
+    /// scrolling merged in afterwards.
+    var arrivalElements: [TapPoint] {
+        Array(elements.dropLast(min(scrolledElementCount, elements.count)))
+    }
 }
 
 /// A single action attempted during exploration (including rejected duplicates).

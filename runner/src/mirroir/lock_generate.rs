@@ -13,10 +13,9 @@ use sha2::{Digest, Sha256};
 use crate::error::{Result, RunnerError};
 use crate::mirroir::lock::format_ref;
 use crate::mirroir::resolve::{ArchetypeOrigin, ResolvedArchetype, resolve_archetype};
-use crate::parser::lockfile::{
-    GitSource, LOCKFILE_SCHEMA_VERSION, LockedArchetype, LockedOrigin, Lockfile, ResolvedRecord,
-};
+use crate::parser::lockfile::{GitSource, LockedArchetype, LockedOrigin, Lockfile, ResolvedRecord};
 use crate::parser::mirroir::{MirroirConfig, PlanEntrySource};
+use crate::parser::version::ArtifactKind;
 
 /// Regenerate the lockfile from scratch: walk every archetype ref in the
 /// config, resolve it on disk, gather source/version/checksum info, and build
@@ -60,7 +59,7 @@ pub fn regenerate_lockfile(
     archetypes.sort_by(|a, b| a.reference.cmp(&b.reference));
 
     Ok(Lockfile {
-        version: LOCKFILE_SCHEMA_VERSION,
+        version: ArtifactKind::Lockfile.current(),
         generated_at: Utc::now(),
         generated_by: format!("mirroir-run {}", env!("CARGO_PKG_VERSION")),
         archetypes,

@@ -137,9 +137,17 @@ extension MirroirMCP {
                         "description": .string(
                             "When true on the finish or explore action, write a runnable " +
                             ".mirroir/apps/<app>/ iOS leg into the consumer repo: the captured " +
-                            "walk as a target: { kind: ios } scenario, a SAMPLE.md declaring it, " +
-                            "and a must_pass plan entry — mirroir-run replays it through " +
-                            "mirroir-mcp test on macOS. Default: false."),
+                            "walk (finish) or every interesting explored path (explore), each " +
+                            "as its own target: { kind: ios } scenario opening reset_app then " +
+                            "launch of the app (so it replays from the root; that own-app " +
+                            "reset needs no --confirm-destructive), a SAMPLE.md declaring " +
+                            "them, and a must_pass plan entry — mirroir-run replays them through " +
+                            "mirroir-mcp test on macOS. Later emits insert into an owned " +
+                            "SAMPLE.md's and mirroir.yaml's must_pass lists in place. A path " +
+                            "that cannot replay is dropped and named in the result. The result " +
+                            "is an error when no flow is left to write, the exploration did not " +
+                            "finish, a must_pass list cannot be located unambiguously, or a " +
+                            "human-owned SAMPLE.md does not declare a written flow. Default: false."),
                     ]),
                     "output_dir": .object([
                         "type": .string("string"),

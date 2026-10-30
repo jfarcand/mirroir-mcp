@@ -34,7 +34,7 @@ If your app has no edge-control cluster (full-screen game, single-view utility),
 
 ## File Format
 
-UTF-8 Markdown with an optional YAML front-matter block. File name must be `APP.md` (case-insensitive match during loading, but `APP.md` is canonical). Recommended location:
+UTF-8 Markdown opened by a YAML front-matter block, which must carry `app:` and `version:`. File name must be `APP.md` (case-insensitive match during loading, but `APP.md` is canonical). Recommended location:
 
 - **Project-local**: `<cwd>/.mirroir-mcp/skills/patterns/apps/<AppName>/APP.md`
 - **Global**: `~/.mirroir-mcp/skills/patterns/apps/<AppName>/APP.md`
@@ -48,7 +48,7 @@ The loader matches the `app:` front-matter field against the `app_name` paramete
 ---
 # Front matter (YAML-ish, flat key:value)
 app: AppName           # required
-version: 1             # reserved for future versioning
+version: 1             # required — schema major; a different major is refused
 locale: fr_CA          # optional — prefer matching locales
 archetype: dashboard   # optional — screen recipe name
 reset_before_explore: true   # optional — force-quit before explore
@@ -96,10 +96,12 @@ Per-tab description. Body is injected into the generated skill's context.
 
 ## Front-Matter Fields
 
+Comments follow YAML: a line starting with `#` is skipped, and a `#` after whitespace outside quotes ends the value, so `version: 1   # schema major` reads as `1`. A `#` inside a word (`C#`) or inside quotes is kept.
+
 | Field | Type | Required | Behavior |
 |---|---|---|---|
 | `app` | string | ✅ yes | Display name. Matching is diacritics-insensitive + case-insensitive. |
-| `version` | int | optional | APP.md schema version (carried on `AppDescription.schemaVersion`). The only supported version is `1`. A file declaring a higher version logs a warning at load time and is still parsed best-effort. Defaults to `1` when absent. |
+| `version` | int or quoted `"MAJOR.MINOR"` | required | APP.md schema version, gated by `AppMdSchemaVersion` (major carried on `AppDescription.schemaVersion`). `1` means major 1, minor 0; a quoted `"1.2"` carries a minor; a bare float (`1.2`) is refused. The only supported major is `1`: a file declaring another major is refused (not loaded). A newer minor of major 1 parses, ignoring what that minor added. A file without `version:` is refused (not loaded), with the reason in the debug log. mirroir-run applies the same rule, `version:` required included, to the archetype-pack `APP.md` it reads for `drift_defaults:`. |
 | `locale` | string | optional | e.g. `fr_CA`. When multiple APP.md files match the same app, a locale match takes priority over a locale-less file. |
 | `archetype` | string | optional | Name of a screen recipe (e.g. `dashboard`, `social-feed`, `settings-list`). When set, bypasses recipe auto-detection. |
 | `reset_before_explore` | bool | optional | `true` / `yes` / `1` → explorer force-quits the app via App Switcher before launching. Used for apps that retain stateful overlays (TikTok, Instagram). Default: `false`. |

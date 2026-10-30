@@ -2,7 +2,7 @@
 // Licensed under the Apache License, Version 2.0
 //
 // ABOUTME: Discovers and loads APP.md files matching an app name from disk search paths.
-// ABOUTME: Supports locale-specific descriptions and ${VAR} substitution in credentials.
+// ABOUTME: Locale-specific descriptions, ${VAR} credentials, and the APP.md files a version gate refused.
 
 import Foundation
 import HelperLib
@@ -11,26 +11,60 @@ import HelperLib
 /// Search paths follow the same convention as skills: project-local overrides global.
 enum AppDescriptionLoader {
 
+    /// An APP.md that named the app but whose `version:` the schema gate refused.
+    struct Refusal: Sendable, Equatable {
+        let path: String
+        let reason: String
+    }
+
+    /// The outcome of looking up an app's APP.md.
+    struct Lookup: Sendable {
+        /// The best matching description, or nil if no usable APP.md matches.
+        let description: AppDescription?
+        /// Every APP.md that named the app and was refused, in search order.
+        let refused: [Refusal]
+
+        /// The line a tool result carries when an APP.md for the app was
+        /// refused, so its tabs, skip list and obstacles are not silently lost;
+        /// nil when none was.
+        var refusalNote: String? {
+            guard !refused.isEmpty else { return nil }
+            let files = refused.map { "  \($0.path): \($0.reason)" }.joined(separator: "\n")
+            let effect = description == nil
+                ? "this run used no APP.md (no tabs, skip list or obstacles from it)"
+                : "this run used another APP.md for the app"
+            return "APP.md refused — \(effect):\n\(files)"
+        }
+    }
+
     /// Load an app description matching the given app name.
     ///
     /// When multiple APP.md files match (e.g. different locales), the first match
     /// from the highest-priority search path wins. Locale-specific files
     /// (matching the system locale) are preferred over locale-less files.
     ///
-    /// - Parameter appName: The app name to match (case-insensitive, diacritics-insensitive).
-    /// - Returns: The best matching AppDescription, or nil if no APP.md matches.
-    static func load(appName: String) -> AppDescription? {
+    /// - Parameters:
+    ///   - appName: The app name to match (case-insensitive, diacritics-insensitive).
+    ///   - searchPaths: The directories searched, in resolution order.
+    /// - Returns: The best matching AppDescription (nil if no usable APP.md
+    ///   matches) and every APP.md naming the app that the version gate refused.
+    static func load(appName: String, searchPaths: [String] = searchPaths()) -> Lookup {
         let normalizedName = foldName(appName)
         var bestMatch: AppDescription?
+        var refused: [Refusal] = []
         let systemLocale = Locale.current.identifier
 
-        for dir in searchPaths() {
+        for dir in searchPaths {
             let files = findAppFiles(in: dir)
             for filePath in files {
                 guard let content = try? String(contentsOfFile: filePath, encoding: .utf8) else {
                     continue
                 }
                 guard let description = AppDescriptionParser.parse(content: content) else {
+                    if let refusal = AppDescriptionParser.schemaRefusal(content: content),
+                       foldName(refusal.appName) == normalizedName {
+                        refused.append(Refusal(path: filePath, reason: refusal.reason))
+                    }
                     continue
                 }
                 guard foldName(description.appName) == normalizedName else {
@@ -42,7 +76,7 @@ enum AppDescriptionLoader {
                    locale.lowercased() == systemLocale.lowercased() {
                     DebugLog.log("app-desc",
                         "Loaded APP.md for '\(appName)' (locale=\(locale)) from \(filePath)")
-                    return resolveVariables(in: description)
+                    return Lookup(description: resolveVariables(in: description), refused: refused)
                 }
 
                 // First name-matched file is the fallback (locale-less preferred,
@@ -59,7 +93,7 @@ enum AppDescriptionLoader {
         if bestMatch != nil {
             DebugLog.log("app-desc", "Loaded APP.md for '\(appName)' (no locale)")
         }
-        return bestMatch.map { resolveVariables(in: $0) }
+        return Lookup(description: bestMatch.map { resolveVariables(in: $0) }, refused: refused)
     }
 
     /// Search paths for APP.md files, in resolution order.

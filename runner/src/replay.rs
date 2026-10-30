@@ -21,10 +21,11 @@ use crate::oracle::drift_log::append_findings;
 use crate::oracle::drift_session::DriftSession;
 use crate::oracle::thresholds::{ThresholdSearch, load_policy};
 use crate::parser::env::substitute;
-use crate::parser::sample::{SAMPLE_SCHEMA_VERSION, SampleManifest, extract_yaml_block};
-use crate::parser::scenario::{SCHEMA_VERSION, Scenario};
+use crate::parser::sample::{SampleManifest, extract_yaml_block};
+use crate::parser::scenario::Scenario;
 use crate::parser::step::TargetKind;
 use crate::parser::surface::step_kind;
+use crate::parser::version::{self, ArtifactKind};
 use crate::replay_dispatch::verify_measures;
 use crate::replay_plan::{ScenarioPlan, Segment};
 use crate::replay_step::{StepDispatch, StepVerdict, dispatch_step};
@@ -47,7 +48,8 @@ pub use crate::scenario_set::ScenarioSet;
 /// * [`RunnerError::Io`] when the file can't be read.
 /// * [`RunnerError::RegexCompile`] when env substitution fails.
 /// * [`RunnerError::YamlParse`] when YAML deserialization fails.
-/// * [`RunnerError::UnsupportedVersion`] when the `version:` field is out of range.
+/// * [`RunnerError::UnsupportedVersion`] when the `version:` major is unsupported.
+/// * [`RunnerError::UnknownFields`] for keys the scenario schema does not define.
 pub fn load_scenario_with_extras(path: &Path, extras: &[(&str, String)]) -> Result<Scenario> {
     let raw = fs::read_to_string(path).map_err(|source| RunnerError::Io {
         context: format!("read scenario file {}", path.display()),
@@ -60,19 +62,14 @@ pub fn load_scenario_with_extras(path: &Path, extras: &[(&str, String)]) -> Resu
     }
     let substituted = substitute(&raw, &environment)?;
 
+    let file = path.display().to_string();
     let scenario: Scenario =
-        serde_norway::from_str(&substituted).map_err(|source| RunnerError::YamlParse {
-            file: path.display().to_string(),
-            source,
+        version::from_yaml_str(ArtifactKind::Scenario, &file, &substituted, |source| {
+            RunnerError::YamlParse {
+                file: file.clone(),
+                source,
+            }
         })?;
-
-    if scenario.version != SCHEMA_VERSION {
-        return Err(RunnerError::UnsupportedVersion {
-            artifact: "scenario.yaml".to_owned(),
-            found: scenario.version,
-            expected: SCHEMA_VERSION..=SCHEMA_VERSION,
-        });
-    }
     Ok(scenario)
 }
 
@@ -100,7 +97,8 @@ pub fn load_scenario(path: &Path) -> Result<Scenario> {
 /// * [`RunnerError::SampleMissingYaml`] when no fenced yaml block is present.
 /// * [`RunnerError::RegexCompile`] when env substitution fails.
 /// * [`RunnerError::YamlParse`] when the YAML body fails deserialization.
-/// * [`RunnerError::UnsupportedVersion`] when the manifest's `version:` is out of range.
+/// * [`RunnerError::UnsupportedVersion`] when the manifest's `version:` major is unsupported.
+/// * [`RunnerError::UnknownFields`] for keys the manifest schema does not define.
 pub fn load_sample_manifest_with_extras(
     path: &Path,
     extras: &[(&str, String)],
@@ -119,18 +117,14 @@ pub fn load_sample_manifest_with_extras(
     }
     let substituted = substitute(&body, &environment)?;
 
+    let file = path.display().to_string();
     let manifest: SampleManifest =
-        serde_norway::from_str(&substituted).map_err(|source| RunnerError::YamlParse {
-            file: path.display().to_string(),
-            source,
+        version::from_yaml_str(ArtifactKind::Sample, &file, &substituted, |source| {
+            RunnerError::YamlParse {
+                file: file.clone(),
+                source,
+            }
         })?;
-    if manifest.version != SAMPLE_SCHEMA_VERSION {
-        return Err(RunnerError::UnsupportedVersion {
-            artifact: "SAMPLE.md".to_owned(),
-            found: manifest.version,
-            expected: SAMPLE_SCHEMA_VERSION..=SAMPLE_SCHEMA_VERSION,
-        });
-    }
     Ok(manifest)
 }
 
@@ -308,7 +302,6 @@ pub async fn run_scenario_with_context(
         return Err(RunnerError::ScenarioNothingEvaluated {
             scenario: scenario.name.clone(),
             steps: scenario.steps.len(),
-            skipped: counters.skipped,
         });
     }
 
@@ -324,7 +317,7 @@ pub async fn run_scenario_with_context(
         }
         (RunVerdict::Pass | RunVerdict::Drift, BaselineMode::Accept)
         | (RunVerdict::Pass, BaselineMode::Compare) => {
-            record_baseline(&review_root, &scenario.name, drift.into_observed())?;
+            record_baseline(&review_root, &scenario.name, &drift.into_observed())?;
         }
     }
 
@@ -332,7 +325,6 @@ pub async fn run_scenario_with_context(
         file = %path.display(),
         name = %scenario.name,
         evaluated = counters.evaluated,
-        skipped = counters.skipped,
         verdict = %verdict,
         "scenario run completed"
     );
@@ -361,7 +353,6 @@ pub async fn run_scenario(path: &Path, roots: ReplayRoots<'_>) -> Result<RunVerd
 #[derive(Debug, Default, Clone, Copy)]
 struct Counters {
     evaluated: usize,
-    skipped: usize,
 }
 
 /// Dispatch the runner-side steps at `indices`, in order, accumulating what
@@ -385,14 +376,6 @@ async fn run_hooks(
         match dispatch_step(index, step, dispatch, processes, http, captures, drift).await? {
             StepVerdict::Evaluated => counters.evaluated += 1,
             StepVerdict::NoVerdict => {}
-            StepVerdict::Skipped => {
-                counters.skipped += 1;
-                info!(
-                    index,
-                    kind = step_kind(step),
-                    "no replay dispatch for this step kind; skipping"
-                );
-            }
         }
     }
     Ok(())

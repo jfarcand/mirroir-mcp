@@ -10,9 +10,7 @@ use crate::error::{Result, RunnerError};
 use crate::mirroir::error::MirroirError;
 
 pub use crate::parser::mirroir_plan::{ArchetypeRef, ArchetypeRefKind};
-
-/// Highest schema version this binary understands for `mirroir.yaml`.
-pub const MIRROIR_SCHEMA_VERSION: u32 = 1;
+use crate::parser::version::{self, ArtifactKind, SchemaVersion};
 
 /// Top-level shape of `<repo>/.mirroir/mirroir.yaml`.
 ///
@@ -21,8 +19,8 @@ pub const MIRROIR_SCHEMA_VERSION: u32 = 1;
 /// overrides) or a fully-local sample definition.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct MirroirConfig {
-    /// Schema major version. Currently always `1`.
-    pub version: u32,
+    /// Schema version, gated by [`ArtifactKind::MirroirConfig`].
+    pub version: SchemaVersion,
     /// Human-readable suite name.
     pub name: Option<String>,
     /// Multi-line description.
@@ -98,7 +96,6 @@ pub enum PlanEntrySource {
 /// in a standalone `SAMPLE.md`. The compose layer separates these back out
 /// when emitting `.mirroir/.build/<sample>/SAMPLE.md`.
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
-#[serde(deny_unknown_fields)]
 pub struct PlanEntryBoot {
     /// Shell-words-tokenized command line.
     pub command: String,
@@ -132,9 +129,8 @@ const fn default_boot_once() -> bool {
 // ─────────────────────────────────────────────────────────────────────────────
 
 #[derive(Debug, Clone, Deserialize)]
-#[serde(deny_unknown_fields)]
 struct MirroirConfigRaw {
-    version: u32,
+    version: SchemaVersion,
     #[serde(default)]
     name: Option<String>,
     #[serde(default)]
@@ -148,7 +144,6 @@ struct MirroirConfigRaw {
 }
 
 #[derive(Debug, Clone, Deserialize, Default)]
-#[serde(deny_unknown_fields)]
 struct PlanRaw {
     #[serde(default)]
     must_pass: Vec<PlanEntryRaw>,
@@ -157,7 +152,6 @@ struct PlanRaw {
 }
 
 #[derive(Debug, Clone, Deserialize)]
-#[serde(deny_unknown_fields)]
 struct PlanEntryRaw {
     name: String,
     #[serde(default)]
@@ -181,25 +175,20 @@ struct PlanEntryRaw {
 /// # Errors
 ///
 /// * [`RunnerError::YamlParse`] when serde rejects the input.
-/// * [`RunnerError::UnsupportedVersion`] when `version != 1`.
+/// * [`RunnerError::UnsupportedVersion`] when the `version:` major is unsupported.
+/// * [`RunnerError::UnknownFields`] for keys the plan schema does not define.
 /// * [`MirroirError::InvalidArchetypeRef`] for malformed refs.
 /// * [`MirroirError::CompositionUnsupported`] for `archetypes.len() > 1`.
 /// * [`MirroirError::PlanEntryAmbiguous`] when neither/both of
 ///   `archetypes` and `local` are set.
 pub fn parse_mirroir_config(source_label: &str, yaml: &str) -> Result<MirroirConfig> {
     let raw: MirroirConfigRaw =
-        serde_norway::from_str(yaml).map_err(|source| RunnerError::YamlParse {
-            file: source_label.to_owned(),
-            source,
+        version::from_yaml_str(ArtifactKind::MirroirConfig, source_label, yaml, |source| {
+            RunnerError::YamlParse {
+                file: source_label.to_owned(),
+                source,
+            }
         })?;
-
-    if raw.version != MIRROIR_SCHEMA_VERSION {
-        return Err(RunnerError::UnsupportedVersion {
-            artifact: "mirroir.yaml".to_owned(),
-            found: raw.version,
-            expected: MIRROIR_SCHEMA_VERSION..=MIRROIR_SCHEMA_VERSION,
-        });
-    }
 
     let plan = Plan {
         must_pass: raw
@@ -414,31 +403,35 @@ plan:
     }
 
     #[test]
-    fn rejects_unknown_top_level_field() {
-        let yaml = r"
-version: 1
-plan:
-  must_pass: []
-unknown_field: yep
-";
-        assert!(matches!(
-            parse_mirroir_config("test", yaml),
-            Err(RunnerError::YamlParse { .. })
-        ));
+    fn rejects_unknown_keys_at_a_known_minor() -> TestResult {
+        let yaml = "version: 1\nplan:\n  must_pass: []\n  must_pas: []\nunknown_field: yep\n";
+        let Err(RunnerError::UnknownFields { keys, .. }) = parse_mirroir_config("test", yaml)
+        else {
+            return Err("expected UnknownFields".into());
+        };
+        assert_eq!(
+            keys,
+            vec!["plan.must_pas".to_owned(), "unknown_field".to_owned()]
+        );
+        Ok(())
     }
 
     #[test]
-    fn rejects_wrong_version() -> TestResult {
-        let yaml = r"
-version: 99
-plan:
-  must_pass: []
-";
+    fn a_newer_minor_ignores_unknown_keys() -> TestResult {
+        let yaml = "version: \"1.1\"\nplan:\n  must_pass: []\nadded_in_1_1: yep\n";
+        let config = parse_mirroir_config("test", yaml)?;
+        assert_eq!(config.version, SchemaVersion::new(1, 1));
+        Ok(())
+    }
+
+    #[test]
+    fn a_newer_major_with_new_keys_is_unsupported_not_a_parse_error() -> TestResult {
+        let yaml = "version: 2\nplan:\n  must_pass: []\nadded_in_2: yep\n";
         let Err(RunnerError::UnsupportedVersion { found, .. }) = parse_mirroir_config("test", yaml)
         else {
             return Err("expected UnsupportedVersion".into());
         };
-        assert_eq!(found, 99);
+        assert_eq!(found, SchemaVersion::new(2, 0));
         Ok(())
     }
 }

@@ -5,16 +5,14 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
 use crate::error::{Result, RunnerError};
-
-/// Schema version of the `mirroir.lock` file.
-pub const LOCKFILE_SCHEMA_VERSION: u32 = 1;
+use crate::parser::version::{self, ArtifactKind, SchemaVersion};
 
 /// Top-level lockfile shape — the data persisted to `<repo>/.mirroir/mirroir.lock`.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
 pub struct Lockfile {
-    /// Schema major version. Currently always `1`.
-    pub version: u32,
+    /// Schema version, gated by [`ArtifactKind::Lockfile`]; a fresh lockfile
+    /// carries [`ArtifactKind::current`].
+    pub version: SchemaVersion,
     /// UTC timestamp recorded when the lockfile was last regenerated.
     pub generated_at: DateTime<Utc>,
     /// Human-readable producer (`"mirroir-run 0.2.0"` etc.).
@@ -25,7 +23,6 @@ pub struct Lockfile {
 
 /// One row of the lockfile — maps a friendly ref to an exact resolution.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
 pub struct LockedArchetype {
     /// Friendly reference as it appears in `mirroir.yaml`
     /// (e.g., `mirroir-skills/atmosphere/ai-console@v1` or `./archetypes/foo`).
@@ -37,7 +34,6 @@ pub struct LockedArchetype {
 
 /// Exact resolution recorded in the lockfile. Path-independent.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
 pub struct ResolvedRecord {
     /// Origin kind — drives install-path computation at resolve time.
     pub kind: LockedOrigin,
@@ -70,7 +66,6 @@ pub enum LockedOrigin {
 
 /// Git source bound recorded for pack-installed archetypes.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
 pub struct GitSource {
     /// Remote URL the pack was cloned from.
     pub url: String,
@@ -86,21 +81,15 @@ pub struct GitSource {
 /// # Errors
 ///
 /// * [`RunnerError::YamlParse`] on serde failure.
-/// * [`RunnerError::UnsupportedVersion`] when `version` is out of range.
+/// * [`RunnerError::UnsupportedVersion`] when the `version:` major is unsupported.
+/// * [`RunnerError::UnknownFields`] for keys the lockfile schema does not define.
 pub fn parse_lockfile(source_label: &str, yaml: &str) -> Result<Lockfile> {
-    let parsed: Lockfile =
-        serde_norway::from_str(yaml).map_err(|source| RunnerError::YamlParse {
+    version::from_yaml_str(ArtifactKind::Lockfile, source_label, yaml, |source| {
+        RunnerError::YamlParse {
             file: source_label.to_owned(),
             source,
-        })?;
-    if parsed.version != LOCKFILE_SCHEMA_VERSION {
-        return Err(RunnerError::UnsupportedVersion {
-            artifact: "mirroir.lock".to_owned(),
-            found: parsed.version,
-            expected: LOCKFILE_SCHEMA_VERSION..=LOCKFILE_SCHEMA_VERSION,
-        });
-    }
-    Ok(parsed)
+        }
+    })
 }
 
 /// Serialize a lockfile to YAML text. The output is deterministic — entries
@@ -134,7 +123,7 @@ mod tests {
     fn sample_lockfile() -> StdResult<Lockfile, Box<dyn StdError>> {
         let ts = DateTime::parse_from_rfc3339("2026-05-16T18:22:14Z")?.with_timezone(&Utc);
         Ok(Lockfile {
-            version: 1,
+            version: ArtifactKind::Lockfile.current(),
             generated_at: ts,
             generated_by: "mirroir-run 0.2.0".to_owned(),
             archetypes: vec![
@@ -205,7 +194,7 @@ mod tests {
         let yaml = "version: 1\ngenerated_at: 2026-05-16T18:22:14Z\ngenerated_by: x\narchetypes: []\nrogue: oops\n";
         assert!(matches!(
             parse_lockfile("test", yaml),
-            Err(RunnerError::YamlParse { .. })
+            Err(RunnerError::UnknownFields { keys, .. }) if keys == ["rogue"]
         ));
     }
 

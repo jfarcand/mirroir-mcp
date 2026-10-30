@@ -39,7 +39,9 @@ extension InputSimulation {
         }
         DebugLog.log("launchApp", "launching '\(name)'")
 
-        // Step 1: Open Spotlight via menu action (requires MenuActionCapable)
+        // Step 1: Open Spotlight via menu action (requires MenuActionCapable). The
+        // screen before it is kept to tell when Spotlight has opened.
+        let beforeOpen = pasteVerifier?.describe(settleTimeoutUs: 0)?.elements ?? []
         guard let menuBridge = bridge as? (any MenuActionCapable),
               menuBridge.triggerMenuAction(menu: "View", item: "Spotlight") else {
             DebugLog.log("launchApp", "ERROR: failed to open Spotlight")
@@ -50,10 +52,20 @@ extension InputSimulation {
         // Step 2: Type the app name, and confirm Spotlight shows it before Return.
         // Spotlight can reopen holding the previous query in a state that swallows
         // keystrokes; Return would then launch the previous result.
-        guard let before = screenLines() else {
-            return "Could not read the screen after opening Spotlight, so the search " +
-                "for '\(name)' could not be confirmed; Return was not pressed."
+        // Spotlight opened while a Home transition finishes is closed again by it,
+        // so a Spotlight that never shows is opened once more before giving up.
+        guard let opened = spotlightScreen(replacing: beforeOpen)
+                ?? (menuBridge.triggerMenuAction(menu: "View", item: "Spotlight")
+                    ? spotlightScreen(replacing: beforeOpen) : nil) else {
+            return "Spotlight did not open (or the screen could not be read), so " +
+                "'\(name)' was not searched for; Return was not pressed."
         }
+        // An app tile already showing the app (the held query's top hit, or a Siri
+        // suggestion) is tapped instead: typing into a held query is ignored.
+        if let tile = SpotlightAppTile.label(for: name, in: opened.elements) {
+            return openTile(tile, name: name, spotlight: opened.elements)
+        }
+        let before = opened.elements.map(\.text)
         let typeResult = typeText(name)
         guard typeResult.success else {
             DebugLog.log("launchApp", "ERROR: failed to type app name")
@@ -61,6 +73,12 @@ extension InputSimulation {
         }
         usleep(EnvConfig.searchResultsPopulateUs)
         guard spotlightShows(name, comparedTo: before) else {
+            // Spotlight can open on its idle page, then restore the held query that
+            // swallowed the typing: its tile for this app still opens it.
+            if let screen = pasteVerifier?.describe(settleTimeoutUs: 0),
+               let tile = SpotlightAppTile.label(for: name, in: screen.elements) {
+                return openTile(tile, name: name, spotlight: screen.elements)
+            }
             DebugLog.log("launchApp", "ERROR: '\(name)' never appeared in Spotlight")
             return "Typed '\(name)' into Spotlight but it never appeared on screen, so " +
                 "Return was not pressed. Spotlight may be holding a previous query, or " +
@@ -84,6 +102,48 @@ extension InputSimulation {
         guard let result = pasteVerifier?.describe(settleTimeoutUs: 0),
               result.ocrFailure == nil else { return nil }
         return result.elements.map(\.text)
+    }
+
+    /// The screen once Spotlight shows on it, polling for up to
+    /// `pasteVerifyTimeoutUs`; nil when it never does or cannot be read. Spotlight
+    /// shows when its known headings appear or the screen no longer matches
+    /// `previous` (the headings are localized, and only some locales are known).
+    private func spotlightScreen(replacing previous: [TapPoint]) -> ScreenDescriber.DescribeResult? {
+        let poll = max(1, EnvConfig.pasteVerifyPollUs)
+        let attempts = max(1, Int(EnvConfig.pasteVerifyTimeoutUs / poll))
+        for attempt in 0 ..< attempts {
+            if attempt > 0 { usleep(poll) }
+            if let screen = pasteVerifier?.describe(settleTimeoutUs: 0),
+               screen.ocrFailure == nil,
+               SpotlightDetector.isSpotlightVisible(elements: screen.elements)
+                || !StructuralFingerprint.areEquivalent(previous, screen.elements) {
+                return screen
+            }
+        }
+        return nil
+    }
+
+    /// Tap the Spotlight tile showing `name`, then confirm Spotlight closed: its
+    /// known headings are gone and the screen no longer matches `spotlight`,
+    /// polling for up to `pasteVerifyTimeoutUs`. Nil on success, else why it failed.
+    private func openTile(_ tile: TapPoint, name: String, spotlight: [TapPoint]) -> String? {
+        DebugLog.log("launchApp", "tapping the '\(name)' tile Spotlight already shows")
+        if let tapError = tap(x: tile.tapX, y: tile.tapY) {
+            return "Failed to tap the '\(name)' tile in Spotlight: \(tapError)"
+        }
+        let poll = max(1, EnvConfig.pasteVerifyPollUs)
+        let attempts = max(1, Int(EnvConfig.pasteVerifyTimeoutUs / poll))
+        for attempt in 0 ..< attempts {
+            if attempt > 0 { usleep(poll) }
+            if let screen = pasteVerifier?.describe(settleTimeoutUs: 0),
+               screen.ocrFailure == nil,
+               !SpotlightDetector.isSpotlightVisible(elements: screen.elements),
+               !StructuralFingerprint.areEquivalent(spotlight, screen.elements) {
+                return nil
+            }
+        }
+        return "Tapped the '\(name)' tile in Spotlight but Spotlight is still open, so " +
+            "'\(name)' did not launch."
     }
 
     /// Whether `name` shows up on screen more often than in `before`, polling

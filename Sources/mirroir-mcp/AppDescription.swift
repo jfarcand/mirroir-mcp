@@ -7,21 +7,14 @@
 import Foundation
 import HelperLib
 
-/// The only supported APP.md schema version.
-/// Bumped whenever a breaking change to the parser is released. When a loaded
-/// file declares a newer version, the loader logs a warning and still parses
-/// best-effort so old binaries don't choke on a forward-compatible field.
-let appDescriptionSchemaVersion: Int = 1
-
 /// A human-authored description of an iOS app's structure, navigation patterns,
 /// and known obstacles. Loaded from APP.md files and injected into exploration
 /// sessions to guide the AI with domain knowledge the developer already has.
 struct AppDescription: Sendable {
     /// App name for matching (case-insensitive). From front matter `app:` field.
     let appName: String
-    /// APP.md schema version from the `version:` front-matter field. Defaults
-    /// to the current supported version when absent. Files declaring a newer
-    /// version log a warning at load time.
+    /// APP.md schema major from the `version:` front-matter field, gated by
+    /// ``AppMdSchemaVersion``. Required: an APP.md without it is refused.
     let schemaVersion: Int
     /// Optional locale (e.g. "fr_CA", "en_US"). When set, only matches that locale.
     let locale: String?
@@ -120,7 +113,9 @@ struct ObstacleRule: Sendable {
 enum AppDescriptionParser {
 
     /// Parse an APP.md file's content into an AppDescription.
-    /// Returns nil if required fields (app name, at least one section) are missing.
+    /// Returns nil if required fields (app name, at least one section) are missing,
+    /// or when ``AppMdSchemaVersion`` refuses the `version:` (absent, malformed,
+    /// or a different major).
     static func parse(content: String) -> AppDescription? {
         let result = AppMdSectioning.extract(content: content)
         let frontMatter = result.frontMatter
@@ -134,13 +129,19 @@ enum AppDescriptionParser {
             (frontMatter["reset_before_explore"] ?? "false").lowercased())
         let obstacleMode = ObstacleMode(rawValue: frontMatter["obstacle_mode"] ?? "auto") ?? .auto
 
-        let schemaVersion = Int(frontMatter["version"] ?? "")
-            ?? appDescriptionSchemaVersion
-        if schemaVersion > appDescriptionSchemaVersion {
+        let schemaVersion: Int
+        switch AppMdSchemaVersion.gate(frontMatter["version"]) {
+        case .supported(let major):
+            schemaVersion = major
+        case .newerMinor(let major, let minor):
             DebugLog.log("app-desc",
-                "APP.md for '\(appName)' declares version \(schemaVersion); "
-                + "this build only supports up to \(appDescriptionSchemaVersion). "
-                + "Parsing best-effort; forward-compatible fields may be ignored.")
+                "APP.md for '\(appName)' declares version \(major).\(minor); "
+                + "this build models up to \(major).\(AppMdSchemaVersion.knownMinor). "
+                + "Fields that minor added are ignored.")
+            schemaVersion = major
+        case .rejected(let reason):
+            DebugLog.log("app-desc", "APP.md for '\(appName)' refused: \(reason)")
+            return nil
         }
 
         // Collect free-form context from Structure + per-tab descriptions.
@@ -190,6 +191,18 @@ enum AppDescriptionParser {
             deepTabs: deepTabs,
             simulator: simulator
         )
+    }
+
+    /// Why ``AppMdSchemaVersion`` refuses `content`, with the app it names:
+    /// nil when it names no `app:` or its `version:` is accepted. The loader
+    /// reports this so a refused APP.md is never dropped without a word.
+    static func schemaRefusal(content: String) -> (appName: String, reason: String)? {
+        let frontMatter = AppMdSectioning.extract(content: content).frontMatter
+        guard let appName = frontMatter["app"],
+              case .rejected(let reason) = AppMdSchemaVersion.gate(frontMatter["version"]) else {
+            return nil
+        }
+        return (appName, reason)
     }
 
     /// Parse the `## Tab Layout` section.

@@ -10,6 +10,7 @@ use tracing::warn;
 
 use crate::error::{Result, RunnerError};
 use crate::oracle::error::OracleError;
+use crate::parser::version::{self, ArtifactKind};
 
 /// Profile registry entry — declares how to reach one LLM provider and which
 /// model to use for judging. Owned fields so profiles can be loaded at runtime
@@ -77,7 +78,9 @@ const fn default_timeout_s() -> u32 {
     30
 }
 
-/// Top-level shape of `oracles/profiles.yaml`.
+/// Top-level shape of `oracles/profiles.yaml`. Its `version:` is required and
+/// gated by [`ArtifactKind::JudgeProfiles`]; the built-in profiles are code,
+/// not a file, and carry none.
 #[derive(Debug, Deserialize)]
 struct ProfilesFile {
     profiles: Vec<ProfileSpec>,
@@ -181,11 +184,18 @@ impl JudgeRegistry {
             path: path.to_path_buf(),
             reason: source.to_string(),
         })?;
-        let parsed: ProfilesFile =
-            serde_norway::from_str(&raw).map_err(|source| OracleError::ProfilesParse {
-                path: path.to_path_buf(),
-                reason: source.to_string(),
-            })?;
+        let parsed: ProfilesFile = version::from_yaml_str(
+            ArtifactKind::JudgeProfiles,
+            &path.display().to_string(),
+            &raw,
+            |source| {
+                OracleError::ProfilesParse {
+                    path: path.to_path_buf(),
+                    reason: source.to_string(),
+                }
+                .into()
+            },
+        )?;
         for spec in parsed.profiles {
             self.apply_spec(spec, trust, path);
         }
@@ -275,7 +285,8 @@ mod tests {
         // Repo-local config tries to redirect fast-ci's endpoint + retune it.
         fs::write(
             oracles.join("profiles.yaml"),
-            "profiles:\n\
+            "version: 1\n\
+             profiles:\n\
              \x20 - name: fast-ci\n\
              \x20   base_url: https://attacker.test/v1/chat/completions\n\
              \x20   model: overridden\n\
@@ -306,7 +317,8 @@ mod tests {
         fs::create_dir_all(&oracles)?;
         fs::write(
             oracles.join("profiles.yaml"),
-            "profiles:\n\
+            "version: 1\n\
+             profiles:\n\
              \x20 - name: my-judge\n\
              \x20   base_url: https://attacker.test/v1/chat/completions\n\
              \x20   model: my-model\n",
@@ -329,7 +341,8 @@ mod tests {
         // The trusted home file adds a new endpoint and redirects a built-in.
         fs::write(
             oracles.join("profiles.yaml"),
-            "profiles:\n\
+            "version: 1\n\
+             profiles:\n\
              \x20 - name: my-judge\n\
              \x20   base_url: https://example.test/v1/chat/completions\n\
              \x20   model: my-model\n\

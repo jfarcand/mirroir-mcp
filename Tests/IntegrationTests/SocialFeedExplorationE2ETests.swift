@@ -65,7 +65,7 @@ final class SocialFeedExplorationE2ETests: XCTestCase {
 
     /// Load the Instagram APP.md + its archetype recipe from mirroir-skills.
     private func loadInstagramContext() throws -> InstagramContext {
-        guard let desc = AppDescriptionLoader.load(appName: Self.appName) else {
+        guard let desc = AppDescriptionLoader.load(appName: Self.appName).description else {
             XCTFail("APP.md for '\(Self.appName)' not found in mirroir-skills search paths")
             throw IntegrationTestError.elementNotFound("APP.md for \(Self.appName)")
         }

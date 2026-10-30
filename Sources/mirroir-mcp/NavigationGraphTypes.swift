@@ -61,6 +61,12 @@ struct ScreenNode: Sendable {
     /// Perceptual hash of the screenshot for visual state identity.
     /// Optional for backward compatibility: nil when screenshot data is unavailable.
     var visualHash: UInt64?
+    /// How many trailing entries of `elements` were merged in by scrolling after
+    /// the screen was recorded. The leading `elements.count - scrolledElementCount`
+    /// are the viewport the screen showed on arrival — what a replay sees the
+    /// moment the action that reached it lands. Graph persistence does not carry
+    /// it: a node restored from disk is never emitted as a scenario.
+    var scrolledElementCount: Int = 0
 }
 
 /// A directed edge in the navigation graph representing a navigation action.

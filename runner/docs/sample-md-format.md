@@ -56,11 +56,12 @@ session:
 
 ## Versioning
 
-- `version: 1` is the only currently-accepted major. Mismatch returns
+- `version: 1` is the only currently-accepted major. Any other major returns
   `RunnerError::UnsupportedVersion` at load time.
-- New optional fields land with `#[serde(default)]` so older `SAMPLE.md`
-  files keep parsing.
-- Breaking changes bump to `version: 2` and the runner gates accordingly.
+- A key the schema does not define is an `UnknownFields` error, unless the
+  manifest declares a newer minor (`version: "1.1"`), in which case it is
+  ignored and logged. The full rule, shared by every artifact the runner
+  loads, is in [scenario-grammar.md](scenario-grammar.md#versioning).
 
 ## `boot_once` semantics
 

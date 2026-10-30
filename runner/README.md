@@ -237,7 +237,7 @@ Playwright attachment into the post-hooks, is in
 | Topic | Doc |
 |---|---|
 | The DRIFT verdict, the threshold hierarchy, and `mirroir-run accept` | [docs/drift-and-accept.md](docs/drift-and-accept.md) |
-| Scenario grammar (every `SkillStep` variant, dispatch routing) | [docs/scenario-grammar.md](docs/scenario-grammar.md) |
+| Scenario grammar (every `SkillStep` variant, dispatch routing, artifact versioning) | [docs/scenario-grammar.md](docs/scenario-grammar.md) |
 | `SAMPLE.md` schema (`Session`, `Boot`, `Scenarios`, `boot_once`) | [docs/sample-md-format.md](docs/sample-md-format.md) |
 | Judge profile registry + Ollama / OpenAI wire format | [docs/judge-profiles.md](docs/judge-profiles.md) |
 | Playwright install + `MIRROIR_PLAYWRIGHT_HOME` walkthrough | [docs/playwright-setup.md](docs/playwright-setup.md) |
@@ -294,10 +294,12 @@ src/
 │   ├── mirroir_plan.rs    # archetype reference parsing (pack / ./path / user refs)
 │   ├── sample.rs          # SAMPLE.md manifest (fenced-yaml block + Session)
 │   ├── scenario.rs        # Scenario top-level (singleton_map_recursive enum form)
+│   ├── shorthand.rs       # step args as `"label"` shorthand or a record, unknown keys still visible
 │   ├── step.rs            # SkillStep enum — 30 variants (Launch..CrossSurface)
 │   ├── step_args.rs       # oracle/verdict step args (judge, drift, http, report, cross_surface)
 │   ├── step_process_args.rs # process-target step args (spawn, wait_port, kill, assert_log)
-│   └── surface.rs         # web-vs-runner step classification + step-kind labels
+│   ├── surface.rs         # web-vs-runner step classification + step-kind labels
+│   └── version.rs         # artifact version seam: major gate, minor-aware unknown-key policy
 ├── mirroir/
 │   ├── mod.rs             # `.mirroir/` discovery → resolve → compose → run index
 │   ├── discover.rs        # walk-up cwd discovery of `.mirroir/mirroir.yaml`
@@ -353,7 +355,9 @@ This runner does **not** port mirroir's Swift code. Both read the shared
 - The contract is pinned on both sides: Swift's `PlaywrightReportWriterTests`
   checks its writer against `src/target/fixtures/mirroir-mcp-report.json`, the
   file `target::ios`'s tests ingest, and the `Build` workflow runs
-  `samples/ios-fixture` through both binaries against FakeMirroring.
+  `samples/ios-fixture` through both binaries against FakeMirroring. It also
+  replays a Clock scenario that `generate_skill` emitted on FakeMirroring in the
+  same job, and requires every emitted step to pass.
 
 The runner owns its own `.mirroir/` consumer pipeline (`runner/src/mirroir/`): a
 checked-out repo carries a `.mirroir/mirroir.yaml` plan that lists samples plus

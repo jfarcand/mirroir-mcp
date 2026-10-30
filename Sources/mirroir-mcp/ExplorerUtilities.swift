@@ -38,12 +38,15 @@ enum ExplorerUtilities {
     ///   - input: Input provider for tap actions.
     ///   - obstacles: App-specific obstacle rules from APP.md (default: empty).
     /// - Returns: Clean OCR result after dismissing any alerts/obstacles, or nil if OCR fails.
+    ///   Every read waits for a settled frame (`frameSettleTimeoutUs`): this is the
+    ///   screen an action led to, and a frame taken mid-transition would record a
+    ///   destination that never exists (a sheet still sliding over the old screen).
     static func dismissAlertIfPresent(
         describer: ScreenDescribing,
         input: InputProviding,
         obstacles: [ObstacleRule] = []
     ) -> ScreenDescriber.DescribeResult? {
-        guard var result = describer.describe() else { return nil }
+        guard var result = describer.describe(settleTimeoutUs: EnvConfig.frameSettleTimeoutUs) else { return nil }
 
         // Triggers that re-appeared after we dismissed them — a self-re-arming
         // dialog (e.g. the "camera not available" alert on Instagram's Story
@@ -57,7 +60,7 @@ enum ExplorerUtilities {
             if let alert = AlertDetector.detectAlert(elements: result.elements) {
                 _ = input.tap(x: alert.dismissTarget.tapX, y: alert.dismissTarget.tapY)
                 usleep(EnvConfig.stepSettlingDelayMs * 1000)
-                guard let cleanResult = describer.describe() else { return nil }
+                guard let cleanResult = describer.describe(settleTimeoutUs: EnvConfig.frameSettleTimeoutUs) else { return nil }
                 result = cleanResult
                 continue
             }
@@ -83,7 +86,7 @@ enum ExplorerUtilities {
                     "obstacle detected: '\(obstacle.trigger)' → tapping '\(target.text)'")
                 _ = input.tap(x: target.tapX, y: target.tapY)
                 usleep(EnvConfig.stepSettlingDelayMs * 1000)
-                guard let cleanResult = describer.describe() else { return nil }
+                guard let cleanResult = describer.describe(settleTimeoutUs: EnvConfig.frameSettleTimeoutUs) else { return nil }
                 result = cleanResult
                 // If the trigger survived the dismissal, it is self-re-arming;
                 // don't tap its action again on the next pass.

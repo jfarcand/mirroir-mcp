@@ -6,6 +6,8 @@ use std::result::Result as StdResult;
 
 use serde::Deserialize;
 
+use crate::parser::shorthand::ShorthandOr;
+
 pub use crate::parser::step_args::{
     CrossSurfaceArgs, HttpArgs, HttpMethod, JudgeArgs, ReportArgs, ResponseDriftConfig,
 };
@@ -131,22 +133,20 @@ impl<'de> Deserialize<'de> for PressKeyArgs {
         D: serde::Deserializer<'de>,
     {
         #[derive(Deserialize)]
-        #[serde(untagged)]
-        enum Repr {
-            Shorthand(String),
-            Full {
-                key: String,
-                #[serde(default)]
-                modifiers: Vec<String>,
-            },
+        struct Full {
+            key: String,
+            #[serde(default)]
+            modifiers: Vec<String>,
         }
-        Ok(match Repr::deserialize(deserializer)? {
-            Repr::Shorthand(key) => Self {
-                key,
-                modifiers: Vec::new(),
+        Ok(
+            match ShorthandOr::<String, Full>::deserialize(deserializer)? {
+                ShorthandOr::Shorthand(key) => Self {
+                    key,
+                    modifiers: Vec::new(),
+                },
+                ShorthandOr::Record(Full { key, modifiers }) => Self { key, modifiers },
             },
-            Repr::Full { key, modifiers } => Self { key, modifiers },
-        })
+        )
     }
 }
 
@@ -167,33 +167,31 @@ impl<'de> Deserialize<'de> for ScrollToArgs {
         D: serde::Deserializer<'de>,
     {
         #[derive(Deserialize)]
-        #[serde(untagged)]
-        enum Repr {
-            Shorthand(String),
-            Full {
-                label: String,
-                #[serde(default = "default_scroll_direction")]
-                direction: String,
-                #[serde(default = "default_max_scrolls")]
-                max_scrolls: u32,
-            },
+        struct Full {
+            label: String,
+            #[serde(default = "default_scroll_direction")]
+            direction: String,
+            #[serde(default = "default_max_scrolls")]
+            max_scrolls: u32,
         }
-        Ok(match Repr::deserialize(deserializer)? {
-            Repr::Shorthand(label) => Self {
-                label,
-                direction: default_scroll_direction(),
-                max_scrolls: default_max_scrolls(),
+        Ok(
+            match ShorthandOr::<String, Full>::deserialize(deserializer)? {
+                ShorthandOr::Shorthand(label) => Self {
+                    label,
+                    direction: default_scroll_direction(),
+                    max_scrolls: default_max_scrolls(),
+                },
+                ShorthandOr::Record(Full {
+                    label,
+                    direction,
+                    max_scrolls,
+                }) => Self {
+                    label,
+                    direction,
+                    max_scrolls,
+                },
             },
-            Repr::Full {
-                label,
-                direction,
-                max_scrolls,
-            } => Self {
-                label,
-                direction,
-                max_scrolls,
-            },
-        })
+        )
     }
 }
 
@@ -209,7 +207,6 @@ fn default_max_scrolls() -> u32 {
 /// `docs/tools.md` (e.g. `"tap:Label"`, `"press_key:return"`,
 /// `"wait_visible:streaming-caret"`).
 #[derive(Debug, Clone, Deserialize, PartialEq)]
-#[serde(deny_unknown_fields)]
 pub struct MeasureArgs {
     /// Friendly name reported in the run artifact (e.g. `"first_token_latency"`).
     pub name: String,
@@ -240,28 +237,25 @@ impl<'de> Deserialize<'de> for LongPressArgs {
         D: serde::Deserializer<'de>,
     {
         #[derive(Deserialize)]
-        #[serde(untagged)]
-        enum Repr {
-            Shorthand(String),
-            Full {
-                label: String,
-                #[serde(default)]
-                duration_ms: Option<u32>,
-            },
+        struct Full {
+            label: String,
+            #[serde(default)]
+            duration_ms: Option<u32>,
         }
-        Ok(match Repr::deserialize(deserializer)? {
-            Repr::Shorthand(label) => Self {
-                label,
-                duration_ms: None,
+        Ok(
+            match ShorthandOr::<String, Full>::deserialize(deserializer)? {
+                ShorthandOr::Shorthand(label) => Self {
+                    label,
+                    duration_ms: None,
+                },
+                ShorthandOr::Record(Full { label, duration_ms }) => Self { label, duration_ms },
             },
-            Repr::Full { label, duration_ms } => Self { label, duration_ms },
-        })
+        )
     }
 }
 
 /// Arguments for `drag`.
 #[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
-#[serde(deny_unknown_fields)]
 pub struct DragArgs {
     /// Label of the element to start dragging from.
     pub from: String,

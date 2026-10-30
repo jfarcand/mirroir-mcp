@@ -21,6 +21,7 @@ use crate::mirroir::error::MirroirError;
 use crate::mirroir::resolve::ResolvedArchetype;
 use crate::parser::archetype::ArchetypeRequiredEnv;
 use crate::parser::mirroir::{PlanEntry, PlanEntrySource};
+use crate::parser::version::ArtifactKind;
 
 pub use crate::mirroir::compose_cache::compose_needed;
 
@@ -208,7 +209,7 @@ fn compose_archetype_entry(
 
     // Write the compose manifest.
     let manifest = ComposeManifest {
-        version: 1,
+        version: ArtifactKind::ComposeManifest.current(),
         composed_at: Utc::now(),
         archetype: ComposeManifestArchetype {
             reference: format!("{:?}", resolved.origin),

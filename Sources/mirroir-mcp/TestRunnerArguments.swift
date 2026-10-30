@@ -274,6 +274,8 @@ extension TestRunner {
           --confirm-destructive
                               Allow steps that send, remove, spend, or reset
                               something on the device. Refused by default.
+                              A reset_app immediately followed by a launch of
+                              the same app needs no confirmation.
           --no-compiled       Skip compiled skills (force full OCR)
           --agent [model]     Diagnose compiled failures. Without model: deterministic OCR only.
                               With model: deterministic + AI diagnosis.

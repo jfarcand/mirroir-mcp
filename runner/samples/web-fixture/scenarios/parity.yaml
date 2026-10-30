@@ -7,9 +7,9 @@ description: |
   live panel into `baselines/parity.web.txt`. That file is one of the two
   surfaces the same step then compares, so the web half is written by the run
   that checks it. The other half, `baselines/parity.ios.txt`, is a committed
-  stand-in for a `generate_skill` device capture — a surface this binary drives
-  no executor for, which is why `mirroir-run accept` re-records the web file and
-  names the iOS one instead of overwriting it.
+  stand-in for an iOS block's device capture — this scenario opens no ios
+  block to write it, which is why `mirroir-run accept` re-records the web file
+  and names the iOS one instead of overwriting it.
 
   Point the `url:` at `parity-reworded.html` and every assertion still holds
   while the panel's token set falls away from the iOS capture: that is the

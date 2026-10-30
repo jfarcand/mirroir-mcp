@@ -19,11 +19,13 @@ use crate::scenario_set::ScenarioSet;
 /// subdirectory of it is not the artifact this guard accounts for.
 const BASELINES_DIR: &str = "baselines";
 
-/// Suffix marking a baseline captured on a surface this binary drives no
-/// executor for: mirroir-mcp's `generate_skill` writes it against a connected
-/// iPhone, and the runner can only ever read it. Nothing in a run produces or
-/// refreshes such a file, so the single thing that gives it an effect is a
-/// `cross_surface:` step naming it.
+/// Suffix marking an iOS surface capture. A run writes one only through a
+/// `cross_surface:` step's `surface: ios` capture, from its `ios` block's final
+/// screen; mirroir-mcp's `generate_skill` emits scenarios and never writes one.
+/// A `.ios.txt` committed to a sample — a stand-in for a device capture, or a
+/// leftover of a capture no scenario declares any more — is refreshed by
+/// nothing, so the single thing that gives it an effect is a `cross_surface:`
+/// step naming it.
 ///
 /// One spelling, everywhere — the samples, the docs and this constant name the
 /// same artifact class the same way, so a capture cannot land outside the guard
@@ -170,8 +172,9 @@ struct ComparedFiles {
 /// as it will when the step runs.
 ///
 /// Only top-level steps count: a `cross_surface:` nested in a `condition:`
-/// branch dispatches as [`crate::replay_step::StepVerdict::Skipped`], so it
-/// compares nothing and vouches for nothing.
+/// branch never runs — the plan refuses every `condition:` with
+/// [`crate::error::RunnerError::ConditionHasNoEvaluator`] — so it compares
+/// nothing and vouches for nothing.
 fn compared_files(
     sample_dir: &Path,
     declared: &[&Path],
@@ -234,7 +237,8 @@ mod tests {
     use tempfile::TempDir;
 
     use super::*;
-    use crate::parser::sample::{Boot, SAMPLE_SCHEMA_VERSION, Scenarios, Session};
+    use crate::parser::sample::{Boot, Scenarios, Session};
+    use crate::parser::version::ArtifactKind;
 
     type TestResult = StdResult<(), Box<dyn StdError>>;
 
@@ -280,7 +284,7 @@ mod tests {
     /// The manifest [`plant_sample`] writes its tree for.
     fn planted_manifest() -> SampleManifest {
         SampleManifest {
-            version: SAMPLE_SCHEMA_VERSION,
+            version: ArtifactKind::Sample.current(),
             name: None,
             description: None,
             session: Session {

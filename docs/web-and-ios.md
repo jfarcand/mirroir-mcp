@@ -98,9 +98,42 @@ HTTP scenarios run anywhere.
 `generate_skill` with `emit: true` (on `finish` or `explore`) writes a runnable iOS leg into
 the consumer repo's `.mirroir/apps/<app>/`:
 
-- `scenarios/<flow>.ios.yaml` — the captured walk as a `target: { kind: ios }` block;
-- `SAMPLE.md` declaring it under `must_pass`;
+- `scenarios/<flow>.ios.yaml` — the captured walk (`finish`) or each interesting explored path
+  (`explore`) as a `target: { kind: ios }` block. Every flow opens `reset_app: "<App>"` then
+  `launch: "<App>"`: a launch of a running app resumes wherever it was left, and the walk was
+  recorded from the app's root. That own-app reset right before its launch is the one
+  `reset_app` `mirroir-mcp test` runs without `--confirm-destructive`; any other `reset_app`
+  still needs it. A tap is followed by a `wait_for:` when the
+  screen it reached shows, on arrival, a landmark the screen before did not; a tap on a row the
+  explorer found by scrolling is preceded by a `scroll_to:` on that row. The emitter owns these
+  files: re-emitting a flow overwrites it;
+- `SAMPLE.md` declaring every flow under `must_pass`;
 - a `must_pass` entry in `.mirroir/mirroir.yaml`.
+
+`SAMPLE.md` and `mirroir.yaml` are created with an ownership marker on their first line, and
+later emits — the next goal of a session, another `explore` — insert their flows and apps into
+the existing `session.scenarios.must_pass` and `plan.must_pass` lists in place. Every other
+byte is kept: a `boot` the web leg filled in (`cwd`, ports, timeout), `nice_to_pass`, `name`,
+`description`, keys after the list, comments. When that list cannot be located unambiguously —
+missing, repeated, written flow-style (`[a, b]`) or empty — the emit is an error result carrying
+the lines to paste rather than a guess. A flow counts as declared only as an entry of the fenced
+yaml block's `session.scenarios.must_pass` or `nice_to_pass` list — a commented-out entry or a
+path mentioned in prose does not; one declared only under `nice_to_pass` is named in the result,
+since its FAIL does not fail the sample. Delete the marker to own the file: the emitter then
+never writes it, and a flow it does not declare makes the emit an error result carrying the
+exact lines to paste under `must_pass` and the flows dropped as unreplayable (the scenarios,
+`APP.md` and plan entry are written before that check). A human-owned `mirroir.yaml` gets the
+plan entry to paste in the result.
+
+A path the runner could not replay faithfully — an AI-only step such as `remember:`, a tap with
+no label, a label OCR never read (an icon-only tab) — is dropped by name, with its reason, in
+the result; the other flows are still emitted. An `emit: true` call is an error result when no
+flow is left to write, when the exploration did not finish, or when a human-owned `SAMPLE.md`
+does not declare a written flow. An `APP.md` for the app whose `version:` is missing or
+unsupported is not used, and the `explore`/`finish` result says which file and why — an
+`explore` that skips a playable game or fails to launch the app included.
+The emitter writes no `baselines/*.ios.txt`: an iOS capture is produced by the run, through a
+`cross_surface:` step's `surface: ios` capture.
 
 Run `mirroir-run` from the repo on a Mac with the phone connected and it replays the flow. To
 check the web app against the same screen, copy the iOS block into the web scenario and end it
@@ -110,9 +143,16 @@ with a `cross_surface:` step as above.
 
 - Swift's report writer is pinned byte for byte to a fixture the runner's ingest tests read,
   so a format change on either side fails a test on that side.
+- The emitter's output for a synthetic Clock walk is committed under
+  `runner/tests/fixtures/emitted/`. A Swift test regenerates it byte for byte; Rust tests load
+  it through the runner's own loaders, plan it, render every step for mirroir-mcp and run it as
+  a sample against a stub `mirroir-mcp`.
 - CI's `Build` workflow runs `runner/samples/ios-fixture` through both binaries against
   FakeMirroring and fails unless the log shows the hand-off, the capture, the comparison and a
   passing verdict.
+- The same workflow explores the Clock pack on FakeMirroring with `generate_skill` (`emit: true`)
+  and replays what it wrote with `mirroir-run --sample`. It fails unless every emitted step
+  passed in mirroir-mcp and a `tap:` and a `wait_for:` crossed to the device.
 
 ## Current limits
 

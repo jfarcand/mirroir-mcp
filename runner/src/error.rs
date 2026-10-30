@@ -16,6 +16,7 @@ use crate::ios_error::IosError;
 use crate::mirroir::error::MirroirError;
 use crate::oracle::error::OracleError;
 use crate::parser::step::TargetKind;
+use crate::parser::version::{ArtifactKind, SchemaVersion};
 
 /// `Result` alias used throughout the `mirroir-run` binary.
 ///
@@ -61,16 +62,29 @@ pub enum RunnerError {
         source: io::Error,
     },
 
-    /// An artifact (`SAMPLE.md` / scenario YAML / `APP.md` / `profiles.yaml`) declares
-    /// a `version` field outside the range the running binary supports.
-    #[error("unsupported {artifact} version {found} (supported range: {expected:?})")]
+    /// A loaded artifact declares a major `version` this binary does not support.
+    #[error("unsupported {artifact} version {found} at {path} (supported majors: {supports:?})")]
     UnsupportedVersion {
-        /// Artifact kind (e.g. `"SAMPLE.md"`, `"scenario.yaml"`).
-        artifact: String,
-        /// Version found in the artifact header.
-        found: u32,
-        /// Inclusive range of major versions the binary supports.
-        expected: RangeInclusive<u32>,
+        /// Which artifact.
+        artifact: ArtifactKind,
+        /// Path or label of the file.
+        path: String,
+        /// Version the artifact declares.
+        found: SchemaVersion,
+        /// Inclusive range of majors the binary supports.
+        supports: RangeInclusive<u32>,
+    },
+
+    /// A loaded artifact at a minor this binary knows carries keys its schema
+    /// does not define — a typo, refused rather than silently dropped.
+    #[error("unknown {artifact} key(s) at {path}: {}", keys.join(", "))]
+    UnknownFields {
+        /// Which artifact.
+        artifact: ArtifactKind,
+        /// Path or label of the file.
+        path: String,
+        /// Dotted key paths (`steps.0.tap.lable`) the schema does not define.
+        keys: Vec<String>,
     },
 
     /// `mirroir-run accept` was invoked in a CI environment.
@@ -244,18 +258,30 @@ pub enum RunnerError {
     },
 
     /// The scenario finished without the runner evaluating anything: every step
-    /// was lifecycle-only, buffered, or of a kind that has no replay dispatch.
-    /// A run that checked nothing about the system under test is not a pass.
+    /// was lifecycle-only (`kill:`) or a note (`remember:`). A run that checked
+    /// nothing about the system under test is not a pass.
     #[error(
-        "scenario `{scenario}` evaluated nothing ({steps} steps, {skipped} skipped for want of a replay dispatch)"
+        "scenario `{scenario}` evaluated nothing ({steps} steps, none of them a check on the system under test)"
     )]
     ScenarioNothingEvaluated {
         /// Name of the scenario.
         scenario: String,
         /// How many steps the scenario declared.
         steps: usize,
-        /// How many of those the runner skipped.
-        skipped: usize,
+    },
+
+    /// A `condition:` step: nothing here evaluates `if_visible` — not the
+    /// runner, not Playwright, not `mirroir-mcp test` (it is AI-only there).
+    /// As a hook it would run neither branch and let the scenario pass on its
+    /// other steps, so the plan refuses it.
+    #[error(
+        "step {index} (`condition` on {if_visible:?}) has no evaluator: no executor here checks `if_visible`, so neither branch would run. Write the branch the run must take as plain steps"
+    )]
+    ConditionHasNoEvaluator {
+        /// Index of the `condition:` step, as the file reads.
+        index: usize,
+        /// The label the condition would have checked.
+        if_visible: String,
     },
 
     /// At least one `must_pass` scenario in a `--sample` run reported FAIL.
@@ -398,11 +424,14 @@ pub enum RunnerError {
         declared: &'static str,
     },
 
-    /// A web step reached the runner-side dispatcher. Web steps belong to the
-    /// scenario's single Playwright invocation and are never dispatched one by
-    /// one; reaching this means the execution plan and the dispatcher disagree.
-    #[error("step {index} (`{kind}`) is a web step and cannot be dispatched outside the web block")]
-    WebStepOutsideBlock {
+    /// A step the runner-side dispatcher has no executor for reached it. Device
+    /// steps belong to their block's single invocation, and the plan refuses a
+    /// step nothing evaluates; reaching this means the execution plan and the
+    /// dispatcher disagree.
+    #[error(
+        "step {index} (`{kind}`) reached the runner-side dispatcher, which has no executor for it; the plan routes it to a device block or refuses it"
+    )]
+    BlockStepOutsideBlock {
         /// Index of the step, as the file reads.
         index: usize,
         /// Step kind at `index`.

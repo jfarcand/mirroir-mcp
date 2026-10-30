@@ -206,6 +206,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     @objc func showHomeScreen(_ sender: Any?) {
+        // Home closes the App Switcher and Spotlight, as on iOS; either overlay
+        // left up would draw over every app launched afterwards.
+        if let view = window?.contentView as? FakeScreenView {
+            view.spotlightOverlay = nil
+            view.appSwitcherOverlay = nil
+        }
         registry.goHome()
     }
 

@@ -113,12 +113,13 @@ mod tests {
     use super::*;
     use crate::mirroir::lock_generate::checksum_directory;
     use crate::parser::lockfile::{LockedArchetype, LockedOrigin, ResolvedRecord};
+    use crate::parser::version::ArtifactKind;
 
     type TestResult = StdResult<(), Box<dyn StdError>>;
 
     fn empty_lockfile() -> Lockfile {
         Lockfile {
-            version: 1,
+            version: ArtifactKind::Lockfile.current(),
             generated_at: Utc::now(),
             generated_by: "test".to_owned(),
             archetypes: Vec::new(),

@@ -28,8 +28,6 @@ pub enum StepVerdict {
     /// The step ran but asserts nothing on its own — `kill:` teardown, or a
     /// `remember:` note.
     NoVerdict,
-    /// The step's kind has no replay dispatch, so it was skipped.
-    Skipped,
 }
 
 /// Scenario-wide facts a step dispatch needs beyond the step itself.
@@ -67,8 +65,10 @@ pub struct StepDispatch<'a> {
 ///
 /// Any error returned by the dispatched step variants propagates verbatim,
 /// plus [`RunnerError::ScenarioReportedFailure`] for `- report: fail` and
-/// [`RunnerError::WebStepOutsideBlock`] for a web step, which belongs to the
-/// scenario's single Playwright invocation and is never dispatched here.
+/// [`RunnerError::BlockStepOutsideBlock`] for a step with no runner-side
+/// executor: a device step belongs to its block's single invocation, and the
+/// plan refuses a `condition:` or a phone-only step outside an `ios` block,
+/// so neither is ever dispatched here.
 pub async fn dispatch_step(
     index: usize,
     step: &SkillStep,
@@ -131,22 +131,20 @@ pub async fn dispatch_step(
             info!(index, note = %note, "remember");
             Ok(StepVerdict::NoVerdict)
         }
-        // LIMITATION(registre#1): the device-only step kinds (launch, home, shake, reset_app,
-        // set_network, condition) have no replay dispatch and are skipped. A scenario
-        // that leans on one of them for its only assertion evaluates nothing, and the caller
-        // fails it on that ground rather than reporting a pass.
+        // Device steps belong to their block's single invocation, and
+        // `ScenarioPlan` routes them there and never here; it refuses a
+        // phone-only step outside an `ios` block and every `condition:`.
+        // Listing the kinds explicitly is what makes the match exhaustive —
+        // adding a step kind breaks the build here — and reaching this arm
+        // means the plan and the dispatcher disagree, which is a failure, not
+        // something to walk past.
         SkillStep::Launch(_)
         | SkillStep::Home(_)
         | SkillStep::Shake(_)
         | SkillStep::ResetApp(_)
         | SkillStep::SetNetwork(_)
-        | SkillStep::Condition(_) => Ok(StepVerdict::Skipped),
-        // Web steps belong to the scenario's single Playwright invocation;
-        // `ScenarioPlan` routes them there and never here. Listing the kinds
-        // explicitly is what makes the match exhaustive — adding a step kind
-        // breaks the build here — and reaching this arm means the plan and the
-        // dispatcher disagree, which is a failure, not something to walk past.
-        SkillStep::Target(_)
+        | SkillStep::Condition(_)
+        | SkillStep::Target(_)
         | SkillStep::Tap(_)
         | SkillStep::Type(_)
         | SkillStep::PressKey(_)
@@ -159,7 +157,7 @@ pub async fn dispatch_step(
         | SkillStep::ScrollTo(_)
         | SkillStep::LongPress(_)
         | SkillStep::Drag(_)
-        | SkillStep::Measure(_) => Err(RunnerError::WebStepOutsideBlock {
+        | SkillStep::Measure(_) => Err(RunnerError::BlockStepOutsideBlock {
             index,
             kind: step_kind(step),
         }),
@@ -221,11 +219,12 @@ mod tests {
         DriftSession::new(DriftPolicy::default(), None)
     }
 
-    /// A web step reaching the runner-side dispatcher means the execution plan
-    /// and the dispatcher disagree about who owns it. That is a hard failure,
-    /// not a step to walk past.
+    /// A device step reaching the runner-side dispatcher means the execution
+    /// plan and the dispatcher disagree about who owns it. That is a hard
+    /// failure, not a step to walk past — for a web verb and for a phone-only
+    /// one alike.
     #[tokio::test]
-    async fn a_web_step_cannot_be_dispatched_outside_the_web_block() -> TestResult {
+    async fn a_device_step_cannot_be_dispatched_outside_its_block() -> TestResult {
         let mut processes = ProcessRegistry::default();
         let http = HttpClient::new().map_err(|e| e.to_string())?;
         let dispatch = StepDispatch {
@@ -234,25 +233,27 @@ mod tests {
             session_shared: false,
             baselines: BaselineMode::Compare,
         };
-        let step = SkillStep::Tap(TapArgs::new("Go".to_owned()));
-        let res = dispatch_step(
-            3,
-            &step,
-            &dispatch,
-            &mut processes,
-            &http,
-            &RunCaptures::default(),
-            &mut session(),
-        )
-        .await;
-        match res {
-            Err(RunnerError::WebStepOutsideBlock { index, kind })
-                if index == 3 && kind == "tap" =>
-            {
-                Ok(())
+        let cases = [
+            (SkillStep::Tap(TapArgs::new("Go".to_owned())), "tap"),
+            (SkillStep::Launch("Acme".to_owned()), "launch"),
+        ];
+        for (step, expected) in cases {
+            let res = dispatch_step(
+                3,
+                &step,
+                &dispatch,
+                &mut processes,
+                &http,
+                &RunCaptures::default(),
+                &mut session(),
+            )
+            .await;
+            match res {
+                Err(RunnerError::BlockStepOutsideBlock { index: 3, kind }) if kind == expected => {}
+                other => return Err(format!("expected BlockStepOutsideBlock, got {other:?}")),
             }
-            other => Err(format!("expected WebStepOutsideBlock, got {other:?}")),
         }
+        Ok(())
     }
 
     /// A `remember:` after the block reaches this dispatcher, and it must be

@@ -61,6 +61,7 @@ final class AppDescriptionTests: XCTestCase {
     func testParseObstacleRules() {
         let content = """
         ---
+        version: 1
         app: TestApp
         ---
 
@@ -98,6 +99,7 @@ final class AppDescriptionTests: XCTestCase {
     func testParseSkipElements() {
         let content = """
         ---
+        version: 1
         app: TestApp
         ---
 
@@ -125,6 +127,7 @@ final class AppDescriptionTests: XCTestCase {
     func testParseCredentials() {
         let content = """
         ---
+        version: 1
         app: TestApp
         ---
 
@@ -149,6 +152,7 @@ final class AppDescriptionTests: XCTestCase {
     func testParseContextIncludesStructureAndTabs() {
         let content = """
         ---
+        version: 1
         app: TestApp
         ---
 
@@ -203,6 +207,7 @@ final class AppDescriptionTests: XCTestCase {
     func testParseReturnsNilWithEmptyContent() {
         let content = """
         ---
+        version: 1
         app: EmptyApp
         ---
 
@@ -216,6 +221,7 @@ final class AppDescriptionTests: XCTestCase {
     func testDefaultObstacleModeIsAuto() {
         let content = """
         ---
+        version: 1
         app: TestApp
         ---
 
@@ -233,6 +239,7 @@ final class AppDescriptionTests: XCTestCase {
     func testObstacleModeHint() {
         let content = """
         ---
+        version: 1
         app: TestApp
         obstacle_mode: hint
         ---
@@ -251,6 +258,7 @@ final class AppDescriptionTests: XCTestCase {
     func testObstacleModeOff() {
         let content = """
         ---
+        version: 1
         app: TestApp
         obstacle_mode: off
         ---
@@ -269,6 +277,7 @@ final class AppDescriptionTests: XCTestCase {
     func testObstacleArrowSeparators() {
         let content = """
         ---
+        version: 1
         app: TestApp
         ---
 
@@ -293,6 +302,7 @@ final class AppDescriptionTests: XCTestCase {
     func testHintsAreParsed() {
         let content = """
         ---
+        version: 1
         app: TestApp
         ---
 
@@ -362,6 +372,7 @@ final class AppDescriptionTests: XCTestCase {
         let playableLine = playable.map { "playable: \($0)\n" } ?? ""
         let content = """
         ---
+        version: 1
         app: GameApp
         \(playableLine)---
 

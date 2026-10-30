@@ -101,12 +101,15 @@ but kept for consistency).
 The built-in registry covers the common cases. The canonical way to add your
 own is an `oracles/profiles.yaml` overlay:
 
-1. Create `~/.mirroir/oracles/profiles.yaml` with a `profiles:` list.
+1. Create `~/.mirroir/oracles/profiles.yaml` with a required `version: 1`
+   and a `profiles:` list (versioning rules:
+   [scenario-grammar.md](scenario-grammar.md#versioning)).
 2. Add an entry with `name`, `base_url`, `model`, `api_key_env`
    (omit for local providers), and optionally `timeout_s` (default 30 s).
 3. Scenarios reference the new name via `judge.profile: <name>`.
 
 ```yaml
+version: 1
 profiles:
   - name: my-judge
     base_url: https://example.test/v1/chat/completions

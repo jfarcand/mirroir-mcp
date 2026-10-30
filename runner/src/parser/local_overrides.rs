@@ -8,17 +8,15 @@ use serde::Deserialize;
 
 use crate::error::{Result, RunnerError};
 use crate::mirroir::error::MirroirError;
-use crate::parser::mirroir::{
-    ArchetypeRef, MIRROIR_SCHEMA_VERSION, MirroirConfig, PlanEntry, PlanEntrySource,
-};
+use crate::parser::mirroir::{ArchetypeRef, MirroirConfig, PlanEntry, PlanEntrySource};
+use crate::parser::version::{self, ArtifactKind};
 
 /// Partial schema for `mirroir.local.yaml`. Same top-level shape as
-/// `mirroir.yaml` but every entry field is optional except `name`.
-#[derive(Debug, Clone, Deserialize, Default)]
-#[serde(deny_unknown_fields)]
+/// `mirroir.yaml` but every entry field is optional except `name`. Its root
+/// `version:` is read and gated by [`ArtifactKind::MirroirLocal`] before this
+/// shape is parsed, so the shape itself does not carry it.
+#[derive(Debug, Clone, Deserialize)]
 pub struct MirroirLocalOverrides {
-    /// Schema version (must match `mirroir.yaml`'s version).
-    pub version: u32,
     /// Plan tier overrides.
     #[serde(default)]
     pub plan: PlanOverrides,
@@ -29,7 +27,6 @@ pub struct MirroirLocalOverrides {
 
 /// Per-tier list of entry overrides. Each entry is identified by its `name`.
 #[derive(Debug, Clone, Deserialize, Default)]
-#[serde(deny_unknown_fields)]
 pub struct PlanOverrides {
     #[serde(default)]
     pub must_pass: Vec<PlanEntryOverride>,
@@ -40,7 +37,6 @@ pub struct PlanOverrides {
 /// Override for one plan entry. `name` matches the base entry; all other
 /// fields are optional and apply the merge rules in the architecture spec.
 #[derive(Debug, Clone, Deserialize)]
-#[serde(deny_unknown_fields)]
 pub struct PlanEntryOverride {
     /// Matches `PlanEntry.name` of the base entry to override.
     pub name: String,
@@ -66,7 +62,6 @@ pub struct PlanEntryOverride {
 
 /// Optional boot-field overrides. Each `Some` replaces the base value.
 #[derive(Debug, Clone, Deserialize)]
-#[serde(deny_unknown_fields)]
 pub struct PlanEntryBootOverride {
     #[serde(default)]
     pub command: Option<String>,
@@ -90,21 +85,15 @@ pub struct PlanEntryBootOverride {
 /// # Errors
 ///
 /// * [`RunnerError::YamlParse`] on serde failure.
-/// * [`RunnerError::UnsupportedVersion`] when `version` mismatches the base.
+/// * [`RunnerError::UnsupportedVersion`] when the `version:` major is unsupported.
+/// * [`RunnerError::UnknownFields`] for keys the override schema does not define.
 pub fn parse_local_overrides(source_label: &str, yaml: &str) -> Result<MirroirLocalOverrides> {
-    let parsed: MirroirLocalOverrides =
-        serde_norway::from_str(yaml).map_err(|source| RunnerError::YamlParse {
+    version::from_yaml_str(ArtifactKind::MirroirLocal, source_label, yaml, |source| {
+        RunnerError::YamlParse {
             file: source_label.to_owned(),
             source,
-        })?;
-    if parsed.version != MIRROIR_SCHEMA_VERSION {
-        return Err(RunnerError::UnsupportedVersion {
-            artifact: "mirroir.local.yaml".to_owned(),
-            found: parsed.version,
-            expected: MIRROIR_SCHEMA_VERSION..=MIRROIR_SCHEMA_VERSION,
-        });
-    }
-    Ok(parsed)
+        }
+    })
 }
 
 /// Apply local overrides to a parsed base config.
@@ -359,6 +348,15 @@ plan:
         // Original entries untouched.
         assert_eq!(base.plan.must_pass.len(), 2);
         Ok(())
+    }
+
+    #[test]
+    fn a_typo_inside_an_override_entry_is_refused() {
+        let ov_yaml = "version: 1\nplan:\n  must_pass:\n    - name: alpha\n      skp: true\n";
+        assert!(matches!(
+            parse_local_overrides("override", ov_yaml),
+            Err(RunnerError::UnknownFields { keys, .. }) if keys == ["plan.must_pass.0.skp"]
+        ));
     }
 
     #[test]
