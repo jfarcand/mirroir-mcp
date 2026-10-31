@@ -86,7 +86,7 @@ enum CompileCommand {
             return 1
         }
 
-        guard let windowInfo = bridge.getWindowInfo() else {
+        guard let device = deviceInfo(of: bridge) else {
             fputs("Error: Cannot find iPhone Mirroring window.\n", stderr)
             return 1
         }
@@ -111,9 +111,9 @@ enum CompileCommand {
             registry: MirroirMCP.buildTargetRegistry()
         )
 
-        let windowWidth = Double(windowInfo.size.width)
-        let windowHeight = Double(windowInfo.size.height)
-        let orientation = bridge.getOrientation()?.rawValue ?? "portrait"
+        let windowWidth = device.windowWidth
+        let windowHeight = device.windowHeight
+        let orientation = device.orientation
 
         fputs("mirroir compile: \(skillFiles.count) skill(s) to compile\n", stderr)
         fputs("  Window: \(Int(windowWidth))x\(Int(windowHeight)) (\(orientation))\n\n", stderr)
@@ -208,12 +208,7 @@ enum CompileCommand {
             sourceHash = ""
         }
 
-        // Labels come from the skill with `${VAR}` placeholders unresolved, so a value
-        // such as a password never lands in the compiled file.
-        let placeholderSteps = (try? SkillFileLoader.load(
-            filePath: filePath, substitutingEnv: false))?.steps
-        let labelSteps = placeholderSteps?.count == skill.steps.count
-            ? placeholderSteps ?? skill.steps : skill.steps
+        let labelSteps = labelSteps(for: skill)
 
         // The screen the skill starts from, read before its first step runs: the one
         // moment every producer of a compiled skill fingerprints.
@@ -244,9 +239,7 @@ enum CompileCommand {
             compiledSteps.append(CompiledStep(
                 index: index,
                 type: step.typeKey,
-                // A value no replay form carries (one holding both quote characters)
-                // keeps at least its element text, with its placeholders.
-                label: labelSteps[index].replayValue ?? labelSteps[index].labelValue,
+                label: compiledLabel(labelSteps[index]),
                 hints: hints
             ))
         }
@@ -262,6 +255,33 @@ enum CompileCommand {
             steps: compiledSteps,
             screenFingerprint: fingerprint
         )
+    }
+
+    /// The steps a compiled skill takes its labels from: `skill`'s own, re-read from
+    /// its file with `${VAR}` placeholders unresolved, so a value such as a password
+    /// never lands in the compiled file. The resolved steps stand in when the re-read
+    /// fails or disagrees on the step count.
+    static func labelSteps(for skill: SkillDefinition) -> [SkillStep] {
+        let placeholderSteps = (try? SkillFileLoader.load(
+            filePath: skill.filePath, substitutingEnv: false))?.steps
+        return placeholderSteps?.count == skill.steps.count
+            ? placeholderSteps ?? skill.steps : skill.steps
+    }
+
+    /// The label a compiled step records: its replay value. A value no replay form
+    /// carries (one holding both quote characters) keeps at least its element text,
+    /// with its placeholders.
+    static func compiledLabel(_ step: SkillStep) -> String? {
+        step.replayValue ?? step.labelValue
+    }
+
+    /// The window a compiled skill is recorded in, or nil when the bridge finds no window.
+    static func deviceInfo(of bridge: any WindowBridging) -> DeviceInfo? {
+        guard let window = bridge.getWindowInfo() else { return nil }
+        return DeviceInfo(
+            windowWidth: Double(window.size.width),
+            windowHeight: Double(window.size.height),
+            orientation: bridge.getOrientation()?.rawValue ?? "portrait")
     }
 
     /// Fingerprint of the screen `describer` shows now, or nil when it reads nothing.

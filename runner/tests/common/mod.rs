@@ -5,6 +5,7 @@
 // only one binary needs reads as dead code in the others.
 #![allow(dead_code)]
 
+use std::env;
 use std::fs;
 use std::net::TcpListener;
 use std::path::{Path, PathBuf};
@@ -41,15 +42,28 @@ impl Run {
 
 /// A scratch directory for scenario files, plus a `bin/` that becomes the
 /// child's `PATH` — empty unless a test plants a stub there.
+///
+/// The sandbox is the child's working directory and carries a copy of the
+/// mirroir-skills `drift-defaults.yaml` (see [`global_drift_defaults`]), so
+/// every run finds the global threshold layer the runner requires — exactly as
+/// a consumer's checkout does.
 pub struct Sandbox {
     dir: TempDir,
 }
 
+/// The global drift-threshold layer, at the sandbox root.
+pub const DRIFT_DEFAULTS_FILE: &str = "drift-defaults.yaml";
+
 impl Sandbox {
-    /// Create the scratch directory and its `bin/`.
+    /// Create the scratch directory, its `bin/`, and its global drift layer.
     pub fn new() -> Result<Self, String> {
         let dir = TempDir::new().map_err(|e| format!("create tempdir: {e}"))?;
         fs::create_dir(dir.path().join("bin")).map_err(|e| format!("create bin dir: {e}"))?;
+        fs::write(
+            dir.path().join(DRIFT_DEFAULTS_FILE),
+            global_drift_defaults()?,
+        )
+        .map_err(|e| format!("write the sandbox {DRIFT_DEFAULTS_FILE}: {e}"))?;
         Ok(Self { dir })
     }
 
@@ -268,6 +282,56 @@ fn binary() -> PathBuf {
 /// Absolute path to a file shipped in this repository.
 pub fn repo_path(relative: &str) -> String {
     format!("{}/{relative}", env!("CARGO_MANIFEST_DIR"))
+}
+
+/// Environment variable naming the mirroir-skills checkout.
+pub const SKILLS_ENV: &str = "MIRROIR_SKILLS";
+
+/// The mirroir-skills checkout that owns the global `drift-defaults.yaml`
+/// layer: `$MIRROIR_SKILLS` when set, else the sibling checkout at
+/// `<CARGO_MANIFEST_DIR>/../../mirroir-skills`.
+///
+/// The global layer lives only there; the tests never carry a copy of it.
+///
+/// # Errors
+///
+/// Returns the failure text, naming both locations, when the resolved
+/// checkout holds no `drift-defaults.yaml`.
+pub fn skills_dir() -> Result<PathBuf, String> {
+    let sibling = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../mirroir-skills");
+    let from_env = env::var_os(SKILLS_ENV).map(PathBuf::from);
+    let dir = from_env.clone().unwrap_or_else(|| sibling.clone());
+    if dir.join(DRIFT_DEFAULTS_FILE).is_file() {
+        return Ok(dir);
+    }
+    let env_text = from_env.map_or_else(|| "unset".to_owned(), |path| path.display().to_string());
+    Err(format!(
+        "the global {DRIFT_DEFAULTS_FILE} layer was not found at {}. It lives only in \
+         the mirroir-skills repo: set {SKILLS_ENV} (currently {env_text}) to a \
+         jfarcand/mirroir-skills checkout, or clone it as the sibling checkout {}",
+        dir.join(DRIFT_DEFAULTS_FILE).display(),
+        sibling.display()
+    ))
+}
+
+/// The global `drift-defaults.yaml` body, read from [`skills_dir`].
+///
+/// # Errors
+///
+/// Returns the failure text when the checkout is missing or the file cannot
+/// be read.
+pub fn global_drift_defaults() -> Result<String, String> {
+    let path = skills_dir()?.join(DRIFT_DEFAULTS_FILE);
+    fs::read_to_string(&path).map_err(|e| format!("read {}: {e}", path.display()))
+}
+
+/// [`skills_dir`] as the string a `--skills` argument takes.
+///
+/// # Errors
+///
+/// Returns the failure text when the checkout is missing.
+pub fn skills_arg() -> Result<String, String> {
+    Ok(skills_dir()?.display().to_string())
 }
 
 /// The text `summary.html` / `summary-reworded.html` render into

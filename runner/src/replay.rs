@@ -4,13 +4,11 @@
 use std::collections::HashMap;
 use std::env;
 use std::fs;
-use std::ops::Range;
 use std::path::{Path, PathBuf};
 
 use tracing::{info, warn};
 
 use crate::compile::invoke::PlaywrightRunner;
-use crate::compile::mirroir_block::ios_block_yaml;
 use crate::compile::playwright::compile_scenario;
 use crate::compile::playwright_prelude::ScenarioSource;
 use crate::compile::report::RunCaptures;
@@ -27,10 +25,10 @@ use crate::parser::step::TargetKind;
 use crate::parser::surface::step_kind;
 use crate::parser::version::{self, ArtifactKind};
 use crate::replay_dispatch::verify_measures;
+use crate::replay_ios::{IosBlock, promote_reference, run_ios_block};
 use crate::replay_plan::{ScenarioPlan, Segment};
 use crate::replay_step::{StepDispatch, StepVerdict, dispatch_step};
 use crate::target::http::HttpClient;
-use crate::target::ios::MirroirMcpRunner;
 use crate::target::process::ProcessRegistry;
 use crate::verdict::RunVerdict;
 
@@ -188,6 +186,13 @@ pub struct ReplayRoots<'a> {
 /// and leaves the baseline untouched for a human to review. A clean run
 /// records what it saw as the next baseline.
 ///
+/// An `ios` block's screens are compared against the scenario's
+/// `<scenario>.compiled.json` the same way: a screen whose structural texts
+/// moved below the `fingerprint_similarity` floor, a screen on one side only,
+/// or a scenario edited since the reference was recorded is a drift
+/// candidate. With no reference yet, or under `accept`, the block records
+/// one, and a run that records baselines writes it next to the scenario.
+///
 /// # Errors
 ///
 /// Any error returned by the dispatched step variants propagates verbatim,
@@ -249,6 +254,7 @@ pub async fn run_scenario_with_context(
 
     let sample_name = context.map(|ctx| path_stem(ctx.sample_dir));
     let mut captures = RunCaptures::default();
+    let mut pending_reference = None;
     for segment in plan.segments() {
         let (kind, range) = match segment {
             Segment::Hook(index) => {
@@ -283,7 +289,16 @@ pub async fn run_scenario_with_context(
                     sample_name.as_deref(),
                     &path_stem(path),
                 );
-                run_ios_block(&scenario, range.clone(), &dir).await?
+                let block = IosBlock {
+                    scenario: &scenario,
+                    block: range.clone(),
+                    dir: &dir,
+                    scenario_path: path,
+                    mode: roots.baselines,
+                };
+                let (block_captures, recorded) = run_ios_block(block, &mut drift).await?;
+                pending_reference = recorded;
+                block_captures
             }
             // The plan admits only surfaces with an executor on this host.
             TargetKind::Process | TargetKind::Http | TargetKind::Macos => {
@@ -318,6 +333,9 @@ pub async fn run_scenario_with_context(
         (RunVerdict::Pass | RunVerdict::Drift, BaselineMode::Accept)
         | (RunVerdict::Pass, BaselineMode::Compare) => {
             record_baseline(&review_root, &scenario.name, &drift.into_observed())?;
+            if let Some(pending) = &pending_reference {
+                promote_reference(pending)?;
+            }
         }
     }
 
@@ -420,33 +438,6 @@ async fn run_web_block(
         cross_surface_captures = outcome.captures.cross_surface.len(),
         workspace = %workspace.dir.display(),
         "playwright invocation completed"
-    );
-    Ok(outcome.captures)
-}
-
-/// Write the scenario's `ios` block in mirroir-mcp's dialect, run it once with
-/// `mirroir-mcp test` in `dir`, and return what the run attached — the block's
-/// final screen among it — for the hooks that follow.
-async fn run_ios_block(
-    scenario: &Scenario,
-    block: Range<usize>,
-    dir: &Path,
-) -> Result<RunCaptures> {
-    let yaml = ios_block_yaml(&scenario.name, &scenario.steps, block.clone())?;
-    let runner = MirroirMcpRunner::from_env()?;
-    info!(
-        ios_steps = block.len(),
-        workspace = %dir.display(),
-        "dispatching the scenario's ios block to mirroir-mcp"
-    );
-    let outcome = runner.run(&yaml, &scenario.steps[block], dir).await?;
-    info!(
-        passed = outcome.verdict.passed,
-        failed = outcome.verdict.failed,
-        metrics = outcome.captures.metrics.len(),
-        cross_surface_captures = outcome.captures.cross_surface.len(),
-        workspace = %dir.display(),
-        "mirroir-mcp invocation completed"
     );
     Ok(outcome.captures)
 }

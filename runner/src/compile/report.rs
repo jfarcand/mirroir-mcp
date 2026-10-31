@@ -9,6 +9,7 @@ use serde::Deserialize;
 
 use crate::compile::report_error::{ReportEngine, ReportError};
 use crate::error::Result;
+use crate::parser::compiled::{DeviceInfo, ScreenFingerprint};
 
 /// Name of the attachment the emitted spec writes its captures to.
 ///
@@ -81,6 +82,13 @@ pub struct RunCaptures {
     /// page depends on.
     #[serde(default)]
     pub failed_requests: Vec<String>,
+    /// The screens an `ios` block left, keyed `start` (before step 0) and by
+    /// the block step index each followed. Only `mirroir-mcp test` writes it.
+    #[serde(default)]
+    pub screens: BTreeMap<String, ScreenFingerprint>,
+    /// The mirroring window an `ios` block drove.
+    #[serde(default)]
+    pub device: Option<DeviceInfo>,
 }
 
 impl RunCaptures {
@@ -91,6 +99,10 @@ impl RunCaptures {
         self.cross_surface.extend(other.cross_surface);
         self.page_errors.extend(other.page_errors);
         self.failed_requests.extend(other.failed_requests);
+        self.screens.extend(other.screens);
+        if other.device.is_some() {
+            self.device = other.device;
+        }
     }
 }
 

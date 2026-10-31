@@ -1,7 +1,7 @@
 // ABOUTME: Structured error type for the oracle layer — judge scoring plus drift threshold resolution.
 // ABOUTME: Converts into RunnerError via #[from]; every variant carries the fields its message needs.
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use thiserror::Error;
 
@@ -95,6 +95,19 @@ pub enum OracleError {
         metric: DriftMetric,
     },
 
+    /// No `drift-defaults.yaml` exists at any candidate on the search path.
+    /// The global layer is required to exist (fail-closed): without it, every
+    /// metric a scenario and its APP.md leave undeclared has no threshold, and
+    /// the run would only discover that once a comparison is already due.
+    #[error(
+        "no drift-defaults.yaml found (searched: {}); the global layer is required (fail-closed)",
+        display_paths(.searched)
+    )]
+    ThresholdsMissing {
+        /// Every candidate path the loader checked, most specific first.
+        searched: Vec<PathBuf>,
+    },
+
     /// A `drift-defaults.yaml` or an APP.md `drift_defaults:` block exists but
     /// could not be read or parsed.
     #[error("failed to load drift thresholds from {path}: {reason}")]
@@ -113,4 +126,40 @@ pub enum OracleError {
         /// Read or parse error description.
         reason: String,
     },
+
+    /// A `<scenario>.compiled.json` screen reference exists but is not a
+    /// compiled skill. A reference that cannot be read cannot be compared
+    /// against, so the run refuses rather than skipping the screen check.
+    #[error("failed to load the compiled screen reference at {path}: {reason}")]
+    CompiledParse {
+        /// Path to the offending compiled file.
+        path: PathBuf,
+        /// Parse error description.
+        reason: String,
+    },
+
+    /// `mirroir-mcp test` passed an `ios` block it was asked to record, and
+    /// left no compiled skill where it was told to write one. The next run
+    /// would have no screen reference to compare against, so the run fails
+    /// now instead of passing without one.
+    #[error(
+        "mirroir-mcp passed the ios block but recorded no compiled screen reference at {staged}; nothing was written to {destination}"
+    )]
+    CompiledNotRecorded {
+        /// Where `mirroir-mcp test --compiled-out` was told to write.
+        staged: PathBuf,
+        /// The reference the run would have recorded.
+        destination: PathBuf,
+    },
+}
+
+/// Render a list of paths as one comma-separated string for an error message.
+fn display_paths(paths: &[PathBuf]) -> String {
+    paths
+        .iter()
+        .map(PathBuf::as_path)
+        .map(Path::display)
+        .map(|path| path.to_string())
+        .collect::<Vec<_>>()
+        .join(", ")
 }

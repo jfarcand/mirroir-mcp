@@ -2,6 +2,7 @@
 // ABOUTME: The step grammar is shared with Swift Sources/mirroir-mcp/SkillParser.swift, which runs ios blocks.
 
 pub mod archetype;
+pub mod compiled;
 pub mod env;
 pub mod local_overrides;
 pub mod lockfile;

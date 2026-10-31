@@ -10,7 +10,7 @@ use std::time::Duration;
 
 use super::loop_tree::{plant_archetype, plant_plan};
 use super::oracle_stub::stub_oracle;
-use super::{Run, Sandbox, free_port, repo_path, strip_ansi};
+use super::{Run, Sandbox, free_port, global_drift_defaults, repo_path, strip_ansi};
 
 /// SHA-256 of the runner's built-in judge prompt template, the value every
 /// `judge:` step pins. Kept in step with `oracle::judge::user_prompt_template_hash`
@@ -226,11 +226,7 @@ impl<'a> LoopFixture<'a> {
     pub fn plant(sandbox: &'a Sandbox, toolchain: Toolchain) -> Result<Self, String> {
         let port = free_port()?;
         copy_fixture_site(sandbox)?;
-        sandbox.write(
-            "drift-defaults.yaml",
-            &fs::read_to_string(repo_path("drift-defaults.yaml"))
-                .map_err(|e| format!("read the shipped drift-defaults.yaml: {e}"))?,
-        )?;
+        sandbox.write("drift-defaults.yaml", &global_drift_defaults()?)?;
         plant_archetype(sandbox, port)?;
         let config = plant_plan(sandbox, port)?;
         // The child's `$HOME` is a sandbox subdirectory rather than the

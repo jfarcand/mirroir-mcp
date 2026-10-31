@@ -35,6 +35,7 @@ mod parser;
 mod replay;
 mod replay_cross_surface;
 mod replay_dispatch;
+mod replay_ios;
 mod replay_plan;
 mod replay_sample;
 mod replay_step;

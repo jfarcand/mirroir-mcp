@@ -12,11 +12,13 @@
 #
 # The runner looks for a `drift-defaults.yaml` in this order and takes the
 # first that exists: the sample directory, `--skills <dir>` / `$MIRROIR_SKILLS`,
-# the working directory, `<cwd>/.mirroir/`, then `$HOME/.mirroir/`.
+# the working directory, `<cwd>/.mirroir/`, then `$HOME/.mirroir/`. A run that
+# finds none is refused at load: this global layer is required.
 version: 1
 
-# Jaccard similarity of the response's token set against the last green run.
-# A floor: below this the answer is made of different words.
+# Jaccard similarity against the last accepted reference: a judge response's
+# token set, and each iOS screen's structural texts against the scenario's
+# .compiled.json. A floor: below this the answer or screen says different things.
 fingerprint_similarity: { min: 0.85 }
 
 # How far the judge's score may move between two runs of the same scenario.

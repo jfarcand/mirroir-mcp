@@ -75,6 +75,41 @@ pub enum DriftFinding {
         /// Why the scenario says it drifted.
         detail: String,
     },
+    /// The compiled screen reference and this run cannot be paired: no
+    /// similarity was measured, and the gap itself is the finding.
+    Reference {
+        /// Which pairing failed.
+        gap: ReferenceGap,
+        /// Which screen or file, in prose.
+        detail: String,
+    },
+}
+
+/// Why an `ios` block's screens could not be compared to its compiled reference.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ReferenceGap {
+    /// The reference recorded a screen this run did not observe.
+    ScreenUnobserved,
+    /// This run observed a screen the reference never recorded.
+    ScreenUnreferenced,
+    /// The scenario file changed since the reference was recorded.
+    SourceChanged,
+    /// The screens were read in a window of another size or orientation
+    /// than the one the reference was recorded in.
+    DeviceChanged,
+}
+
+impl ReferenceGap {
+    /// The metric column's text.
+    #[must_use]
+    pub const fn label(self) -> &'static str {
+        match self {
+            Self::ScreenUnobserved => "screen_unobserved",
+            Self::ScreenUnreferenced => "screen_unreferenced",
+            Self::SourceChanged => "compiled_source_changed",
+            Self::DeviceChanged => "compiled_device_changed",
+        }
+    }
 }
 
 impl DriftFinding {
@@ -84,6 +119,7 @@ impl DriftFinding {
         match self {
             Self::Metric { metric, .. } => metric.key(),
             Self::Declared { .. } => "declared",
+            Self::Reference { gap, .. } => gap.label(),
         }
     }
 
@@ -95,7 +131,7 @@ impl DriftFinding {
                 threshold,
                 ..
             } => (format!("{observed:.3}"), format!("{threshold:.3}")),
-            Self::Declared { .. } => ("n/a".to_owned(), "n/a".to_owned()),
+            Self::Declared { .. } | Self::Reference { .. } => ("n/a".to_owned(), "n/a".to_owned()),
         }
     }
 
@@ -103,7 +139,9 @@ impl DriftFinding {
     #[must_use]
     pub fn detail(&self) -> &str {
         match self {
-            Self::Metric { detail, .. } | Self::Declared { detail } => detail,
+            Self::Metric { detail, .. }
+            | Self::Declared { detail }
+            | Self::Reference { detail, .. } => detail,
         }
     }
 

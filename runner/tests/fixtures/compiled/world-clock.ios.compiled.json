@@ -1,0 +1,108 @@
+{
+  "device" : {
+    "orientation" : "portrait",
+    "windowHeight" : 898,
+    "windowWidth" : 410
+  },
+  "screenFingerprint" : {
+    "hash" : "a369d033c135c2c6f05cba72ff3e6e1dad19dc7fae03aa30b5881ed308ec5fe8",
+    "iconCount" : 0,
+    "structuralTexts" : [
+      "Calendar",
+      "Camera",
+      "Clock",
+      "Photos",
+      "Settings"
+    ]
+  },
+  "source" : {
+    "compiledAt" : "2026-10-30T00:00:00Z",
+    "sha256" : "25d7b824f0025090b86ffc87e4b696cf26293783963c89af5c23ff2e8cd27d1d"
+  },
+  "steps" : [
+    {
+      "hints" : {
+        "arrivalFingerprint" : {
+          "hash" : "a369d033c135c2c6f05cba72ff3e6e1dad19dc7fae03aa30b5881ed308ec5fe8",
+          "iconCount" : 0,
+          "structuralTexts" : [
+            "Calendar",
+            "Camera",
+            "Clock",
+            "Photos",
+            "Settings"
+          ]
+        },
+        "compiledAction" : "passthrough"
+      },
+      "index" : 0,
+      "label" : "{ kind: ios, app: \"Clock\" }",
+      "type" : "target"
+    },
+    {
+      "hints" : {
+        "arrivalFingerprint" : {
+          "hash" : "23b2cdf8943d5076b3ade275c8bce4a913bb9cd5998f5924f7dbb4860e5ade24",
+          "iconCount" : 0,
+          "structuralTexts" : [
+            "Add Alarm",
+            "Alarms",
+            "Edit",
+            "Other",
+            "Sleep | Wake Up",
+            "Stopwatch",
+            "Timers",
+            "World Clock"
+          ]
+        },
+        "compiledAction" : "passthrough"
+      },
+      "index" : 1,
+      "label" : "Clock",
+      "type" : "launch"
+    },
+    {
+      "hints" : {
+        "arrivalFingerprint" : {
+          "hash" : "5f4a7578edb75eebc5d480db0765474b341988f4267d0323595a681ae686e2cc",
+          "iconCount" : 0,
+          "structuralTexts" : [
+            "Alarms",
+            "Cupertino",
+            "Edit",
+            "Stopwatch",
+            "Timers",
+            "Today, +0HRS",
+            "World Clock"
+          ]
+        },
+        "compiledAction" : "passthrough"
+      },
+      "index" : 2,
+      "label" : "World Clock",
+      "type" : "tap"
+    },
+    {
+      "hints" : {
+        "arrivalFingerprint" : {
+          "hash" : "5f4a7578edb75eebc5d480db0765474b341988f4267d0323595a681ae686e2cc",
+          "iconCount" : 0,
+          "structuralTexts" : [
+            "Alarms",
+            "Cupertino",
+            "Edit",
+            "Stopwatch",
+            "Timers",
+            "Today, +0HRS",
+            "World Clock"
+          ]
+        },
+        "compiledAction" : "passthrough"
+      },
+      "index" : 3,
+      "label" : "Cupertino",
+      "type" : "wait_for"
+    }
+  ],
+  "version" : 5
+}

@@ -1,0 +1,36 @@
+{
+  "suites" : [
+    {
+      "file" : "ios-block.yaml",
+      "specs" : [
+        {
+          "ok" : true,
+          "tests" : [
+            {
+              "projectName" : "ios",
+              "results" : [
+                {
+                  "attachments" : [
+                    {
+                      "body" : "eyJjcm9zc19zdXJmYWNlIjp7ImlvcyI6IkVkaXQgV29ybGQgQ2xvY2sgQ3VwZXJ0aW5vIFRvZGF5LCArMEhSUyBBbGFybXMgU3RvcHdhdGNoIFRpbWVyc1xuIn0sImRldmljZSI6eyJvcmllbnRhdGlvbiI6InBvcnRyYWl0Iiwid2luZG93SGVpZ2h0Ijo4OTgsIndpbmRvd1dpZHRoIjo0MTB9LCJtZXRyaWNzIjp7fSwic2NyZWVucyI6eyIwIjp7Imhhc2giOiJhMzY5ZDAzM2MxMzVjMmM2ZjA1Y2JhNzJmZjNlNmUxZGFkMTlkYzdmYWUwM2FhMzBiNTg4MWVkMzA4ZWM1ZmU4IiwiaWNvbkNvdW50IjowLCJzdHJ1Y3R1cmFsVGV4dHMiOlsiQ2FsZW5kYXIiLCJDYW1lcmEiLCJDbG9jayIsIlBob3RvcyIsIlNldHRpbmdzIl19LCIxIjp7Imhhc2giOiIyM2IyY2RmODk0M2Q1MDc2YjNhZGUyNzVjOGJjZTRhOTEzYmI5Y2Q1OTk4ZjU5MjRmN2RiYjQ4NjBlNWFkZTI0IiwiaWNvbkNvdW50IjowLCJzdHJ1Y3R1cmFsVGV4dHMiOlsiQWRkIEFsYXJtIiwiQWxhcm1zIiwiRWRpdCIsIk90aGVyIiwiU2xlZXAgfCBXYWtlIFVwIiwiU3RvcHdhdGNoIiwiVGltZXJzIiwiV29ybGQgQ2xvY2siXX0sIjIiOnsiaGFzaCI6IjUyNGFmYzM1OGM4NDk5ODkzNzg0ZjU3NmU4NGI3NTdlYTA1ODg0YTM1N2Y2MGE4NThmMjhiYjgyNjdkY2Y5MTIiLCJpY29uQ291bnQiOjAsInN0cnVjdHVyYWxUZXh0cyI6WyJBbGFybXMiLCJFZGl0IiwiTG9uZG9uIiwiU3RvcHdhdGNoIiwiVGltZXJzIiwiVG9kYXksICswSFJTIiwiV29ybGQgQ2xvY2siXX0sIjMiOnsiaGFzaCI6IjVmNGE3NTc4ZWRiNzVlZWJjNWQ0ODBkYjA3NjU0NzRiMzQxOTg4ZjQyNjdkMDMyMzU5NWE2ODFhZTY4NmUyY2MiLCJpY29uQ291bnQiOjAsInN0cnVjdHVyYWxUZXh0cyI6WyJBbGFybXMiLCJDdXBlcnRpbm8iLCJFZGl0IiwiU3RvcHdhdGNoIiwiVGltZXJzIiwiVG9kYXksICswSFJTIiwiV29ybGQgQ2xvY2siXX0sInN0YXJ0Ijp7Imhhc2giOiJhMzY5ZDAzM2MxMzVjMmM2ZjA1Y2JhNzJmZjNlNmUxZGFkMTlkYzdmYWUwM2FhMzBiNTg4MWVkMzA4ZWM1ZmU4IiwiaWNvbkNvdW50IjowLCJzdHJ1Y3R1cmFsVGV4dHMiOlsiQ2FsZW5kYXIiLCJDYW1lcmEiLCJDbG9jayIsIlBob3RvcyIsIlNldHRpbmdzIl19fX0=",
+                      "contentType" : "application\/json",
+                      "name" : "mirroir-captures"
+                    }
+                  ],
+                  "duration" : 1000,
+                  "errors" : [
+
+                  ],
+                  "status" : "passed"
+                }
+              ],
+              "status" : "expected"
+            }
+          ],
+          "title" : "world-clock"
+        }
+      ],
+      "title" : "ios-block.yaml"
+    }
+  ]
+}

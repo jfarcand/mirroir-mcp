@@ -139,6 +139,47 @@ enum AppSwitcherCardLocator {
         }
     }
 
+    /// X of `appName`'s card from the switcher's own label above it, or nil
+    /// when the label is absent, sits in the clipped left sliver, or matches
+    /// more than one element. Each label is drawn over the left part of its
+    /// own card, so its center X lands on that card even when the card's
+    /// preview is clipped by the right edge and its text no longer matches the
+    /// foreground capture.
+    static func locateCardXByLabel(
+        appName: String, switcherElements: [TapPoint], windowSize: CGSize
+    ) -> Double? {
+        let name = normalize(appName)
+        guard name.count >= 2 else { return nil }
+        let maxY = Double(windowSize.height) * labelBandMaxYFraction
+        let leftEdge = Double(windowSize.width) * leftEdgeFraction
+        let labels = switcherElements.filter { el in
+            guard el.tapY <= maxY, el.tapX >= leftEdge else { return false }
+            let label = normalize(el.text)
+            return label == name || (label.count >= 4 && name.hasPrefix(label))
+        }
+        guard labels.count == 1, let label = labels.first else { return nil }
+        return label.tapX
+    }
+
+    /// Locate `appName`'s card. The switcher's own label, matched exactly once,
+    /// is the stronger signal: it names the app and survives a preview clipped
+    /// by the window edge, where too few lines match the foreground capture.
+    /// The content fingerprint locates the card when no single label reads.
+    static func locateCard(
+        appName: String,
+        appElements: [TapPoint],
+        switcherElements: [TapPoint],
+        windowSize: CGSize
+    ) -> Double? {
+        if let byLabel = locateCardXByLabel(
+            appName: appName, switcherElements: switcherElements, windowSize: windowSize) {
+            return byLabel
+        }
+        return locateCardX(
+            appElements: appElements, switcherElements: switcherElements,
+            windowWidth: Double(windowSize.width))
+    }
+
     private static func normalize(_ text: String) -> String {
         text.lowercased().trimmingCharacters(in: .whitespaces)
     }

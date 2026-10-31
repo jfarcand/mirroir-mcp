@@ -2,7 +2,7 @@
 // Licensed under the Apache License, Version 2.0
 //
 // ABOUTME: Unit tests for AppSwitcherCardLocator: matches foreground app OCR text against App Switcher OCR to find the app's card position.
-// ABOUTME: Covers single-card layout, multi-card carousel with the target on the right, and the no-match fallback path.
+// ABOUTME: Covers single-card layout, multi-card carousel, the no-match path, and label-first locating of clipped cards.
 
 import XCTest
 @testable import HelperLib
@@ -244,5 +244,58 @@ final class AppSwitcherCardLocatorTests: XCTestCase {
                 appElements: app, switcherElements: switcher, windowWidth: 410
             ),
             "Two equally-matching cards must fail closed (never quit the wrong app)")
+    }
+
+    // MARK: - Label-first locate
+
+    /// On-device 2026-10-31: Horloge relaunched warm onto a sheet whose card
+    /// preview is clipped by the right edge, so only "Annuler" and "encore."
+    /// match the foreground capture — two equal clusters, an ambiguous
+    /// fingerprint. The switcher's label names the card.
+    private let device = CGSize(width: 430, height: 942)
+
+    private var clippedHorlogeApp: [TapPoint] {
+        [tap("Annuler", x: 50), tap("Sommeil désormais", x: 215),
+         tap("dans Santé", x: 215), tap("encore.", x: 243),
+         tap("Configurer dans Santé", x: 215)]
+    }
+
+    private var clippedHorlogeSwitcher: [TapPoint] {
+        [tap("Horloge", x: 321, y: 146), tap("Roblox", x: 154, y: 150),
+         tap("Pour toi", x: 153, y: 219), tap("Annuler", x: 269, y: 225),
+         tap("Sommeil désc", x: 347, y: 345), tap("dans Sant", x: 371, y: 374),
+         tap("encore.", x: 380, y: 499), tap("Configurer dans Sa", x: 369, y: 709)]
+    }
+
+    func testClippedPreviewFingerprintIsAmbiguous() {
+        XCTAssertNil(AppSwitcherCardLocator.locateCardX(
+            appElements: clippedHorlogeApp, switcherElements: clippedHorlogeSwitcher,
+            windowWidth: Double(device.width)))
+    }
+
+    func testLocateCardUsesLabelWhenPreviewIsClipped() {
+        XCTAssertEqual(AppSwitcherCardLocator.locateCard(
+            appName: "Horloge", appElements: clippedHorlogeApp,
+            switcherElements: clippedHorlogeSwitcher, windowSize: device), 321)
+    }
+
+    func testLocateCardUsesFingerprintWhenNoLabelReads() {
+        let app = [tap("Résumé", x: 92), tap("Entraînements", x: 107)]
+        let switcher = [tap("Résumé", x: 300), tap("Entraînements", x: 310)]
+        XCTAssertEqual(AppSwitcherCardLocator.locateCard(
+            appName: "Santé", appElements: app, switcherElements: switcher,
+            windowSize: device), 310)
+    }
+
+    func testLabelLocateIgnoresLeftSliverAndContentZone() {
+        let switcher = [tap("Horloge", x: 40, y: 146), tap("Horloge", x: 300, y: 400)]
+        XCTAssertNil(AppSwitcherCardLocator.locateCardXByLabel(
+            appName: "Horloge", switcherElements: switcher, windowSize: device))
+    }
+
+    func testLabelLocateFailsClosedOnTwoMatchingLabels() {
+        let switcher = [tap("Horl", x: 150, y: 146), tap("Horloge", x: 321, y: 146)]
+        XCTAssertNil(AppSwitcherCardLocator.locateCardXByLabel(
+            appName: "Horloge", switcherElements: switcher, windowSize: device))
     }
 }

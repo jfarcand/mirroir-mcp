@@ -27,15 +27,22 @@ enum PlaywrightReportWriter {
     ///   - screenCaptures: final-screen OCR text per skill index, recorded
     ///     when the run was asked to capture.
     ///   - captureKey: the `cross_surface` key each capture is attached under.
+    ///   - stepScreens: the screens each skill run left, per skill index,
+    ///     attached as `screens`; a skill with none attaches neither `screens`
+    ///     nor `device`.
+    ///   - device: the window the screens were read in, attached as `device`
+    ///     beside a skill's `screens`.
     static func document(
         results: [ConsoleReporter.SkillResult],
         screenCaptures: [Int: String],
-        captureKey: String?
+        captureKey: String?,
+        stepScreens: [Int: StepScreens] = [:],
+        device: DeviceInfo? = nil
     ) throws -> Data {
         let suites = try results.enumerated().map { index, result in
             try suite(for: result, capture: captureKey.flatMap { key in
                 screenCaptures[index].map { (key, $0) }
-            })
+            }, screens: stepScreens[index], device: device)
         }
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
@@ -47,10 +54,13 @@ enum PlaywrightReportWriter {
         results: [ConsoleReporter.SkillResult],
         screenCaptures: [Int: String],
         captureKey: String?,
+        stepScreens: [Int: StepScreens] = [:],
+        device: DeviceInfo? = nil,
         to path: String
     ) throws {
         let data = try document(
-            results: results, screenCaptures: screenCaptures, captureKey: captureKey)
+            results: results, screenCaptures: screenCaptures, captureKey: captureKey,
+            stepScreens: stepScreens, device: device)
         let dir = (path as NSString).deletingLastPathComponent
         if !dir.isEmpty {
             try FileManager.default.createDirectory(
@@ -63,11 +73,16 @@ enum PlaywrightReportWriter {
 
     private static func suite(
         for result: ConsoleReporter.SkillResult,
-        capture: (key: String, text: String)?
+        capture: (key: String, text: String)?,
+        screens: StepScreens?,
+        device: DeviceInfo?
     ) throws -> Suite {
+        let screenMap = screens.flatMap { $0.isEmpty ? nil : $0.reportMap }
         let captures = Captures(
             metrics: measureMetrics(in: result),
-            crossSurface: capture.map { [$0.key: $0.text] } ?? [:])
+            crossSurface: capture.map { [$0.key: $0.text] } ?? [:],
+            screens: screenMap,
+            device: screenMap == nil ? nil : device)
         let inner = JSONEncoder()
         inner.outputFormatting = [.sortedKeys]
         let body = try inner.encode(captures).base64EncodedString()
@@ -140,13 +155,20 @@ enum PlaywrightReportWriter {
         let body: String
     }
 
+    /// The `mirroir-captures` body. `screens` and `device` are left out when
+    /// nil, so a reader that predates them sees the document it always did.
     private struct Captures: Encodable {
         let metrics: [String: Double]
         let crossSurface: [String: String]
+        /// `start` and each step index → the structural fingerprint of that screen.
+        let screens: [String: ScreenFingerprint]?
+        let device: DeviceInfo?
 
         enum CodingKeys: String, CodingKey {
             case metrics
             case crossSurface = "cross_surface"
+            case screens
+            case device
         }
     }
 }

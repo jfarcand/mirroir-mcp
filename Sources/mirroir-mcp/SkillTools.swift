@@ -158,8 +158,10 @@ extension MirroirMCP {
     /// Returns relative paths sorted with .md files before .yaml files for the same stem,
     /// ensuring .md takes precedence during discovery.
     static func findSkillFiles(in baseDir: String) -> [String] {
+        // drift-defaults.yaml is the runner's threshold config, never a skill.
         let results = findFiles(in: baseDir) {
-            $0.hasSuffix(".yaml") || $0.hasSuffix(".md")
+            ($0.hasSuffix(".yaml") || $0.hasSuffix(".md"))
+                && ($0 as NSString).lastPathComponent != DriftDefaultsSeeder.fileName
         }
 
         // Sort with .md before .yaml for the same stem, so .md wins during dedup

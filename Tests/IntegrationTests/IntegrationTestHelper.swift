@@ -1,7 +1,7 @@
 // Copyright 2026 jfarcand@apache.org
 // Licensed under the Apache License, Version 2.0
 // ABOUTME: Shared setup logic for integration tests that target the FakeMirroring app.
-// ABOUTME: Auto-launches FakeMirroring if not running and hard-fails if launch fails.
+// ABOUTME: Auto-launches FakeMirroring if not running, hard-fails if launch fails, and quits it at bundle end if it started it.
 
 import AppKit
 @testable import mirroir_mcp
@@ -60,6 +60,7 @@ enum IntegrationTestHelper {
     /// Throws a hard error if the app cannot be found or launched — integration tests
     /// must never silently skip.
     static func ensureFakeMirroringRunning() throws {
+        FakeMirroringTeardown.claimIfNotRunning(isRunning: isFakeMirroringRunning)
         if isFakeMirroringRunning { return }
 
         // Resolve app path relative to the package root (parent of .build/)

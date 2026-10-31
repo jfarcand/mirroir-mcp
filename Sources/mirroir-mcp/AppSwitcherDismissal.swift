@@ -15,7 +15,7 @@ import HelperLib
 /// 1. Launch the app (resolves localized display name via Spotlight)
 /// 2. Capture foreground OCR (fingerprint)
 /// 3. Open App Switcher
-/// 4. Locate the just-launched card via OCR-intersection (`AppSwitcherCardLocator`)
+/// 4. Locate the just-launched card by its switcher label, else via OCR-intersection (`AppSwitcherCardLocator`)
 /// 5. Drag the card upward to dismiss
 /// 6. Return to the home screen, retrying once if iOS lands on Spotlight
 ///
@@ -88,19 +88,20 @@ enum AppSwitcherDismissal {
             return "App Switcher appears empty — no app cards detected"
         }
 
-        // 5. Locate the matching card via OCR intersection. Fail closed when
-        // the locator returns nil (no match OR an ambiguous one) — never drag a
-        // guess, or we quit the wrong app.
+        // 5. Locate the matching card by its switcher label, else by OCR
+        // intersection. Fail closed when the locator returns nil (no match OR
+        // an ambiguous one) — never drag a guess, or we quit the wrong app.
         let windowSize = bridge.getWindowInfo()?.size ?? CGSize(width: 410, height: 898)
-        guard let cardX = AppSwitcherCardLocator.locateCardX(
+        guard let cardX = AppSwitcherCardLocator.locateCard(
+            appName: appName,
             appElements: appOcr.elements,
             switcherElements: switcherOcr.elements,
-            windowWidth: Double(windowSize.width)
+            windowSize: windowSize
         ) else {
             _ = menuBridge.triggerMenuAction(menu: "View", item: "Home Screen")
             return "Cannot locate '\(appName)' card in App Switcher unambiguously — refusing to drag (would risk quitting the wrong app)"
         }
-        DebugLog.log("reset_app", "located '\(appName)' card at x=\(Int(cardX)) via OCR match")
+        DebugLog.log("reset_app", "located '\(appName)' card at x=\(Int(cardX))")
 
         // 6. Drag the card upward. The end point must stay inside the mirrored
         // content: window-relative y=0 is the macOS title-bar edge, and a drag
@@ -126,10 +127,11 @@ enum AppSwitcherDismissal {
         // every observed false positive lacked it.
         usleep(EnvConfig.appSwitcherOpenSettleUs)
         if let postDrag = describer.describe(),
-           AppSwitcherCardLocator.locateCardX(
+           AppSwitcherCardLocator.locateCard(
+               appName: appName,
                appElements: appOcr.elements,
                switcherElements: postDrag.elements,
-               windowWidth: Double(windowSize.width)
+               windowSize: windowSize
            ) != nil,
            AppSwitcherCardLocator.labelBandContains(
                appName: appName,

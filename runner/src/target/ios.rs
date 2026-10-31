@@ -36,11 +36,23 @@ const BLOCK_FILE: &str = "ios-block.yaml";
 /// File `mirroir-mcp test` writes its report to inside the workspace.
 const REPORT_FILE: &str = "ios-report.json";
 
+/// Where `mirroir-mcp test --compiled-out` writes the compiled skill a
+/// passing block records, and the file whose digest it stamps on it.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CompiledRecording {
+    /// `--compiled-out`: the path the compiled skill is written to.
+    pub out: PathBuf,
+    /// `--compiled-source`: the scenario file the block was rendered from.
+    pub source: PathBuf,
+}
+
 /// Driver for one `mirroir-mcp test` invocation per `ios` block.
 pub struct MirroirMcpRunner {
     binary: PathBuf,
     /// What each step of a block earns toward its run budget.
     step_allowance: Duration,
+    /// Set when the block's passing run records the scenario's screen reference.
+    recording: Option<CompiledRecording>,
 }
 
 impl MirroirMcpRunner {
@@ -59,6 +71,13 @@ impl MirroirMcpRunner {
             &env::var_os("PATH").unwrap_or_default(),
         )?
         .with_step_allowance(allowance))
+    }
+
+    /// Have a passing block record its compiled skill per `recording`.
+    #[must_use]
+    pub fn with_recording(mut self, recording: Option<CompiledRecording>) -> Self {
+        self.recording = recording;
+        self
     }
 
     /// Grant each step of a block `allowance` toward its run budget.
@@ -88,12 +107,14 @@ impl MirroirMcpRunner {
             return Ok(Self {
                 binary,
                 step_allowance: DEFAULT_IOS_STEP_ALLOWANCE,
+                recording: None,
             });
         }
         which_in(path, MIRROIR_MCP)
             .map(|binary| Self {
                 binary,
                 step_allowance: DEFAULT_IOS_STEP_ALLOWANCE,
+                recording: None,
             })
             .ok_or_else(|| IosError::NotInstalled.into())
     }
@@ -154,8 +175,15 @@ impl MirroirMcpRunner {
             .arg(&report)
             .arg("--capture")
             .arg(IOS_CAPTURE_KEY)
-            .arg(&block)
-            .current_dir(workspace)
+            .arg(&block);
+        // After the block path, so the positional layout before it is stable.
+        if let Some(recording) = &self.recording {
+            cmd.arg("--compiled-out")
+                .arg(&recording.out)
+                .arg("--compiled-source")
+                .arg(&recording.source);
+        }
+        cmd.current_dir(workspace)
             .stdin(Stdio::null())
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())

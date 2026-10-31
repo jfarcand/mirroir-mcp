@@ -13,36 +13,62 @@
 mod common;
 
 use std::fs;
+use std::path::Path;
 
-use common::{Sandbox, repo_path};
+use common::{DRIFT_DEFAULTS_FILE, Sandbox, repo_path};
 
 /// The emitted Clock app dir, as `mirroir.yaml`'s `local:` entry names it.
 const CLOCK_SAMPLE: &str = "tests/fixtures/emitted/.mirroir/apps/clock";
 
+/// The emitted `.mirroir/` tree, copied into the sandbox as a consumer repo's.
+const EMITTED_TREE: &str = "tests/fixtures/emitted/.mirroir";
+
 /// A `mirroir-mcp test` that keeps the block it was handed and reports a pass:
-/// argv is `test --report-json <report> --capture ios <block>`.
+/// argv is `test --report-json <report> --capture ios <block>`, then
+/// `--compiled-out <path> --compiled-source <scenario>` when the run records
+/// the scenario's screen reference — which a passing block writes.
 const PASSING_MIRROIR_MCP: &str = concat!(
     "#!/bin/sh\n",
     "PATH=/bin:/usr/bin\n",
     "export PATH\n",
     "cp \"$6\" \"$(basename \"$(dirname \"$6\")\").handed.yaml\"\n",
     "cat \"$MIRROIR_TEST_REPORT\" > \"$3\"\n",
+    "if [ \"$7\" = --compiled-out ]; then cp \"$MIRROIR_TEST_COMPILED\" \"$8\"; fi\n",
 );
 
 /// Every emitted flow runs as a must-pass scenario, each handing mirroir-mcp
 /// a block with every emitted step — the own-app reset, the taps, their
 /// arrival waits and a scrolled-to row included — and the sample's verdict
 /// is a pass.
+///
+/// The sandbox stands in for the consumer repo: it holds a copy of the
+/// emitted `.mirroir/` tree and no global drift layer of its own, so the run
+/// passes only because the emitted tree carries the `drift-defaults.yaml` the
+/// runner requires.
 #[test]
 fn the_emitted_sample_hands_every_step_of_every_flow_to_mirroir_mcp() -> Result<(), String> {
     let sandbox = Sandbox::new()?;
+    let own_layer = sandbox.path().join(DRIFT_DEFAULTS_FILE);
+    fs::remove_file(&own_layer).map_err(|e| format!("remove {}: {e}", own_layer.display()))?;
+    copy_tree(
+        Path::new(&repo_path(EMITTED_TREE)),
+        &sandbox.path().join(".mirroir"),
+    )?;
     let stub = sandbox.stub_bin("mirroir-mcp", PASSING_MIRROIR_MCP)?;
     let report = repo_path("src/target/fixtures/mirroir-mcp-report.json");
-    let sample = repo_path(CLOCK_SAMPLE);
+    let compiled = repo_path("tests/fixtures/compiled/world-clock.ios.compiled.json");
+    let sample = sandbox.path().join(".mirroir/apps/clock");
+    let sample = sample.display().to_string();
+    let home = sandbox.path().display().to_string();
 
     let run = sandbox.run_with_env(
         &["--sample", &sample],
-        &[("MIRROIR_MCP_BIN", &stub), ("MIRROIR_TEST_REPORT", &report)],
+        &[
+            ("MIRROIR_MCP_BIN", &stub),
+            ("MIRROIR_TEST_REPORT", &report),
+            ("MIRROIR_TEST_COMPILED", &compiled),
+            ("HOME", &home),
+        ],
     )?;
     if run.is_failure() {
         return Err(format!("the emitted sample failed\n{}", run.output()));
@@ -78,6 +104,25 @@ fn the_emitted_sample_hands_every_step_of_every_flow_to_mirroir_mcp() -> Result<
         return Err(format!(
             "the gym-alarm block lacks `{scrolled_tap}`\n{gym_alarm}"
         ));
+    }
+    Ok(())
+}
+
+/// Copy every file under `from` to the same relative path under `to`.
+fn copy_tree(from: &Path, to: &Path) -> Result<(), String> {
+    fs::create_dir_all(to).map_err(|e| format!("create {}: {e}", to.display()))?;
+    let entries = fs::read_dir(from).map_err(|e| format!("read {}: {e}", from.display()))?;
+    for entry in entries {
+        let path = entry.map_err(|e| e.to_string())?.path();
+        let Some(name) = path.file_name() else {
+            continue;
+        };
+        let target = to.join(name);
+        if path.is_dir() {
+            copy_tree(&path, &target)?;
+        } else {
+            fs::copy(&path, &target).map_err(|e| format!("copy {}: {e}", path.display()))?;
+        }
     }
     Ok(())
 }

@@ -23,6 +23,15 @@ extension SkillToolsTests {
         XCTAssertFalse(results.contains("c.txt"))
     }
 
+    func testFindSkillFilesSkipsDriftDefaults() {
+        createFile("drift-defaults.yaml", content: "version: 1")
+        createFile("apps/clock/drift-defaults.yaml", content: "version: 1")
+        createFile("apps/clock/check.yaml", content: "name: Check")
+
+        let results = MirroirMCP.findSkillFiles(in: tmpDir)
+        XCTAssertEqual(results, ["apps/clock/check.yaml"])
+    }
+
     func testFindSkillFilesMdBeforeYamlForSameStem() {
         createFile("test.yaml", content: "name: YAML")
         createFile("test.md", content: "---\nname: MD\n---\n\nBody")
