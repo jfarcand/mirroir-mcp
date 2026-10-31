@@ -18,21 +18,13 @@ mod common;
 use std::fs;
 
 use common::oracle_stub::stub_oracle;
-use common::{Sandbox, fixture_summary_text, passing_report_with_judge, repo_path};
+use common::{Sandbox, fixture_summary_text, passing_report_with_judge, repo_path, skills_arg};
 
 /// Exit code the runner reserves for the DRIFT verdict.
 const EXIT_DRIFT: i32 = 65;
 
 /// The judge step sits at index 5 of `order-summary.yaml`.
 const JUDGE_STEP_INDEX: &str = "5";
-
-/// The shipped `drift-defaults.yaml` lives at the crate root.
-fn shipped_thresholds() -> String {
-    repo_path("")
-        .trim_end_matches('/')
-        .trim_end_matches('\\')
-        .to_owned()
-}
 
 fn report_with(summary: &str) -> String {
     passing_report_with_judge(
@@ -69,7 +61,7 @@ fn prime(sandbox: &Sandbox, report: &str) -> Result<(), String> {
 fn run(sandbox: &Sandbox, report: &str) -> Result<(Option<i32>, String), String> {
     prime(sandbox, report)?;
     let scenario = repo_path("samples/web-fixture/scenarios/order-summary.yaml");
-    let skills = shipped_thresholds();
+    let skills = skills_arg()?;
     let home = sandbox.path().display().to_string();
     let outcome = sandbox.run_outside_ci(
         &["--run-scenario", scenario.as_str(), "--skills", &skills],
@@ -82,7 +74,7 @@ fn run(sandbox: &Sandbox, report: &str) -> Result<(Option<i32>, String), String>
 fn accept(sandbox: &Sandbox, report: &str) -> Result<(Option<i32>, String), String> {
     prime(sandbox, report)?;
     let scenario = repo_path("samples/web-fixture/scenarios/order-summary.yaml");
-    let skills = shipped_thresholds();
+    let skills = skills_arg()?;
     let home = sandbox.path().display().to_string();
     let outcome = sandbox.run_outside_ci(
         &[

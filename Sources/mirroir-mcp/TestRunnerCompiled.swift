@@ -12,6 +12,7 @@ extension TestRunner {
     /// Execute a skill from its compiled hints, each step verified on the live screen.
     /// When `agent` is non-nil, failed steps trigger a diagnostic OCR call.
     /// When `agent` is a non-empty model name, AI diagnosis runs after deterministic analysis.
+    /// `recorder`, when given, reads the settled screen after each step that ran.
     static func executeCompiledSkill(
         skill: SkillDefinition,
         compiled: CompiledSkill,
@@ -19,7 +20,8 @@ extension TestRunner {
         normalExecutor: StepExecutor,
         describer: ScreenDescribing,
         agent: String?,
-        verbose: Bool
+        verbose: Bool,
+        recorder: StepScreenRecorder? = nil
     ) -> ConsoleReporter.SkillResult {
         let agentEnabled = agent != nil
         let stepCount = skill.steps.count
@@ -90,6 +92,7 @@ extension TestRunner {
                 }
             }
 
+            recorder?.recordStep(index, result: result)
             stepResults.append(result)
             ConsoleReporter.reportStep(index: index, total: stepCount,
                                        result: result, verbose: verbose)
@@ -157,7 +160,8 @@ extension TestRunner {
     /// compiled file matches the skill source, the format version and the window.
     /// A stale one — including one that no longer decodes, like an older format
     /// version — is named through `warn` and left out, so its skill runs on live
-    /// OCR. The files are only read: `mirroir-mcp test` never writes a `.compiled.json`.
+    /// OCR. The files are only read: `mirroir-mcp test` writes a `.compiled.json` only
+    /// where `--compiled-out` names it.
     static func freshCompiledSkills(
         for skills: [SkillDefinition],
         windowWidth: Double,

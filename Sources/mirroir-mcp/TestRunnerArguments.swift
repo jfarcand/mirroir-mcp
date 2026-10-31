@@ -17,6 +17,8 @@ extension TestRunner {
     /// - Throws: `TestRunnerArgumentError` for a flag this command does not know, a
     ///   flag missing its value, or `--dry-run` with `--report-json`: a dry run
     ///   executes nothing, so it must never write a report a caller reads as a verdict.
+    ///   `--compiled-out` and `--compiled-source` come together, name exactly one
+    ///   skill, and are refused with `--dry-run`, which has no screens to record.
     static func parseArguments(_ args: [String]) throws -> TestRunConfig {
         var skillArgs: [String] = []
         var junitPath: String?
@@ -29,6 +31,8 @@ extension TestRunner {
         var confirmDestructive = false
         var reportJSONPath: String?
         var captureKey: String?
+        var compiledOutPath: String?
+        var compiledSourcePath: String?
         var showHelp = false
 
         /// The value after flag `args[i]`, advancing past it.
@@ -53,6 +57,10 @@ extension TestRunner {
                 reportJSONPath = try value(at: &i)
             case "--capture":
                 captureKey = try value(at: &i)
+            case "--compiled-out":
+                compiledOutPath = try value(at: &i)
+            case "--compiled-source":
+                compiledSourcePath = try value(at: &i)
             case "--screenshot-dir":
                 screenshotDir = try value(at: &i)
             case "--timeout":
@@ -97,6 +105,21 @@ extension TestRunner {
         if dryRun, reportJSONPath != nil {
             throw TestRunnerArgumentError.dryRunWithReport
         }
+        switch (compiledOutPath, compiledSourcePath) {
+        case (.some, nil):
+            throw TestRunnerArgumentError.compiledFlagWithoutPartner(
+                given: "--compiled-out", missing: "--compiled-source")
+        case (nil, .some):
+            throw TestRunnerArgumentError.compiledFlagWithoutPartner(
+                given: "--compiled-source", missing: "--compiled-out")
+        case (.some, .some):
+            if dryRun { throw TestRunnerArgumentError.dryRunWithCompiledOut }
+            if skillArgs.count != 1 {
+                throw TestRunnerArgumentError.compiledOutNeedsOneSkill(count: skillArgs.count)
+            }
+        case (nil, nil):
+            break
+        }
 
         return TestRunConfig(
             skillArgs: skillArgs,
@@ -110,6 +133,8 @@ extension TestRunner {
             confirmDestructive: confirmDestructive,
             reportJSONPath: reportJSONPath,
             captureKey: captureKey,
+            compiledOutPath: compiledOutPath,
+            compiledSourcePath: compiledSourcePath,
             showHelp: showHelp
         )
     }
@@ -265,7 +290,18 @@ extension TestRunner {
                               Write a Playwright JSON-reporter document to <path>
                               (the format mirroir-run ingests)
           --capture <key>     Attach each skill's final-screen OCR text to the
-                              --report-json document under cross_surface.<key>
+                              --report-json document under cross_surface.<key>,
+                              with the structural fingerprint of the start screen
+                              and of each step's settled screen under screens
+                              and the window under device
+          --compiled-out <path>
+                              After the one skill given passes, write its
+                              .compiled.json to <path>: each step that ran with
+                              the screen it left (needs --compiled-source; a
+                              failed run writes nothing)
+          --compiled-source <file>
+                              The file whose SHA-256 the --compiled-out skill
+                              records as its source (the scenario it came from)
           --screenshot-dir    Failure screenshot directory (default: ./mirroir-test-results/)
           --timeout <sec>     wait_for timeout in seconds (default: 15)
           --verbose, -v       Show detailed output
@@ -303,6 +339,9 @@ enum TestRunnerArgumentError: LocalizedError, Equatable {
     case missingValue(flag: String)
     case invalidValue(flag: String, value: String)
     case dryRunWithReport
+    case compiledFlagWithoutPartner(given: String, missing: String)
+    case compiledOutNeedsOneSkill(count: Int)
+    case dryRunWithCompiledOut
 
     var errorDescription: String? {
         switch self {
@@ -315,6 +354,13 @@ enum TestRunnerArgumentError: LocalizedError, Equatable {
         case .dryRunWithReport:
             return "--dry-run cannot be combined with --report-json: a dry run executes "
                 + "no step, so it has no verdict to report"
+        case .compiledFlagWithoutPartner(let given, let missing):
+            return "option '\(given)' needs '\(missing)' too"
+        case .compiledOutNeedsOneSkill(let count):
+            return "--compiled-out records exactly one skill, but \(count) were given"
+        case .dryRunWithCompiledOut:
+            return "--dry-run cannot be combined with --compiled-out: a dry run executes "
+                + "no step, so it has no screens to record"
         }
     }
 }

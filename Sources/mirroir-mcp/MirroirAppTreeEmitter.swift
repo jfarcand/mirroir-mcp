@@ -35,6 +35,8 @@ enum MirroirAppTreeEmitter {
         let planNote: String
         /// Flows left out because their walk cannot replay, in name order.
         let dropped: [DroppedFlow]
+        /// Human-readable note: `.mirroir/drift-defaults.yaml` was created or kept.
+        let driftDefaultsNote: String
     }
 
     /// A flow the emit left out, and the formatter's reason it cannot replay.
@@ -73,6 +75,10 @@ enum MirroirAppTreeEmitter {
         /// `plan.must_pass` list unambiguously, so the `slug` entry was not
         /// added; `snippet` is the entry to paste there.
         case unplacedPlanEntry(plan: String, slug: String, snippet: String)
+        /// The tree has no `drift-defaults.yaml` and no mirroir-skills copy
+        /// exists at any of `searched`, so the global threshold layer
+        /// `mirroir-run` requires cannot be seeded. Nothing was emitted.
+        case driftDefaultsMissing(searched: [String])
         var errorDescription: String? {
             switch self {
             case .noConsumerRoot:
@@ -103,6 +109,11 @@ enum MirroirAppTreeEmitter {
             case .unplacedPlanEntry(let plan, let slug, let snippet):
                 return "\(plan) has no single plan.must_pass block list to add '\(slug)' to; " +
                     "add this entry under plan.must_pass:\n\(snippet)"
+            case .driftDefaultsMissing(let searched):
+                return "no \(DriftDefaultsSeeder.fileName) in the mirroir-skills checkout " +
+                    "(searched: \(searched.joined(separator: ", "))); mirroir-run requires " +
+                    "the global threshold layer, so nothing was emitted — install mirroir-skills " +
+                    "or add .mirroir/\(DriftDefaultsSeeder.fileName)"
             }
         }
     }
@@ -119,7 +130,11 @@ enum MirroirAppTreeEmitter {
     /// `EmitResult.dropped`; only when every flow is dropped is the emit
     /// refused, leaving the tree untouched. The emitter owns each `.ios.yaml`
     /// it writes and overwrites it on re-emit; `APP.md` is created when
-    /// absent and never rewritten.
+    /// absent and never rewritten. `.mirroir/drift-defaults.yaml` — the
+    /// global threshold layer `mirroir-run` requires — is copied from the
+    /// first of `driftDefaultsCandidates` that exists when the tree has none,
+    /// and an existing one is never overwritten; with neither, the emit is
+    /// refused before anything is written.
     ///
     /// `SAMPLE.md` and `mirroir.yaml` are created with an ownership marker
     /// and kept current by later emits (`MirroirManifestUpsert`), which insert
@@ -132,14 +147,15 @@ enum MirroirAppTreeEmitter {
     /// in that error or in the success note; they stay on disk and declared.
     ///
     /// - Throws: `EmitError` when there is nothing to emit, no replayable
-    ///   flow, no consumer root, a written flow SAMPLE.md does not declare and
+    ///   flow, no consumer root, no drift-defaults layer to seed, a written flow SAMPLE.md does not declare and
     ///   the emitter cannot add, a plan entry it cannot place, or a
     ///   file-system error.
     static func emit(
         appName: String,
         flows: [Flow],
         outputDir: String? = nil,
-        root: URL? = nil
+        root: URL? = nil,
+        driftDefaultsCandidates: [String] = DriftDefaultsSeeder.candidatePaths()
     ) throws -> EmitResult {
         guard !flows.isEmpty else { throw EmitError.noFlows(appName: appName) }
         if let empty = flows.first(where: { $0.screens.isEmpty }) {
@@ -152,6 +168,8 @@ enum MirroirAppTreeEmitter {
         guard !scenarios.isEmpty else {
             throw EmitError.noReplayableFlow(appName: appName, dropped: dropped)
         }
+        let driftDefaults = try DriftDefaultsSeeder.plan(
+            mirroirRoot: mirroirRoot, candidates: driftDefaultsCandidates)
 
         let slug = slugify(appName)
         let appDir = mirroirRoot.appendingPathComponent("apps/\(slug)", isDirectory: true)
@@ -174,6 +192,8 @@ enum MirroirAppTreeEmitter {
             try appMdBanner(appName: appName).write(to: appMd, atomically: true, encoding: .utf8)
         }
 
+        let driftDefaultsNote = try DriftDefaultsSeeder.apply(driftDefaults)
+
         // The plan's error is raised after SAMPLE.md is brought current, and
         // SAMPLE.md goes last, so either error leaves every other file in place.
         // When both fail, SAMPLE.md's error carries the plan's, so one result
@@ -195,7 +215,8 @@ enum MirroirAppTreeEmitter {
         let planNote = try plan.get()
         return EmitResult(
             appDir: appDir, scenarioPaths: scenarioPaths,
-            sampleNote: sampleNote, planNote: planNote, dropped: dropped
+            sampleNote: sampleNote, planNote: planNote, dropped: dropped,
+            driftDefaultsNote: driftDefaultsNote
         )
     }
 

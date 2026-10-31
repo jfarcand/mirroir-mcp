@@ -177,7 +177,7 @@ The compiled file is invalidated when any of these change:
 | Window dimensions changed | `stale` | Device mismatch → warning, falls back to full OCR |
 | Format version bumped | `stale` | Version mismatch → warning, falls back to full OCR |
 
-Staleness checks return one of two `StalenessResult` values: `fresh` or `stale`. The screen content is not a staleness signal: `mirroir test` reads compiled files and never writes one, so a run cannot quietly re-bless a changed screen.
+Staleness checks return one of two `StalenessResult` values: `fresh` or `stale`. The screen content is not a staleness signal: `mirroir test` reads compiled files and never rewrites one, so a run cannot quietly re-bless a changed screen. It writes a compiled file only to the path `--compiled-out` names — the reference `mirroir-run` records for an iOS scenario's drift check on its first green run or in accept mode.
 
 When a compiled file is stale, the test runner prints a warning and runs the skill with full OCR. Recompile to update — either by running the skill again via AI (which records the steps again when it sees `[Compiled: stale]`) or via the CLI:
 

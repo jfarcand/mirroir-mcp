@@ -48,7 +48,7 @@ use common::parity_tree::{
     IOS_BASELINE, PAGE, REWORDED_PAGE, SAMPLE_SOURCE, WEB_BASELINE, panel_lines, plant_sample,
     reword_scenario, shipped_ios_baseline,
 };
-use common::{Sandbox, free_port, repo_path, strip_ansi};
+use common::{Sandbox, free_port, global_drift_defaults, strip_ansi};
 
 /// Exit code for a genuine failure — every `Err` the runner returns.
 const EXIT_FAIL: i32 = 1;
@@ -116,14 +116,10 @@ impl<'a> ParityGate<'a> {
     /// Copy the shipped sample into `sandbox` and reserve its port.
     fn plant(sandbox: &'a Sandbox, toolchain: &Toolchain) -> Result<Self, String> {
         let sample_dir = plant_sample(sandbox, free_port()?)?;
-        // The same file the repository's own runs resolve thresholds from, so
-        // the sandbox run and a `--sample samples/web-fixture` run read one
+        // The mirroir-skills global layer — the same file a `--sample
+        // samples/web-fixture` run resolves thresholds from, so both read one
         // policy rather than two.
-        sandbox.write(
-            "drift-defaults.yaml",
-            &fs::read_to_string(repo_path("drift-defaults.yaml"))
-                .map_err(|e| format!("read the shipped drift-defaults.yaml: {e}"))?,
-        )?;
+        sandbox.write("drift-defaults.yaml", &global_drift_defaults()?)?;
         let path = env::var_os("PATH")
             .ok_or("no PATH in this process's environment")?
             .into_string()

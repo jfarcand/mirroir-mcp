@@ -19,7 +19,7 @@ runner milestones below cover its spine; iOS delegation and live web↔iOS parit
 (steps 17–18, sequential form) run through mirroir-mcp. Still open against the
 spec: parallel web/iOS lanes, `wait_for_agui_event`, the LLM
 `cross_surface_equivalent` judge, native Anthropic/Ollama judge clients,
-per-browser verdicts, and `.compiled.json` drift. `main.rs` dispatches a
+and per-browser verdicts. `main.rs` dispatches a
 multi-mode runner: scenario `--validate` / `--emit playwright` /
 `--run-scenario`, `--sample` session replay, `--diff-text` drift, and the
 `.mirroir/` consumer pipeline (explicit `--config` or bare-invocation
@@ -151,6 +151,14 @@ it saw and passes.
 | `response_levenshtein_pct` | ceiling (`max`) | normalized Levenshtein distance of the judged response |
 | `step_latency_pct_increase` | ceiling (`max`) | fractional growth of a `measure:` latency |
 
+An `ios` block's screens are held to a different store: the
+`<scenario>.compiled.json` next to the scenario, which mirroir-mcp records on
+the first green run and on `accept`. Each screen is compared by
+`fingerprint_similarity` (mirroir-mcp's structural-text Jaccard), and a screen
+on one side only, a window of another size or orientation, or a scenario
+edited since recording is a candidate too — see
+[docs/drift-and-accept.md](docs/drift-and-accept.md#ios-screens-the-compiled-reference).
+
 ### Threshold resolution is fail-closed
 
 ```
@@ -170,9 +178,16 @@ reported as DRIFT or swallowed as a green run.
 
 The `drift-defaults.yaml` search takes the first that exists: the sample
 directory, `--skills <dir>` / `$MIRROIR_SKILLS`, the working directory,
-`<cwd>/.mirroir/`, then `$HOME/.mirroir/`. This repository ships one at
-`runner/drift-defaults.yaml` with the design's starting values; it is a dev
-fixture, not part of the published crate, so a consumer declares their own.
+`<cwd>/.mirroir/`, then `$HOME/.mirroir/`. The global layer is **required**:
+a run that finds no `drift-defaults.yaml` on any of those paths is refused at
+load, before a step runs, naming every path it searched. It lives in the
+[mirroir-skills](https://github.com/jfarcand/mirroir-skills) repo
+(`drift-defaults.yaml` at its root) with the design's starting values — the one
+copy; this repository carries none. Point `--skills` / `$MIRROIR_SKILLS` at a
+checkout, or let `generate_skill`'s emit seed `.mirroir/drift-defaults.yaml`
+from it. The runner's own tests read the same file, from `$MIRROIR_SKILLS` or
+the sibling checkout `../mirroir-skills`, and fail naming both when it is
+missing.
 
 ```yaml
 version: 1
@@ -206,9 +221,10 @@ git diff                        # the reviewed change, as files
 mirroir-run                     # exit 0 again, now holding to the new output
 ```
 
-Four artifacts move, and they are the four a DRIFT verdict can point at:
+Five artifacts move, and they are the five a DRIFT verdict can point at:
 `.harness/last-green.json`, every `judge.drift_baseline_file`, every
-`cross_surface.capture.to`, and `.mirroir/mirroir.lock`. `.harness/drift-log.md`
+`cross_surface.capture.to`, `.mirroir/mirroir.lock`, and every `ios` block's
+`<scenario>.compiled.json`. `.harness/drift-log.md`
 is deleted first — its rows are the queue accept answers. The judge still runs
 and its `pass_threshold` is still enforced: accept moves the drift baseline, it
 does not bless a response the judge fails.

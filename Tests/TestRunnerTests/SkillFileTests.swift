@@ -240,7 +240,8 @@ final class SkillFileTests: XCTestCase {
     }
 
     /// Return unique skill stems from the skills directory, filtering out legacy/,
-    /// dotfile directories (.claude/, .github/), and root-level non-skill .md files.
+    /// dotfile directories (.claude/, .github/), and root-level files — the repo's
+    /// docs (README.md, CLA.md) and config (drift-defaults.yaml), never skills.
     /// When both .yaml and .md exist for the same stem, only one entry is returned.
     private func skillStems() -> [String] {
         let allFiles = MirroirMCP.findSkillFiles(in: Self.skillsDir)
@@ -263,8 +264,8 @@ final class SkillFileTests: XCTestCase {
             // Skip dotfile directories (.claude/, .github/)
             let pathComponents = relPath.components(separatedBy: "/")
             if pathComponents.contains(where: { $0.hasPrefix(".") }) { continue }
-            // Skip root-level .md files (README.md, CLA.md, etc.)
-            if pathComponents.count == 1 && relPath.hasSuffix(".md") { continue }
+            // Skip root-level files (README.md, CLA.md, drift-defaults.yaml, etc.)
+            if pathComponents.count == 1 { continue }
 
             let stem = MirroirMCP.skillStem(relPath)
             if seenStems.contains(stem) { continue }
@@ -277,10 +278,11 @@ final class SkillFileTests: XCTestCase {
 
     /// Return .yaml skill files for tests that require parsed steps, excluding
     /// legacy/ and archetypes/ (the latter are framework scenarios driven by the
-    /// runner's .mirroir/ pipeline, not standalone iPhone skills).
+    /// runner's .mirroir/ pipeline, not standalone iPhone skills) and root-level
+    /// repo config such as drift-defaults.yaml.
     private func yamlFilesSkippingLegacy() -> [String] {
         MirroirMCP.findYAMLFiles(in: Self.skillsDir).filter {
-            !$0.hasPrefix("legacy/") && !$0.hasPrefix("archetypes/")
+            !$0.hasPrefix("legacy/") && !$0.hasPrefix("archetypes/") && $0.contains("/")
         }
     }
 

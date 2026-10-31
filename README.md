@@ -377,7 +377,9 @@ mirroir test --dry-run apps/settings/check-about    # validate without executing
 |---|---|
 | `--junit <path>` | Write JUnit XML report |
 | `--report-json <path>` | Write a Playwright JSON-reporter document — the format `mirroir-run` ingests |
-| `--capture <key>` | Attach each skill's final-screen OCR text to the `--report-json` document under `cross_surface.<key>` |
+| `--capture <key>` | Attach each skill's final-screen OCR text to the `--report-json` document under `cross_surface.<key>`, with the structural fingerprint of the start screen and of each step's settled screen under `screens` (`start`, `0`, `1`, …) and the window under `device` |
+| `--compiled-out <path>` | After the one skill given passes, write its `.compiled.json` to `<path>`: each step that ran as a passthrough step carrying the screen it left (`arrivalFingerprint`), the start screen as `screenFingerprint`. A failed run, or a pass whose start screen or any step's screen could not be read, writes nothing and exits `1`. Needs `--compiled-source`; refused with `--dry-run` or more than one skill |
+| `--compiled-source <file>` | The file whose SHA-256 the `--compiled-out` skill records as its source — the scenario `mirroir-run` rendered the skill from |
 | `--screenshot-dir <dir>` | Save failure screenshots (default: `./mirroir-test-results/`) |
 | `--timeout <seconds>` | `wait_for` timeout (default: 15) |
 | `--verbose` | Step-by-step detail |
@@ -388,7 +390,7 @@ mirroir test --dry-run apps/settings/check-about    # validate without executing
 
 Exit code `0` = all pass, `1` = any failure, `2` = refused arguments (an unknown option is named, never ignored). A skill whose every step was skipped is a failure, and a skill holding a step the parser cannot read (an unknown verb, a malformed `target:`) or cannot use (a `drag:` naming neither end, a `measure:` with no action) is refused before anything runs, `--dry-run` included. A skill holding an AI-only step (`verify`, `remember`, `condition`, `repeat`, `summarize`) fails with `not evaluated: <step> needs an AI client`: the CLI has no AI to check it, so it never reports that skill as passed.
 
-`mirroir test` only reads `.compiled.json` files, never rewrites them. A compiled file stale for its source, format version or window size is named and the skill runs on live OCR.
+`mirroir test` only reads `.compiled.json` files, never rewrites them; it writes one only to the path `--compiled-out` names. A compiled file stale for its source, format version or window size is named and the skill runs on live OCR.
 
 ### Compiled Skills
 

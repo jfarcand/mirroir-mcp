@@ -55,16 +55,18 @@ impl Fingerprint {
 /// Returns 0.0 when only one side is empty.
 #[must_use]
 pub fn jaccard_similarity(a: &Fingerprint, b: &Fingerprint) -> f64 {
-    if a.tokens.is_empty() && b.tokens.is_empty() {
+    jaccard_index(&a.tokens, &b.tokens)
+}
+
+/// Jaccard index of two sets: `|A ∩ B| / |A ∪ B|`, with two empty sets
+/// vacuously identical (1.0). The one Jaccard every drift metric uses.
+#[must_use]
+pub fn jaccard_index<T: Ord>(a: &BTreeSet<T>, b: &BTreeSet<T>) -> f64 {
+    let union = a.union(b).count();
+    if union == 0 {
         return 1.0;
     }
-    let inter = a.tokens.intersection(&b.tokens).count();
-    let union = a.tokens.union(&b.tokens).count();
-    if union == 0 {
-        0.0
-    } else {
-        inter as f64 / union as f64
-    }
+    a.intersection(b).count() as f64 / union as f64
 }
 
 /// Levenshtein edit distance between `a` and `b`, normalized to `[0, 1]`

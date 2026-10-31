@@ -136,6 +136,10 @@ pub enum ArtifactKind {
     LastGreen,
     /// A composed sample's `.compose-manifest.json`.
     ComposeManifest,
+    /// The `<scenario>.compiled.json` mirroir-mcp records for an `ios` block.
+    /// Its versioning is mirroir-mcp's `CompiledSkill.currentVersion`, which
+    /// started its count before this seam existed — hence major 5.
+    CompiledSkill,
 }
 
 impl ArtifactKind {
@@ -154,6 +158,7 @@ impl ArtifactKind {
             | Self::AppMd
             | Self::LastGreen
             | Self::ComposeManifest => 1..=1,
+            Self::CompiledSkill => 5..=5,
         }
     }
 
@@ -171,7 +176,8 @@ impl ArtifactKind {
             | Self::JudgeProfiles
             | Self::AppMd
             | Self::LastGreen
-            | Self::ComposeManifest => 0,
+            | Self::ComposeManifest
+            | Self::CompiledSkill => 0,
         }
     }
 
@@ -206,6 +212,7 @@ impl ArtifactKind {
             Self::AppMd => "APP.md",
             Self::LastGreen => "last-green.json",
             Self::ComposeManifest => ".compose-manifest.json",
+            Self::CompiledSkill => "compiled.json",
         }
     }
 }

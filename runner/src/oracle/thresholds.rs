@@ -229,12 +229,20 @@ impl ThresholdSearch<'_> {
 /// Build the policy for one scenario: the scenario's own `drift:` block over
 /// the sample's `APP.md` over the first `drift-defaults.yaml` on the search path.
 ///
+/// The global layer is required to exist: a run with no `drift-defaults.yaml`
+/// at any candidate is refused at load time rather than discovering a missing
+/// threshold only once a comparison is due. An absent `APP.md` is not an
+/// error — the scenario and global layers cover it.
+///
 /// # Errors
 ///
-/// [`OracleError::ThresholdsParse`] when a file that exists cannot be read or
-/// deserialized. A file that is simply absent is not an error — the layer below
-/// it takes over, and a metric no layer covers fails closed at
-/// [`DriftPolicy::resolve`] instead.
+/// * [`OracleError::ThresholdsMissing`] when no `drift-defaults.yaml` candidate
+///   exists; the error lists every path searched.
+/// * [`OracleError::ThresholdsParse`] when a file that exists cannot be read or
+///   deserialized.
+///
+/// A metric that no layer declares still fails closed at
+/// [`DriftPolicy::resolve`].
 pub fn load_policy(
     scenario: Option<DriftThresholds>,
     search: &ThresholdSearch<'_>,
@@ -252,16 +260,17 @@ pub fn load_policy(
         None => None,
     };
 
-    let mut global = None;
-    for candidate in search.global_candidates() {
-        if candidate.is_file() {
-            global = Some(load_drift_defaults(&candidate)?);
-            sources.push(candidate);
-            break;
+    let candidates = search.global_candidates();
+    let Some(found) = candidates.iter().find(|candidate| candidate.is_file()) else {
+        return Err(OracleError::ThresholdsMissing {
+            searched: candidates,
         }
-    }
+        .into());
+    };
+    let global = load_drift_defaults(found)?;
+    sources.push(found.clone());
 
-    let policy = DriftPolicy::new(scenario, app, global);
+    let policy = DriftPolicy::new(scenario, app, Some(global));
     info!(
         sources = ?sources,
         declared = ?policy.declared_metrics(),
@@ -347,4 +356,79 @@ pub fn parse_app_defaults(path: &Path, markdown: &str) -> Result<Option<DriftThr
         |source| thresholds_parse(path, &source),
     )?;
     Ok(parsed.drift_defaults)
+}
+
+#[cfg(test)]
+mod tests {
+    use std::result::Result as StdResult;
+
+    use tempfile::tempdir;
+
+    use super::*;
+
+    type TestResult = StdResult<(), String>;
+
+    const GLOBAL_LAYER: &str = "version: 1\nfingerprint_similarity: { min: 0.85 }\n";
+
+    #[test]
+    fn a_missing_global_layer_is_a_load_error_naming_every_searched_path() -> TestResult {
+        let sample = tempdir().map_err(|e| e.to_string())?;
+        let cwd = tempdir().map_err(|e| e.to_string())?;
+        let home = tempdir().map_err(|e| e.to_string())?;
+        let search = ThresholdSearch {
+            sample_dir: Some(sample.path()),
+            skills_root: None,
+            cwd: Some(cwd.path()),
+            home: Some(home.path()),
+        };
+        let err = match load_policy(None, &search) {
+            Err(err) => err,
+            Ok(policy) => return Err(format!("expected a load error, got {policy:?}")),
+        };
+        let message = err.to_string();
+        if !message.contains("the global layer is required (fail-closed)") {
+            return Err(format!("the error did not say fail-closed: {message}"));
+        }
+        for path in search.global_candidates() {
+            let shown = path.display().to_string();
+            if !message.contains(&shown) {
+                return Err(format!("the error omitted {shown}: {message}"));
+            }
+        }
+        if !matches!(
+            err,
+            RunnerError::Oracle(OracleError::ThresholdsMissing { ref searched })
+                if searched.len() == 4
+        ) {
+            return Err(format!(
+                "expected ThresholdsMissing over 4 paths, got {err:?}"
+            ));
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn a_present_global_layer_loads_into_the_policy() -> TestResult {
+        let cwd = tempdir().map_err(|e| e.to_string())?;
+        let mirroir = cwd.path().join(".mirroir");
+        fs::create_dir_all(&mirroir).map_err(|e| e.to_string())?;
+        fs::write(mirroir.join(DRIFT_DEFAULTS_FILE), GLOBAL_LAYER).map_err(|e| e.to_string())?;
+        let search = ThresholdSearch {
+            cwd: Some(cwd.path()),
+            ..ThresholdSearch::default()
+        };
+        let policy = load_policy(None, &search).map_err(|e| e.to_string())?;
+        let similarity = policy
+            .resolve(DriftMetric::FingerprintSimilarity, None)
+            .map_err(|e| e.to_string())?;
+        if (similarity - 0.85).abs() > f64::EPSILON {
+            return Err(format!(
+                "expected 0.85 from the global layer, got {similarity}"
+            ));
+        }
+        if policy.resolve(DriftMetric::JudgeScoreSwing, None).is_ok() {
+            return Err("a metric the layer omits must still fail closed".to_owned());
+        }
+        Ok(())
+    }
 }

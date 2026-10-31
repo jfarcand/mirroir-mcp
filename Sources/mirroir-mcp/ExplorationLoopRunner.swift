@@ -169,6 +169,7 @@ enum ExplorationLoopRunner {
             "\(scenarios)\n" + dropped +
             "  sample: \(result.sampleNote)\n" +
             "  plan: \(result.planNote)\n" +
+            "  drift defaults: \(result.driftDefaultsNote)\n" +
             "  run it: mirroir-run (from the consumer repo, iPhone Mirroring connected)"
     }
 

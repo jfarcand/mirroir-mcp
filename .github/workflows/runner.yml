@@ -55,9 +55,16 @@ jobs:
     permissions:
       contents: read
     timeout-minutes: 15
+    env:
+      MIRROIR_SKILLS: ${{ github.workspace }}/../mirroir-skills
     steps:
       - name: Checkout
         uses: actions/checkout@v7
+
+      # The global drift-defaults.yaml layer lives only in mirroir-skills; every
+      # run that resolves drift thresholds, and every runner test, reads it.
+      - name: Clone skills repo (global drift-defaults.yaml)
+        run: git clone https://github.com/jfarcand/mirroir-skills.git ../mirroir-skills
 
       - name: Install Rust toolchain (${{ env.RUST_TOOLCHAIN }})
         uses: dtolnay/rust-toolchain@stable
@@ -132,10 +139,16 @@ jobs:
       contents: read
     timeout-minutes: 15
     env:
+      MIRROIR_SKILLS: ${{ github.workspace }}/../mirroir-skills
       MIRROIR_PLAYWRIGHT_HOME: /tmp/mirroir-pw
     steps:
       - name: Checkout
         uses: actions/checkout@v7
+
+      # The global drift-defaults.yaml layer lives only in mirroir-skills; every
+      # run that resolves drift thresholds, and every runner test, reads it.
+      - name: Clone skills repo (global drift-defaults.yaml)
+        run: git clone https://github.com/jfarcand/mirroir-skills.git ../mirroir-skills
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
@@ -292,6 +305,7 @@ jobs:
       contents: read
     timeout-minutes: 25
     env:
+      MIRROIR_SKILLS: ${{ github.workspace }}/../mirroir-skills
       MIRROIR_PLAYWRIGHT_HOME: /tmp/mirroir-pw
       # This is the lane that owes the loop. If its browser setup ever breaks,
       # the test must go red rather than announce a skip and pass.
@@ -299,6 +313,11 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v7
+
+      # The global drift-defaults.yaml layer lives only in mirroir-skills; every
+      # run that resolves drift thresholds, and every runner test, reads it.
+      - name: Clone skills repo (global drift-defaults.yaml)
+        run: git clone https://github.com/jfarcand/mirroir-skills.git ../mirroir-skills
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
@@ -357,11 +376,17 @@ jobs:
       contents: read
     timeout-minutes: 30
     env:
+      MIRROIR_SKILLS: ${{ github.workspace }}/../mirroir-skills
       MIRROIR_PLAYWRIGHT_HOME: /tmp/mirroir-pw
       OLLAMA_JUDGE_MODEL: qwen2.5:0.5b
     steps:
       - name: Checkout
         uses: actions/checkout@v7
+
+      # The global drift-defaults.yaml layer lives only in mirroir-skills; every
+      # run that resolves drift thresholds, and every runner test, reads it.
+      - name: Clone skills repo (global drift-defaults.yaml)
+        run: git clone https://github.com/jfarcand/mirroir-skills.git ../mirroir-skills
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
@@ -460,11 +485,17 @@ jobs:
       contents: read
     timeout-minutes: 45
     env:
+      MIRROIR_SKILLS: ${{ github.workspace }}/../mirroir-skills
       MIRROIR_PLAYWRIGHT_HOME: /tmp/mirroir-pw
       OLLAMA_JUDGE_MODEL: qwen2.5:0.5b
     steps:
       - name: Checkout
         uses: actions/checkout@v7
+
+      # The global drift-defaults.yaml layer lives only in mirroir-skills; every
+      # run that resolves drift thresholds, and every runner test, reads it.
+      - name: Clone skills repo (global drift-defaults.yaml)
+        run: git clone https://github.com/jfarcand/mirroir-skills.git ../mirroir-skills
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable

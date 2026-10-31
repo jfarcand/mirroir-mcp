@@ -51,6 +51,47 @@ every run: is the latency inside its absolute `max_seconds` budget (a FAIL if
 not), and did it grow past `step_latency_pct_increase` relative to the last
 green run (a DRIFT if so).
 
+## iOS screens: the compiled reference
+
+An `ios` block has no judged response, but it does have screens. Every
+`mirroir-mcp test` the runner starts reads the screen before the block's first
+step and the settled screen after each step that ran, and files a structural
+fingerprint of each (sorted structural texts, an icon count, and their hash)
+in the report's `mirroir-captures` attachment under `screens` — keyed `start`
+and by the step's 0-based index in the block (the block's `target:` is step 0).
+
+The reference those screens are held to is a file next to the scenario:
+`world-clock.ios.yaml` → `world-clock.ios.compiled.json`, a version-5 compiled
+skill as mirroir-mcp writes it. It is committed like any other baseline.
+
+| The run sees | Finding |
+|---|---|
+| a screen whose similarity to the recorded one is below `fingerprint_similarity` | `fingerprint_similarity`, naming the step and the texts missing and new |
+| a screen the reference recorded that this run never read | `screen_unobserved` |
+| a screen this run read that the reference never recorded | `screen_unreferenced` |
+| a scenario whose bytes no longer hash to the reference's `source.sha256` | `compiled_source_changed` |
+| screens read in a window whose size or orientation differs from the reference's `device` | `compiled_device_changed` |
+
+Similarity is mirroir-mcp's own: equal hashes are 1.0, otherwise the Jaccard
+index of the two structural-text sets (two empty sets are 1.0). The floor comes
+from the same hierarchy as every other metric, and is resolved only when a pair
+of screens is compared. The four gap findings carry no measurement, so the log
+renders their observed and threshold cells as `n/a`:
+
+```
+| … | world-clock | fingerprint_similarity | 0.750 | 0.850 | ios block step 2 (scenario step 2, tap: "World Clock"): missing "Cupertino"; new "London"; icons 0 → 0 |
+```
+
+**Recording.** When no reference exists yet, or under `accept`, the runner
+passes `--compiled-out <block workspace>/screen-reference.compiled.json
+--compiled-source <scenario>` to `mirroir-mcp test`, which writes the compiled
+skill after the block passes. The runner copies it next to the scenario only
+when the scenario's verdict records baselines — a `PASS`, or `accept` — so a
+run that fails or drifts after the block records nothing. A block asked to
+record that passes without writing the file fails the run: the next run would
+have nothing to compare against. A later green run does not rewrite an existing
+reference; only `accept` moves it.
+
 ## Threshold resolution is fail-closed
 
 ```
@@ -71,7 +112,12 @@ guess would be invisible in the report.
 
 The `drift-defaults.yaml` search takes the first that exists: the sample
 directory, `--skills <dir>` / `$MIRROIR_SKILLS`, the working directory,
-`<cwd>/.mirroir/`, then `$HOME/.mirroir/`.
+`<cwd>/.mirroir/`, then `$HOME/.mirroir/`. The global layer is required: a run
+that finds none is refused at load with `no drift-defaults.yaml found`, naming
+every path it searched. Its one copy lives at the root of the
+[mirroir-skills](https://github.com/jfarcand/mirroir-skills) repo — point
+`--skills` / `$MIRROIR_SKILLS` at a checkout, or let `generate_skill`'s emit
+seed `.mirroir/drift-defaults.yaml` from it.
 
 ```yaml
 version: 1
@@ -81,8 +127,9 @@ response_levenshtein_pct:  { max: 0.25 }
 step_latency_pct_increase: { max: 0.30 }
 ```
 
-Note that fail-closed applies only when a comparison is actually due. A first
-run needs no thresholds at all, because it has nothing to compare against.
+Note that the per-metric refusal applies only when a comparison is actually
+due. A first run resolves no metric, because it has nothing to compare against
+— but the global file must still exist, since the policy loads before any step.
 
 ## How the values reach the runner
 
@@ -152,7 +199,7 @@ mirroir-run accept --run-scenario scenarios/x.yaml  # one scenario
 ```
 
 It runs the same scenarios the ordinary invocation runs, with the baselines in
-write mode instead of compare mode. Four artifacts move, and they are the four
+write mode instead of compare mode. Five artifacts move, and they are the five
 a DRIFT verdict can point at:
 
 | Artifact | What accept writes |
@@ -161,6 +208,7 @@ a DRIFT verdict can point at:
 | `judge.drift_baseline_file` | the text this run judged, for each step that names a file |
 | `cross_surface.capture.to` | the live page's captured text, for each `cross_surface:` step that declares a capture |
 | `.mirroir/mirroir.lock` | re-resolved and re-checksummed against the archetype trees on disk |
+| `<scenario>.compiled.json` | the screens each `ios` block left, recorded by mirroir-mcp from this run |
 
 `.harness/drift-log.md` is deleted first: its rows are the queue this command
 is the answer to.
@@ -211,7 +259,8 @@ git add -p && git commit
 ```
 
 Every artifact accept touches is a committed file — the baseline store, the
-explicit judge baselines, the cross-surface web captures, the lockfile — so
+explicit judge baselines, the cross-surface web captures, the lockfile, the
+compiled screen references — so
 review is `git diff` and the audit trail is the repository's history.
 
 ## The lockfile leg

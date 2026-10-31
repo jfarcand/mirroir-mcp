@@ -1,0 +1,7 @@
+version: 1
+name: "world-clock"
+steps:
+  - target: { kind: ios, app: "Clock" }
+  - launch: "Clock"
+  - tap: "World Clock"
+  - wait_for: "Cupertino"

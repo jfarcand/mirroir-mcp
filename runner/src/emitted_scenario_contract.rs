@@ -9,6 +9,7 @@ use crate::baseline_coverage::ensure_ios_baselines_are_referenced;
 use crate::compile::mirroir_block::ios_block_yaml;
 #[cfg(not(target_os = "macos"))]
 use crate::error::RunnerError;
+use crate::oracle::thresholds::{DriftMetric, ThresholdSearch, load_policy};
 use crate::parser::mirroir::{PlanEntrySource, parse_mirroir_config};
 use crate::parser::scenario::Scenario;
 use crate::parser::step::SkillStep;
@@ -140,6 +141,31 @@ fn the_emitted_tree_loads_plans_and_renders_every_step() -> TestResult {
         }
         check_plan(&scenario)?;
         render_whole_block(&scenario)?;
+    }
+    Ok(())
+}
+
+/// The emitted tree carries the global `drift-defaults.yaml` layer the runner
+/// requires: a run from the consumer repo root finds it under `.mirroir/` and
+/// resolves every drift metric from it, with no other layer present.
+#[test]
+fn the_emitted_tree_carries_the_required_global_drift_layer() -> TestResult {
+    let consumer = emitted("");
+    let sample_dir = emitted(".mirroir/apps/clock");
+    let policy = load_policy(
+        None,
+        &ThresholdSearch {
+            sample_dir: Some(&sample_dir),
+            skills_root: None,
+            cwd: Some(&consumer),
+            home: None,
+        },
+    )
+    .map_err(|e| e.to_string())?;
+    for metric in DriftMetric::all() {
+        policy
+            .resolve(metric, None)
+            .map_err(|e| format!("the emitted layer leaves {metric} unresolved: {e}"))?;
     }
     Ok(())
 }

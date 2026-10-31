@@ -7,6 +7,7 @@ use crate::error::Result;
 use crate::oracle::baseline::ScenarioBaseline;
 use crate::oracle::drift::{Fingerprint, jaccard_similarity, levenshtein_pct};
 use crate::oracle::drift_log::DriftFinding;
+use crate::oracle::screen_drift::{ScreenCheck, compare_screens};
 use crate::oracle::thresholds::{DriftMetric, DriftPolicy};
 use crate::verdict::RunVerdict;
 
@@ -126,6 +127,21 @@ impl DriftSession {
                 detail: format!("measure `{name}`: {previous:.0}ms → {elapsed_ms:.0}ms"),
             });
         }
+        Ok(())
+    }
+
+    /// Compare the screens an `ios` block left against its compiled reference.
+    ///
+    /// The reference is a file next to the scenario, not a key in the
+    /// last-green store, so nothing is added to the observed baseline.
+    ///
+    /// # Errors
+    ///
+    /// [`crate::oracle::error::OracleError::ThresholdUnspecified`] when a pair
+    /// of screens is compared and no layer declares `fingerprint_similarity`.
+    pub fn observe_screens(&mut self, check: ScreenCheck<'_>) -> Result<()> {
+        let findings = compare_screens(&self.policy, check)?;
+        self.findings.extend(findings);
         Ok(())
     }
 

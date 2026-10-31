@@ -18,9 +18,10 @@ struct CompiledSkill: Codable, Equatable {
     /// Pre-compiled steps with cached coordinates and timing.
     let steps: [CompiledStep]
     /// OCR-based fingerprint of the screen the skill starts from, captured before its
-    /// first step ran. Every producer (`mirroir-mcp compile`, `save_compiled`) records
-    /// that same moment, so a caller can compare it against the screen a run starts on.
-    /// `mirroir-mcp test` never compares or rewrites it. Nil when no start screen was read.
+    /// first step ran. Every producer (`mirroir-mcp compile`, `save_compiled`,
+    /// `mirroir-mcp test --compiled-out`) records that same moment, so a caller can
+    /// compare it against the screen a run starts on. `mirroir-mcp test` never compares
+    /// it, nor rewrites a compiled file it replays. Nil when no start screen was read.
     var screenFingerprint: ScreenFingerprint? = nil
 
     /// Current format version. Bump forces recompilation of all existing compiled skills.
@@ -118,10 +119,14 @@ struct StepHints: Codable, Equatable {
     }
 
     /// Create hints for a passthrough action: the step runs live through `StepExecutor`.
-    static func passthrough() -> StepHints {
+    /// `arrival` is the settled screen the step left on display when a run recorded
+    /// it (`mirroir-mcp test --compiled-out`), for a caller comparing a later run's
+    /// screens against it; replay does not read it for a passthrough step.
+    static func passthrough(arrival: ScreenFingerprint? = nil) -> StepHints {
         StepHints(compiledAction: .passthrough, tapX: nil, tapY: nil,
                   matchStrategy: nil,
-                  observedDelayMs: nil, scrollCount: nil, scrollDirection: nil)
+                  observedDelayMs: nil, scrollCount: nil, scrollDirection: nil,
+                  arrivalFingerprint: arrival)
     }
 }
 
@@ -255,7 +260,12 @@ enum CompiledSkillIO {
 
     /// Save a compiled skill to disk alongside its source file.
     static func save(_ compiled: CompiledSkill, for skillPath: String) throws {
-        let path = compiledPath(for: skillPath)
+        try save(compiled, toPath: compiledPath(for: skillPath))
+    }
+
+    /// Save a compiled skill to exactly `path`, for a caller that names the file
+    /// itself rather than deriving it from a skill path.
+    static func save(_ compiled: CompiledSkill, toPath path: String) throws {
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
         let data = try encoder.encode(compiled)

@@ -1,4 +1,4 @@
-// ABOUTME: The third verdict end-to-end — a reworded page drifts, a broken page fails, a bare metric errors.
+// ABOUTME: The third verdict end-to-end — a reworded page drifts, a broken page fails, a bare metric or a missing layer errors.
 // ABOUTME: Drives the built binary against runner/samples/web-fixture with a stub npx and a stub oracle.
 
 //! DRIFT verdict suite.
@@ -21,7 +21,7 @@ mod common;
 use std::fs;
 
 use common::oracle_stub::stub_oracle;
-use common::{Sandbox, fixture_summary_text, passing_report_with_judge, repo_path};
+use common::{Sandbox, fixture_summary_text, passing_report_with_judge, repo_path, skills_arg};
 
 /// Exit code the runner reserves for the DRIFT verdict.
 const EXIT_DRIFT: i32 = 65;
@@ -77,8 +77,8 @@ const BROKEN_BEHAVIOUR_REPORT: &str = r#"{
 /// freshly primed stub oracle and a stub `npx` that hands back `summary`.
 ///
 /// `skills` points the global drift-threshold layer at a directory; `None`
-/// leaves the run with no `drift-defaults.yaml` anywhere, which is the
-/// fail-closed case.
+/// leaves the run on the sandbox's own `drift-defaults.yaml` in its working
+/// directory.
 fn run_scenario(
     sandbox: &Sandbox,
     report: &str,
@@ -115,14 +115,6 @@ fn run_scenario(
     Ok((run.code, run.output()))
 }
 
-/// The repository's own `drift-defaults.yaml` — the shipped global layer.
-fn shipped_thresholds() -> String {
-    repo_path("")
-        .trim_end_matches('/')
-        .trim_end_matches('\\')
-        .to_owned()
-}
-
 /// The wedge. Run the scenario against the baseline wording, then against the
 /// reworded twin. Every assertion passes both times and the judge scores both
 /// above threshold — so Playwright reports the same green either way. The
@@ -131,7 +123,7 @@ fn shipped_thresholds() -> String {
 #[test]
 fn a_reworded_page_drifts_instead_of_failing() -> Result<(), String> {
     let sandbox = Sandbox::new()?;
-    let skills = shipped_thresholds();
+    let skills = skills_arg()?;
 
     let baseline = fixture_summary_text("summary.html")?;
     let (code, output) = run_scenario(&sandbox, &report_with(&baseline), Some(&skills))?;
@@ -184,7 +176,7 @@ fn a_reworded_page_drifts_instead_of_failing() -> Result<(), String> {
 #[test]
 fn an_unchanged_page_stays_green_on_the_second_run() -> Result<(), String> {
     let sandbox = Sandbox::new()?;
-    let skills = shipped_thresholds();
+    let skills = skills_arg()?;
     let baseline = fixture_summary_text("summary.html")?;
 
     for attempt in 1..=2 {
@@ -212,7 +204,7 @@ fn an_unchanged_page_stays_green_on_the_second_run() -> Result<(), String> {
 #[test]
 fn a_behaviour_break_is_a_failure_not_a_drift() -> Result<(), String> {
     let sandbox = Sandbox::new()?;
-    let skills = shipped_thresholds();
+    let skills = skills_arg()?;
 
     let (code, output) = run_scenario(&sandbox, BROKEN_BEHAVIOUR_REPORT, Some(&skills))?;
     if code != Some(EXIT_FAIL) {
@@ -236,13 +228,22 @@ fn a_behaviour_break_is_a_failure_not_a_drift() -> Result<(), String> {
     Ok(())
 }
 
-/// Fail-closed. With a baseline to compare against and no `drift-defaults.yaml`
-/// on any layer, the runner refuses by metric name instead of inventing a
-/// threshold — a guessed ceiling would silently decide whether the change was
-/// reported at all.
+/// Fail-closed by metric. With a baseline to compare against and a global
+/// layer that leaves `fingerprint_similarity` undeclared — as does every other
+/// layer — the runner refuses by metric name instead of inventing a threshold:
+/// a guessed ceiling would silently decide whether the change was reported.
 #[test]
 fn a_metric_no_layer_declares_errors_by_name() -> Result<(), String> {
     let sandbox = Sandbox::new()?;
+    sandbox.write(
+        common::DRIFT_DEFAULTS_FILE,
+        concat!(
+            "version: 1\n",
+            "judge_score_swing: { max_delta: 0.10 }\n",
+            "response_levenshtein_pct: { max: 0.25 }\n",
+            "step_latency_pct_increase: { max: 0.30 }\n",
+        ),
+    )?;
     let baseline = fixture_summary_text("summary.html")?;
 
     // First run: nothing to compare against, so no threshold is needed yet.
@@ -263,6 +264,44 @@ fn a_metric_no_layer_declares_errors_by_name() -> Result<(), String> {
     }
     if !output.contains("unspecified drift threshold for fingerprint_similarity") {
         return Err(format!("the refusal did not name the metric.\n{output}"));
+    }
+    Ok(())
+}
+
+/// Fail-closed at load. The global `drift-defaults.yaml` layer is required to
+/// exist: a run that finds none on any candidate path is refused before a
+/// single step runs, and the refusal names every path it searched.
+#[test]
+fn a_run_with_no_global_layer_is_refused_naming_the_searched_paths() -> Result<(), String> {
+    let sandbox = Sandbox::new()?;
+    let layer = sandbox.path().join(common::DRIFT_DEFAULTS_FILE);
+    fs::remove_file(&layer).map_err(|e| format!("remove {}: {e}", layer.display()))?;
+    let baseline = fixture_summary_text("summary.html")?;
+
+    let (code, output) = run_scenario(&sandbox, &report_with(&baseline), None)?;
+    if code != Some(EXIT_FAIL) {
+        return Err(format!(
+            "a run with no global layer exited {code:?}, expected {EXIT_FAIL}.\n{output}"
+        ));
+    }
+    if !output.contains("no drift-defaults.yaml found")
+        || !output.contains("the global layer is required (fail-closed)")
+    {
+        return Err(format!(
+            "the refusal did not explain the missing layer.\n{output}"
+        ));
+    }
+    let home_layer = sandbox
+        .path()
+        .join(".mirroir")
+        .join(common::DRIFT_DEFAULTS_FILE);
+    for searched in [&layer, &home_layer] {
+        if !output.contains(&searched.display().to_string()) {
+            return Err(format!(
+                "the refusal did not name {}.\n{output}",
+                searched.display()
+            ));
+        }
     }
     Ok(())
 }

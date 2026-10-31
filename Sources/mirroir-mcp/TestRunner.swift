@@ -28,6 +28,11 @@ struct TestRunConfig {
     /// Attach each skill's final-screen OCR text to that report under this
     /// `cross_surface` key, for a paired surface to be compared against.
     let captureKey: String?
+    /// After the one skill passes, write its compiled skill here: each step that
+    /// ran, with the screen it left. Set together with `compiledSourcePath`.
+    let compiledOutPath: String?
+    /// The file whose SHA-256 the `compiledOutPath` skill records as its source.
+    let compiledSourcePath: String?
     let showHelp: Bool
 }
 
@@ -67,6 +72,11 @@ enum TestRunner {
             fputs("No skills found.\n", stderr)
             fputs("Place skills in .mirroir-mcp/skills/ or specify paths.\n", stderr)
             return 1
+        }
+
+        if config.compiledOutPath != nil, skillFiles.count != 1 {
+            fputs("Error: \(TestRunnerArgumentError.compiledOutNeedsOneSkill(count: skillFiles.count).localizedDescription)\n", stderr)
+            return usageExitCode
         }
 
         fputs("mirroir test: \(skillFiles.count) skill(s) to run\n", stderr)
@@ -135,7 +145,8 @@ enum TestRunner {
             registry: registry
         )
 
-        // Load compiled skills if available. Only read: a test run never writes one.
+        // Load compiled skills if available. Only read: a test run writes one only
+        // where --compiled-out names it.
         var compiledMap: [String: CompiledSkill] = [:]
         if !config.noCompiled {
             let windowInfo = bridge.getWindowInfo()
@@ -148,10 +159,18 @@ enum TestRunner {
         // Execute skills
         var allResults: [ConsoleReporter.SkillResult] = []
         var screenCaptures: [Int: String] = [:]
+        // The screens each skill left: reported under --capture, recorded by --compiled-out.
+        let recordsScreens = !config.dryRun
+            && (config.captureKey != nil || config.compiledOutPath != nil)
+        let device = recordsScreens ? CompileCommand.deviceInfo(of: bridge) : nil
+        var stepScreens: [Int: StepScreens] = [:]
         var totalCompiledSteps = 0
         var totalNormalSteps = 0
 
         for skill in skills {
+            let recorder = recordsScreens
+                ? StepScreenRecorder(describer: { executor.describer }) : nil
+            recorder?.recordStart()
             let result: ConsoleReporter.SkillResult
             if let compiled = compiledMap[skill.filePath] {
                 let compiledExecutor = CompiledStepExecutor(
@@ -165,7 +184,7 @@ enum TestRunner {
                     compiledExecutor: compiledExecutor,
                     normalExecutor: executor,
                     describer: describer, agent: config.agent,
-                    verbose: config.verbose)
+                    verbose: config.verbose, recorder: recorder)
                 totalCompiledSteps += compiled.steps.filter {
                     $0.hints?.compiledAction != .passthrough
                 }.count
@@ -174,13 +193,16 @@ enum TestRunner {
                 }.count
             } else {
                 result = executeSkill(skill: skill, executor: executor,
-                                      verbose: config.verbose)
+                                      verbose: config.verbose, recorder: recorder)
                 totalNormalSteps += skill.steps.count
             }
             if config.captureKey != nil, !config.dryRun,
                let screen = executor.describer.describe() {
                 screenCaptures[allResults.count] =
                     ScenarioStepFormatter.screenText(elements: screen.elements)
+            }
+            if let recorder {
+                stepScreens[allResults.count] = recorder.snapshot()
             }
             allResults.append(result)
         }
@@ -203,13 +225,34 @@ enum TestRunner {
             }
         }
 
+        // The compiled skill is a contract too: a caller that asked for one and
+        // finds none must hear why, and no report then stands in for the run.
+        if let outputPath = config.compiledOutPath, let sourcePath = config.compiledSourcePath,
+           let skill = skills.first, let result = allResults.first {
+            do {
+                try CompiledRunRecord.write(
+                    skill: skill, result: result, screens: stepScreens[0] ?? StepScreens(),
+                    device: device, sourcePath: sourcePath, outputPath: outputPath)
+                fputs("\nCompiled skill written to: \(outputPath)\n", stderr)
+            } catch CompiledRunRecordError.runFailed(let name) {
+                fputs("\nNo compiled skill written: "
+                    + "\(CompiledRunRecordError.runFailed(skill: name).localizedDescription)\n", stderr)
+            } catch {
+                fputs("\nError: failed to write compiled skill to \(outputPath): "
+                    + "\(error.localizedDescription)\n", stderr)
+                return 1
+            }
+        }
+
         // The JSON report is a contract a caller reads for the verdict, so
         // failing to write it fails the run rather than warning.
         if let reportPath = config.reportJSONPath {
             do {
                 try PlaywrightReportWriter.write(
                     results: allResults, screenCaptures: screenCaptures,
-                    captureKey: config.captureKey, to: reportPath)
+                    captureKey: config.captureKey,
+                    stepScreens: config.captureKey == nil ? [:] : stepScreens,
+                    device: device, to: reportPath)
                 fputs("\nJSON report written to: \(reportPath)\n", stderr)
             } catch {
                 fputs("\nError: failed to write JSON report: \(error.localizedDescription)\n", stderr)
@@ -221,10 +264,12 @@ enum TestRunner {
         return allResults.allSatisfy(\.passed) ? 0 : 1
     }
 
-    /// Execute a single skill and return results.
+    /// Execute a single skill and return results. `recorder`, when given, reads
+    /// the settled screen after each step that ran.
     static func executeSkill(skill: SkillDefinition,
                              executor: StepExecutor,
-                             verbose: Bool) -> ConsoleReporter.SkillResult {
+                             verbose: Bool,
+                             recorder: StepScreenRecorder? = nil) -> ConsoleReporter.SkillResult {
         let stepCount = skill.steps.count
         ConsoleReporter.reportSkillStart(
             name: skill.name, filePath: skill.filePath, stepCount: stepCount)
@@ -248,6 +293,7 @@ enum TestRunner {
 
             let result = executor.execute(step: step, stepIndex: index,
                                           skillName: skill.name)
+            recorder?.recordStep(index, result: result)
             stepResults.append(result)
             ConsoleReporter.reportStep(index: index, total: stepCount,
                                        result: result, verbose: verbose)

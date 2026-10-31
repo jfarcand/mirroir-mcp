@@ -183,12 +183,32 @@ person reads the rows, runs `mirroir-run accept` on their machine, reviews
 ### Drift thresholds in CI
 
 Drift comparison is fail-closed: a metric no layer of the hierarchy declares
-stops the run with `unspecified drift threshold for <metric>` (exit 1). A lane
-that runs scenarios with `judge:` steps therefore needs a `drift-defaults.yaml`
-reachable from the invocation — in the sample directory, at `--skills <dir>` /
-`$MIRROIR_SKILLS`, in the working directory, under `<cwd>/.mirroir/`, or under
-`$HOME/.mirroir/`. See the README's "The three verdicts" section for the
-metrics and their starting values.
+stops the run with `unspecified drift threshold for <metric>` (exit 1). The
+global layer is required outright: every `--run-scenario` / `--sample` / `accept`
+run loads it before the first step, and a run that finds no
+`drift-defaults.yaml` is refused (`no drift-defaults.yaml found`, exit 1) —
+`--validate` and `--diff-text` load no thresholds and need nothing. The file
+must be reachable from the invocation — in the sample directory, at
+`--skills <dir>` / `$MIRROIR_SKILLS`, in the working directory, under
+`<cwd>/.mirroir/`, or under `$HOME/.mirroir/`.
+
+Its one copy lives at the root of the
+[mirroir-skills](https://github.com/jfarcand/mirroir-skills) repo. A lane that
+runs scenarios checks it out and points `MIRROIR_SKILLS` at it:
+
+```yaml
+- name: Clone skills repo (global drift-defaults.yaml)
+  run: git clone https://github.com/jfarcand/mirroir-skills.git ../mirroir-skills
+- name: Run scenarios
+  env:
+    MIRROIR_SKILLS: ${{ github.workspace }}/../mirroir-skills
+  run: mirroir-run --sample path/to/sample
+```
+
+A consumer whose `.mirroir/` tree was emitted by `generate_skill` already holds
+a seeded copy at `.mirroir/drift-defaults.yaml`, found when the run starts from
+the repo root. See the README's "The three verdicts" section for the metrics
+and their starting values.
 
 The baseline drift is measured against lives at `.harness/last-green.json`,
 relative to the invocation directory. A fresh CI runner has none, so the first

@@ -179,6 +179,9 @@ jobs:
           MIRROIR_BUNDLE_ID: com.jfarcand.FakeMirroring
           MIRROIR_PROCESS_NAME: FakeMirroring
           MIRROIR_MCP_BIN: ${{ github.workspace }}/.build/release/mirroir-mcp
+          # The global drift-defaults.yaml layer the runner requires, from the
+          # skills clone made at the top of this job.
+          MIRROIR_SKILLS: ${{ github.workspace }}/../mirroir-skills
           # mirroir-mcp's stderr reaches the log only at debug on a passing
           # block; the capture summary below is read from it.
           RUST_LOG: info,mirroir_run::target::ios=debug
@@ -278,6 +281,9 @@ jobs:
           MIRROIR_BUNDLE_ID: com.jfarcand.FakeMirroring
           MIRROIR_PROCESS_NAME: FakeMirroring
           MIRROIR_MCP_BIN: ${{ github.workspace }}/.build/release/mirroir-mcp
+          # The global drift-defaults.yaml layer the runner requires, from the
+          # skills clone made at the top of this job.
+          MIRROIR_SKILLS: ${{ github.workspace }}/../mirroir-skills
           # mirroir-mcp's stderr — the step counts and the capture summary —
           # reaches the log only at debug on a passing block.
           RUST_LOG: info,mirroir_run::target::ios=debug
