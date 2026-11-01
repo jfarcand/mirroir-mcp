@@ -2,7 +2,7 @@
 // Licensed under the Apache License, Version 2.0
 //
 // ABOUTME: Tests that emitted labels are text OCR read on the screen acted on, and waits name what is on screen.
-// ABOUTME: Covers arrivedVia over displayLabel, icon-only tabs, scroll_to, containment, below-the-fold landmarks.
+// ABOUTME: Covers arrivedVia over displayLabel, icon-only tabs, scroll_to/wait_for, containment, below-the-fold landmarks.
 
 import XCTest
 import HelperLib
@@ -96,6 +96,26 @@ final class ScenarioLabelAndLandmarkTests: XCTestCase {
             screen(0, nil, nil, ["Repeat", "Every Sunday"]),
             screen(1, "scroll_to", "Every Monday", ["Every Sunday"]),
         ]), .labelNotOnScreen(index: 1, action: "scroll_to", label: "Every Monday"))
+    }
+
+    /// A recorded `wait_for` (a compiled skill's step) names what it waited to
+    /// see: it resolves, in OCR casing, on the screen it reached, and is
+    /// refused when that screen does not show it.
+    func testAWaitForResolvesOnTheScreenItReached() throws {
+        let yaml = try ScenarioStepFormatter.scenarioYAML(name: "f", appName: "Clock", screens: [
+            screen(0, nil, nil, ["Alarms", "Edit"]),
+            screen(1, "wait_for", "add alarm", ["Alarms", "Add Alarm"]),
+        ])
+        XCTAssertTrue(yaml.contains("  - wait_for: \"Add Alarm\"\n"), yaml)
+
+        XCTAssertEqual(refusal([
+            screen(0, nil, nil, ["Alarms", "Edit"]),
+            screen(1, "wait_for", "Snooze", ["Alarms", "Edit"]),
+        ]), .labelNotOnScreen(index: 1, action: "wait_for", label: "Snooze"))
+        XCTAssertEqual(refusal([
+            screen(0, nil, nil, ["Alarms"]),
+            screen(1, "wait_for", nil, ["Alarms"]),
+        ]), .unlabeledAction(index: 1, action: "wait_for"))
     }
 
     /// A tap on a row the explorer reached by scrolling the source screen is

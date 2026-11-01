@@ -15,7 +15,7 @@ import HelperLib
 /// 1. Launch the app (resolves localized display name via Spotlight)
 /// 2. Capture foreground OCR (fingerprint)
 /// 3. Open App Switcher
-/// 4. Locate the just-launched card by its switcher label, else via OCR-intersection (`AppSwitcherCardLocator`)
+/// 4. Locate the just-launched card by its switcher label, else via OCR-intersection (`AppSwitcherCardLocator`), once two reads agree on where it rests
 /// 5. Drag the card upward to dismiss
 /// 6. Return to the home screen, retrying once if iOS lands on Spotlight
 ///
@@ -78,28 +78,20 @@ enum AppSwitcherDismissal {
         }
         usleep(EnvConfig.appSwitcherOpenSettleUs)
 
-        // 4. Capture App Switcher OCR.
-        guard let switcherOcr = describer.describe() else {
-            _ = menuBridge.triggerMenuAction(menu: "View", item: "Home Screen")
-            return "Failed to capture App Switcher screen for verification"
-        }
-        guard !switcherOcr.elements.isEmpty else {
-            _ = menuBridge.triggerMenuAction(menu: "View", item: "Home Screen")
-            return "App Switcher appears empty — no app cards detected"
-        }
-
-        // 5. Locate the matching card by its switcher label, else by OCR
-        // intersection. Fail closed when the locator returns nil (no match OR
-        // an ambiguous one) — never drag a guess, or we quit the wrong app.
+        // 4–5. Locate the matching card by its switcher label, else by OCR
+        // intersection, once two reads agree on where it rests. Fail closed when
+        // it cannot be located (no match OR an ambiguous one) or never holds
+        // still — never drag a guess, or we quit the wrong app.
         let windowSize = bridge.getWindowInfo()?.size ?? CGSize(width: 410, height: 898)
-        guard let cardX = AppSwitcherCardLocator.locateCard(
-            appName: appName,
-            appElements: appOcr.elements,
-            switcherElements: switcherOcr.elements,
-            windowSize: windowSize
-        ) else {
+        let cardX: Double
+        switch locateRestingCard(
+            appName: appName, appElements: appOcr.elements,
+            describer: describer, windowSize: windowSize) {
+        case .success(let x):
+            cardX = x
+        case .failure(let failure):
             _ = menuBridge.triggerMenuAction(menu: "View", item: "Home Screen")
-            return "Cannot locate '\(appName)' card in App Switcher unambiguously — refusing to drag (would risk quitting the wrong app)"
+            return failure.message(appName: appName)
         }
         DebugLog.log("reset_app", "located '\(appName)' card at x=\(Int(cardX))")
 
@@ -158,5 +150,72 @@ enum AppSwitcherDismissal {
             _ = menuBridge.triggerMenuAction(menu: "View", item: "Home Screen")
         }
         return nil
+    }
+    /// Why the card to drag could not be pinned down.
+    enum CardLocateFailure: Error, Equatable {
+        /// The switcher screen could not be read.
+        case unreadable
+        /// The switcher showed no text at all.
+        case empty
+        /// No read located the card unambiguously.
+        case notFound
+        /// The card was located on every read but never at the same place twice.
+        case neverSettled
+
+        func message(appName: String) -> String {
+            switch self {
+            case .unreadable:
+                return "Failed to capture App Switcher screen for verification"
+            case .empty:
+                return "App Switcher appears empty — no app cards detected"
+            case .notFound:
+                return "Cannot locate '\(appName)' card in App Switcher unambiguously — " +
+                    "refusing to drag (would risk quitting the wrong app)"
+            case .neverSettled:
+                return "'\(appName)' card never came to rest in the App Switcher — " +
+                    "refusing to drag (would risk quitting the wrong app)"
+            }
+        }
+    }
+
+    /// Most switcher reads spent waiting for the card to hold still.
+    static let maxRestReads = 4
+
+    /// Largest shift, in points, between two reads of the card that still
+    /// counts as the card at rest.
+    static let restTolerancePt = 8.0
+
+    /// The X of `appName`'s card once two consecutive reads, `pauseUs` apart,
+    /// locate it at the same place. The card slides from center to its resting
+    /// slot after the switcher opens, and the mirrored frame lags the device:
+    /// one read can show the card where it was, and a drag aimed there lands on
+    /// the neighboring card and quits the wrong app.
+    static func locateRestingCard(
+        appName: String,
+        appElements: [TapPoint],
+        describer: any ScreenDescribing,
+        windowSize: CGSize,
+        pauseUs: UInt32 = EnvConfig.stepSettlingDelayMs * 1000,
+        sleep: (UInt32) -> Void = { usleep($0) }
+    ) -> Result<Double, CardLocateFailure> {
+        var previous: Double?
+        var failure = CardLocateFailure.notFound
+        for read in 0 ..< maxRestReads {
+            if read > 0 { sleep(pauseUs) }
+            guard let screen = describer.describe() else { return .failure(.unreadable) }
+            guard !screen.elements.isEmpty else { return .failure(.empty) }
+            guard let x = AppSwitcherCardLocator.locateCard(
+                appName: appName, appElements: appElements,
+                switcherElements: screen.elements, windowSize: windowSize) else {
+                previous = nil
+                failure = .notFound
+                continue
+            }
+            DebugLog.log("reset_app", "read \(read + 1): '\(appName)' card at x=\(Int(x))")
+            if let previous, abs(x - previous) <= restTolerancePt { return .success(x) }
+            previous = x
+            failure = .neverSettled
+        }
+        return .failure(failure)
     }
 }

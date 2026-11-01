@@ -95,11 +95,18 @@ HTTP scenarios run anywhere.
 
 ## Getting an iOS flow into `.mirroir/`
 
-`generate_skill` with `emit: true` (on `finish` or `explore`) writes a runnable iOS leg into
-the consumer repo's `.mirroir/apps/<app>/`:
+Three producers write a runnable iOS leg into the consumer repo's `.mirroir/apps/<app>/`, through
+one emitter, one formatter and one set of refusals:
 
-- `scenarios/<flow>.ios.yaml` — the captured walk (`finish`) or each interesting explored path
-  (`explore`) as a `target: { kind: ios }` block. Every flow opens `reset_app: "<App>"` then
+- `generate_skill` with `emit: true` — on `finish`, the walk captured by `start` / `capture`;
+  on `explore`, each interesting explored path;
+- `save_compiled` with `emit: true` — the walk of a skill an AI ran step by step, its app taken
+  from the skill's opening `launch:` (see [Compiled Skills](compiled-skills.md#emitting-the-walk-into-mirroir));
+- `mirroir record` — a walk driven by hand on the mirrored phone (see the README's Recorder).
+
+Each writes:
+
+- `scenarios/<flow>.ios.yaml` — the walk as a `target: { kind: ios }` block. Every flow opens `reset_app: "<App>"` then
   `launch: "<App>"`: a launch of a running app resumes wherever it was left, and the walk was
   recorded from the app's root. That own-app reset right before its launch is the one
   `reset_app` `mirroir-mcp test` runs without `--confirm-destructive`; any other `reset_app`

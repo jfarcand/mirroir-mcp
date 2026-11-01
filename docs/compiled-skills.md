@@ -19,6 +19,15 @@ Source:     apps/settings/check-about.md (or .yaml)
 Compiled:   apps/settings/check-about.compiled.json
 ```
 
+### Two files named `.compiled.json`
+
+Two different artifacts share the `.compiled.json` suffix, and they never stand in for each other:
+
+- **The skill's compiled file** — `check-about.compiled.json` next to a skill, written by `save_compiled` or `mirroir compile`. It is a speed cache for standalone `mirroir test`: recorded coordinates, timing and scroll counts, so a replay skips the element search. This page is about that file.
+- **The runner's drift baseline** — `<scenario>.compiled.json` next to an `.ios.yaml` in a consumer repo's `.mirroir/`. `mirroir-run` records it itself on the first passing run of an `ios` block, and compares the screens of later runs against it (screen drift). The runner never replays from it: every `ios` block runs live through `mirroir-mcp test`.
+
+So `save_compiled` with `emit: true` writes the skill's `.compiled.json` next to the skill and a scenario into `.mirroir/`, but never a `.compiled.json` into `.mirroir/`: that file belongs to the runner.
+
 ## How It Works
 
 There are two ways to compile a skill: AI-driven compilation (recommended) and CLI compilation. Both produce identical `.compiled.json` files.
@@ -28,7 +37,7 @@ There are two ways to compile a skill: AI-driven compilation (recommended) and C
 When an AI agent executes a skill via MCP tools, it already has all the data needed for compilation — tap coordinates from `describe_screen`, timing from step execution, scroll counts from `scroll_to`. Two MCP tools let the AI report this data back to the server:
 
 1. **`record_step`** — called after each step with the step index, type, label, and observed data (coordinates, timing, scroll counts). Each call reads the settled screen the step left, which the next step starts from. For a tap with coordinates and no label, that screen is the tap's destination and is stored as the hint's `arrivalFingerprint`; the step is refused when that screen cannot be read, shows fewer than `compiledTapArrivalMinTexts` labels, still matches the screen before the tap (the one read after the previous step, or by `get_skill` for step 0) because the tap changed nothing, or a later step is already recorded (the screen on display is then not the tap's destination)
-2. **`save_compiled`** — called after all steps complete, writes the `.compiled.json` file
+2. **`save_compiled`** — called after all steps complete, writes the `.compiled.json` file. With `emit: true` it also writes the same walk into a consumer repo as a runnable iOS scenario (see [Emitting the walk into `.mirroir/`](#emitting-the-walk-into-mirroir))
 
 The first AI execution IS the compilation. No separate learning run needed.
 
@@ -45,6 +54,17 @@ The first AI execution IS the compilation. No separate learning run needed.
 3. After all steps succeed, AI calls `save_compiled("check-about")`. It refuses a gap in the recorded step indices, and for a SKILL.md a step that could not replay as recorded (a missing value, a drag without both ends, a measure without an action or `until:`), keeping the session so the AI can record those steps again
 4. Server builds `CompiledSkill` with the start-screen fingerprint `get_skill` read, writes `.compiled.json` next to the source file (a skill saved without that `get_skill` call gets no fingerprint, never the screen the run ended on)
 5. Next `get_skill("check-about")` returns `[Compiled: fresh]` — AI skips compilation
+
+#### Emitting the walk into `.mirroir/`
+
+`save_compiled(skill_name, emit: true, output_dir: <repo root>)` also renders the compiled walk as `<output_dir>/.mirroir/apps/<app>/scenarios/<skill>.ios.yaml`, declared in `SAMPLE.md` and the `mirroir.yaml` plan — the same tree `generate_skill … emit=true` and `mirroir record` write, through the same formatter and refusals. Without `output_dir` the nearest `.mirroir/` above the server's working directory is used; `~/.mirroir` is refused.
+
+- The skill must open with `launch:` (after any `target:` / `reset_app:`). Those opening steps name the app; the scenario writes its own `target: { kind: ios }`, `reset_app` and `launch` for it. An opening step that drives another app is refused.
+- The walk starts on the screen `record_step` read after the opening, and each later step reaches the screen `record_step` read after it. Those reads give each tap its on-screen label casing and the `wait_for:` on the screen it reaches. A step whose screen was not read is refused by index.
+- A step the scenario cannot carry is refused by index, with its reason: a `wait_for` with an explicit timeout, a tap recorded by coordinates alone (no label to replay by), an AI-only step, or a step type the scenario grammar has no verb for.
+- A value the skill takes from `${VAR}` is emitted as that placeholder, as it is stored in the compiled file.
+
+The skill's `.compiled.json` is written first. When the emit is refused the result is an error carrying the `Saved …` text, then `emit failed:` and the reason; the compiled file stays written.
 
 The server derives `compiledAction` from the reported data:
 - `tap` + coordinates → `.tap` (a labeled tap is checked by OCR finding its element; a tap with no label records `arrivalFingerprint`, the screen it led to, which replay must reach)
@@ -228,7 +248,7 @@ Server accumulates CompiledStep[] in CompilationSession (thread-safe)
 After all steps → AI calls save_compiled(skill_name)
   ↓
 Server builds CompiledSkill, writes .compiled.json next to source
-  ↓
+  ↓  (emit: true) CompiledWalkBuilder → MirroirAppTreeEmitter → .mirroir/apps/<app>/
 mirroir test can now replay without AI, verifying each step
 ```
 
@@ -265,7 +285,9 @@ mirroir test can now replay without AI, verifying each step
 
 | File | Purpose |
 |------|---------|
-| `Sources/mirroir-mcp/CompilationTools.swift` | MCP tools `record_step` + `save_compiled` |
+| `Sources/mirroir-mcp/CompilationTools.swift` | MCP tools `record_step` + `save_compiled` (schemas; `record_step` hint derivation) |
+| `Sources/mirroir-mcp/SaveCompiledHandler.swift` | `save_compiled` logic: writes the `.compiled.json`, and with `emit: true` the `.mirroir/` scenario |
+| `Sources/mirroir-mcp/CompiledWalkBuilder.swift` | Turns the recorded steps and the screen read after each into the walk the `.mirroir/` emitter renders |
 | `Sources/mirroir-mcp/CompilationSession.swift` | `CompilationSession`: recorded steps and the start-screen fingerprint `get_skill` reads |
 | `Sources/mirroir-mcp/CompiledSkill.swift` | Data model: `CompiledSkill`, `CompiledStep`, `StepHints`, file I/O, SHA-256 |
 | `Sources/mirroir-mcp/RecordingDescriber.swift` | Decorator that caches OCR results during CLI compilation |

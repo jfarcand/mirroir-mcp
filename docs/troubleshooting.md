@@ -8,6 +8,10 @@ Pass `--debug` to enable verbose logging:
 npx -y mirroir-mcp --debug
 ```
 
+The flag works on every subcommand too (`mirroir-mcp --debug record …`,
+`mirroir-mcp --debug test …`): their launch, tap and `reset_app` steps are then
+logged the same way, appended to the log.
+
 Logs are written to both stderr and `~/.mirroir-mcp/debug.log`. Logged events include permission checks, tap coordinates, focus state, and window geometry. With `--debug` active, the existing log is preserved across restarts (a `--- restart <time> ---` separator is appended) so prior-session diagnostics survive. Without `--debug`, the log is truncated in place on each startup.
 
 Even without `--debug`, the server always writes startup information to `~/.mirroir-mcp/debug.log` — permission mode, denied tools, and hidden tools. Check this file first when debugging permission issues.

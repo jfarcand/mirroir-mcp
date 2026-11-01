@@ -34,7 +34,7 @@ public struct RawTextElement: Sendable {
 }
 
 /// A finalized tap point with coordinates ready for use by the tap tool.
-public struct TapPoint: Sendable {
+public struct TapPoint: Sendable, Codable, Equatable {
     /// The recognized text string.
     public let text: String
     /// X coordinate in points, relative to the mirroring window top-left.

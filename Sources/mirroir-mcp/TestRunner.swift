@@ -115,7 +115,8 @@ enum TestRunner {
         // Initialize subsystems (skip for dry run — no system access needed)
         let bridge = MirroringBridge()
         let capture = ScreenCapture(bridge: bridge)
-        let describer = ScreenDescriber(bridge: bridge, capture: capture)
+        let describer = ScreenDescriber(
+            bridge: bridge, capture: capture, textRecognizer: MirroirMCP.buildTextRecognizer())
         let input = InputSimulation(bridge: bridge, pasteVerifier: describer)
 
         // Pre-flight check: verify mirroring is connected (unless dry run)

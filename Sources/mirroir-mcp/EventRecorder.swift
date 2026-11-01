@@ -2,58 +2,47 @@
 // Licensed under the Apache License, Version 2.0
 //
 // ABOUTME: Records user interactions with the iPhone Mirroring window via CGEvent tap.
-// ABOUTME: Captures taps, swipes, and keyboard input for skill YAML generation.
+// ABOUTME: Captures taps, swipes, and keyboard input, each with the OCR screen it acted on.
 
 import AppKit
 import CoreGraphics
 import Foundation
 import HelperLib
 
-/// A single recorded user interaction with timestamp.
-struct RecordedEvent {
-    let timestamp: CFAbsoluteTime
-    let kind: RecordedEventKind
-}
-
-/// The type of user interaction that was recorded.
-enum RecordedEventKind {
-    case tap(x: Double, y: Double, label: String?)
-    case swipe(direction: String)
-    case longPress(x: Double, y: Double, label: String?, durationMs: Int)
-    case type(text: String)
-    case pressKey(keyName: String, modifiers: [String])
-}
-
 /// Records user interactions with the iPhone Mirroring window using a passive
 /// CGEvent tap (`.listenOnly`). Classifies mouse clicks as taps/swipes/long-presses
-/// and groups keyboard input into type/press_key events. Optionally labels taps
-/// with the nearest OCR text element.
+/// and groups keyboard input into type/press_key events. Each recorded step
+/// carries the OCR elements of the screen it acted on, and a tap or long press
+/// is labeled with the nearest of those elements.
 ///
-/// Usage: create, call `start()`, run CFRunLoop, call `stop()` to retrieve events.
+/// Usage: create, call `start()`, run CFRunLoop, call `stop()` to retrieve the steps.
 final class EventRecorder {
     private let bridge: MirroringBridging
-    private let describer: ScreenDescribing?
-    private(set) var events: [RecordedEvent] = []
+    private let describer: ScreenDescribing
+    private(set) var steps: [RecordedStep] = []
 
     // Mouse tracking state
     private var mouseDownPos: CGPoint?
-    private var mouseDownTime: CFAbsoluteTime = 0
+    private var mouseDownTimestamp: CGEventTimestamp = 0
 
     // Keyboard buffering: consecutive character keys are grouped into type events
     private var keyBuffer = ""
+    // The screen the buffered characters were typed into, read on the first one
+    private var keyBufferScreen: [TapPoint] = []
 
     // Cached window geometry (refreshed on each mouse event)
     private var windowOrigin: CGPoint = .zero
     private var windowSize: CGSize = .zero
 
-    // Cached OCR elements (refreshed on each mouseDown for label lookup)
+    // Cached OCR elements: the screen the next step acts on, read on each
+    // mouseDown, first buffered character, and special or modifier key
     private var cachedElements: [TapPoint] = []
 
     // CGEvent tap resources
     private var eventTap: CFMachPort?
     private var runLoopSource: CFRunLoopSource?
 
-    init(bridge: MirroringBridging, describer: ScreenDescribing? = nil) {
+    init(bridge: MirroringBridging, describer: ScreenDescribing) {
         self.bridge = bridge
         self.describer = describer
     }
@@ -92,8 +81,9 @@ final class EventRecorder {
         return true
     }
 
-    /// Stop recording and return all captured events.
-    func stop() -> [RecordedEvent] {
+    /// Stop recording and return every captured step, plus the screen the
+    /// last one reached — nil when that final OCR read failed.
+    func stop() -> (steps: [RecordedStep], finalScreen: [TapPoint]?) {
         flushKeyBuffer()
 
         if let tap = eventTap {
@@ -105,7 +95,7 @@ final class EventRecorder {
         eventTap = nil
         runLoopSource = nil
 
-        return events
+        return (steps, describer.describe()?.elements)
     }
 
     // MARK: - Event Handling
@@ -143,7 +133,7 @@ final class EventRecorder {
         guard isInsideWindow(pos) else { return }
 
         mouseDownPos = pos
-        mouseDownTime = CFAbsoluteTimeGetCurrent()
+        mouseDownTimestamp = event.timestamp
 
         // Run OCR now while the screen still shows the state the user sees.
         // In .listenOnly mode, this doesn't block event delivery to the app.
@@ -160,7 +150,8 @@ final class EventRecorder {
             return
         }
 
-        let holdTime = CFAbsoluteTimeGetCurrent() - mouseDownTime
+        let holdTime = EventClassifier.holdSeconds(
+            downTimestamp: mouseDownTimestamp, upTimestamp: event.timestamp)
 
         // Convert to window-relative coordinates
         let relDownX = Double(downPos.x - windowOrigin.x)
@@ -179,24 +170,15 @@ final class EventRecorder {
         switch classified {
         case .tap:
             let label = findNearestLabel(x: relDownX, y: relDownY)
-            events.append(RecordedEvent(
-                timestamp: CFAbsoluteTimeGetCurrent(),
-                kind: .tap(x: relDownX, y: relDownY, label: label)
-            ))
+            appendStep(.tap(x: relDownX, y: relDownY, label: label))
 
         case .longPress:
             let label = findNearestLabel(x: relDownX, y: relDownY)
-            events.append(RecordedEvent(
-                timestamp: CFAbsoluteTimeGetCurrent(),
-                kind: .longPress(x: relDownX, y: relDownY, label: label,
-                                 durationMs: Int(holdTime * 1000))
-            ))
+            appendStep(.longPress(x: relDownX, y: relDownY, label: label,
+                                  durationMs: Int(holdTime * 1000)))
 
         case .swipe(let direction):
-            events.append(RecordedEvent(
-                timestamp: CFAbsoluteTimeGetCurrent(),
-                kind: .swipe(direction: direction)
-            ))
+            appendStep(.swipe(direction: direction))
 
         case .ignored:
             break
@@ -219,26 +201,27 @@ final class EventRecorder {
         // Check if it's a special key
         if let keyName = EventClassifier.specialKeyName(for: keyCode) {
             flushKeyBuffer()
-            events.append(RecordedEvent(
-                timestamp: CFAbsoluteTimeGetCurrent(),
-                kind: .pressKey(keyName: keyName, modifiers: modifiers)
-            ))
+            refreshOCRCache()
+            appendStep(.pressKey(keyName: keyName, modifiers: modifiers))
             return
         }
 
         // If command/option/control modifiers are held, treat as press_key
         if hasCommandModifiers {
             flushKeyBuffer()
+            refreshOCRCache()
             let charName = unicodeCharacter(from: event) ?? "unknown"
-            events.append(RecordedEvent(
-                timestamp: CFAbsoluteTimeGetCurrent(),
-                kind: .pressKey(keyName: charName, modifiers: modifiers)
-            ))
+            appendStep(.pressKey(keyName: charName, modifiers: modifiers))
             return
         }
 
-        // Regular printable character — buffer for type event
+        // Regular printable character — buffer for type event. The first one
+        // reads the screen the text is typed into.
         if let char = unicodeCharacter(from: event) {
+            if keyBuffer.isEmpty {
+                refreshOCRCache()
+                keyBufferScreen = cachedElements
+            }
             keyBuffer.append(char)
         }
     }
@@ -260,41 +243,31 @@ final class EventRecorder {
         return frontApp?.bundleIdentifier == EnvConfig.mirroringBundleID
     }
 
-    /// Flush the keyboard buffer as a single type event.
+    /// Flush the keyboard buffer as a single type step on the screen its
+    /// first character was typed into.
     func flushKeyBuffer() {
         guard !keyBuffer.isEmpty else { return }
-        events.append(RecordedEvent(
-            timestamp: CFAbsoluteTimeGetCurrent(),
-            kind: .type(text: keyBuffer)
-        ))
+        steps.append(RecordedStep(kind: .type(text: keyBuffer), screenBefore: keyBufferScreen))
         keyBuffer = ""
+        keyBufferScreen = []
     }
 
-    /// Run OCR and cache the element positions for tap label lookup.
+    /// Record `kind` on the cached screen — the snapshot its label came from.
+    private func appendStep(_ kind: RecordedEventKind) {
+        steps.append(RecordedStep(kind: kind, screenBefore: cachedElements))
+    }
+
+    /// Run OCR and cache the element positions for the next step. A failed
+    /// read caches no elements, so a step recorded on it carries no label and
+    /// no screen rather than a previous screen's.
     private func refreshOCRCache() {
-        guard let describer = describer,
-              let result = describer.describe()
-        else { return }
-        cachedElements = result.elements
+        cachedElements = describer.describe()?.elements ?? []
     }
 
     /// Find the nearest OCR text label to the given window-relative coordinates.
     private func findNearestLabel(x: Double, y: Double) -> String? {
-        let maxDistance = EnvConfig.eventLabelMaxDistance
-        var bestLabel: String?
-        var bestDistance = Double.infinity
-
-        for element in cachedElements {
-            let dx = element.tapX - x
-            let dy = element.tapY - y
-            let distance = sqrt(dx * dx + dy * dy)
-            if distance < bestDistance && distance <= maxDistance {
-                bestDistance = distance
-                bestLabel = element.text
-            }
-        }
-
-        return bestLabel
+        EventClassifier.nearestLabel(x: x, y: y, in: cachedElements,
+                                     maxDistance: EnvConfig.eventLabelMaxDistance)
     }
 
     /// Extract the Unicode character string from a keyDown CGEvent.
@@ -324,87 +297,4 @@ private func eventTapCallback(
     let recorder = Unmanaged<EventRecorder>.fromOpaque(userInfo).takeUnretainedValue()
     recorder.handleEvent(type, event)
     return Unmanaged.passUnretained(event)
-}
-
-// MARK: - Event Classification (Pure Logic)
-
-/// Pure classification logic for recorded events. Testable without CGEvent dependencies.
-enum EventClassifier {
-
-    /// Mouse gesture classification result.
-    enum MouseClassification {
-        case tap
-        case longPress
-        case swipe(direction: String)
-        case ignored
-    }
-
-    /// Tap distance threshold in points — clicks within this distance are taps.
-    static var tapDistanceThreshold: Double { EnvConfig.eventTapDistanceThreshold }
-
-    /// Swipe distance threshold in points — drags beyond this distance are swipes.
-    static var swipeDistanceThreshold: Double { EnvConfig.eventSwipeDistanceThreshold }
-
-    /// Long press threshold in seconds.
-    static var longPressThreshold: Double { EnvConfig.eventLongPressThreshold }
-
-    /// Classify a mouse gesture from down/up positions and hold duration.
-    /// Coordinates are window-relative.
-    static func classifyMouse(
-        downX: Double, downY: Double,
-        upX: Double, upY: Double,
-        holdSeconds: CFAbsoluteTime
-    ) -> MouseClassification {
-        let dx = upX - downX
-        let dy = upY - downY
-        let distance = sqrt(dx * dx + dy * dy)
-
-        if distance < tapDistanceThreshold {
-            return holdSeconds >= longPressThreshold ? .longPress : .tap
-        }
-
-        if distance >= swipeDistanceThreshold {
-            let direction: String
-            if abs(dx) > abs(dy) {
-                direction = dx > 0 ? "right" : "left"
-            } else {
-                direction = dy > 0 ? "down" : "up"
-            }
-            return .swipe(direction: direction)
-        }
-
-        // Small movement — likely a slightly imprecise tap
-        return .tap
-    }
-
-    /// Map macOS virtual key codes to skill key names.
-    /// Returns nil for regular printable keys.
-    static func specialKeyName(for keyCode: UInt16) -> String? {
-        specialKeyMap[keyCode]
-    }
-
-    /// Extract modifier names from CGEvent flags.
-    /// Only includes non-lock modifiers relevant to key shortcuts.
-    static func extractModifiers(_ flags: CGEventFlags) -> [String] {
-        var mods: [String] = []
-        if flags.contains(.maskCommand) { mods.append("command") }
-        if flags.contains(.maskShift) { mods.append("shift") }
-        if flags.contains(.maskAlternate) { mods.append("option") }
-        if flags.contains(.maskControl) { mods.append("control") }
-        return mods
-    }
-
-    /// Reverse map from macOS virtual key codes to key names.
-    private static let specialKeyMap: [UInt16: String] = [
-        36: "return",
-        53: "escape",
-        48: "tab",
-        51: "delete",
-        49: "space",
-        126: "up",
-        125: "down",
-        123: "left",
-        124: "right",
-        117: "forwarddelete",
-    ]
 }

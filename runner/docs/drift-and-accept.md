@@ -66,7 +66,9 @@ hold still for a moment before the one it led to slides in.
 Only the screens a step's action produced are judged. The `start` screen and
 the screen a `target:` step leaves are whatever the phone showed before the
 scenario acted — the previous run's last screen, or home — so they are
-recorded but never compared.
+recorded but never compared. Neither is the home screen a `reset_app:` or
+`home:` step leaves: its widgets and date change from day to day whatever the
+app does.
 
 The reference those screens are held to is a file next to the scenario:
 `world-clock.ios.yaml` → `world-clock.ios.compiled.json`, a version-5 compiled

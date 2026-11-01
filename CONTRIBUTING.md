@@ -36,6 +36,8 @@ mirroir-mcp/
 │   │   ├── TargetTools.swift        # list_targets, switch_target
 │   │   ├── GenerateSkillTools.swift # generate_skill (session-based + autonomous BFS)
 │   │   ├── CompilationTools.swift   # record_step, save_compiled
+│   │   ├── SaveCompiledHandler.swift # save_compiled logic (.compiled.json + emit=true .mirroir/ scenario)
+│   │   ├── CompiledWalkBuilder.swift # compiled steps + screens read → emitter walk
 │   │   ├── ComponentTools.swift     # calibrate_component
 │   │   │
 │   │   │── # ── Window & Target Management ──
@@ -123,8 +125,10 @@ mirroir-mcp/
 │   │   ├── ElementMatcher.swift     # Fuzzy OCR text matching
 │   │   ├── ConsoleReporter.swift    # Terminal output formatting
 │   │   ├── JUnitReporter.swift      # JUnit XML generation
-│   │   ├── EventRecorder.swift      # CGEvent tap monitoring
-│   │   ├── YAMLGenerator.swift      # Recorded events → skill YAML
+│   │   ├── EventRecorder.swift      # CGEvent tap monitoring, OCR screen per step
+│   │   ├── EventClassifier.swift    # Mouse gesture / key event classification
+│   │   ├── Recording.swift          # Saved `record` session (versioned JSON)
+│   │   ├── RecordingWalk.swift      # Recording → screen walk for the .mirroir/ emitter
 │   │   │
 │   │   │── # ── AI Integration ──
 │   │   ├── AIAgentProvider.swift    # AI agent abstraction
@@ -137,7 +141,7 @@ mirroir-mcp/
 │   │   │
 │   │   │── # ── CLI Subcommands ──
 │   │   ├── CompileCommand.swift     # mirroir compile
-│   │   ├── RecordCommand.swift      # mirroir record
+│   │   ├── RecordCommand.swift      # mirroir record (→ .mirroir/ ios scenario)
 │   │   ├── MigrateCommand.swift     # mirroir migrate (YAML → SKILL.md)
 │   │   ├── DoctorCommand.swift      # mirroir doctor
 │   │   ├── ConfigureCommand.swift   # mirroir configure (keyboard layout)

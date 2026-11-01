@@ -131,7 +131,10 @@ final class RecordStepHandlerTests: XCTestCase {
     private func startOn(_ texts: [String]) {
         let start = screen(texts)
         session.markStart(skillPath: "skill.md") {
-            StructuralFingerprint.buildScreenFingerprint(elements: start.elements, icons: [])
+            CompiledScreenRead(
+                fingerprint: StructuralFingerprint.buildScreenFingerprint(
+                    elements: start.elements, icons: []),
+                elements: start.elements)
         }
     }
 
@@ -245,5 +248,20 @@ final class RecordStepHandlerTests: XCTestCase {
         ])
         XCTAssertFalse(result.isError, result.text)
         XCTAssertTrue(result.text.contains("AI-only"))
+    }
+
+    func testEachStepKeepsTheElementsOfTheScreenItLeftForTheEmit() {
+        describer.describeResult = screen(["Alarms", "Add Alarm", "World Clock"])
+        XCTAssertFalse(recordStep([
+            "step_index": .number(0), "type": .string("launch"), "label": .string("Clock"),
+        ]).isError)
+        describer.describeResult = nil
+        XCTAssertFalse(recordStep([
+            "step_index": .number(1), "type": .string("tap"), "label": .string("Add Alarm"),
+        ]).isError)
+
+        let elements = session.elementsAfterSteps
+        XCTAssertEqual(elements[0]?.map(\.text), ["Alarms", "Add Alarm", "World Clock"])
+        XCTAssertNil(elements[1], "a failed read keeps no screen, so the emit refuses that step")
     }
 }

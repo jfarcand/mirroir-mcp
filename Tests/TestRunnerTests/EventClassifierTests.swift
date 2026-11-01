@@ -2,9 +2,10 @@
 // Licensed under the Apache License, Version 2.0
 //
 // ABOUTME: Tests for EventClassifier: mouse gesture classification and key event mapping.
-// ABOUTME: Covers tap detection, swipe directions, long press, and modifier extraction.
+// ABOUTME: Covers tap detection, swipe directions, long press, hold time, labels, and modifiers.
 
 import CoreGraphics
+import HelperLib
 import XCTest
 @testable import mirroir_mcp
 
@@ -208,60 +209,50 @@ final class EventClassifierTests: XCTestCase {
         XCTAssertTrue(mods.contains("option"))
         XCTAssertTrue(mods.contains("control"))
     }
+    // MARK: - Hold Time
 
-    // MARK: - RecordCommand Argument Parsing
-
-    func testParseDefaultArguments() {
-        let config = RecordCommand.parseArguments([])
-        XCTAssertEqual(config.outputPath, "recorded-skill.yaml")
-        XCTAssertEqual(config.skillName, "Recorded Skill")
-        XCTAssertFalse(config.noOCR)
-        XCTAssertFalse(config.showHelp)
-        XCTAssertNil(config.appName)
+    func testHoldSecondsComesFromEventTimestamps() {
+        // A 60ms posted tap whose mouse-up was handled 700ms later (the
+        // recorder read the screen on mouse-down) still holds for 60ms.
+        let hold = EventClassifier.holdSeconds(
+            downTimestamp: 5_000_000_000, upTimestamp: 5_060_000_000)
+        XCTAssertEqual(hold, 0.06, accuracy: 0.000_001)
+        if case .tap = EventClassifier.classifyMouse(
+            downX: 67, downY: 536, upX: 67, upY: 536, holdSeconds: hold) {
+            // expected
+        } else {
+            XCTFail("A 60ms hold must classify as a tap")
+        }
     }
 
-    func testParseOutputPath() {
-        let config = RecordCommand.parseArguments(["--output", "my-flow.yaml"])
-        XCTAssertEqual(config.outputPath, "my-flow.yaml")
+    func testHoldSecondsIsZeroForOutOfOrderTimestamps() {
+        XCTAssertEqual(
+            EventClassifier.holdSeconds(downTimestamp: 9, upTimestamp: 3), 0)
     }
 
-    func testParseShortOutput() {
-        let config = RecordCommand.parseArguments(["-o", "flow.yaml"])
-        XCTAssertEqual(config.outputPath, "flow.yaml")
+    // MARK: - Nearest Label
+
+    func testNearestLabelPicksClosestTextWithinDistance() {
+        let elements = [
+            TapPoint(text: "7", tapX: 67, tapY: 536, confidence: 1),
+            TapPoint(text: "8", tapX: 165, tapY: 535, confidence: 1),
+        ]
+        XCTAssertEqual(
+            EventClassifier.nearestLabel(x: 70, y: 540, in: elements, maxDistance: 30), "7")
+        XCTAssertNil(
+            EventClassifier.nearestLabel(x: 120, y: 700, in: elements, maxDistance: 30))
     }
 
-    func testParseName() {
-        let config = RecordCommand.parseArguments(["--name", "Login Flow"])
-        XCTAssertEqual(config.skillName, "Login Flow")
-    }
-
-    func testParseAppName() {
-        let config = RecordCommand.parseArguments(["--app", "Settings"])
-        XCTAssertEqual(config.appName, "Settings")
-    }
-
-    func testParseNoOCR() {
-        let config = RecordCommand.parseArguments(["--no-ocr"])
-        XCTAssertTrue(config.noOCR)
-    }
-
-    func testParseHelp() {
-        let config = RecordCommand.parseArguments(["--help"])
-        XCTAssertTrue(config.showHelp)
-    }
-
-    func testParseAllOptions() {
-        let config = RecordCommand.parseArguments([
-            "--output", "test.yaml",
-            "--name", "Test Flow",
-            "--description", "A test recording",
-            "--app", "MyApp",
-            "--no-ocr"
-        ])
-        XCTAssertEqual(config.outputPath, "test.yaml")
-        XCTAssertEqual(config.skillName, "Test Flow")
-        XCTAssertEqual(config.description, "A test recording")
-        XCTAssertEqual(config.appName, "MyApp")
-        XCTAssertTrue(config.noOCR)
+    func testNearestLabelSkipsDetectorIconPlaceholder() {
+        // The Calculator's "3" key OCR missed: only the detector's icon sits
+        // there, and its placeholder text is no label a replay could find.
+        let elements = [
+            TapPoint(text: CoreMLElementDetector.iconLabel, tapX: 285, tapY: 743, confidence: 1),
+            TapPoint(text: "+", tapX: 360, tapY: 734, confidence: 1),
+        ]
+        XCTAssertNil(
+            EventClassifier.nearestLabel(x: 262, y: 730, in: elements, maxDistance: 30))
+        XCTAssertEqual(
+            EventClassifier.nearestLabel(x: 350, y: 735, in: elements, maxDistance: 30), "+")
     }
 }

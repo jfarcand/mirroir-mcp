@@ -1,0 +1,760 @@
+{
+  "appName": "Calculator",
+  "finalScreen": [
+    {
+      "confidence": 1.0,
+      "pageY": 250,
+      "tapX": 340,
+      "tapY": 250,
+      "text": "7+3"
+    },
+    {
+      "confidence": 1.0,
+      "pageY": 320,
+      "tapX": 340,
+      "tapY": 320,
+      "text": "10"
+    },
+    {
+      "confidence": 1.0,
+      "pageY": 430,
+      "tapX": 62,
+      "tapY": 430,
+      "text": "AC"
+    },
+    {
+      "confidence": 1.0,
+      "pageY": 430,
+      "tapX": 160,
+      "tapY": 430,
+      "text": "+/-"
+    },
+    {
+      "confidence": 1.0,
+      "pageY": 430,
+      "tapX": 258,
+      "tapY": 430,
+      "text": "%"
+    },
+    {
+      "confidence": 1.0,
+      "pageY": 430,
+      "tapX": 356,
+      "tapY": 430,
+      "text": "÷"
+    },
+    {
+      "confidence": 1.0,
+      "pageY": 528,
+      "tapX": 62,
+      "tapY": 528,
+      "text": "7"
+    },
+    {
+      "confidence": 1.0,
+      "pageY": 528,
+      "tapX": 160,
+      "tapY": 528,
+      "text": "8"
+    },
+    {
+      "confidence": 1.0,
+      "pageY": 528,
+      "tapX": 258,
+      "tapY": 528,
+      "text": "9"
+    },
+    {
+      "confidence": 1.0,
+      "pageY": 528,
+      "tapX": 356,
+      "tapY": 528,
+      "text": "×"
+    },
+    {
+      "confidence": 1.0,
+      "pageY": 626,
+      "tapX": 62,
+      "tapY": 626,
+      "text": "4"
+    },
+    {
+      "confidence": 1.0,
+      "pageY": 626,
+      "tapX": 160,
+      "tapY": 626,
+      "text": "5"
+    },
+    {
+      "confidence": 1.0,
+      "pageY": 626,
+      "tapX": 258,
+      "tapY": 626,
+      "text": "6"
+    },
+    {
+      "confidence": 1.0,
+      "pageY": 626,
+      "tapX": 356,
+      "tapY": 626,
+      "text": "-"
+    },
+    {
+      "confidence": 1.0,
+      "pageY": 724,
+      "tapX": 62,
+      "tapY": 724,
+      "text": "1"
+    },
+    {
+      "confidence": 1.0,
+      "pageY": 724,
+      "tapX": 160,
+      "tapY": 724,
+      "text": "2"
+    },
+    {
+      "confidence": 1.0,
+      "pageY": 724,
+      "tapX": 258,
+      "tapY": 724,
+      "text": "3"
+    },
+    {
+      "confidence": 1.0,
+      "pageY": 724,
+      "tapX": 356,
+      "tapY": 724,
+      "text": "+"
+    },
+    {
+      "confidence": 1.0,
+      "pageY": 822,
+      "tapX": 111,
+      "tapY": 822,
+      "text": "0"
+    },
+    {
+      "confidence": 1.0,
+      "pageY": 822,
+      "tapX": 258,
+      "tapY": 822,
+      "text": "."
+    },
+    {
+      "confidence": 1.0,
+      "pageY": 822,
+      "tapX": 356,
+      "tapY": 822,
+      "text": "="
+    }
+  ],
+  "flowName": "calculator-add",
+  "steps": [
+    {
+      "kind": {
+        "tap": {
+          "label": "7",
+          "x": 62,
+          "y": 528
+        }
+      },
+      "screenBefore": [
+        {
+          "confidence": 1.0,
+          "pageY": 250,
+          "tapX": 340,
+          "tapY": 250,
+          "text": "0"
+        },
+        {
+          "confidence": 1.0,
+          "pageY": 430,
+          "tapX": 62,
+          "tapY": 430,
+          "text": "AC"
+        },
+        {
+          "confidence": 1.0,
+          "pageY": 430,
+          "tapX": 160,
+          "tapY": 430,
+          "text": "+/-"
+        },
+        {
+          "confidence": 1.0,
+          "pageY": 430,
+          "tapX": 258,
+          "tapY": 430,
+          "text": "%"
+        },
+        {
+          "confidence": 1.0,
+          "pageY": 430,
+          "tapX": 356,
+          "tapY": 430,
+          "text": "÷"
+        },
+        {
+          "confidence": 1.0,
+          "pageY": 528,
+          "tapX": 62,
+          "tapY": 528,
+          "text": "7"
+        },
+        {
+          "confidence": 1.0,
+          "pageY": 528,
+          "tapX": 160,
+          "tapY": 528,
+          "text": "8"
+        },
+        {
+          "confidence": 1.0,
+          "pageY": 528,
+          "tapX": 258,
+          "tapY": 528,
+          "text": "9"
+        },
+        {
+          "confidence": 1.0,
+          "pageY": 528,
+          "tapX": 356,
+          "tapY": 528,
+          "text": "×"
+        },
+        {
+          "confidence": 1.0,
+          "pageY": 626,
+          "tapX": 62,
+          "tapY": 626,
+          "text": "4"
+        },
+        {
+          "confidence": 1.0,
+          "pageY": 626,
+          "tapX": 160,
+          "tapY": 626,
+          "text": "5"
+        },
+        {
+          "confidence": 1.0,
+          "pageY": 626,
+          "tapX": 258,
+          "tapY": 626,
+          "text": "6"
+        },
+        {
+          "confidence": 1.0,
+          "pageY": 626,
+          "tapX": 356,
+          "tapY": 626,
+          "text": "-"
+        },
+        {
+          "confidence": 1.0,
+          "pageY": 724,
+          "tapX": 62,
+          "tapY": 724,
+          "text": "1"
+        },
+        {
+          "confidence": 1.0,
+          "pageY": 724,
+          "tapX": 160,
+          "tapY": 724,
+          "text": "2"
+        },
+        {
+          "confidence": 1.0,
+          "pageY": 724,
+          "tapX": 258,
+          "tapY": 724,
+          "text": "3"
+        },
+        {
+          "confidence": 1.0,
+          "pageY": 724,
+          "tapX": 356,
+          "tapY": 724,
+          "text": "+"
+        },
+        {
+          "confidence": 1.0,
+          "pageY": 822,
+          "tapX": 111,
+          "tapY": 822,
+          "text": "0"
+        },
+        {
+          "confidence": 1.0,
+          "pageY": 822,
+          "tapX": 258,
+          "tapY": 822,
+          "text": "."
+        },
+        {
+          "confidence": 1.0,
+          "pageY": 822,
+          "tapX": 356,
+          "tapY": 822,
+          "text": "="
+        }
+      ]
+    },
+    {
+      "kind": {
+        "tap": {
+          "label": "+",
+          "x": 356,
+          "y": 724
+        }
+      },
+      "screenBefore": [
+        {
+          "confidence": 1.0,
+          "pageY": 250,
+          "tapX": 340,
+          "tapY": 250,
+          "text": "7"
+        },
+        {
+          "confidence": 1.0,
+          "pageY": 430,
+          "tapX": 62,
+          "tapY": 430,
+          "text": "AC"
+        },
+        {
+          "confidence": 1.0,
+          "pageY": 430,
+          "tapX": 160,
+          "tapY": 430,
+          "text": "+/-"
+        },
+        {
+          "confidence": 1.0,
+          "pageY": 430,
+          "tapX": 258,
+          "tapY": 430,
+          "text": "%"
+        },
+        {
+          "confidence": 1.0,
+          "pageY": 430,
+          "tapX": 356,
+          "tapY": 430,
+          "text": "÷"
+        },
+        {
+          "confidence": 1.0,
+          "pageY": 528,
+          "tapX": 62,
+          "tapY": 528,
+          "text": "7"
+        },
+        {
+          "confidence": 1.0,
+          "pageY": 528,
+          "tapX": 160,
+          "tapY": 528,
+          "text": "8"
+        },
+        {
+          "confidence": 1.0,
+          "pageY": 528,
+          "tapX": 258,
+          "tapY": 528,
+          "text": "9"
+        },
+        {
+          "confidence": 1.0,
+          "pageY": 528,
+          "tapX": 356,
+          "tapY": 528,
+          "text": "×"
+        },
+        {
+          "confidence": 1.0,
+          "pageY": 626,
+          "tapX": 62,
+          "tapY": 626,
+          "text": "4"
+        },
+        {
+          "confidence": 1.0,
+          "pageY": 626,
+          "tapX": 160,
+          "tapY": 626,
+          "text": "5"
+        },
+        {
+          "confidence": 1.0,
+          "pageY": 626,
+          "tapX": 258,
+          "tapY": 626,
+          "text": "6"
+        },
+        {
+          "confidence": 1.0,
+          "pageY": 626,
+          "tapX": 356,
+          "tapY": 626,
+          "text": "-"
+        },
+        {
+          "confidence": 1.0,
+          "pageY": 724,
+          "tapX": 62,
+          "tapY": 724,
+          "text": "1"
+        },
+        {
+          "confidence": 1.0,
+          "pageY": 724,
+          "tapX": 160,
+          "tapY": 724,
+          "text": "2"
+        },
+        {
+          "confidence": 1.0,
+          "pageY": 724,
+          "tapX": 258,
+          "tapY": 724,
+          "text": "3"
+        },
+        {
+          "confidence": 1.0,
+          "pageY": 724,
+          "tapX": 356,
+          "tapY": 724,
+          "text": "+"
+        },
+        {
+          "confidence": 1.0,
+          "pageY": 822,
+          "tapX": 111,
+          "tapY": 822,
+          "text": "0"
+        },
+        {
+          "confidence": 1.0,
+          "pageY": 822,
+          "tapX": 258,
+          "tapY": 822,
+          "text": "."
+        },
+        {
+          "confidence": 1.0,
+          "pageY": 822,
+          "tapX": 356,
+          "tapY": 822,
+          "text": "="
+        }
+      ]
+    },
+    {
+      "kind": {
+        "tap": {
+          "label": "3",
+          "x": 258,
+          "y": 724
+        }
+      },
+      "screenBefore": [
+        {
+          "confidence": 1.0,
+          "pageY": 250,
+          "tapX": 340,
+          "tapY": 250,
+          "text": "7+"
+        },
+        {
+          "confidence": 1.0,
+          "pageY": 430,
+          "tapX": 62,
+          "tapY": 430,
+          "text": "AC"
+        },
+        {
+          "confidence": 1.0,
+          "pageY": 430,
+          "tapX": 160,
+          "tapY": 430,
+          "text": "+/-"
+        },
+        {
+          "confidence": 1.0,
+          "pageY": 430,
+          "tapX": 258,
+          "tapY": 430,
+          "text": "%"
+        },
+        {
+          "confidence": 1.0,
+          "pageY": 430,
+          "tapX": 356,
+          "tapY": 430,
+          "text": "÷"
+        },
+        {
+          "confidence": 1.0,
+          "pageY": 528,
+          "tapX": 62,
+          "tapY": 528,
+          "text": "7"
+        },
+        {
+          "confidence": 1.0,
+          "pageY": 528,
+          "tapX": 160,
+          "tapY": 528,
+          "text": "8"
+        },
+        {
+          "confidence": 1.0,
+          "pageY": 528,
+          "tapX": 258,
+          "tapY": 528,
+          "text": "9"
+        },
+        {
+          "confidence": 1.0,
+          "pageY": 528,
+          "tapX": 356,
+          "tapY": 528,
+          "text": "×"
+        },
+        {
+          "confidence": 1.0,
+          "pageY": 626,
+          "tapX": 62,
+          "tapY": 626,
+          "text": "4"
+        },
+        {
+          "confidence": 1.0,
+          "pageY": 626,
+          "tapX": 160,
+          "tapY": 626,
+          "text": "5"
+        },
+        {
+          "confidence": 1.0,
+          "pageY": 626,
+          "tapX": 258,
+          "tapY": 626,
+          "text": "6"
+        },
+        {
+          "confidence": 1.0,
+          "pageY": 626,
+          "tapX": 356,
+          "tapY": 626,
+          "text": "-"
+        },
+        {
+          "confidence": 1.0,
+          "pageY": 724,
+          "tapX": 62,
+          "tapY": 724,
+          "text": "1"
+        },
+        {
+          "confidence": 1.0,
+          "pageY": 724,
+          "tapX": 160,
+          "tapY": 724,
+          "text": "2"
+        },
+        {
+          "confidence": 1.0,
+          "pageY": 724,
+          "tapX": 258,
+          "tapY": 724,
+          "text": "3"
+        },
+        {
+          "confidence": 1.0,
+          "pageY": 724,
+          "tapX": 356,
+          "tapY": 724,
+          "text": "+"
+        },
+        {
+          "confidence": 1.0,
+          "pageY": 822,
+          "tapX": 111,
+          "tapY": 822,
+          "text": "0"
+        },
+        {
+          "confidence": 1.0,
+          "pageY": 822,
+          "tapX": 258,
+          "tapY": 822,
+          "text": "."
+        },
+        {
+          "confidence": 1.0,
+          "pageY": 822,
+          "tapX": 356,
+          "tapY": 822,
+          "text": "="
+        }
+      ]
+    },
+    {
+      "kind": {
+        "tap": {
+          "label": "=",
+          "x": 356,
+          "y": 822
+        }
+      },
+      "screenBefore": [
+        {
+          "confidence": 1.0,
+          "pageY": 250,
+          "tapX": 340,
+          "tapY": 250,
+          "text": "7+3"
+        },
+        {
+          "confidence": 1.0,
+          "pageY": 430,
+          "tapX": 62,
+          "tapY": 430,
+          "text": "AC"
+        },
+        {
+          "confidence": 1.0,
+          "pageY": 430,
+          "tapX": 160,
+          "tapY": 430,
+          "text": "+/-"
+        },
+        {
+          "confidence": 1.0,
+          "pageY": 430,
+          "tapX": 258,
+          "tapY": 430,
+          "text": "%"
+        },
+        {
+          "confidence": 1.0,
+          "pageY": 430,
+          "tapX": 356,
+          "tapY": 430,
+          "text": "÷"
+        },
+        {
+          "confidence": 1.0,
+          "pageY": 528,
+          "tapX": 62,
+          "tapY": 528,
+          "text": "7"
+        },
+        {
+          "confidence": 1.0,
+          "pageY": 528,
+          "tapX": 160,
+          "tapY": 528,
+          "text": "8"
+        },
+        {
+          "confidence": 1.0,
+          "pageY": 528,
+          "tapX": 258,
+          "tapY": 528,
+          "text": "9"
+        },
+        {
+          "confidence": 1.0,
+          "pageY": 528,
+          "tapX": 356,
+          "tapY": 528,
+          "text": "×"
+        },
+        {
+          "confidence": 1.0,
+          "pageY": 626,
+          "tapX": 62,
+          "tapY": 626,
+          "text": "4"
+        },
+        {
+          "confidence": 1.0,
+          "pageY": 626,
+          "tapX": 160,
+          "tapY": 626,
+          "text": "5"
+        },
+        {
+          "confidence": 1.0,
+          "pageY": 626,
+          "tapX": 258,
+          "tapY": 626,
+          "text": "6"
+        },
+        {
+          "confidence": 1.0,
+          "pageY": 626,
+          "tapX": 356,
+          "tapY": 626,
+          "text": "-"
+        },
+        {
+          "confidence": 1.0,
+          "pageY": 724,
+          "tapX": 62,
+          "tapY": 724,
+          "text": "1"
+        },
+        {
+          "confidence": 1.0,
+          "pageY": 724,
+          "tapX": 160,
+          "tapY": 724,
+          "text": "2"
+        },
+        {
+          "confidence": 1.0,
+          "pageY": 724,
+          "tapX": 258,
+          "tapY": 724,
+          "text": "3"
+        },
+        {
+          "confidence": 1.0,
+          "pageY": 724,
+          "tapX": 356,
+          "tapY": 724,
+          "text": "+"
+        },
+        {
+          "confidence": 1.0,
+          "pageY": 822,
+          "tapX": 111,
+          "tapY": 822,
+          "text": "0"
+        },
+        {
+          "confidence": 1.0,
+          "pageY": 822,
+          "tapX": 258,
+          "tapY": 822,
+          "text": "."
+        },
+        {
+          "confidence": 1.0,
+          "pageY": 822,
+          "tapX": 356,
+          "tapY": 822,
+          "text": "="
+        }
+      ]
+    }
+  ],
+  "version": 1
+}

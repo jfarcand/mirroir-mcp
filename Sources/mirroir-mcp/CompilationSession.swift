@@ -2,33 +2,42 @@
 // Licensed under the Apache License, Version 2.0
 //
 // ABOUTME: Session accumulator for AI-driven compilation: the steps record_step reports and
-// ABOUTME: the start-screen fingerprint get_skill reads, both consumed by save_compiled.
+// ABOUTME: the screens read around them (start and after each step), consumed by save_compiled.
 
 import Foundation
+import HelperLib
 
-/// Accumulates compiled steps reported by the AI during skill execution, and the
-/// fingerprint of the screen that execution started from.
+/// One local OCR read of a screen during compilation: the fingerprint replay
+/// checks a screen against, and the elements a `.mirroir/` scenario is
+/// rendered from (label casing, landmark waits).
+struct CompiledScreenRead: Sendable {
+    let fingerprint: ScreenFingerprint
+    let elements: [TapPoint]
+}
+
+/// Accumulates compiled steps reported by the AI during skill execution, the
+/// screen that execution started from, and the screen each step left on display.
 /// Thread-safe via NSLock. Session persists across MCP calls (survives context compaction).
 final class CompilationSession: @unchecked Sendable {
     private var steps: [CompiledStep] = []
-    /// The skill whose start screen was read, and that screen's fingerprint.
-    private var start: (skillPath: String, fingerprint: ScreenFingerprint?)?
+    /// The skill whose start screen was read, and that screen.
+    private var start: (skillPath: String, screen: CompiledScreenRead?)?
     /// The settled screen read right after each recorded step, by step index
     /// (nil when that read failed). A coordinate-only tap is compared with the
     /// screen before it, so a tap that changed nothing is refused when recorded.
-    private var screensAfter: [Int: ScreenFingerprint?] = [:]
+    private var screensAfter: [Int: CompiledScreenRead?] = [:]
     private let lock = NSLock()
 
     /// Record the screen `skillPath` starts from, read by `capture`, when no step
     /// has been recorded yet. Once a step is recorded the screen is no longer the
     /// start screen, so a skill read again mid-run keeps the one read before step 1.
-    func markStart(skillPath: String, capture: () -> ScreenFingerprint?) {
+    func markStart(skillPath: String, capture: () -> CompiledScreenRead?) {
         guard isIdle else { return }
-        let fingerprint = capture()
+        let screen = capture()
         lock.lock()
         defer { lock.unlock() }
         if steps.isEmpty {
-            start = (skillPath, fingerprint)
+            start = (skillPath, screen)
         }
     }
 
@@ -37,14 +46,22 @@ final class CompilationSession: @unchecked Sendable {
         lock.lock()
         defer { lock.unlock() }
         guard let start, start.skillPath == skillPath else { return nil }
-        return start.fingerprint
+        return start.screen?.fingerprint
     }
 
-    /// Keep the screen read right after step `index`.
-    func noteScreen(_ fingerprint: ScreenFingerprint?, after index: Int) {
+    /// Keep the screen read right after step `index` (nil when that read failed).
+    func noteScreen(_ read: CompiledScreenRead?, after index: Int) {
         lock.lock()
         defer { lock.unlock() }
-        screensAfter[index] = fingerprint
+        screensAfter[index] = read
+    }
+
+    /// The elements of every screen read right after a recorded step, by step
+    /// index; a step whose read failed is absent. The session is not cleared.
+    var elementsAfterSteps: [Int: [TapPoint]] {
+        lock.lock()
+        defer { lock.unlock() }
+        return screensAfter.compactMapValues { $0?.elements }
     }
 
     /// The screen step `index` started from: the one read after the step before
@@ -52,8 +69,8 @@ final class CompilationSession: @unchecked Sendable {
     func screenBefore(step index: Int) -> ScreenFingerprint? {
         lock.lock()
         defer { lock.unlock() }
-        guard index > 0 else { return start?.fingerprint }
-        return screensAfter[index - 1] ?? nil
+        guard index > 0 else { return start?.screen?.fingerprint }
+        return (screensAfter[index - 1] ?? nil)?.fingerprint
     }
 
     private var isIdle: Bool {

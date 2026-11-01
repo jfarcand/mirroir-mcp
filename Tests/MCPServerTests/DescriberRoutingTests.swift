@@ -142,9 +142,10 @@ final class DescriberRoutingTests: XCTestCase {
         let ocr = StubDescriber()
         ocr.describeResult = screen("General", "About")
 
-        let fingerprint = MirroirMCP.captureScreenFingerprint(target: context(client: client, ocr: ocr))
+        let read = MirroirMCP.captureScreen(target: context(client: client, ocr: ocr))
 
-        XCTAssertNotNil(fingerprint)
+        XCTAssertNotNil(read?.fingerprint)
+        XCTAssertEqual(read?.elements.map(\.text), ["General", "About"])
         XCTAssertEqual(ocr.describeCallCount, 1)
         XCTAssertEqual(client.describeCallCount, 0, "the compile fingerprint must not use the vision describer")
     }

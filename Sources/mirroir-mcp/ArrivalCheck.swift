@@ -60,19 +60,23 @@ enum ArrivalCheck {
                 "Step \(later) is already recorded, so the screen on display is not the one " +
                 "coordinate-only tap \(stepIndex) led to. Record it right after the tap."))
         }
-        let fingerprint = target.ocrDescriber.describe(
+        let read = target.ocrDescriber.describe(
             settleTimeoutUs: EnvConfig.frameSettleTimeoutUs).map {
-                StructuralFingerprint.buildScreenFingerprint(elements: $0.elements, icons: $0.icons)
+                CompiledScreenRead(
+                    fingerprint: StructuralFingerprint.buildScreenFingerprint(
+                        elements: $0.elements, icons: $0.icons),
+                    elements: $0.elements)
             }
         guard coordinateOnlyTap else {
-            session.noteScreen(fingerprint, after: stepIndex)
+            session.noteScreen(read, after: stepIndex)
             return .success(nil)
         }
-        guard let fingerprint else {
+        guard let read else {
             return .failure(ArrivalRefusal(reason:
                 "Could not read the screen this coordinate-only tap led to, so replay could " +
                 "not check it. Call record_step again once the screen has settled."))
         }
+        let fingerprint = read.fingerprint
         guard isCheckable(fingerprint) else {
             return .failure(ArrivalRefusal(reason:
                 "The screen this coordinate-only tap led to shows fewer than " +
@@ -95,7 +99,7 @@ enum ArrivalCheck {
                 "so replay could never prove it. Tap again until the screen changes, then " +
                 "call record_step."))
         }
-        session.noteScreen(fingerprint, after: stepIndex)
+        session.noteScreen(read, after: stepIndex)
         return .success(fingerprint)
     }
 }

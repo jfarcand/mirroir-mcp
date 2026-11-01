@@ -133,7 +133,7 @@ mcp__mirroir__generate_skill(
 
 ## 7. (Optional) compile a skill for fast replay
 
-`record_step` is not an interactive flow recorder. It is the compilation hook: while an AI agent executes an existing skill step by step, it calls `record_step` after each step with the observed coordinates, timing, and match data, and then `save_compiled` writes a `.compiled.json` next to the source skill. The compiled artifact lets future runs replay deterministically instead of re-driving the AI. See [compiled-skills.md](compiled-skills.md). (For a raw screen-capture video of a run, use `start_recording` / `stop_recording` instead — those produce a `.mov`, not skill steps.)
+`record_step` is not an interactive flow recorder (that is `mirroir record`). It is the compilation hook: while an AI agent executes an existing skill step by step, it calls `record_step` after each step with the observed coordinates, timing, and match data, and then `save_compiled` writes a `.compiled.json` next to the source skill. The compiled artifact lets future runs replay deterministically instead of re-driving the AI. `save_compiled` with `emit: true` (and `output_dir`, the consumer repo root) also writes the walk as the iOS leg under `.mirroir/apps/<app>/`, as `generate_skill … emit=true` does; the skill must open with `launch:`. See [compiled-skills.md](compiled-skills.md). (For a raw screen-capture video of a run, use `start_recording` / `stop_recording` instead — those produce a `.mov`, not skill steps.)
 
 ## When something goes wrong
 

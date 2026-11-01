@@ -104,9 +104,9 @@ extension StepExecutorTests {
 
     // MARK: - reset_app
 
-    /// describe() sequence for a successful reset: foreground OCR, App Switcher
-    /// OCR (the card present at window center, x=200), then the post-drag verify
-    /// OCR with the card gone — so `AppSwitcherCardLocator` returns nil and the
+    /// describe() sequence for a successful reset: foreground OCR, two App
+    /// Switcher reads that agree the card rests at window center (x=200), then
+    /// the post-drag verify OCR with the card gone — so `AppSwitcherCardLocator` returns nil and the
     /// dismissal is confirmed rather than reported as a stuck card.
     private func resetDescribeSequence(cardText: String) -> [ScreenDescriber.DescribeResult?] {
         // Several clustered lines: a real screen renders enough text to pass
@@ -126,12 +126,12 @@ extension StepExecutorTests {
         let cardGone = ScreenDescriber.DescribeResult(
             elements: [TapPoint(text: "OtherApp", tapX: 200, tapY: 400, confidence: 0.95)],
             screenshotBase64: "")
-        return [withCard, withCard, cardGone]
+        return [withCard, withCard, withCard, cardGone]
     }
 
     func testResetAppForceQuit() {
-        // describe() order: foreground OCR, App Switcher OCR (locate), then the
-        // post-drag verify — which must show the card gone for the dismiss to
+        // describe() order: foreground OCR, two App Switcher reads (locate the
+        // card at rest), then the post-drag verify — which must show the card gone for the dismiss to
         // be reported as successful.
         describer.describeResults = resetDescribeSequence(cardText: "Settings")
 

@@ -1,10 +1,12 @@
 # Clock — iOS capture (mirroir-mcp)
 
-The **iOS leg** of this app dir is emitted by `generate_skill` from an
-iPhone Mirroring capture. Each `scenarios/<flow>.ios.yaml` is a faithful
-**linear** record of the captured walk, opened by
+The **iOS leg** of this app dir is emitted by mirroir-mcp from an
+iPhone Mirroring walk: `generate_skill` (explore, or start/capture/finish),
+`save_compiled` (a skill run step by step), or `mirroir-mcp record` (a
+hand-driven session). Each `scenarios/<flow>.ios.yaml` is a faithful
+**linear** record of the walk, opened by
 `target: { kind: ios }`, waiting for each screen a tap reaches.
-`generate_skill` owns those files: re-emitting a flow overwrites its
+The emitter owns those files: re-emitting a flow overwrites its
 `.ios.yaml`, so record a changed walk rather than edit one by hand.
 `mirroir-run` hands that block to
 `mirroir-mcp test` on a macOS host with iPhone Mirroring connected, and

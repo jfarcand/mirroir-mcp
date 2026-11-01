@@ -2,7 +2,7 @@
 // Licensed under the Apache License, Version 2.0
 //
 // ABOUTME: Registers MCP tools for AI-driven skill compilation (record_step, save_compiled).
-// ABOUTME: Derives hints from the steps the AI reports and writes .compiled.json via CompilationSession.
+// ABOUTME: Derives hints from the steps the AI reports; save_compiled delegates to SaveCompiledHandler.
 
 import Foundation
 import HelperLib
@@ -162,11 +162,15 @@ extension MirroirMCP {
 
     // MARK: - save_compiled
 
-    /// Fingerprint of the target's current screen, from one local OCR call.
-    /// Always OCR: it is bookkeeping, not a description the client asked for,
-    /// so it never spends a vision call.
-    static func captureScreenFingerprint(target: any Target) -> ScreenFingerprint? {
-        CompileCommand.screenFingerprint(describer: target.ocrDescriber)
+    /// The target's current screen, from one local OCR call: its fingerprint and
+    /// its elements. Always OCR: it is bookkeeping, not a description the client
+    /// asked for, so it never spends a vision call.
+    static func captureScreen(target: any Target) -> CompiledScreenRead? {
+        guard let screen = target.ocrDescriber.describe() else { return nil }
+        return CompiledScreenRead(
+            fingerprint: StructuralFingerprint.buildScreenFingerprint(
+                elements: screen.elements, icons: screen.icons),
+            elements: screen.elements)
     }
 
     private static func registerSaveCompiledTool(
@@ -180,7 +184,9 @@ extension MirroirMCP {
                 Save the accumulated compiled steps as a .compiled.json file next to \
                 the source skill file. Call this after all record_step calls are done. \
                 The file fingerprints the screen get_skill saw before step 1, so call \
-                get_skill before running the first step. \
+                get_skill before running the first step. With emit=true, the same walk \
+                is also written as a runnable .mirroir/apps/<app>/ iOS scenario in the \
+                consumer repo; its app is the one the skill's opening launch: names. \
                 Clears the compilation session afterward.
                 """,
             inputSchema: [
@@ -191,143 +197,33 @@ extension MirroirMCP {
                         "description": .string(
                             "Skill name or path to resolve (e.g. 'check-about' or 'apps/settings/check-about')"),
                     ]),
+                    "emit": .object([
+                        "type": .string("boolean"),
+                        "description": .string(
+                            "When true, also write the compiled walk into the consumer repo as a " +
+                            ".mirroir/apps/<app>/scenarios/<skill>.ios.yaml scenario (target: " +
+                            "{ kind: ios }, reset_app then launch of the app the skill launches, " +
+                            "a wait_for on each screen a tap reaches), plus SAMPLE.md, the " +
+                            "mirroir.yaml plan entry and drift defaults. The skill must open " +
+                            "with launch: (after any target: / reset_app:). No .compiled.json " +
+                            "is written into .mirroir/: the runner replays the scenario live. " +
+                            "A walk the scenario cannot carry is refused by step."),
+                    ]),
+                    "output_dir": .object([
+                        "type": .string("string"),
+                        "description": .string(
+                            "Consumer repo root the emit=true tree is written under " +
+                            "(<output_dir>/.mirroir/apps/<app>/). Defaults to walking up from " +
+                            "the working directory; emitting into ~/.mirroir is refused."),
+                    ]),
                 ]),
                 "required": .array([.string("skill_name")]),
             ],
             handler: { args in
-                guard let skillName = args["skill_name"]?.asString() else {
-                    return .error("Missing required parameter: skill_name (string)")
-                }
-
-                let stepCount = session.stepCount
-                if stepCount == 0 {
-                    return .error("No steps recorded. Call record_step before save_compiled.")
-                }
-                // Replay pairs steps by position, so a gap would shift every later
-                // step onto the wrong hints. The session is kept for the retry.
-                let missing = session.missingIndices
-                if !missing.isEmpty {
-                    return .error("No step recorded at index \(CompiledSkillIO.describe(missing)). "
-                        + "Call record_step for "
-                        + "every step, AI-only ones included, then save_compiled again.")
-                }
-
-                // Resolve skill path
-                let dirs = PermissionPolicy.skillDirs
-                let (resolvedPath, ambiguous) = resolveSkill(name: skillName, dirs: dirs)
-
-                guard let skillPath = resolvedPath else {
-                    if !ambiguous.isEmpty {
-                        let matches = ambiguous.map { "  - \($0)" }.joined(separator: "\n")
-                        return .error(
-                            "Ambiguous skill name '\(skillName)':\n\(matches)")
-                    }
-                    return .error("Skill '\(skillName)' not found")
-                }
-
-                // A kind:game skill is model-interpreted: it is never compiled
-                // to a .compiled.json. Refuse rather than writing a dead artifact.
-                if let content = try? String(contentsOfFile: skillPath),
-                   SkillParser.headerKind(from: content) == "game" {
-                    return .error(
-                        "'\(skillName)' is a kind:game skill — model-interpreted and "
-                        + "never compiled. Run it via the game model loop instead.")
-                }
-
-                // A SKILL.md replays only from what was recorded, so each step must hold
-                // what it needs to run (a YAML skill keeps its steps in its own file).
-                // The session is kept so the AI can record the step again.
-                if skillPath.hasSuffix(".md") {
-                    let problems = skillMdReplayProblems(session.recordedSteps)
-                    if !problems.isEmpty {
-                        return .error("Cannot save a SKILL.md that would not replay:\n"
-                            + problems.joined(separator: "\n")
-                            + "\nCall record_step again for these steps, then save_compiled.")
-                    }
-                }
-
-                // A YAML twin's compiled file holds a SKILL.md's only replayable steps.
-                // The session is kept so the AI can save under the right name.
-                if let owner = CompiledSkillIO.skillMdTwinOwningCompiledFile(for: skillPath) {
-                    return .error("\(CompiledSkillIO.compiledPath(for: skillPath)) holds the "
-                        + "recorded steps of \(owner); saving \(skillName) would overwrite them.")
-                }
-
-                let compiled: CompiledSkill
-                do {
-                    compiled = try compiledSkill(
-                        skillPath: skillPath, session: session, target: registry.activeTarget)
-                } catch {
-                    return .error("Failed to hash skill file: \(error.localizedDescription)")
-                }
-                let steps = compiled.steps
-
-                // Check if compiled file already exists
-                let compiledPath = CompiledSkillIO.compiledPath(for: skillPath)
-                let alreadyExists = FileManager.default.fileExists(atPath: compiledPath)
-
-                // Write the compiled file
-                do {
-                    try CompiledSkillIO.save(compiled, for: skillPath)
-                } catch {
-                    return .error("Failed to write compiled file: \(error.localizedDescription)")
-                }
-
-                let compiledSteps = steps.filter { $0.hints != nil }.count
-                let passthroughSteps = steps.filter { $0.hints?.compiledAction == .passthrough }.count
-                let aiOnlySteps = steps.filter { $0.hints == nil }.count
-
-                var response = "Saved \(compiledPath)\n"
-                response += "Steps: \(steps.count) total, \(compiledSteps) compiled, "
-                response += "\(passthroughSteps) passthrough, \(aiOnlySteps) AI-only"
-
-                if alreadyExists {
-                    response += "\nWarning: overwrote existing compiled file"
-                }
-                if compiled.screenFingerprint == nil {
-                    response += "\nNote: no start-screen fingerprint saved: get_skill was not "
-                        + "called for this skill before its first step"
-                }
-
-                return .text(response)
+                SaveCompiledHandler.handle(
+                    args: args, session: session, target: registry.activeTarget)
             }
         ))
-    }
-
-    /// Build the compiled skill save_compiled writes for `skillPath` from the steps
-    /// `session` holds, clearing it. Its fingerprint is the screen get_skill read
-    /// before step 1, the moment every producer of a compiled skill fingerprints;
-    /// never the screen the run ended on. Each value the skill takes from a `${VAR}`
-    /// placeholder is stored as that placeholder, field by field.
-    ///
-    /// - Throws: the error reading `skillPath` to hash it; the session is then kept.
-    static func compiledSkill(
-        skillPath: String, session: CompilationSession, target: any Target
-    ) throws -> CompiledSkill {
-        let sourceHash = try CompiledSkillIO.sha256(of: skillPath)
-        let windowInfo = target.bridge.getWindowInfo()
-        let fingerprint = session.startFingerprint(for: skillPath)
-        let source = (try? String(contentsOfFile: skillPath, encoding: .utf8)) ?? ""
-        let steps = session.finalizeAndClear().map { step in
-            CompiledStep(
-                index: step.index, type: step.type,
-                label: step.label.map { storedLabel($0, type: step.type, source: source) },
-                hints: step.hints)
-        }
-        return CompiledSkill(
-            version: CompiledSkill.currentVersion,
-            source: SourceInfo(
-                sha256: sourceHash,
-                compiledAt: ISO8601DateFormatter().string(from: Date())
-            ),
-            device: DeviceInfo(
-                windowWidth: windowInfo.map { Double($0.size.width) } ?? 0,
-                windowHeight: windowInfo.map { Double($0.size.height) } ?? 0,
-                orientation: target.bridge.getOrientation()?.rawValue ?? "unknown"
-            ),
-            steps: steps,
-            screenFingerprint: fingerprint
-        )
     }
 
     /// Mark on `session` the screen `skillPath` starts from, read by local OCR on
@@ -338,7 +234,7 @@ extension MirroirMCP {
     ) {
         guard SkillParser.headerKind(from: content) != "game" else { return }
         session.markStart(skillPath: skillPath) {
-            captureScreenFingerprint(target: target)
+            captureScreen(target: target)
         }
     }
 

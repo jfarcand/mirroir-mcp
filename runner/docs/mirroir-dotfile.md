@@ -365,8 +365,12 @@ assert they stay equivalent:
 - **iOS leg** — a `target: { kind: ios, app: "…" }` block. `mirroir-run`
   hands it, as one block, to `mirroir-mcp test` on a macOS host with iPhone
   Mirroring connected, and reads back the report it writes; on any other host
-  it is refused by name, never skipped. `generate_skill … emit=true` records
-  one from a capture on the phone.
+  it is refused by name, never skipped. `generate_skill … emit=true`,
+  `save_compiled … emit=true` and `mirroir-mcp record` each write one from a
+  walk on the phone. The `<scenario>.compiled.json` beside an `.ios.yaml` is
+  the runner's own screen-drift baseline, recorded on a passing run; it is not
+  the speed-cache `.compiled.json` `save_compiled` writes next to a skill, and
+  no producer writes it.
 
 Both legs can live in **one scenario**, and the `cross_surface:` step after
 them compares a live capture from each:

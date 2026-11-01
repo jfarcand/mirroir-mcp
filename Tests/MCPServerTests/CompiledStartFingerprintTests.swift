@@ -36,6 +36,10 @@ final class CompiledStartFingerprintTests: XCTestCase {
         StructuralFingerprint.buildScreenFingerprint(elements: result.elements, icons: result.icons)
     }
 
+    private func read(_ result: ScreenDescriber.DescribeResult) -> CompiledScreenRead {
+        CompiledScreenRead(fingerprint: fingerprint(result), elements: result.elements)
+    }
+
     private var homeScreen: ScreenDescriber.DescribeResult {
         screen("Phone", "Mail", "Safari", "Music")
     }
@@ -91,7 +95,7 @@ final class CompiledStartFingerprintTests: XCTestCase {
                                   session: session, target: target)
         session.record(CompiledStep(index: 0, type: "launch", label: "Clock",
                                     hints: .passthrough()))
-        let compiled = try MirroirMCP.compiledSkill(
+        let compiled = try SaveCompiledHandler.compiledSkill(
             skillPath: path, session: session, target: target)
 
         XCTAssertEqual(compiled.screenFingerprint, fingerprint(homeScreen))
@@ -124,7 +128,7 @@ final class CompiledStartFingerprintTests: XCTestCase {
                                   session: session, target: target)
         session.record(CompiledStep(index: 0, type: "assert_visible", label: "Timer",
                                     hints: .assertion(delayMs: 10)))
-        let mcp = try MirroirMCP.compiledSkill(skillPath: path, session: session, target: target)
+        let mcp = try SaveCompiledHandler.compiledSkill(skillPath: path, session: session, target: target)
 
         XCTAssertNotNil(cli.screenFingerprint)
         XCTAssertEqual(cli.screenFingerprint, mcp.screenFingerprint)
@@ -136,26 +140,26 @@ final class CompiledStartFingerprintTests: XCTestCase {
     /// read before step 1: once a step is recorded, the screen is not the start.
     func testStartScreenIsNotReplacedOnceAStepIsRecorded() throws {
         let session = CompilationSession()
-        let start = fingerprint(homeScreen)
+        let start = read(homeScreen)
         session.markStart(skillPath: "/s.yaml") { start }
         session.record(CompiledStep(index: 0, type: "home", label: nil, hints: .passthrough()))
 
         var captured = false
         session.markStart(skillPath: "/s.yaml") {
             captured = true
-            return self.fingerprint(self.endScreen)
+            return self.read(self.endScreen)
         }
 
         XCTAssertFalse(captured, "no screen is read once a step is recorded")
-        XCTAssertEqual(session.startFingerprint(for: "/s.yaml"), start)
+        XCTAssertEqual(session.startFingerprint(for: "/s.yaml"), start.fingerprint)
     }
 
     func testStartScreenBelongsToTheSkillItWasReadFor() {
         let session = CompilationSession()
-        let start = fingerprint(homeScreen)
+        let start = read(homeScreen)
         session.markStart(skillPath: "/a.yaml") { start }
 
-        XCTAssertEqual(session.startFingerprint(for: "/a.yaml"), start)
+        XCTAssertEqual(session.startFingerprint(for: "/a.yaml"), start.fingerprint)
         XCTAssertNil(session.startFingerprint(for: "/b.yaml"))
     }
 
@@ -166,7 +170,7 @@ final class CompiledStartFingerprintTests: XCTestCase {
         let session = CompilationSession()
         session.record(CompiledStep(index: 0, type: "home", label: nil, hints: .passthrough()))
 
-        let compiled = try MirroirMCP.compiledSkill(
+        let compiled = try SaveCompiledHandler.compiledSkill(
             skillPath: path, session: session, target: target(ocr: ocr))
 
         XCTAssertNil(compiled.screenFingerprint)

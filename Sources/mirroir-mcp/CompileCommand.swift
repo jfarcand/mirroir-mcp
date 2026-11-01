@@ -92,7 +92,8 @@ enum CompileCommand {
         }
 
         let capture = ScreenCapture(bridge: bridge)
-        let realDescriber = ScreenDescriber(bridge: bridge, capture: capture)
+        let realDescriber = ScreenDescriber(
+            bridge: bridge, capture: capture, textRecognizer: MirroirMCP.buildTextRecognizer())
         let input = InputSimulation(bridge: bridge, pasteVerifier: realDescriber)
         let recordingDescriber = RecordingDescriber(wrapping: realDescriber)
 

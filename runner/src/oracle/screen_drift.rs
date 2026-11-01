@@ -17,6 +17,9 @@ pub const START_SCREEN: &str = "start";
 /// The step kind that binds the block to a device and acts on nothing.
 const TARGET_STEP: &str = "target";
 
+/// Step kinds that leave the device on its home screen, outside the app.
+const LAUNCHER_STEPS: [&str; 2] = ["reset_app", "home"];
+
 /// One `ios` block's screens, ready to compare against its reference.
 #[derive(Debug, Clone, Copy)]
 pub struct ScreenCheck<'a> {
@@ -80,14 +83,16 @@ pub fn compare_screens(policy: &DriftPolicy, check: ScreenCheck<'_>) -> Result<V
         });
     }
 
-    // Only screens a step's action produced are judged. The start screen and
-    // the screen a `target:` step leaves are whatever the device showed before
-    // the scenario acted — the previous run's last screen, or home — so they
-    // describe the device's history, not the app's behavior.
+    // Only screens the app produced are judged. The start screen and the
+    // screen a `target:` step leaves are whatever the device showed before the
+    // scenario acted — the previous run's last screen, or home — so they
+    // describe the device's history, not the app's behavior. A `reset_app:` or
+    // `home:` step leaves the home screen, whose widgets and date change
+    // from day to day whatever the app does.
     let mut unjudged: BTreeSet<String> = BTreeSet::from([START_SCREEN.to_owned()]);
     let mut expected: BTreeMap<String, (String, &ScreenFingerprint)> = BTreeMap::new();
     for step in &reference.steps {
-        if step.kind == TARGET_STEP {
+        if step.kind == TARGET_STEP || LAUNCHER_STEPS.contains(&step.kind.as_str()) {
             unjudged.insert(step.index.to_string());
             continue;
         }
@@ -366,6 +371,33 @@ mod tests {
         };
         let without = compare_screens(&policy(0.85), check)?;
         assert!(without.is_empty(), "{without:?}");
+        Ok(())
+    }
+
+    /// The home screen a `reset_app:` or `home:` step leaves is not judged:
+    /// its weather widget and date changed between two runs of one flow.
+    #[test]
+    fn the_home_screen_a_launcher_step_leaves_is_not_judged() -> TestResult {
+        for kind in LAUNCHER_STEPS {
+            let mut reference = reference()?;
+            let step = reference
+                .steps
+                .iter_mut()
+                .find(|s| s.index == 1)
+                .ok_or("fixture has no step 1")?;
+            step.kind = kind.to_owned();
+            let mut observed = screens(MATCH)?;
+            observed.insert("1".to_owned(), fp("home-sunday", &["DIM.", "10°"]));
+            let check = ScreenCheck {
+                reference: &reference,
+                source_sha256: &sha256_hex(SCENARIO),
+                observed: &observed,
+                observed_device: Some(&reference.device),
+                block_start: 0,
+            };
+            let findings = compare_screens(&policy(0.85), check)?;
+            assert!(findings.is_empty(), "{kind}: {findings:?}");
+        }
         Ok(())
     }
 

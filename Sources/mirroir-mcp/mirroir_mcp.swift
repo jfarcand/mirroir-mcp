@@ -20,8 +20,10 @@ struct MirroirMCP {
         // disconnects or its stdio pipe closes unexpectedly.
         signal(SIGPIPE, SIG_IGN)
 
-        // Parse CLI flags
-        let args = CommandLine.arguments
+        // Parse CLI flags. `--debug` is global: the server and every
+        // subcommand honor it, so it is removed before a subcommand parses.
+        DebugLog.enabled = CommandLine.arguments.contains("--debug")
+        let args = CommandLine.arguments.filter { $0 != "--debug" }
 
         // Handle subcommands before MCP server initialization
         if args.count >= 2 && args[1] == "test" {
@@ -49,7 +51,6 @@ struct MirroirMCP {
             Darwin.exit(exitCode)
         }
         let skipPermissions = PermissionPolicy.parseSkipPermissions(from: args)
-        DebugLog.enabled = args.contains("--debug")
         DebugLog.reset()
         DebugLog.persist("startup", "version: \(GitVersion.commitHash)")
         if DebugLog.enabled {
