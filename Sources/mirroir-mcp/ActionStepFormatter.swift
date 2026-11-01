@@ -12,18 +12,37 @@ enum ActionStepFormatter {
 
     /// Text cleanup rules loaded from `text-cleanup.md` in the skills repo.
     /// Lazily initialized once on first use.
-    private static let cleanupRules = ComponentLoader.loadTextCleanupRules()
+    static let cleanupRules = ComponentLoader.loadTextCleanupRules()
 
     /// Strip leading OCR noise characters (bullets, markers) from a label.
     /// Characters are defined in `text-cleanup.md`, not hardcoded.
-    static func cleanLabel(_ text: String) -> String {
-        let prefixes = cleanupRules.stripPrefixes
+    static func cleanLabel(
+        _ text: String, stripPrefixes prefixes: [Character] = cleanupRules.stripPrefixes
+    ) -> String {
         guard !prefixes.isEmpty else { return text }
         var result = text
         while let first = result.first, prefixes.contains(first) {
             result = String(result.dropFirst())
         }
         return result.trimmingCharacters(in: .whitespaces)
+    }
+
+    /// The items of one OCR line: `text` split on the segment separators
+    /// `text-cleanup.md` declares, each cleaned of its leading markers, in
+    /// reading order, empty segments dropped. OCR merges neighboring items
+    /// into one line on one read and splits them on the next ("• Sommeil |
+    /// Réveil" vs "Sommeil" and "Réveil"), so a label that must match a later
+    /// read is taken from one segment. A line with no separator is its one
+    /// cleaned segment.
+    static func segments(
+        of text: String, rules: ComponentLoader.TextCleanupRules = cleanupRules
+    ) -> [String] {
+        text.split(whereSeparator: { rules.segmentSeparators.contains($0) })
+            .map {
+                cleanLabel(String($0), stripPrefixes: rules.stripPrefixes)
+                    .trimmingCharacters(in: .whitespaces)
+            }
+            .filter { !$0.isEmpty }
     }
 
     /// Check if a label should be excluded from skill output.

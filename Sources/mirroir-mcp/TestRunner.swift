@@ -119,14 +119,12 @@ enum TestRunner {
             bridge: bridge, capture: capture, textRecognizer: MirroirMCP.buildTextRecognizer())
         let input = InputSimulation(bridge: bridge, pasteVerifier: describer)
 
-        // Pre-flight check: verify mirroring is connected (unless dry run)
-        if !config.dryRun {
-            let state = bridge.getState()
-            if state != .connected {
-                fputs("Error: iPhone Mirroring is not connected (state: \(state))\n", stderr)
-                fputs("Start iPhone Mirroring and connect your device before running tests.\n", stderr)
-                return 1
-            }
+        // Pre-flight check: verify mirroring is connected (unless dry run),
+        // freeing a paused session first the way every MCP input tool does.
+        if !config.dryRun, let refusal = input.ensureConnected(tag: "test") {
+            fputs("Error: \(refusal)\n", stderr)
+            fputs("Start iPhone Mirroring and connect your device before running tests.\n", stderr)
+            return 1
         }
 
         let executorConfig = StepExecutorConfig(

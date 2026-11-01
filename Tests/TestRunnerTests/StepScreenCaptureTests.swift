@@ -103,7 +103,11 @@ final class StepScreenCaptureTests: XCTestCase {
         XCTAssertTrue(result.passed, result.failureReasons.joined(separator: "\n"))
         XCTAssertEqual(screens.start?.structuralTexts, ClockWalkDouble.home.sorted())
         XCTAssertEqual(screens.afterStep[0]?.structuralTexts, ClockWalkDouble.home.sorted())
-        XCTAssertEqual(screens.afterStep[1]?.structuralTexts, ClockWalkDouble.alarms.sorted())
+        // The merged "Sleep | Wake Up" line is recorded as its two items.
+        XCTAssertEqual(screens.afterStep[1]?.structuralTexts, [
+            "Add Alarm", "Alarms", "Edit", "Other", "Sleep", "Stopwatch", "Timers",
+            "Wake Up", "World Clock",
+        ])
         XCTAssertEqual(screens.afterStep[2]?.structuralTexts, ClockWalkDouble.worldClock.sorted())
         XCTAssertEqual(screens.afterStep[3]?.structuralTexts, ClockWalkDouble.worldClock.sorted())
         XCTAssertEqual(screens.reportMap.keys.sorted(), ["0", "1", "2", "3", "start"])

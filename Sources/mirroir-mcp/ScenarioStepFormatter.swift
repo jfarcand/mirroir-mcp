@@ -214,20 +214,24 @@ enum ScenarioStepFormatter {
         })?.text
     }
 
-    /// Pick a landmark: the longest non-excluded label of `elements` that
+    /// Pick a landmark: the longest non-excluded segment of `elements` that
     /// `absentFrom` does not also show (prominence-by-length, mirroring
-    /// `LandmarkPicker`). The first such label in screen order wins a tie. Only
+    /// `LandmarkPicker`). The first such segment in screen order wins a tie. Only
     /// structural text counts: the status bar, times, bare numbers, dates and long
-    /// paragraphs change between runs, so a wait on them proves nothing.
+    /// paragraphs change between runs, so a wait on them proves nothing. A
+    /// candidate is one item of an OCR line (`ActionStepFormatter.segments`),
+    /// never the merged line: the replay's read may split "• Sommeil | Réveil"
+    /// into "Sommeil" and "Réveil", and only a single item matches every read.
     private static func landmark(in elements: [TapPoint], absentFrom: [TapPoint]) -> String? {
-        let shared = Set(absentFrom.map { ActionStepFormatter.cleanLabel($0.text) })
+        let shared = Set(absentFrom.flatMap { ActionStepFormatter.segments(of: $0.text) })
         var best: String?
         for element in elements where StructuralFingerprint.passesStructuralFilter(element) {
-            let label = ActionStepFormatter.cleanLabel(element.text)
-            guard label.count >= 3, !ActionStepFormatter.isExcludedLabel(label),
-                  !shared.contains(label) else { continue }
-            if label.count > (best?.count ?? 0) {
-                best = label
+            for label in ActionStepFormatter.segments(of: element.text) {
+                guard label.count >= 3, !ActionStepFormatter.isExcludedLabel(label),
+                      !shared.contains(label) else { continue }
+                if label.count > (best?.count ?? 0) {
+                    best = label
+                }
             }
         }
         return best

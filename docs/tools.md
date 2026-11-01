@@ -151,6 +151,8 @@ Steps like `tap: "Email"` don't specify coordinates — the AI calls `describe_s
 <cwd>/.mirroir-mcp/skills/      # project-local skills (overrides global)
 ```
 
+Patterns (`patterns/elements`, `patterns/screens`, `patterns/apps`, `drift-defaults.yaml`) are read from the mirroir-skills checkout: `$MIRROIR_SKILLS` when set (`mirroir-run` sets it on every `mirroir-mcp test` it starts), then the two directories above, then a `mirroir-skills` checkout beside the working directory. Emitting a `.mirroir/` scenario refuses to run when none of them holds `patterns/elements/text-cleanup.md`: its landmarks are cleaned with those rules.
+
 Both directories are scanned recursively, so you can organize skills into subdirectories (e.g. `apps/slack/send-message.md`). Project-local skills with the same relative path override global ones. When both a `.md` and `.yaml` file exist with the same stem name, the `.md` file takes precedence.
 
 ### SKILL.md Format (Recommended)

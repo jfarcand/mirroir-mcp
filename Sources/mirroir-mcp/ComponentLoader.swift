@@ -28,20 +28,13 @@ enum ComponentLoader {
         let home = ("~" as NSString).expandingTildeInPath
         let configDir = PermissionPolicy.configDirName
 
-        return [
-            // Project-local overrides
-            URL(fileURLWithPath: cwd + "/" + configDir + "/components"),
-            URL(fileURLWithPath: home + "/" + configDir + "/components"),
-            // New structure: patterns/elements/
-            URL(fileURLWithPath: cwd + "/" + configDir + "/skills/patterns/elements"),
-            URL(fileURLWithPath: home + "/" + configDir + "/skills/patterns/elements"),
-            URL(fileURLWithPath: cwd + "/../mirroir-skills/patterns/elements"),
-            // Legacy fallback: components/ios/
-            URL(fileURLWithPath: cwd + "/" + configDir + "/skills/components/ios"),
-            URL(fileURLWithPath: cwd + "/" + configDir + "/skills/components/custom"),
-            URL(fileURLWithPath: cwd + "/../mirroir-skills/components/ios"),
-            URL(fileURLWithPath: cwd + "/../mirroir-skills/components/custom"),
-        ]
+        let checkouts = PermissionPolicy.skillsCheckouts
+        // Project-local overrides, then the new structure (patterns/elements/),
+        // then the legacy fallback (components/ios/ and components/custom/).
+        let paths = [cwd + "/" + configDir + "/components", home + "/" + configDir + "/components"]
+            + checkouts.map { $0 + "/patterns/elements" }
+            + checkouts.flatMap { [$0 + "/components/ios", $0 + "/components/custom"] }
+        return paths.map { URL(fileURLWithPath: $0) }
     }
 
     // MARK: - Private
@@ -133,28 +126,39 @@ enum ComponentLoader {
         return indicators
     }
 
-    /// Parsed text cleanup rules: prefix characters to strip and labels to exclude.
+    /// Parsed text cleanup rules: prefix characters to strip, the separators
+    /// OCR reads between items it merged into one line, and labels to exclude.
     struct TextCleanupRules: Sendable {
         let stripPrefixes: [Character]
+        let segmentSeparators: [Character]
         let excludeLabels: Set<String>
+    }
+
+    /// File name of the text cleanup rules in the component search paths.
+    static let textCleanupFileName = "text-cleanup.md"
+
+    /// Every path `text-cleanup.md` is looked up at, in resolution order.
+    static func textCleanupCandidates() -> [String] {
+        searchPaths().map { $0.appendingPathComponent(textCleanupFileName).path }
     }
 
     /// Load text cleanup rules from `text-cleanup.md` in component search paths.
     /// Returns default empty rules if no file is found.
     static func loadTextCleanupRules() -> TextCleanupRules {
-        for searchPath in searchPaths() {
-            let fileURL = searchPath.appendingPathComponent("text-cleanup.md")
-            guard let content = try? String(contentsOf: fileURL, encoding: .utf8) else {
+        for candidate in textCleanupCandidates() {
+            guard let content = try? String(contentsOfFile: candidate, encoding: .utf8) else {
                 continue
             }
             return parseTextCleanup(content: content)
         }
-        return TextCleanupRules(stripPrefixes: [], excludeLabels: [])
+        return TextCleanupRules(stripPrefixes: [], segmentSeparators: [], excludeLabels: [])
     }
 
-    /// Parse the `## Strip Prefixes` and `## Exclude Labels` sections.
-    private static func parseTextCleanup(content: String) -> TextCleanupRules {
+    /// Parse the `## Strip Prefixes`, `## Segment Separators` and
+    /// `## Exclude Labels` sections.
+    static func parseTextCleanup(content: String) -> TextCleanupRules {
         var prefixes: [Character] = []
+        var separators: [Character] = []
         var excludes: Set<String> = []
         var currentSection: String?
 
@@ -162,6 +166,10 @@ enum ComponentLoader {
             let trimmed = line.trimmingCharacters(in: .whitespaces)
             if trimmed.hasPrefix("## Strip Prefixes") {
                 currentSection = "prefixes"
+                continue
+            }
+            if trimmed.hasPrefix("## Segment Separators") {
+                currentSection = "separators"
                 continue
             }
             if trimmed.hasPrefix("## Exclude Labels") {
@@ -179,6 +187,8 @@ enum ComponentLoader {
             switch currentSection {
             case "prefixes":
                 if let char = value.first { prefixes.append(char) }
+            case "separators":
+                if let char = value.first { separators.append(char) }
             case "excludes":
                 excludes.insert(value)
             default:
@@ -187,8 +197,10 @@ enum ComponentLoader {
         }
 
         DebugLog.log("components",
-            "Loaded text cleanup: \(prefixes.count) prefixes, \(excludes.count) excludes")
-        return TextCleanupRules(stripPrefixes: prefixes, excludeLabels: excludes)
+            "Loaded text cleanup: \(prefixes.count) prefixes, \(separators.count) separators, " +
+            "\(excludes.count) excludes")
+        return TextCleanupRules(
+            stripPrefixes: prefixes, segmentSeparators: separators, excludeLabels: excludes)
     }
 
     /// Find all `.md` files in a directory (non-recursive).

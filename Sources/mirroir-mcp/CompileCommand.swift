@@ -79,9 +79,9 @@ enum CompileCommand {
         // Initialize subsystems
         let bridge = MirroringBridge()
 
-        let state = bridge.getState()
-        if state != .connected {
-            fputs("Error: iPhone Mirroring is not connected (state: \(state))\n", stderr)
+        // A paused session is freed first, the way every MCP input tool does.
+        if let refusal = InputSimulation(bridge: bridge).ensureConnected(tag: "compile") {
+            fputs("Error: \(refusal)\n", stderr)
             fputs("Start iPhone Mirroring and connect your device before compiling.\n", stderr)
             return 1
         }

@@ -42,16 +42,17 @@
     {
       "hints" : {
         "arrivalFingerprint" : {
-          "hash" : "23b2cdf8943d5076b3ade275c8bce4a913bb9cd5998f5924f7dbb4860e5ade24",
+          "hash" : "53c6d6476af752756817cd795d71623b414df1e7436e3150c9aba35e008069f7",
           "iconCount" : 0,
           "structuralTexts" : [
             "Add Alarm",
             "Alarms",
             "Edit",
             "Other",
-            "Sleep | Wake Up",
+            "Sleep",
             "Stopwatch",
             "Timers",
+            "Wake Up",
             "World Clock"
           ]
         },

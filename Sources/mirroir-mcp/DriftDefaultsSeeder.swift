@@ -26,13 +26,10 @@ enum DriftDefaultsSeeder {
         case copy(source: URL, target: URL)
     }
 
-    /// Candidate skills-repo copies, in the order the rest of mirroir-mcp
-    /// resolves the skills checkout: the project-local then global skill
-    /// directories, then a `mirroir-skills` sibling of the working directory.
+    /// Candidate skills-repo copies, in the order every pattern loader
+    /// resolves the skills checkout (`PermissionPolicy.skillsCheckouts`).
     static func candidatePaths() -> [String] {
-        let cwd = FileManager.default.currentDirectoryPath
-        return (PermissionPolicy.skillDirs + [cwd + "/../mirroir-skills"])
-            .map { $0 + "/" + fileName }
+        PermissionPolicy.skillsCheckouts.map { $0 + "/" + fileName }
     }
 
     /// Decide how `mirroirRoot` gets its layer: keep an existing file, or copy

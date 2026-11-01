@@ -37,6 +37,8 @@ pub struct IosBlock<'a> {
     pub scenario_path: &'a Path,
     /// Compare against the reference, or re-record it.
     pub mode: BaselineMode,
+    /// The invocation's mirroir-skills checkout, handed to `mirroir-mcp test`.
+    pub skills: Option<&'a Path>,
 }
 
 /// A compiled reference the block recorded, waiting for the run's verdict.
@@ -90,7 +92,9 @@ pub async fn run_ios_block(
         ScreenReference::Compare { .. } => None,
     };
     let yaml = ios_block_yaml(&run.scenario.name, &run.scenario.steps, run.block.clone())?;
-    let runner = MirroirMcpRunner::from_env()?.with_recording(recording);
+    let runner = MirroirMcpRunner::from_env()?
+        .with_recording(recording)
+        .with_skills(run.skills)?;
     info!(
         ios_steps = run.block.len(),
         workspace = %run.dir.display(),

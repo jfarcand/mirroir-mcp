@@ -234,7 +234,11 @@ plan time (`IosError::AiOnlyStepInBlock`): `mirroir-mcp test` cannot evaluate
 it and would fail the block on it. Place it after the block's last device step.
 The AI-only kinds are pinned on both sides by
 `src/target/fixtures/ai-only-step-kinds.json`.
-`mirroir-mcp` is found through `MIRROIR_MCP_BIN`, else `PATH`.
+`mirroir-mcp` is found through `MIRROIR_MCP_BIN`, else `PATH`. The block runs
+from its scratch workspace, so the runner hands its `--skills` /
+`$MIRROIR_SKILLS` checkout to `mirroir-mcp test` as an absolute
+`MIRROIR_SKILLS`: the block's pattern loaders (text cleanup, screen recipes,
+APP.md) read the same checkout as the runner's threshold layers.
 
 Each `mirroir-mcp test` run is bounded. Every step of the block earns an
 allowance — 30 s by default, the same ceiling a web step gets — or its own

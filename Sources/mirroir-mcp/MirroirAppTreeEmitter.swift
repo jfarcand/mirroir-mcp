@@ -79,6 +79,10 @@ enum MirroirAppTreeEmitter {
         /// exists at any of `searched`, so the global threshold layer
         /// `mirroir-run` requires cannot be seeded. Nothing was emitted.
         case driftDefaultsMissing(searched: [String])
+        /// No `text-cleanup.md` exists at any of `searched`, so landmarks would
+        /// keep OCR markers and merged lines a replay's read does not
+        /// reproduce. Nothing was emitted.
+        case textCleanupMissing(searched: [String])
         var errorDescription: String? {
             switch self {
             case .noConsumerRoot:
@@ -114,6 +118,11 @@ enum MirroirAppTreeEmitter {
                     "(searched: \(searched.joined(separator: ", "))); mirroir-run requires " +
                     "the global threshold layer, so nothing was emitted — install mirroir-skills " +
                     "or add .mirroir/\(DriftDefaultsSeeder.fileName)"
+            case .textCleanupMissing(let searched):
+                return "no \(ComponentLoader.textCleanupFileName) in the mirroir-skills checkout " +
+                    "(searched: \(searched.joined(separator: ", "))); without it the emitted " +
+                    "landmarks keep OCR markers a replay does not read, so nothing was emitted " +
+                    "— install mirroir-skills (clone it into ~/.mirroir-mcp/skills)"
             }
         }
     }
@@ -134,7 +143,10 @@ enum MirroirAppTreeEmitter {
     /// global threshold layer `mirroir-run` requires — is copied from the
     /// first of `driftDefaultsCandidates` that exists when the tree has none,
     /// and an existing one is never overwritten; with neither, the emit is
-    /// refused before anything is written.
+    /// refused before anything is written. So is an emit that finds
+    /// `text-cleanup.md` at none of `textCleanupCandidates`: landmarks are
+    /// taken from cleaned OCR segments, and without the rules they would be
+    /// raw lines a replay's read does not reproduce.
     ///
     /// `SAMPLE.md` and `mirroir.yaml` are created with an ownership marker
     /// and kept current by later emits (`MirroirManifestUpsert`), which insert
@@ -147,7 +159,7 @@ enum MirroirAppTreeEmitter {
     /// in that error or in the success note; they stay on disk and declared.
     ///
     /// - Throws: `EmitError` when there is nothing to emit, no replayable
-    ///   flow, no consumer root, no drift-defaults layer to seed, a written flow SAMPLE.md does not declare and
+    ///   flow, no consumer root, no text cleanup rules, no drift-defaults layer to seed, a written flow SAMPLE.md does not declare and
     ///   the emitter cannot add, a plan entry it cannot place, or a
     ///   file-system error.
     static func emit(
@@ -155,9 +167,13 @@ enum MirroirAppTreeEmitter {
         flows: [Flow],
         outputDir: String? = nil,
         root: URL? = nil,
-        driftDefaultsCandidates: [String] = DriftDefaultsSeeder.candidatePaths()
+        driftDefaultsCandidates: [String] = DriftDefaultsSeeder.candidatePaths(),
+        textCleanupCandidates: [String] = ComponentLoader.textCleanupCandidates()
     ) throws -> EmitResult {
         guard !flows.isEmpty else { throw EmitError.noFlows(appName: appName) }
+        guard textCleanupCandidates.contains(where: { FileManager.default.fileExists(atPath: $0) }) else {
+            throw EmitError.textCleanupMissing(searched: textCleanupCandidates)
+        }
         if let empty = flows.first(where: { $0.screens.isEmpty }) {
             throw EmitError.emptyWalk(flow: empty.name)
         }

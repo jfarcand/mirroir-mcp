@@ -99,15 +99,12 @@ enum AppDescriptionLoader {
     /// Search paths for APP.md files, in resolution order.
     /// New `patterns/apps/` paths first; legacy `apps/` as fallback.
     static func searchPaths() -> [String] {
-        let cwd = FileManager.default.currentDirectoryPath
-        return PermissionPolicy.skillDirs + [
-            // New structure: patterns/apps/
-            cwd + "/../mirroir-skills/patterns/apps",
-        ] + PermissionPolicy.skillDirs.map { $0 + "/patterns/apps" } + [
-            // Legacy fallback: apps/
-            cwd + "/../mirroir-skills/apps",
-            cwd + "/../mirroir-skills",
-        ]
+        let checkouts = PermissionPolicy.skillsCheckouts
+        // New structure (patterns/apps/), then the legacy fallback (apps/ and
+        // the checkout root).
+        return checkouts.map { $0 + "/patterns/apps" }
+            + checkouts.map { $0 + "/apps" }
+            + checkouts
     }
 
     // MARK: - Private

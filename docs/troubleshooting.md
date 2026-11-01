@@ -64,7 +64,7 @@ The script uses `fswatch` to monitor `Sources/` for `.swift` file changes, rebui
 
 **Taps don't register** — Run `mirroir doctor` to check prerequisites. Verify that iPhone Mirroring is connected (not showing "Connect to your iPhone" screen) and that Accessibility permissions are granted in System Settings > Privacy & Security > Accessibility.
 
-**"Mirroring paused" screenshots** — The MCP server auto-resumes paused sessions. If it persists, click the iPhone Mirroring window manually once.
+**"Mirroring paused" screenshots** — The MCP server, and the `test`, `compile` and `record` commands, auto-resume paused sessions. If it persists, click the iPhone Mirroring window manually once.
 
 **iOS autocorrect mangling typed text** — iOS applies autocorrect to typed text. Disable autocorrect in iPhone Settings > General > Keyboard, or type words followed by spaces to confirm them before autocorrect triggers.
 

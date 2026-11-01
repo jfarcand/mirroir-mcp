@@ -155,7 +155,8 @@ pub struct SampleContext<'a> {
 #[derive(Debug, Clone, Copy, Default)]
 pub struct ReplayRoots<'a> {
     /// The `mirroir-skills` checkout, when the invocation named one. Supplies
-    /// the global `drift-defaults.yaml` layer.
+    /// the global `drift-defaults.yaml` layer, and is handed to every
+    /// `mirroir-mcp test` block as `MIRROIR_SKILLS`.
     pub skills: Option<&'a Path>,
     /// Compare against the recorded baselines, or re-record them from what
     /// this run observes. `mirroir-run accept` is the only caller that passes
@@ -295,6 +296,7 @@ pub async fn run_scenario_with_context(
                     dir: &dir,
                     scenario_path: path,
                     mode: roots.baselines,
+                    skills: roots.skills,
                 };
                 let (block_captures, recorded) = run_ios_block(block, &mut drift).await?;
                 pending_reference = recorded;

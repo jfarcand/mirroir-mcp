@@ -77,13 +77,17 @@ enum StructuralFingerprint {
     /// Structural elements are stable across captures: headers, labels, menu items.
     /// Dynamic elements change between captures: timestamps, counters, badges.
     /// Compound labels with embedded timestamps are normalized (timestamp stripped).
+    /// Each OCR line contributes its cleaned segments (`ActionStepFormatter.segments`),
+    /// not its raw text: OCR reads a bullet as "•" on one capture and "*" on the
+    /// next, and merges or splits neighboring items, so only the items compare
+    /// stably across captures of the same screen.
     static func extractStructural(from elements: [TapPoint]) -> Set<String> {
         var result = Set<String>()
         for el in elements {
             guard passesStructuralFilter(el) else { continue }
             // Normalize: strip embedded timestamps from compound labels
             let normalized = stripEmbeddedTimestamp(el.text)
-            result.insert(normalized)
+            result.formUnion(ActionStepFormatter.segments(of: normalized))
         }
         return result
     }

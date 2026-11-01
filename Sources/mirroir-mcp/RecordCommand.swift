@@ -154,9 +154,9 @@ enum RecordCommand {
     private static func recordLive(appName: String, flowName: String) -> Recording? {
         let bridge = MirroringBridge()
 
-        let state = bridge.getState()
-        if state != .connected {
-            fputs("Error: iPhone Mirroring is not connected (state: \(state))\n", stderr)
+        // A paused session is freed first, the way every MCP input tool does.
+        if let refusal = InputSimulation(bridge: bridge).ensureConnected(tag: "record") {
+            fputs("Error: \(refusal)\n", stderr)
             fputs("Start iPhone Mirroring and connect your device before recording.\n", stderr)
             return nil
         }

@@ -283,6 +283,21 @@ public struct PermissionPolicy: Sendable {
         [localConfigDir + "/skills", globalConfigDir + "/skills"]
     }
 
+    /// Environment variable naming a mirroir-skills checkout. `mirroir-run`
+    /// sets it on every `mirroir-mcp test` it spawns, whose working directory
+    /// is the runner's scratch workspace, where no cwd-relative path resolves.
+    public static let skillsCheckoutVariable = "MIRROIR_SKILLS"
+
+    /// The mirroir-skills checkouts the pattern loaders read, in resolution
+    /// order: `$MIRROIR_SKILLS` when set, the project-local then global skill
+    /// directories, then a `mirroir-skills` sibling of the working directory.
+    public static var skillsCheckouts: [String] {
+        let environment = ProcessInfo.processInfo.environment[skillsCheckoutVariable]
+            .flatMap { $0.isEmpty ? nil : $0 }
+        let sibling = FileManager.default.currentDirectoryPath + "/../mirroir-skills"
+        return [environment].compactMap { $0 } + skillDirs + [sibling]
+    }
+
     /// Returns the agent profile directories in resolution order (project-local first, then global).
     public static var agentDirs: [String] {
         [localConfigDir + "/agents", globalConfigDir + "/agents"]
