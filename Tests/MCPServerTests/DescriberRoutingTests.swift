@@ -156,7 +156,7 @@ final class DescriberRoutingTests: XCTestCase {
         let client = StubDescriber()
         let ocr = StubDescriber()
         // Spotlight still up on the first poll, then the app.
-        ocr.describeResults = [screen("Q Notes", "Notes"), screen("All iCloud", "New Folder")]
+        ocr.describeResults = [screen("Q Notes", "Notes"), screen("All iCloud", "New Folder", "Notes", "Shared", "Recently Deleted")]
 
         let result = MirroirMCP.launchAndWait(appName: "Notes", ctx: context(client: client, ocr: ocr))
 
@@ -165,11 +165,38 @@ final class DescriberRoutingTests: XCTestCase {
         XCTAssertEqual(client.describeCallCount, 0, "launch bookkeeping must not use the vision describer")
     }
 
+    func testLaunchAndWaitWaitsOutAColdBootSplash() {
+        let client = StubDescriber()
+        let ocr = StubDescriber()
+        // A game's cold boot: a black frame, then its logo, then the menu.
+        let menu = screen("MAGASIN", "BRAWLERS", "INFOS", "AMIS", "JOUER")
+        ocr.describeResults = [screen(), screen("U"), menu]
+
+        let result = MirroirMCP.launchAndWait(appName: "Brawl Stars", ctx: context(client: client, ocr: ocr))
+
+        guard case .success(let first) = result else { return XCTFail("launch should succeed") }
+        XCTAssertEqual(first.elements.map(\.text), menu.elements.map(\.text),
+                       "the first screen is the rendered menu, not a boot frame")
+        XCTAssertEqual(client.describeCallCount, 0)
+    }
+
+    func testLaunchAndWaitTakesASparseAppOnceTheWaitRunsOut() {
+        let client = StubDescriber()
+        let ocr = StubDescriber()
+        ocr.describeResult = screen("Empty")
+
+        let result = MirroirMCP.launchAndWait(
+            appName: "Empty", ctx: context(client: client, ocr: ocr), renderTimeoutMs: 1)
+
+        guard case .success(let first) = result else { return XCTFail("a sparse app still launches") }
+        XCTAssertEqual(first.elements.map(\.text), ["Empty"])
+    }
+
     func testLaunchAndDescribeSpendsOneClientDescribe() {
         let client = StubDescriber()
-        client.describeResult = screen("All iCloud", "New Folder")
+        client.describeResult = screen("All iCloud", "New Folder", "Notes", "Shared", "Recently Deleted")
         let ocr = StubDescriber()
-        ocr.describeResult = screen("All iCloud", "New Folder")
+        ocr.describeResult = screen("All iCloud", "New Folder", "Notes", "Shared", "Recently Deleted")
 
         let result = MirroirMCP.launchAndDescribe(appName: "Notes", ctx: context(client: client, ocr: ocr))
 
@@ -180,9 +207,9 @@ final class DescriberRoutingTests: XCTestCase {
 
     func testLaunchInForegroundSpendsOneClientDescribe() {
         let client = StubDescriber()
-        client.describeResult = screen("All iCloud", "New Folder")
+        client.describeResult = screen("All iCloud", "New Folder", "Notes", "Shared", "Recently Deleted")
         let ocr = StubDescriber()
-        ocr.describeResult = screen("All iCloud", "New Folder")
+        ocr.describeResult = screen("All iCloud", "New Folder", "Notes", "Shared", "Recently Deleted")
 
         let result = MirroirMCP.launchInForeground(
             appName: "Notes", ctx: context(client: client, ocr: ocr))
@@ -195,7 +222,7 @@ final class DescriberRoutingTests: XCTestCase {
     func testLaunchAndDescribeReportsAnUndescribableFirstScreen() {
         let client = StubDescriber()
         let ocr = StubDescriber()
-        ocr.describeResult = screen("All iCloud")
+        ocr.describeResult = screen("All iCloud", "New Folder", "Notes", "Shared", "Recently Deleted")
 
         let result = MirroirMCP.launchAndDescribe(appName: "Notes", ctx: context(client: client, ocr: ocr))
 
@@ -286,11 +313,36 @@ final class DescriberRoutingTests: XCTestCase {
         return input
     }
 
+    func testStartLoadsTheAppMdIntoTheSession() throws {
+        let app = uniqueApp()
+        let dir = FileManager.default.temporaryDirectory
+            .appendingPathComponent("start-appmd-\(UUID().uuidString)", isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let appDir = dir.appendingPathComponent("shop", isDirectory: true)
+        try FileManager.default.createDirectory(at: appDir, withIntermediateDirectories: true)
+        try "---\nversion: 1\napp: \(app)\n---\n\n## Structure\n\nA shop.\n\n## Landmarks\n- RESSOURCES\n"
+            .write(to: appDir.appendingPathComponent("APP.md"), atomically: true, encoding: .utf8)
+        let client = StubDescriber()
+        client.describeResult = screen("MAGASIN", "BRAWLERS", "INFOS", "AMIS", "JOUER")
+        let ocr = StubDescriber()
+        ocr.describeResult = client.describeResult
+        let session = ExplorationSession()
+        let registry = makeTestRegistry(
+            bridge: StubBridge(), input: StubInput(), describer: client, ocrDescriber: ocr)
+
+        _ = MirroirMCP.handleStart(
+            args: ["app_name": .string(app)], session: session, registry: registry,
+            appMdSearchPaths: [dir.path])
+
+        XCTAssertEqual(session.currentAppDescription?.landmarks, ["RESSOURCES"],
+                       "a manual session's SKILL.md must see the APP.md an explore sees")
+    }
+
     func testColdStartSpendsOneClientDescribe() {
         let client = StubDescriber()
-        client.describeResult = screen("Inbox")
+        client.describeResult = screen("Inbox", "Mailboxes", "Edit", "Updated Just Now", "Search")
         let ocr = StubDescriber()
-        ocr.describeResult = screen("Inbox")
+        ocr.describeResult = screen("Inbox", "Mailboxes", "Edit", "Updated Just Now", "Search")
 
         let input = start(app: uniqueApp(), client: client, ocr: ocr)
 
@@ -329,7 +381,7 @@ final class DescriberRoutingTests: XCTestCase {
 
     func testColdExploreSpendsOneClientDescribe() {
         let ocr = StubDescriber()
-        ocr.describeResult = screen("Inbox")
+        ocr.describeResult = screen("Inbox", "Mailboxes", "Edit", "Updated Just Now", "Search")
 
         let (client, input) = exploreUntilFirstScreen(app: uniqueApp(), ocr: ocr)
 

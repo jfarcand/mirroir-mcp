@@ -132,10 +132,7 @@ enum AppSwitcherCardLocator {
         let maxY = windowHeight * labelBandMaxYFraction
         return switcherElements.contains { el in
             guard el.tapY <= maxY else { return false }
-            let label = normalize(el.text)
-            if label == name { return true }
-            // OCR of a clipped edge-card label: a ≥4-char prefix of the name.
-            return label.count >= 4 && name.hasPrefix(label)
+            return labelNames(normalize(el.text), name)
         }
     }
 
@@ -154,8 +151,7 @@ enum AppSwitcherCardLocator {
         let leftEdge = Double(windowSize.width) * leftEdgeFraction
         let labels = switcherElements.filter { el in
             guard el.tapY <= maxY, el.tapX >= leftEdge else { return false }
-            let label = normalize(el.text)
-            return label == name || (label.count >= 4 && name.hasPrefix(label))
+            return labelNames(normalize(el.text), name)
         }
         guard labels.count == 1, let label = labels.first else { return nil }
         return label.tapX
@@ -178,6 +174,19 @@ enum AppSwitcherCardLocator {
         return locateCardX(
             appElements: appElements, switcherElements: switcherElements,
             windowWidth: Double(windowSize.width))
+    }
+
+    /// Whether a normalized switcher label names the normalized app `name`:
+    /// the whole name, or the OCR of a clipped edge-card label — a ≥4-char
+    /// prefix of the name that ends mid-word ("insta" of "instagram"). A prefix
+    /// ending where a word of the name ends is a whole name of its own: the
+    /// "brawl stars" card is another app than "brawl stars victoire", and
+    /// taking it for that app's label quits the wrong app or reports a
+    /// dismissed card as still present.
+    private static func labelNames(_ label: String, _ name: String) -> Bool {
+        if label == name { return true }
+        guard label.count >= 4, name.hasPrefix(label) else { return false }
+        return name[name.index(name.startIndex, offsetBy: label.count)] != " "
     }
 
     private static func normalize(_ text: String) -> String {

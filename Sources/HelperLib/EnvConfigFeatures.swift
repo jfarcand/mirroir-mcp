@@ -70,6 +70,10 @@ extension EnvConfig {
         readInt("appForegroundReadyRetries", default: TimingConstants.appForegroundReadyRetries)
     }
 
+    public static var appLaunchRenderTimeoutMs: Int {
+        readInt("appLaunchRenderTimeoutMs", default: TimingConstants.appLaunchRenderTimeoutMs)
+    }
+
     public static var appSwitcherMaxSwipes: Int {
         readInt("appSwitcherMaxSwipes", default: TimingConstants.appSwitcherMaxSwipes)
     }

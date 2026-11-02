@@ -211,6 +211,12 @@ public enum TimingConstants {
     /// giving up (cold launches render within 2-4 seconds).
     public static let appForegroundReadyRetries: Int = 4
 
+    /// Longest wait, after a launch's Spotlight closes, for the app's first
+    /// screen to show `appForegroundReadyMinElements` texts (milliseconds). A
+    /// game's cold boot shows black and logo frames for ~20 s; a first screen
+    /// taken from one has nothing a later step can act on.
+    public static let appLaunchRenderTimeoutMs: Int = 30_000
+
     /// Settle delay after opening the App Switcher before capturing OCR for
     /// card location (microseconds). On iOS 26 the just-foregrounded app's
     /// card enters centered and then slides to its resting slot right of

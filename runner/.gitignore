@@ -15,3 +15,9 @@
 # The live iOS capture `samples/ios-fixture/scenarios/settings-list.yaml`
 # writes on every run; `expected/settings-list.txt` is the committed half.
 /samples/ios-fixture/baselines/
+# The screen baselines the game samples' first run records next to each
+# scenario. They belong to the host that recorded them: a device run and a
+# FakeMirroring run see different screens, so one host's baseline is the
+# other's drift. Each run starts from none and records its own.
+/samples/game-shell/scenarios/*.ios.compiled.json
+/samples/game-result/scenarios/*.ios.compiled.json

@@ -158,8 +158,12 @@ enum ExplorationLoopRunner {
     static func emitNote(
         appName: String, flows: [MirroirAppTreeEmitter.Flow], outputDir: String?
     ) throws -> String {
+        // The app's APP.md names the texts a generated wait takes first and
+        // the ones it never takes.
+        let landmarks = ScenarioStepFormatter.LandmarkPolicy(
+            description: AppDescriptionLoader.load(appName: appName).description)
         let result = try MirroirAppTreeEmitter.emit(
-            appName: appName, flows: flows, outputDir: outputDir)
+            appName: appName, flows: flows, outputDir: outputDir, landmarks: landmarks)
         let scenarios = result.scenarioPaths.map { "    \($0.path)" }.joined(separator: "\n")
         let dropped = result.dropped.isEmpty ? "" :
             "  dropped (a step no replay can perform; no scenario written):\n" +

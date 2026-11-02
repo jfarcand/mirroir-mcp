@@ -189,10 +189,10 @@ final class SkillMdGeneratorTests: XCTestCase {
             "Launch should be step 1")
         XCTAssertTrue(result.contains("2. Wait for \"Settings\" to appear"),
             "First wait should be step 2")
-        XCTAssertTrue(result.contains("3. Wait for \"General\" to appear"),
-            "Second wait should be step 3")
-        XCTAssertTrue(result.contains("4. Tap \"General\""),
-            "Tap should be step 4")
+        XCTAssertTrue(result.contains("3. Tap \"General\""),
+            "The tap that reaches the General screen should be step 3")
+        XCTAssertTrue(result.contains("4. Wait for \"General\" to appear"),
+            "The wait for the screen the tap reached should follow it")
     }
 
     // MARK: - deriveName

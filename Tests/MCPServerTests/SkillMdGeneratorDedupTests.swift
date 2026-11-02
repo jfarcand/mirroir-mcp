@@ -220,13 +220,13 @@ extension SkillMdGeneratorTests {
         // Expected steps:
         // 1. Launch **Settings**
         // 2. Wait for "Settings" to appear
-        // 3. Wait for "General" to appear
-        // 4. Tap "General"
+        // 3. Tap "General"
+        // 4. Wait for "General" to appear
         // 5. Press **[**    ← "Settings" wait is skipped (Set-based dedup)
         XCTAssertTrue(result.contains("1. Launch **Settings**"))
         XCTAssertTrue(result.contains("2. Wait for \"Settings\" to appear"))
-        XCTAssertTrue(result.contains("3. Wait for \"General\" to appear"))
-        XCTAssertTrue(result.contains("4. Tap \"General\""))
+        XCTAssertTrue(result.contains("3. Tap \"General\""))
+        XCTAssertTrue(result.contains("4. Wait for \"General\" to appear"))
         XCTAssertTrue(result.contains("5. Press **[**"),
             "Back navigation should be step 5, no gap from skipped duplicate wait")
         XCTAssertFalse(result.contains("6."),
@@ -278,6 +278,8 @@ extension SkillMdGeneratorTests {
                 index: 0,
                 elements: [
                     TapPoint(text: "Settings", tapX: 205, tapY: 120, confidence: 0.98),
+                    // The row the tap acted on, whose casing the label resolves to.
+                    TapPoint(text: "General", tapX: 205, tapY: 300, confidence: 0.9),
                 ],
                 hints: [],
                 actionType: nil,

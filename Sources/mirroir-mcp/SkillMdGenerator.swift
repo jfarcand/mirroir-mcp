@@ -18,9 +18,14 @@ enum SkillMdGenerator {
     ///   - goal: Optional description of the flow (e.g. "check software version").
     ///   - screens: Captured screens in navigation order.
     ///   - recipeMatch: Optional matched screen recipe for archetype-aware generation.
-    ///   - appDescription: Optional APP.md description; its tab names become stable
-    ///     wait-step anchors and its skip list excludes landmark candidates.
+    ///   - appDescription: Optional APP.md description; its tab names and
+    ///     landmarks become stable wait-step anchors and its skip list excludes
+    ///     landmark candidates.
     /// - Returns: A complete SKILL.md string with YAML front matter and markdown body.
+    /// Actions whose element is on the screen they acted on, the one before the
+    /// screen they reached.
+    private static let sourceScreenActions: Set<String> = ["tap", "long_press"]
+
     static func generate(
         appName: String, goal: String, screens: [ExploredScreen],
         recipeMatch: RecipeMatch? = nil,
@@ -120,12 +125,33 @@ enum SkillMdGenerator {
         let requireStable = recipeMatch?.recipe.navigationModel.scrollBehavior == "infinite"
 
         // Steps for each captured screen
-        for screen in screens {
+        for (index, screen) in screens.enumerated() {
+            // The action that reached this screen comes first, then the wait for
+            // the screen it reached: a wait placed before the action would look
+            // for the next screen's landmark on the screen the action starts from.
+            // Prefer displayLabel (component-derived, OCR-artifact-free) over raw arrivedVia.
+            // Fall back to resolving arrivedVia against screen elements for proper casing:
+            // a tap or long press acted on the screen before, so its label is resolved
+            // there — on the screen it reached, "BRAWLERS" would match a longer
+            // "BRAWLERS À DÉBLOQUER" by containment.
+            let actedOn = index > 0 && Self.sourceScreenActions.contains(screen.actionType ?? "")
+                ? screens[index - 1].elements : screen.elements
+            let stepLabel: String? = screen.displayLabel ?? screen.arrivedVia.map { via in
+                ActionStepFormatter.resolveLabel(arrivedVia: via, elements: actedOn)
+            }
+
+            // Generate action step based on actionType
+            if let step = ActionStepFormatter.format(actionType: screen.actionType, arrivedVia: stepLabel) {
+                lines.append("\(stepNum). \(step)")
+                stepNum += 1
+            }
+
             // Pick a landmark element for wait_for, skipping already-emitted landmarks.
-            // APP.md tab names act as stable anchors and its skip list as exclusions.
+            // APP.md tab names and landmarks act as stable anchors and its skip
+            // list as exclusions.
             if let landmark = LandmarkPicker.pickLandmark(
                 from: screen.elements,
-                stableAnchors: appDescription?.tabs ?? [],
+                stableAnchors: appDescription?.stableAnchors ?? [],
                 excludedPatterns: appDescription?.skipElements ?? [],
                 requireStable: requireStable
             ) {
@@ -134,18 +160,6 @@ enum SkillMdGenerator {
                     lines.append("\(stepNum). Wait for \"\(landmark)\" to appear")
                     stepNum += 1
                 }
-            }
-
-            // Prefer displayLabel (component-derived, OCR-artifact-free) over raw arrivedVia.
-            // Fall back to resolving arrivedVia against screen elements for proper casing.
-            let stepLabel: String? = screen.displayLabel ?? screen.arrivedVia.map { via in
-                ActionStepFormatter.resolveLabel(arrivedVia: via, elements: screen.elements)
-            }
-
-            // Generate action step based on actionType
-            if let step = ActionStepFormatter.format(actionType: screen.actionType, arrivedVia: stepLabel) {
-                lines.append("\(stepNum). \(step)")
-                stepNum += 1
             }
         }
 

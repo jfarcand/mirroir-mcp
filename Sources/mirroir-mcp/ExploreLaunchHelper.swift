@@ -31,13 +31,15 @@ extension MirroirMCP {
     private static let homeScreenSyncRetries = 4
 
     /// Spotlight-launch `appName` and wait for the overlay to dismiss, returning
-    /// the first clean screen as local OCR reads it.
+    /// the app's first rendered screen as local OCR reads it (see `awaitRender`;
+    /// `renderTimeoutMs` bounds that wait).
     ///
     /// Every poll here is bookkeeping (is Spotlight gone, is the app up yet), so
     /// it runs on `ctx.ocrDescriber` and never spends a vision call.
     static func launchAndWait(
         appName: String,
-        ctx: TargetContext
+        ctx: TargetContext,
+        renderTimeoutMs: Int = EnvConfig.appLaunchRenderTimeoutMs
     ) -> Result<ScreenDescriber.DescribeResult, LaunchFailure> {
         if let launchError = ctx.input.launchApp(name: appName) {
             return .failure(.launchFailed("Failed to launch '\(appName)': \(launchError)"))
@@ -63,7 +65,33 @@ extension MirroirMCP {
             result = next
             attempts += 1
         }
-        return .success(result)
+        return .success(awaitRender(result, appName: appName, ctx: ctx, timeoutMs: renderTimeoutMs))
+    }
+
+    /// `first`, or the first later read showing `appForegroundReadyMinElements`
+    /// texts, polling for up to `timeoutMs`. A cold launch shows black and logo
+    /// frames before the app's UI — a game's for ~20 s — and a first screen
+    /// taken from one holds no label a later step can act on. An app that
+    /// never shows that many texts is taken as it is once the wait runs out.
+    private static func awaitRender(
+        _ first: ScreenDescriber.DescribeResult,
+        appName: String,
+        ctx: TargetContext,
+        timeoutMs: Int
+    ) -> ScreenDescriber.DescribeResult {
+        let minElements = EnvConfig.appForegroundReadyMinElements
+        let pollUs = EnvConfig.toolSettlingDelayUs
+        let polls = max(0, timeoutMs * 1000 / Int(max(1, pollUs)))
+        var current = first
+        var poll = 0
+        while current.elements.count < minElements, poll < polls {
+            DebugLog.log("explore", "'\(appName)' shows \(current.elements.count) text(s) — "
+                + "waiting for its first screen to render (\(poll + 1)/\(polls))")
+            usleep(pollUs)
+            if let next = ctx.ocrDescriber.describe() { current = next }
+            poll += 1
+        }
+        return current
     }
 
     /// `launchAndWait`, then the launched screen as the client's describer

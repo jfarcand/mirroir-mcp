@@ -207,6 +207,42 @@ jobs:
           grep -qE "capture: sck=[1-9][0-9]* fallback=0" <<<"$plain" \
             || { echo "missing: capture: sck=N fallback=0"; exit 1; }
 
+      # The game shell on the same rails: Brawl Stars' menu, shop and
+      # brawlers flows (game-shell, emitted from a device recording) and its
+      # end-of-match result screen (game-result, on two fixtures that open on
+      # VICTOIRE and DÉFAITE) run as ordinary iOS scenarios against the
+      # synthetic, text-only Brawl Stars packs in mirroir-skills' default
+      # branch. Every step has to pass: a skipped or unevaluated one fails.
+      - name: mirroir-run → game shell and result screen (FakeMirroring)
+        timeout-minutes: 15
+        working-directory: runner
+        env:
+          MIRROIR_BUNDLE_ID: com.jfarcand.FakeMirroring
+          MIRROIR_PROCESS_NAME: FakeMirroring
+          MIRROIR_MCP_BIN: ${{ github.workspace }}/.build/release/mirroir-mcp
+          MIRROIR_SKILLS: ${{ github.workspace }}/../mirroir-skills
+          RUST_LOG: info,mirroir_run::target::ios=debug
+        run: |
+          set -euo pipefail
+          for sample in game-shell game-result; do
+            echo "=== $sample ==="
+            ./target/debug/mirroir-run --sample "samples/$sample" 2>&1 | tee "$sample.log"
+            plain=$(sed 's/\x1b\[[0-9;]*m//g' "$sample.log")
+            grep -qF "dispatching the scenario's ios block to mirroir-mcp" <<<"$plain" \
+              || { echo "$sample: no ios block was handed to mirroir-mcp"; exit 1; }
+            # Negative checks are `if` blocks: a bare `grep … && exit` that
+            # finds nothing returns 1, which would fail the step as the
+            # loop's last command.
+            if grep -E "Steps — PASSED: [0-9]+, FAILED: [1-9]|NOT EVALUATED: [1-9]|SKIPPED: [1-9]" <<<"$plain"; then
+              echo "$sample: a step did not pass"; exit 1
+            fi
+            grep -qE "capture: sck=[1-9][0-9]* fallback=0" <<<"$plain" \
+              || { echo "$sample: missing capture: sck=N fallback=0"; exit 1; }
+            if grep -E "capture: sck=[0-9]+ fallback=[1-9]" <<<"$plain"; then
+              echo "$sample: a block fell back to the screencapture CLI"; exit 1
+            fi
+          done
+
       # The recorder's emit, off-device: a checked-in recording renders a
       # .mirroir/ scenario that mirroir-run's own validator accepts, and a
       # recording whose tap carries no label is refused with nothing written.

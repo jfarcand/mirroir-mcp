@@ -73,6 +73,25 @@ enum ScenarioStepFormatter {
         "open_url", "screenshot", "home",
     ]
 
+    /// What the app's APP.md says about landmarks: texts a wait takes first
+    /// (`AppDescription.stableAnchors`) and texts it never takes (the Skip
+    /// list). The default — no APP.md — leaves prominence alone to decide.
+    struct LandmarkPolicy: Sendable {
+        let anchors: [String]
+        let exclusions: [String]
+
+        init(anchors: [String] = [], exclusions: [String] = []) {
+            self.anchors = anchors
+            self.exclusions = exclusions
+        }
+
+        /// The policy `description` declares; the default when there is none.
+        init(description: AppDescription?) {
+            self.init(anchors: description?.stableAnchors ?? [],
+                      exclusions: description?.skipElements ?? [])
+        }
+    }
+
     /// Build the full `<flow>.ios.yaml` scenario document for `screens`.
     /// The first screen is the launch, preceded by a `reset_app:` of the same
     /// app: launching a running app resumes wherever it was left, and the walk
@@ -91,7 +110,10 @@ enum ScenarioStepFormatter {
     ///
     /// - Throws: `FormatError` when a screen was reached by an action the
     ///   scenario cannot carry faithfully.
-    static func scenarioYAML(name: String, appName: String, screens: [ExploredScreen]) throws -> String {
+    static func scenarioYAML(
+        name: String, appName: String, screens: [ExploredScreen],
+        landmarks: LandmarkPolicy = LandmarkPolicy()
+    ) throws -> String {
         var steps: [String] = [
             "  - target: { kind: ios, app: \(yamlScalar(appName)) }",
             "  - reset_app: \(yamlScalar(appName))",
@@ -102,11 +124,13 @@ enum ScenarioStepFormatter {
             steps.append(contentsOf: try stepLines(index: index, screen: screen, source: source))
             let action = screen.actionType ?? "tap"
             if arrivalActions.contains(action),
-               let arrived = landmark(in: screen.arrivalElements, absentFrom: source.elements) {
+               let arrived = landmark(
+                   in: screen.arrivalElements, absentFrom: source.elements, policy: landmarks) {
                 steps.append("  - wait_for: \(yamlScalar(arrived))")
             }
         }
-        if let destination = landmark(in: screens.last?.arrivalElements ?? [], absentFrom: []) {
+        if let destination = landmark(
+            in: screens.last?.arrivalElements ?? [], absentFrom: [], policy: landmarks) {
             let assertion = "  - assert_visible: \(yamlScalar(destination))"
             if steps.last != "  - wait_for: \(yamlScalar(destination))" {
                 steps.append(assertion)
@@ -214,21 +238,32 @@ enum ScenarioStepFormatter {
         })?.text
     }
 
-    /// Pick a landmark: the longest non-excluded segment of `elements` that
+    /// Pick a landmark: a segment naming one of `policy.anchors` when the
+    /// screen shows one, else the longest non-excluded segment of `elements` that
     /// `absentFrom` does not also show (prominence-by-length, mirroring
-    /// `LandmarkPicker`). The first such segment in screen order wins a tie. Only
+    /// `LandmarkPicker`). The first such segment in screen order wins a tie. A
+    /// segment containing one of `policy.exclusions` never qualifies. Only
     /// structural text counts: the status bar, times, bare numbers, dates and long
     /// paragraphs change between runs, so a wait on them proves nothing. A
     /// candidate is one item of an OCR line (`ActionStepFormatter.segments`),
     /// never the merged line: the replay's read may split "• Sommeil | Réveil"
     /// into "Sommeil" and "Réveil", and only a single item matches every read.
-    private static func landmark(in elements: [TapPoint], absentFrom: [TapPoint]) -> String? {
+    private static func landmark(
+        in elements: [TapPoint], absentFrom: [TapPoint], policy: LandmarkPolicy
+    ) -> String? {
         let shared = Set(absentFrom.flatMap { ActionStepFormatter.segments(of: $0.text) })
+        let anchors = Set(policy.anchors.map { $0.lowercased() })
+        let exclusions = policy.exclusions.map { $0.lowercased() }
         var best: String?
         for element in elements where StructuralFingerprint.passesStructuralFilter(element) {
             for label in ActionStepFormatter.segments(of: element.text) {
+                let lowered = label.lowercased()
                 guard label.count >= 3, !ActionStepFormatter.isExcludedLabel(label),
-                      !shared.contains(label) else { continue }
+                      !shared.contains(label),
+                      !exclusions.contains(where: { lowered.contains($0) }) else { continue }
+                if anchors.contains(lowered) {
+                    return label
+                }
                 if label.count > (best?.count ?? 0) {
                     best = label
                 }

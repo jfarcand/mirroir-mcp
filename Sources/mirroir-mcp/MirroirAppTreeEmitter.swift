@@ -146,7 +146,9 @@ enum MirroirAppTreeEmitter {
     /// refused before anything is written. So is an emit that finds
     /// `text-cleanup.md` at none of `textCleanupCandidates`: landmarks are
     /// taken from cleaned OCR segments, and without the rules they would be
-    /// raw lines a replay's read does not reproduce.
+    /// raw lines a replay's read does not reproduce. Each wait takes a
+    /// `landmarks` anchor the arrival screen shows before any other text, and
+    /// never a text the policy excludes.
     ///
     /// `SAMPLE.md` and `mirroir.yaml` are created with an ownership marker
     /// and kept current by later emits (`MirroirManifestUpsert`), which insert
@@ -168,7 +170,8 @@ enum MirroirAppTreeEmitter {
         outputDir: String? = nil,
         root: URL? = nil,
         driftDefaultsCandidates: [String] = DriftDefaultsSeeder.candidatePaths(),
-        textCleanupCandidates: [String] = ComponentLoader.textCleanupCandidates()
+        textCleanupCandidates: [String] = ComponentLoader.textCleanupCandidates(),
+        landmarks: ScenarioStepFormatter.LandmarkPolicy = ScenarioStepFormatter.LandmarkPolicy()
     ) throws -> EmitResult {
         guard !flows.isEmpty else { throw EmitError.noFlows(appName: appName) }
         guard textCleanupCandidates.contains(where: { FileManager.default.fileExists(atPath: $0) }) else {
@@ -180,7 +183,8 @@ enum MirroirAppTreeEmitter {
         guard let mirroirRoot = root ?? MirroirRootLocator.resolve(explicitDir: outputDir) else {
             throw EmitError.noConsumerRoot
         }
-        let (scenarios, dropped) = try renderScenarios(appName: appName, flows: flows)
+        let (scenarios, dropped) = try renderScenarios(
+            appName: appName, flows: flows, landmarks: landmarks)
         guard !scenarios.isEmpty else {
             throw EmitError.noReplayableFlow(appName: appName, dropped: dropped)
         }
@@ -256,14 +260,14 @@ enum MirroirAppTreeEmitter {
     /// the formatter refuses is dropped, with its reason, before slugs are
     /// assigned, so it takes none.
     private static func renderScenarios(
-        appName: String, flows: [Flow]
+        appName: String, flows: [Flow], landmarks: ScenarioStepFormatter.LandmarkPolicy
     ) throws -> (scenarios: [RenderedScenario], dropped: [DroppedFlow]) {
         var dropped: [DroppedFlow] = []
         let keyed = flows.compactMap { flow -> (slug: String, flow: Flow, body: String)? in
             let slug = slugify(flow.name.isEmpty ? "capture" : flow.name)
             do {
                 let body = try ScenarioStepFormatter.scenarioYAML(
-                    name: slug, appName: appName, screens: flow.screens)
+                    name: slug, appName: appName, screens: flow.screens, landmarks: landmarks)
                 return (slug, flow, body)
             } catch {
                 dropped.append(DroppedFlow(
@@ -285,7 +289,7 @@ enum MirroirAppTreeEmitter {
             }
             used.insert(slug)
             let yaml = slug == entry.slug ? entry.body : try ScenarioStepFormatter.scenarioYAML(
-                name: slug, appName: appName, screens: entry.flow.screens)
+                name: slug, appName: appName, screens: entry.flow.screens, landmarks: landmarks)
             return RenderedScenario(file: "scenarios/\(slug).ios.yaml", yaml: yaml)
         }
         let byName = dropped.sorted { ($0.flow, $0.reason) < ($1.flow, $1.reason) }

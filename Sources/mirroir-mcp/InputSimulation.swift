@@ -51,8 +51,10 @@ final class InputSimulation: Sendable {
     /// The key and button poster behind hold_keys.
     let heldInputPoster: any HeldInputPosting
     /// Local OCR describer that confirms each `type_text` clipboard paste on
-    /// screen. Nil means no paste can be confirmed, so any text that needs the
-    /// clipboard fails rather than being reported as typed.
+    /// screen and reads Spotlight during `launch_app`, wrapped so a read the
+    /// window resized across comes back nil. Nil means no paste can be
+    /// confirmed, so any text that needs the clipboard fails rather than being
+    /// reported as typed.
     let pasteVerifier: (any ScreenDescribing)?
     /// The key event poster behind type_text and press_key.
     let keyPoster: any KeyEventPosting
@@ -84,7 +86,12 @@ final class InputSimulation: Sendable {
          keyPoster: any KeyEventPosting = CGEventKeyPoster(),
          pasteboard: any PasteboardAccessing = GeneralPasteboard()) {
         self.bridge = bridge
-        self.pasteVerifier = pasteVerifier
+        // Every read behind a paste check or a Spotlight launch is one the
+        // window kept its size across: launching from a landscape app rotates
+        // the mirror while Spotlight opens.
+        self.pasteVerifier = pasteVerifier.map {
+            WindowStableDescriber(wrapping: $0, bridge: bridge)
+        }
         self.keyPoster = keyPoster
         self.pasteboard = pasteboard
         self.cursorMode = cursorMode

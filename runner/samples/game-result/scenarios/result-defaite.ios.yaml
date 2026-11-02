@@ -1,0 +1,14 @@
+version: 1
+name: "result-defaite"
+description: |
+  The Brawl Stars result screen after a 3v3 loss (DÉFAITE), on the
+  FakeMirroring fixture that opens on it. Waits for the universal QUITTER button, reads the outcome,
+  and returns to the main menu — the steps of mirroir-skills' result-assert.
+steps:
+  - target: { kind: ios, app: "Brawl Stars Defaite" }
+  - reset_app: "Brawl Stars Defaite"
+  - launch: "Brawl Stars Defaite"
+  - wait_for: "QUITTER"
+  - assert_visible: "DÉFAITE"
+  - tap: "QUITTER"
+  - wait_for: "JOUER"

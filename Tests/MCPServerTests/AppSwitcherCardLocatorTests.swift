@@ -216,6 +216,30 @@ final class AppSwitcherCardLocatorTests: XCTestCase {
             appName: "Instagram", switcherElements: elements, windowHeight: 898))
     }
 
+    func testAnotherAppWhoseNameIsAWholeWordPrefixIsNotThisAppsLabel() {
+        // "Brawl Stars" is its own app, not a clipped "Brawl Stars Victoire".
+        let elements = [tap("Brawl Stars", x: 169, y: 144)]
+        XCTAssertFalse(AppSwitcherCardLocator.labelBandContains(
+            appName: "Brawl Stars Victoire", switcherElements: elements, windowHeight: 898))
+        XCTAssertNil(AppSwitcherCardLocator.locateCardXByLabel(
+            appName: "Brawl Stars Victoire", switcherElements: elements,
+            windowSize: CGSize(width: 410, height: 898)))
+    }
+
+    func testAClipCutMidWordStillNamesTheApp() {
+        // iOS truncates "Brawl Stars Victoire" to "Brawl Stars V…" on an edge card.
+        let elements = [tap("Brawl Stars V", x: 380, y: 142)]
+        XCTAssertTrue(AppSwitcherCardLocator.labelBandContains(
+            appName: "Brawl Stars Victoire", switcherElements: elements, windowHeight: 898))
+    }
+
+    func testTheLabelPicksThisAppsCardBesideAPrefixNamedApp() {
+        let elements = [tap("Brawl Stars", x: 169, y: 144), tap("Brawl Stars Victoire", x: 336, y: 143)]
+        XCTAssertEqual(AppSwitcherCardLocator.locateCardXByLabel(
+            appName: "Brawl Stars Victoire", switcherElements: elements,
+            windowSize: CGSize(width: 410, height: 898)), 336)
+    }
+
     func testLabelBandIgnoresContentZoneText() {
         // The app name appearing INSIDE a card's content (Instagram's own logo
         // wordmark at feed top renders around y=220 in the card preview) is not

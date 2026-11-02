@@ -41,6 +41,11 @@ enum AppSwitcherDismissal {
         menuBridge: any MenuActionCapable,
         describer: any ScreenDescribing
     ) -> String? {
+        // Every read below is one the window kept its size across: launching
+        // from Spotlight (always portrait) into a landscape app rotates the
+        // mirror, and the App Switcher opened over that app is landscape too.
+        let describer = WindowStableDescriber(wrapping: describer, bridge: bridge)
+
         // 1. Launch — handles localized app names via Spotlight.
         if let error = input.launchApp(name: appName) {
             return "Failed to launch '\(appName)': \(error)"
@@ -55,8 +60,12 @@ enum AppSwitcherDismissal {
         // first attempt.
         var foregroundOcr: ScreenDescriber.DescribeResult?
         for attempt in 1 ... EnvConfig.appForegroundReadyRetries {
+            // Spotlight lingers for a moment after Return: its results are
+            // text-rich but are not the app, and a fingerprint of them matches
+            // no card in the switcher.
             if let capture = describer.describe(),
-               capture.elements.count >= EnvConfig.appForegroundReadyMinElements {
+               capture.elements.count >= EnvConfig.appForegroundReadyMinElements,
+               !SpotlightDetector.isSpotlightVisible(elements: capture.elements) {
                 foregroundOcr = capture
                 break
             }
@@ -82,18 +91,24 @@ enum AppSwitcherDismissal {
         // intersection, once two reads agree on where it rests. Fail closed when
         // it cannot be located (no match OR an ambiguous one) or never holds
         // still — never drag a guess, or we quit the wrong app.
-        let windowSize = bridge.getWindowInfo()?.size ?? CGSize(width: 410, height: 898)
-        let cardX: Double
+        // The window size is read with each switcher read, and the drag uses
+        // the size of the reads that located the card: a switcher opened while
+        // the mirror rotates changes size between reads.
+        let card: RestingCard
         switch locateRestingCard(
             appName: appName, appElements: appOcr.elements,
-            describer: describer, windowSize: windowSize) {
-        case .success(let x):
-            cardX = x
+            describer: describer,
+            windowSize: { bridge.getWindowInfo()?.size ?? CGSize(width: 410, height: 898) }) {
+        case .success(let located):
+            card = located
         case .failure(let failure):
             _ = menuBridge.triggerMenuAction(menu: "View", item: "Home Screen")
             return failure.message(appName: appName)
         }
-        DebugLog.log("reset_app", "located '\(appName)' card at x=\(Int(cardX))")
+        let cardX = card.x
+        let windowSize = card.windowSize
+        DebugLog.log("reset_app", "located '\(appName)' card at x=\(Int(cardX)) "
+            + "in a \(Int(windowSize.width))x\(Int(windowSize.height)) switcher")
 
         // 6. Drag the card upward. The end point must stay inside the mirrored
         // content: window-relative y=0 is the macOS title-bar edge, and a drag
@@ -111,20 +126,15 @@ enum AppSwitcherDismissal {
         }
         // 6b. Verify the card actually dismissed. The drag posts successfully
         // (CGEvent=OK) even when the flick fails to fling the card off-screen,
-        // so re-OCR the switcher after the re-layout settles. "Still present"
-        // requires BOTH signals: the content-fingerprint re-locates (stray
-        // token overlap alone kept reporting long-dismissed cards as present)
-        // AND the switcher's own app-name label for this app is still rendered
-        // in the label band — every genuinely stuck card shows its label;
-        // every observed false positive lacked it.
+        // so re-OCR the switcher after the re-layout settles. The switcher's
+        // own app-name label for this app, still rendered in the label band,
+        // is what says the card is still there: every genuinely stuck card
+        // shows its label. The content fingerprint is no part of it — stray
+        // token overlap made it report long-dismissed cards as present, and a
+        // fingerprint that matches nothing (a landscape app's card against a
+        // portrait capture) would report a stuck card as gone.
         usleep(EnvConfig.appSwitcherOpenSettleUs)
         if let postDrag = describer.describe(),
-           AppSwitcherCardLocator.locateCard(
-               appName: appName,
-               appElements: appOcr.elements,
-               switcherElements: postDrag.elements,
-               windowSize: windowSize
-           ) != nil,
            AppSwitcherCardLocator.labelBandContains(
                appName: appName,
                switcherElements: postDrag.elements,
@@ -185,8 +195,15 @@ enum AppSwitcherDismissal {
     /// counts as the card at rest.
     static let restTolerancePt = 8.0
 
-    /// The X of `appName`'s card once two consecutive reads, `pauseUs` apart,
-    /// locate it at the same place. The card slides from center to its resting
+    /// Where `appName`'s card rests: its X, and the size of the window the
+    /// reads that located it were taken in.
+    struct RestingCard: Equatable {
+        let x: Double
+        let windowSize: CGSize
+    }
+
+    /// `appName`'s card once two consecutive reads, `pauseUs` apart, locate it
+    /// at the same place in a window of the same size. The card slides from center to its resting
     /// slot after the switcher opens, and the mirrored frame lags the device:
     /// one read can show the card where it was, and a drag aimed there lands on
     /// the neighboring card and quits the wrong app.
@@ -194,26 +211,37 @@ enum AppSwitcherDismissal {
         appName: String,
         appElements: [TapPoint],
         describer: any ScreenDescribing,
-        windowSize: CGSize,
+        windowSize: () -> CGSize,
         pauseUs: UInt32 = EnvConfig.stepSettlingDelayMs * 1000,
         sleep: (UInt32) -> Void = { usleep($0) }
-    ) -> Result<Double, CardLocateFailure> {
-        var previous: Double?
+    ) -> Result<RestingCard, CardLocateFailure> {
+        var previous: RestingCard?
         var failure = CardLocateFailure.notFound
         for read in 0 ..< maxRestReads {
             if read > 0 { sleep(pauseUs) }
-            guard let screen = describer.describe() else { return .failure(.unreadable) }
+            // No read: the window resized across it (the switcher rotating),
+            // so read again rather than give up.
+            guard let screen = describer.describe() else {
+                previous = nil
+                failure = .unreadable
+                continue
+            }
             guard !screen.elements.isEmpty else { return .failure(.empty) }
+            let size = windowSize()
             guard let x = AppSwitcherCardLocator.locateCard(
                 appName: appName, appElements: appElements,
-                switcherElements: screen.elements, windowSize: windowSize) else {
+                switcherElements: screen.elements, windowSize: size) else {
                 previous = nil
                 failure = .notFound
                 continue
             }
-            DebugLog.log("reset_app", "read \(read + 1): '\(appName)' card at x=\(Int(x))")
-            if let previous, abs(x - previous) <= restTolerancePt { return .success(x) }
-            previous = x
+            DebugLog.log("reset_app", "read \(read + 1): '\(appName)' card at x=\(Int(x)) "
+                + "(\(Int(size.width))x\(Int(size.height)))")
+            let card = RestingCard(x: x, windowSize: size)
+            if let previous, previous.windowSize == size, abs(x - previous.x) <= restTolerancePt {
+                return .success(card)
+            }
+            previous = card
             failure = .neverSettled
         }
         return .failure(failure)

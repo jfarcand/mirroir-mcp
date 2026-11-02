@@ -432,7 +432,8 @@ Dashboard app with 4 tabs: Résumé, Partage, Parcourir, Profil.
 | `## Structure` | AI reads | High-level app overview |
 | `## [Name] Tab` | AI reads | Per-tab descriptions |
 | `## Obstacles` | machine | Auto-dismiss rules: `trigger → action` |
-| `## Skip` | machine | Elements the explorer must never tap |
+| `## Skip` | machine | Elements the explorer must never tap, and no generated wait names |
+| `## Landmarks` | machine | Stable texts a generated wait takes before any other |
 | `## Credentials` | machine | Login data with `${VAR}` substitution |
 | `## Tips` | AI reads | Free-form exploration advice |
 

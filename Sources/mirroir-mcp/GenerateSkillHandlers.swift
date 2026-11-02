@@ -15,7 +15,8 @@ extension MirroirMCP {
     static func handleStart(
         args: [String: JSONValue],
         session: ExplorationSession,
-        registry: TargetRegistry
+        registry: TargetRegistry,
+        appMdSearchPaths: [String] = AppDescriptionLoader.searchPaths()
     ) -> MCPToolResult {
         guard let appName = args["app_name"]?.asString(), !appName.isEmpty else {
             return .error("Missing required parameter: app_name (for start action)")
@@ -46,6 +47,13 @@ extension MirroirMCP {
         let goal = args["goal"]?.asString() ?? ""
         let goals = args["goals"]?.asStringArray() ?? []
         session.start(appName: appName, goal: goal, goals: goals)
+        // The app's APP.md shapes the SKILL.md `finish` writes, as it does an
+        // explore's: its landmarks and tabs anchor the waits, its Skip list
+        // never names one, and its tips and context are carried over.
+        if let desc = AppDescriptionLoader.load(
+            appName: appName, searchPaths: appMdSearchPaths).description {
+            session.setAppDescription(desc)
+        }
 
         // Detect and store strategy
         let explicitStrategy = args["strategy"]?.asString()

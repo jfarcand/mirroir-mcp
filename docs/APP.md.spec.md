@@ -83,6 +83,10 @@ Per-tab description. Body is injected into the generated skill's context.
 - Delete Account
 - Sign Out
 
+## Landmarks            # optional — text a generated wait takes first
+
+- RESSOURCES
+
 ## Credentials          # optional — parsed only, no consumer today
 
 - email: ${TEST_EMAIL:-test@example.com}
@@ -172,7 +176,16 @@ When `obstacle_mode: auto` (default), the explorer checks these rules after each
 
 ### `## Skip` (optional)
 
-Element text patterns the explorer must never tap. Merged with `permissions.json.skipElements` into a single global skip list for the session.
+Element text patterns the explorer must never tap. Merged with `permissions.json.skipElements` into a single global skip list for the session. A generated wait never names a text containing one of them either: `SkillMdGenerator` and the scenario emitter (`ScenarioStepFormatter.LandmarkPolicy`) both drop it from the landmark candidates.
+
+### `## Landmarks` (optional)
+
+Texts the app shows on the same screen on every run — a permanent shop category, a search button — listed one per bullet. A generated wait takes one of them before any other text: the emitter's `wait_for:` after a tap names a declared landmark the arrival screen shows (and the screen before did not), and `SkillMdGenerator` treats them as stable anchors alongside the tab names (`AppDescription.stableAnchors`). Without them the wait is the most prominent new text, which on a seasonal or paid screen ("MEILLEURE OFFRE DE BRAWL STARS !") changes between runs and fails a later replay.
+
+```markdown
+- RESSOURCES
+- BRAWLERS À DÉBLOQUER
+```
 
 ```markdown
 - Delete Account

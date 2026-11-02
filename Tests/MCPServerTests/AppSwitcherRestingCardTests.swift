@@ -2,7 +2,7 @@
 // Licensed under the Apache License, Version 2.0
 //
 // ABOUTME: Tests that reset_app drags an App Switcher card only once two reads agree on where it rests.
-// ABOUTME: A card read mid-slide, or from a lagging frame, must never be the drag target.
+// ABOUTME: A card read mid-slide, from a lagging frame, or in another window size must never be the drag target.
 
 import CoreGraphics
 import HelperLib
@@ -23,14 +23,14 @@ final class AppSwitcherRestingCardTests: XCTestCase {
             Self.switcher(horlogeLabelX: 321),
         ])
         let result = locate(with: switcher)
-        XCTAssertEqual(result, .success(321))
+        XCTAssertEqual(result, .success(rest(321)))
         XCTAssertEqual(switcher.readCount, 3)
     }
 
     /// A card already at rest is dragged after the confirming second read.
     func testCardAtRestNeedsTwoAgreeingReads() {
         let switcher = SwitcherFrames(frames: [Self.switcher(horlogeLabelX: 321)])
-        XCTAssertEqual(locate(with: switcher), .success(321))
+        XCTAssertEqual(locate(with: switcher), .success(rest(321)))
         XCTAssertEqual(switcher.readCount, 2)
     }
 
@@ -61,12 +61,58 @@ final class AppSwitcherRestingCardTests: XCTestCase {
         XCTAssertEqual(switcher.readCount, 1)
     }
 
+    // MARK: - Rotation
+
+    /// A switcher opened while the mirror rotates out of portrait: the first
+    /// read is portrait, the window then turns landscape. Two reads agree only
+    /// within one window size, and the card carries the size it was read in.
+    func testReadsAgreeOnlyWithinOneWindowSize() {
+        let landscape = CGSize(width: 942, height: 430)
+        // The landscape switcher as read on the XR: labels near the top
+        // (y≈76), the just-launched card at the right edge.
+        let landscapeFrame = [
+            TapPoint(text: "Brave", tapX: 322, tapY: 79, confidence: 1),
+            TapPoint(text: "Horloge", tapX: 823, tapY: 76, confidence: 1),
+        ]
+        let switcher = SwitcherFrames(frames: [
+            Self.switcher(horlogeLabelX: 321), landscapeFrame, landscapeFrame,
+        ])
+        var sizes = [window, landscape, landscape]
+        let result = AppSwitcherDismissal.locateRestingCard(
+            appName: "Horloge", appElements: [], describer: switcher,
+            windowSize: { sizes.count > 1 ? sizes.removeFirst() : sizes[0] },
+            pauseUs: 0, sleep: { _ in })
+        XCTAssertEqual(result, .success(.init(x: 823, windowSize: landscape)))
+        XCTAssertEqual(switcher.readCount, 3, "the portrait read cannot confirm a landscape one")
+    }
+
+    /// A read the window resized across comes back nil: the locator reads
+    /// again instead of failing.
+    func testADroppedReadIsReadAgain() {
+        let switcher = SwitcherFrames(frames: [nil, Self.switcher(horlogeLabelX: 321)])
+        XCTAssertEqual(locate(with: switcher), .success(rest(321)))
+        XCTAssertEqual(switcher.readCount, 3)
+    }
+
+    /// Reads that never come back fail closed as unreadable.
+    func testNoReadEverFailsClosed() {
+        let switcher = SwitcherFrames(frames: [nil])
+        XCTAssertEqual(locate(with: switcher), .failure(.unreadable))
+        XCTAssertEqual(switcher.readCount, AppSwitcherDismissal.maxRestReads)
+    }
+
     // MARK: - Helpers
 
-    private func locate(with switcher: SwitcherFrames) -> Result<Double, AppSwitcherDismissal.CardLocateFailure> {
+    private func rest(_ x: Double) -> AppSwitcherDismissal.RestingCard {
+        .init(x: x, windowSize: window)
+    }
+
+    private func locate(
+        with switcher: SwitcherFrames
+    ) -> Result<AppSwitcherDismissal.RestingCard, AppSwitcherDismissal.CardLocateFailure> {
         AppSwitcherDismissal.locateRestingCard(
             appName: "Horloge", appElements: [], describer: switcher,
-            windowSize: window, pauseUs: 0, sleep: { _ in })
+            windowSize: { self.window }, pauseUs: 0, sleep: { _ in })
     }
 
     /// Switcher OCR with the Roblox card label on the left and the Horloge
@@ -82,15 +128,17 @@ final class AppSwitcherRestingCardTests: XCTestCase {
 
 /// Test double: returns switcher frames in order, repeating the last one —
 /// the mirrored App Switcher as successive reads see it.
+/// A nil frame is a read that came back empty-handed (the window resized
+/// across it).
 private final class SwitcherFrames: ScreenDescribing, @unchecked Sendable {
-    private let frames: [[TapPoint]]
+    private let frames: [[TapPoint]?]
     private(set) var readCount = 0
 
-    init(frames: [[TapPoint]]) { self.frames = frames }
+    init(frames: [[TapPoint]?]) { self.frames = frames }
 
     func describe(settleTimeoutUs: UInt32?) -> ScreenDescriber.DescribeResult? {
         let elements = frames[min(readCount, frames.count - 1)]
         readCount += 1
-        return ScreenDescriber.DescribeResult(elements: elements, screenshotBase64: "")
+        return elements.map { ScreenDescriber.DescribeResult(elements: $0, screenshotBase64: "") }
     }
 }

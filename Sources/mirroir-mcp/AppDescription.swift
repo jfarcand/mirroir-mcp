@@ -59,6 +59,15 @@ struct AppDescription: Sendable {
     /// Present once the app has been ported to the FakeMirroring simulator;
     /// nil for guidance-only APP.md files that haven't been ported yet.
     let simulator: SimulatorSpec?
+    /// Texts the app shows on the same screen on every run (`## Landmarks`),
+    /// such as a permanent shop category. A generated wait prefers one over the
+    /// most prominent new text, which on a seasonal or paid screen changes
+    /// between runs. Empty when the APP.md declares none.
+    var landmarks: [String] = []
+
+    /// Texts a generated wait takes before any other: the tab names and the
+    /// declared landmarks.
+    var stableAnchors: [String] { tabs + landmarks }
 
     /// Whether the explorer may BFS this app. True for ordinary apps (no
     /// `playable:` declared) and for `observe-only` apps; false for any other
@@ -189,7 +198,8 @@ enum AppDescriptionParser {
             tabs: tabs,
             tabLayout: tabLayout,
             deepTabs: deepTabs,
-            simulator: simulator
+            simulator: simulator,
+            landmarks: parseList(sections["Landmarks"] ?? "")
         )
     }
 
