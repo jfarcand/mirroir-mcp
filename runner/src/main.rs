@@ -49,6 +49,7 @@ use crate::accept::{AcceptArgs, run_accept};
 use crate::compile::emit::emit_playwright;
 use crate::error::{Result, RunnerError};
 use crate::mirroir::lock::LockfileMode;
+use crate::mirroir::pack_install::{PackArgs, run_pack};
 use crate::mirroir::run::{MirroirRunOptions, run_mirroir, run_mirroir_autodiscover};
 use crate::oracle::baseline::BaselineMode;
 use crate::oracle::drift::{DriftVerdict, detect_drift};
@@ -72,6 +73,8 @@ enum Command {
     /// DRIFT becomes a `git diff` and the next run is green. Refuses to run
     /// in CI.
     Accept(AcceptArgs),
+    /// Manage the archetype packs installed under `~/.mirroir/skills/`.
+    Pack(PackArgs),
 }
 
 /// Cross-platform replayer for mirroir `SkillStep` YAML scenarios.
@@ -79,7 +82,7 @@ enum Command {
 #[command(name = "mirroir-run", version, about, long_about = None)]
 #[command(args_conflicts_with_subcommands = true, subcommand_negates_reqs = true)]
 struct Cli {
-    /// The `accept` subcommand; absent for every ordinary run.
+    /// The `accept` / `pack` subcommand; absent for every ordinary run.
     #[command(subcommand)]
     command: Option<Command>,
 
@@ -246,8 +249,10 @@ fn main() -> ExitCode {
 /// The three states are distinguishable from the shell: `Ok(RunVerdict::Pass)`
 /// exits 0, `Ok(RunVerdict::Drift)` exits 65, and any `Err` exits 1.
 async fn run(cli: &Cli) -> Result<RunVerdict> {
-    if let Some(Command::Accept(args)) = &cli.command {
-        return run_accept(args).await;
+    match &cli.command {
+        Some(Command::Accept(args)) => return run_accept(args).await,
+        Some(Command::Pack(args)) => return run_pack(args),
+        None => {}
     }
 
     let roots = ReplayRoots {

@@ -3,17 +3,18 @@
 
 use std::collections::HashSet;
 use std::fs;
-use std::io;
 use std::path::{Path, PathBuf};
-use std::process::Command;
 
 use chrono::Utc;
 use sha2::{Digest, Sha256};
 
 use crate::error::{Result, RunnerError};
+use crate::mirroir::git::gather_git_source;
 use crate::mirroir::lock::format_ref;
-use crate::mirroir::resolve::{ArchetypeOrigin, ResolvedArchetype, resolve_archetype};
-use crate::parser::lockfile::{GitSource, LockedArchetype, LockedOrigin, Lockfile, ResolvedRecord};
+use crate::mirroir::resolve::{
+    ArchetypeOrigin, ResolvedArchetype, pack_version_directory, resolve_archetype,
+};
+use crate::parser::lockfile::{LockedArchetype, LockedOrigin, Lockfile, ResolvedRecord};
 use crate::parser::mirroir::{MirroirConfig, PlanEntrySource};
 use crate::parser::version::ArtifactKind;
 
@@ -47,7 +48,7 @@ pub fn regenerate_lockfile(
                     continue;
                 }
                 let resolved = resolve_archetype(r, project_root, home_root, None)?;
-                let record = build_locked_record(&resolved)?;
+                let record = build_locked_record(&resolved, home_root)?;
                 archetypes.push(LockedArchetype {
                     reference,
                     resolved: record,
@@ -66,7 +67,7 @@ pub fn regenerate_lockfile(
     })
 }
 
-fn build_locked_record(resolved: &ResolvedArchetype) -> Result<ResolvedRecord> {
+fn build_locked_record(resolved: &ResolvedArchetype, home_root: &Path) -> Result<ResolvedRecord> {
     let checksum = checksum_directory(&resolved.directory)?;
     match &resolved.origin {
         ArchetypeOrigin::Pack {
@@ -74,14 +75,9 @@ fn build_locked_record(resolved: &ResolvedArchetype) -> Result<ResolvedRecord> {
             name,
             version,
         } => {
-            // Best-effort: walk up to the pack-version dir and read git info.
-            let pack_version_root = resolved
-                .directory
-                .ancestors()
-                .nth(2) // skip "archetypes" and "<name-components>"; walk varies — use deepest .git
-                .unwrap_or(&resolved.directory)
-                .to_path_buf();
-            let source = gather_git_source(&pack_version_root).ok();
+            // Provenance is read from the pack checkout `pack install` wrote;
+            // a hand-copied install with no `.git` records none.
+            let source = gather_git_source(&pack_version_directory(home_root, pack, version)).ok();
             Ok(ResolvedRecord {
                 kind: LockedOrigin::Pack,
                 pack: Some(pack.clone()),
@@ -156,39 +152,6 @@ fn collect_files(root: &Path, current: &Path, out: &mut Vec<PathBuf>) -> Result<
         }
     }
     Ok(())
-}
-
-fn gather_git_source(dir: &Path) -> Result<GitSource> {
-    let url = run_git(dir, &["remote", "get-url", "origin"])?;
-    let commit = run_git(dir, &["rev-parse", "HEAD"])?;
-    let tag = run_git(dir, &["describe", "--tags", "--exact-match", "HEAD"]).ok();
-    Ok(GitSource { url, tag, commit })
-}
-
-fn run_git(dir: &Path, args: &[&str]) -> Result<String> {
-    let output = Command::new("git")
-        .args(args)
-        .current_dir(dir)
-        .output()
-        .map_err(|source| RunnerError::Io {
-            context: format!("git {} (cwd={})", args.join(" "), dir.display()),
-            source,
-        })?;
-    if !output.status.success() {
-        return Err(RunnerError::Io {
-            context: format!(
-                "git {} exit {:?} cwd={}",
-                args.join(" "),
-                output.status.code(),
-                dir.display()
-            ),
-            source: io::Error::other(format!(
-                "git stderr: {}",
-                String::from_utf8_lossy(&output.stderr).trim()
-            )),
-        });
-    }
-    Ok(String::from_utf8_lossy(&output.stdout).trim().to_owned())
 }
 
 #[cfg(test)]

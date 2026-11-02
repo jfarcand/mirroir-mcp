@@ -157,6 +157,33 @@ pub enum MirroirError {
         total: usize,
     },
 
+    /// A fetched pack checkout is not an installable pack: no `INDEX.md`, a
+    /// name or version that cannot be a directory, or a listed archetype that
+    /// is missing or names itself differently. Nothing was installed.
+    #[error("pack `{source_ref}` cannot be installed: {reason}")]
+    PackInvalid {
+        /// The git URL or path `pack install` was given.
+        source_ref: String,
+        /// What the checkout got wrong.
+        reason: String,
+    },
+
+    /// The pack version is already installed from a different commit. An
+    /// installed version is immutable — lockfiles pin its checksum — so the
+    /// pack author bumps `pack_version`, or the stale directory is removed by
+    /// hand before reinstalling.
+    #[error(
+        "`{directory}` already holds {installed}, not {incoming}; bump `pack_version` in the pack's INDEX.md, or remove that directory to replace it"
+    )]
+    PackVersionConflict {
+        /// The installed pack-version directory.
+        directory: PathBuf,
+        /// What is installed there: its commit, or that it is no git checkout.
+        installed: String,
+        /// The commit `pack install` fetched.
+        incoming: String,
+    },
+
     /// `HOME` environment variable is not set; can't locate `~/.mirroir/`.
     #[error("cannot resolve user home directory ($HOME is unset)")]
     HomeDirUnavailable,

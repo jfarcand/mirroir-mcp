@@ -22,10 +22,10 @@ tree for each consumer instance.
 
 ## Pack repo layout
 
-A pack repo carries **one archetype tree at HEAD per tag**:
+A pack repo carries **one archetype tree per commit**:
 
 ```
-<pack-repo>/   (at tag v1.0.0)
+<pack-repo>/
 ├── INDEX.md
 └── archetypes/
     └── <archetype-name>/
@@ -35,9 +35,16 @@ A pack repo carries **one archetype tree at HEAD per tag**:
         └── scenarios/<flow>.yaml
 ```
 
-There are **no in-tree version directories**. Versioning is via git
-tags; the installer fetches per tag into separate dirs on the user's
-machine (`~/.mirroir/skills/<pack>/<version>/`).
+There are **no in-tree version directories**. `INDEX.md`'s `pack_version`
+names the version: `mirroir-run pack install <repo> [--ref <branch-or-tag>]`
+installs the fetched commit at `~/.mirroir/skills/<pack>/<pack_version>/`,
+one directory per installed version. A git tag is optional provenance (the
+lockfile records it when `HEAD` sits on one); it does not pick the version.
+
+An installed version is immutable — lockfiles pin its checksum — so
+`pack install` refuses a different commit under a `pack_version` that is
+already installed. **Bump `pack_version` whenever the archetype tree
+changes**, following *Semver discipline* below.
 
 ## `INDEX.md` (pack manifest)
 
@@ -45,7 +52,7 @@ machine (`~/.mirroir/skills/<pack>/<version>/`).
 ```yaml
 version: 1
 name: <pack-name>
-pack_version: 1.0.0      # matches the git tag
+pack_version: 1.0.0      # exact MAJOR.MINOR.PATCH; the install directory
 description: |
   One-line summary.
 repository: https://github.com/...
@@ -151,19 +158,23 @@ steps:
 ## Releasing a version
 
 ```bash
-# Make changes on a feature branch, merge to main:
-git checkout main && git pull
-# Tag a release:
+# Change the archetype tree, bump `pack_version` in INDEX.md, merge to main.
+# Optionally tag the commit — the lockfile records the tag as provenance:
 git tag -a v1.0.1 -m "atmosphere/ai-console v1.0.1"
 git push origin v1.0.1
 ```
 
-Consumers update by either:
+Consumers update by installing the new version beside the old one and
+re-locking:
 
-- Bumping their `mirroir.yaml` ref + running `mirroir-run` (regenerates
-  the lockfile under default mode).
-- Running `mirroir lock --upgrade <ref>` (planned command) to bump
-  without editing the friendly ref.
+```bash
+mirroir-run pack install https://github.com/<owner>/<pack-repo>
+mirroir-run            # default mode regenerates mirroir.lock
+```
+
+A floating ref (`@v1`) resolves to the highest installed `1.x.x`, so the
+plan picks the new version up without editing `mirroir.yaml`; an exact pin
+(`@1.0.0`) is bumped in `mirroir.yaml`.
 
 ## Semver discipline
 

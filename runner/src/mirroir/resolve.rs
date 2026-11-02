@@ -13,6 +13,9 @@ use crate::parser::mirroir::{ArchetypeRef, ArchetypeRefKind};
 /// Filename of the archetype manifest at the root of an archetype directory.
 pub const ARCHETYPE_MANIFEST_FILE: &str = "archetype.md";
 
+/// Directory inside a pack checkout that holds its archetypes.
+pub const PACK_ARCHETYPES_DIR: &str = "archetypes";
+
 /// Result of resolving an [`ArchetypeRef`] against its declared-kind resolver.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ResolvedArchetype {
@@ -68,12 +71,8 @@ pub fn origin_directory(
             pack,
             name,
             version,
-        } => home_root
-            .join(".mirroir")
-            .join("skills")
-            .join(pack)
-            .join(version)
-            .join("archetypes")
+        } => pack_version_directory(home_root, pack, version)
+            .join(PACK_ARCHETYPES_DIR)
             .join(name),
         ArchetypeOrigin::ProjectLocal { path } => project_root
             .join(".mirroir")
@@ -84,6 +83,28 @@ pub fn origin_directory(
             .join(name)
             .join(version),
     }
+}
+
+/// Where installed packs live: `~/.mirroir/skills/`.
+#[must_use]
+pub fn skills_root(home_root: &Path) -> PathBuf {
+    home_root.join(".mirroir").join("skills")
+}
+
+/// Where every installed version of `pack` lives:
+/// `~/.mirroir/skills/<pack>/`.
+#[must_use]
+pub fn pack_directory(home_root: &Path, pack: &str) -> PathBuf {
+    skills_root(home_root).join(pack)
+}
+
+/// The checkout of one installed pack version:
+/// `~/.mirroir/skills/<pack>/<version>/`. `pack install` writes it, the
+/// resolver reads archetypes under it, and lockfile generation reads its git
+/// provenance from it.
+#[must_use]
+pub fn pack_version_directory(home_root: &Path, pack: &str, version: &str) -> PathBuf {
+    pack_directory(home_root, pack).join(version)
 }
 
 /// Resolve an [`ArchetypeRef`] to an on-disk archetype.
@@ -150,7 +171,7 @@ fn resolve_pack(
             searched: vec![],
         })
     })?;
-    let pack_root = home_root.join(".mirroir").join("skills").join(pack);
+    let pack_root = pack_directory(home_root, pack);
 
     let resolved_version = resolve_version_from_constraint(
         &pack_root,

@@ -25,8 +25,7 @@ plan:
 YAML
 
 # Install the archetype pack once per machine:
-git clone --branch v1.0.0 https://github.com/jfarcand/mirroir-skills \
-          ~/.mirroir/skills/mirroir-skills/1.0.0
+mirroir-run pack install https://github.com/jfarcand/mirroir-skills
 
 # Replay (anywhere inside your project root):
 mirroir-run
@@ -346,13 +345,32 @@ the repo's own git history; no `@<version>` field is honored.
 ## Installing archetype packs
 
 ```bash
-mkdir -p ~/.mirroir/skills
-git clone --branch v1.0.0 https://github.com/jfarcand/mirroir-skills \
-          ~/.mirroir/skills/mirroir-skills/1.0.0
+mirroir-run pack install https://github.com/jfarcand/mirroir-skills
+mirroir-run pack install https://github.com/jfarcand/mirroir-skills --ref <branch-or-tag>
+mirroir-run pack install ../my-pack            # a local checkout works too
 ```
 
+`pack install` shallow-clones the source into a staging directory under
+`~/.mirroir/skills/`, reads the pack's `INDEX.md`, and installs the checkout
+at `~/.mirroir/skills/<name>/<pack_version>/` — the name and version come
+from `INDEX.md`, not from the URL or the git ref. Before the move it checks
+that every archetype `INDEX.md` lists is present with an `archetype.md` that
+names it, so a pack that would fail at resolve time is refused at install
+time and nothing is left behind.
+
 Each installed version is a separate directory; the resolver picks the
-right one per `@<version>` constraint + lockfile pin.
+right one per `@<version>` constraint + lockfile pin. An installed version
+is immutable:
+
+| Already at `<name>/<pack_version>/` | `pack install` |
+|---|---|
+| nothing | installs |
+| the same commit | no-op, exit 0 |
+| another commit, or a hand-copied tree with no `.git` | refuses — the pack author bumps `pack_version`, or you remove that directory to replace it |
+
+The install is a git checkout, so the lockfile records its `source:` (origin
+URL, commit, and the tag `HEAD` sits on, when there is one). A hand-copied
+tree records no `source:`.
 
 ## Cross-surface parity (iOS ↔ web)
 
@@ -443,8 +461,8 @@ in [drift-and-accept.md](drift-and-accept.md).
 - **`MirroirConfigNotFound`** — no `.mirroir/mirroir.yaml` in cwd or any
   ancestor. Run from inside a consumer repo, or pass `--config <PATH>`.
 - **`MirroirArchetypeNotFound`** — pack not installed at the required
-  version. `git clone --branch <tag>` the pack into
-  `~/.mirroir/skills/<pack>/<version>/`.
+  version. `mirroir-run pack install <pack-repository>` (add `--ref` for a
+  branch or tag that carries the version you need).
 - **`MirroirLockfileStale`** — `mirroir.yaml` and `mirroir.lock` disagree
   under `--locked` / `--frozen`, either on the ref set / version pins or on a
   recorded `checksum:` the archetype tree no longer hashes to. A message

@@ -8,6 +8,7 @@ pub mod local_overrides;
 pub mod lockfile;
 pub mod mirroir;
 pub mod mirroir_plan;
+pub mod pack_index;
 pub mod sample;
 pub mod scenario;
 pub mod shorthand;

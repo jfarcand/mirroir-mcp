@@ -126,6 +126,8 @@ pub enum ArtifactKind {
     Lockfile,
     /// An archetype pack's `archetype.md`.
     Archetype,
+    /// An archetype pack's `INDEX.md`.
+    PackIndex,
     /// `drift-defaults.yaml`.
     DriftDefaults,
     /// `oracles/profiles.yaml`.
@@ -153,6 +155,7 @@ impl ArtifactKind {
             | Self::MirroirLocal
             | Self::Lockfile
             | Self::Archetype
+            | Self::PackIndex
             | Self::DriftDefaults
             | Self::JudgeProfiles
             | Self::AppMd
@@ -172,6 +175,7 @@ impl ArtifactKind {
             | Self::MirroirLocal
             | Self::Lockfile
             | Self::Archetype
+            | Self::PackIndex
             | Self::DriftDefaults
             | Self::JudgeProfiles
             | Self::AppMd
@@ -207,6 +211,7 @@ impl ArtifactKind {
             Self::MirroirLocal => "mirroir.local.yaml",
             Self::Lockfile => "mirroir.lock",
             Self::Archetype => "archetype.md",
+            Self::PackIndex => "INDEX.md",
             Self::DriftDefaults => "drift-defaults.yaml",
             Self::JudgeProfiles => "profiles.yaml",
             Self::AppMd => "APP.md",

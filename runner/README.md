@@ -90,6 +90,10 @@ mirroir-run --emit playwright samples/web-fixture --scenarios all
 mirroir-run accept
 mirroir-run accept --run-scenario scenarios/connect-then-broadcast.yaml
 
+# 3b) Install an archetype pack where `<pack>/<name>@<version>` refs resolve:
+#     ~/.mirroir/skills/<name>/<pack_version>/, both read from the pack's INDEX.md.
+mirroir-run pack install https://github.com/jfarcand/mirroir-skills
+
 # 4) Run a single scenario end-to-end (process / http / web / judge / drift).
 MIRROIR_PLAYWRIGHT_HOME=/path/to/playwright \
   mirroir-run --run-scenario scenarios/connect-then-broadcast.yaml

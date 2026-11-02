@@ -88,7 +88,8 @@ fn read_installed_versions(root: &Path) -> Result<Vec<InstalledVersion>> {
 
 /// Parse strings like `1.0.3` or `v1.0.3` into a `(u32, u32, u32)` triple.
 /// Returns `None` for incomplete versions (e.g., `1.2`, `v1`).
-fn parse_exact_version(s: &str) -> Option<(u32, u32, u32)> {
+#[must_use]
+pub fn parse_exact_version(s: &str) -> Option<(u32, u32, u32)> {
     let trimmed = s.strip_prefix('v').unwrap_or(s);
     let parts: Vec<&str> = trimmed.split('.').collect();
     if parts.len() != 3 {

@@ -15,6 +15,7 @@ use crate::parser::archetype::parse_archetype_manifest;
 use crate::parser::local_overrides::parse_local_overrides;
 use crate::parser::lockfile::parse_lockfile;
 use crate::parser::mirroir::parse_mirroir_config;
+use crate::parser::pack_index::parse_pack_index;
 use crate::parser::sample::SampleManifest;
 use crate::parser::scenario::Scenario;
 
@@ -174,6 +175,11 @@ fn loaders() -> Vec<Loader> {
             kind: ArtifactKind::Archetype,
             body_with_unknown_key: "name: x/y\narchetype_version: 1.0.0\nprovides:\n  flows: []\n  flowz: []\n",
             load: |raw| parse_archetype_manifest("a", &fenced(raw)).map(drop),
+        },
+        Loader {
+            kind: ArtifactKind::PackIndex,
+            body_with_unknown_key: "name: p\npack_version: 1.0.0\narchetypes: []\nnew_key: x\n",
+            load: |raw| parse_pack_index("i", &fenced(raw)).map(drop),
         },
         Loader {
             kind: ArtifactKind::DriftDefaults,
