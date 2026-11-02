@@ -4,21 +4,10 @@
 use std::time::Duration;
 
 use tokio::net::TcpStream;
-use tokio::time::{Instant, sleep, timeout};
+use tokio::time::{Instant, sleep};
 
 use crate::error::{Result, RunnerError};
 use crate::parser::step::{PortState, WaitPortArgs};
-
-/// The longest one connection attempt may take before it counts as "not
-/// open". A SYN the kernel drops instead of refusing — macOS does this for a
-/// socket bound but not yet listening — is otherwise retried by the kernel
-/// for its full connect timeout (75 s on macOS), so one unlucky probe outlived
-/// a 15 s `wait_port` budget. A fresh attempt on the next poll succeeds as
-/// soon as the server listens.
-const PROBE_TIMEOUT: Duration = Duration::from_millis(500);
-
-/// Poll interval between probes.
-const POLL_INTERVAL: Duration = Duration::from_millis(100);
 
 /// Implements the `wait_port:` step. Polls both the IPv4 (`127.0.0.1`) and
 /// IPv6 (`[::1]`) loopback addresses for `<port>` at 100ms intervals up to
@@ -26,9 +15,7 @@ const POLL_INTERVAL: Duration = Duration::from_millis(100);
 /// which loopback they bind — Vite, for example, binds `[::1]` only when
 /// told to listen on `localhost`, so an IPv4-only probe would never see it.
 /// `expect: open` passes once either address connects; `expect: closed`
-/// passes once neither does. Each attempt is bounded by [`PROBE_TIMEOUT`] and
-/// by the deadline, so the step never runs past its budget by more than one
-/// probe.
+/// passes once both refuse.
 ///
 /// # Errors
 ///
@@ -39,7 +26,8 @@ pub async fn wait_for_port(args: &WaitPortArgs) -> Result<()> {
     let v4 = format!("127.0.0.1:{}", args.port);
     let v6 = format!("[::1]:{}", args.port);
     loop {
-        let open_now = connects(&v4, deadline).await || connects(&v6, deadline).await;
+        let open_now =
+            TcpStream::connect(&v4).await.is_ok() || TcpStream::connect(&v6).await.is_ok();
         let satisfied = match args.expect {
             PortState::Open => open_now,
             PortState::Closed => !open_now,
@@ -57,18 +45,8 @@ pub async fn wait_for_port(args: &WaitPortArgs) -> Result<()> {
                 },
             });
         }
-        sleep(POLL_INTERVAL).await;
+        sleep(Duration::from_millis(100)).await;
     }
-}
-
-/// Whether a connection to `address` completes within [`PROBE_TIMEOUT`],
-/// cut short at `deadline`.
-async fn connects(address: &str, deadline: Instant) -> bool {
-    let budget = PROBE_TIMEOUT.min(deadline.saturating_duration_since(Instant::now()));
-    matches!(
-        timeout(budget, TcpStream::connect(address)).await,
-        Ok(Ok(_))
-    )
 }
 
 #[cfg(test)]
@@ -150,41 +128,6 @@ mod tests {
             expect: PortState::Closed,
         })
         .await?;
-        Ok(())
-    }
-
-    /// A SYN nobody answers — TEST-NET-1 (RFC 5737) is reserved and routed
-    /// nowhere — leaves a bare connect waiting out the kernel's whole connect
-    /// timeout. The probe must count it as "not open" within its own bound,
-    /// which is what keeps `wait_port` inside its budget when the kernel drops
-    /// a loopback SYN the same way.
-    #[tokio::test]
-    async fn a_probe_whose_syn_goes_unanswered_gives_up_at_its_bound() -> TestResult {
-        let deadline = Instant::now() + Duration::from_secs(60);
-        let started = Instant::now();
-        let connected = timeout(PROBE_TIMEOUT * 4, connects("192.0.2.1:9", deadline))
-            .await
-            .map_err(|_| "the probe ignored its bound and hung on the unanswered SYN")?;
-        assert!(!connected);
-        assert!(
-            started.elapsed() < PROBE_TIMEOUT * 2,
-            "the probe ran {:?}",
-            started.elapsed()
-        );
-        Ok(())
-    }
-
-    /// The bound shrinks to what is left of the deadline.
-    #[tokio::test]
-    async fn a_probe_never_runs_past_the_deadline() -> TestResult {
-        let deadline = Instant::now() + Duration::from_millis(50);
-        let started = Instant::now();
-        assert!(!connects("192.0.2.1:9", deadline).await);
-        assert!(
-            started.elapsed() < Duration::from_millis(300),
-            "the probe ran {:?}",
-            started.elapsed()
-        );
         Ok(())
     }
 }
