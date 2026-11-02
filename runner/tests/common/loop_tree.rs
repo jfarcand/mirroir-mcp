@@ -86,7 +86,7 @@ pub fn plant_plan(sandbox: &Sandbox, port: u16) -> Result<String, String> {
                 "      archetypes: [\"./archetypes/order-desk\"]\n",
                 "      flows: [{flow}]\n",
                 "      boot:\n",
-                "        command: \"python3 -m http.server {port}\"\n",
+                "        command: \"python3 -c \\\"import http.server as h, socketserver as s; h.ThreadingHTTPServer.server_bind = s.TCPServer.server_bind; h.ThreadingHTTPServer(('127.0.0.1', {port}), h.SimpleHTTPRequestHandler).serve_forever()\\\"\"\n",
                 "        cwd: \"{site}\"\n",
                 "        boot_once: false\n"
             ),

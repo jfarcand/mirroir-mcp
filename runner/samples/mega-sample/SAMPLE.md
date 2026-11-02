@@ -19,7 +19,7 @@ session:
   boot_ready_port: 18898
   boot_ready_timeout_s: 10
   boot:
-    command: "python3 -m http.server 18898"
+    command: "python3 -c \"import http.server as h, socketserver as s; h.ThreadingHTTPServer.server_bind = s.TCPServer.server_bind; h.ThreadingHTTPServer(('127.0.0.1', 18898), h.SimpleHTTPRequestHandler).serve_forever()\""
   scenarios:
     must_pass:
       - scenarios/web-cross-browser.yaml

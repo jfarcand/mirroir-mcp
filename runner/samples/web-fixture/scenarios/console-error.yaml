@@ -13,7 +13,7 @@ tags: ["web-fixture", "negative", "console"]
 steps:
   - spawn:
       id: fixture
-      command: "python3 -m http.server 18903"
+      command: "python3 -c \"import http.server as h, socketserver as s; h.ThreadingHTTPServer.server_bind = s.TCPServer.server_bind; h.ThreadingHTTPServer(('127.0.0.1', 18903), h.SimpleHTTPRequestHandler).serve_forever()\""
       cwd: "samples/web-fixture/public"
   - wait_port: { port: 18903, timeout_s: 15 }
   - target:

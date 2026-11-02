@@ -38,7 +38,10 @@ session:
   boot_ready_port: 18902
   boot_ready_timeout_s: 15
   boot:
-    command: "python3 -m http.server 18902"
+    # http.server's HTTPServer resolves its own address with getfqdn() before
+    # listening; on macOS CI runners that lookup takes 35 s. The plain TCPServer
+    # bind skips it and serves the same handler.
+    command: "python3 -c \"import http.server as h, socketserver as s; h.ThreadingHTTPServer.server_bind = s.TCPServer.server_bind; h.ThreadingHTTPServer(('127.0.0.1', 18902), h.SimpleHTTPRequestHandler).serve_forever()\""
     cwd: "public"
   scenarios:
     must_pass:
@@ -76,7 +79,7 @@ The spawn's `cwd` is relative to `runner/`; run them from there.
 ## Serving it by hand
 
 ```bash
-cd runner/samples/web-fixture/public && python3 -m http.server 18902
+cd runner/samples/web-fixture/public && python3 -m http.server --bind 127.0.0.1 18902
 ```
 
 Then open <http://127.0.0.1:18902/>.
