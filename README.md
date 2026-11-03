@@ -228,7 +228,7 @@ test@example.com / password123. Screenshot after each step.
 ```
 
 ```
-Start recording, open Settings, scroll to General > About, stop recording.
+Start recording, open Instagram, scroll the feed and open my profile, stop recording.
 ```
 
 ## Vision: agents that test — and play
