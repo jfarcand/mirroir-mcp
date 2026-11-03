@@ -1,0 +1,26 @@
+{
+  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
+  "name": "mirroir",
+  "description": "mirroir: drive a real iPhone from Claude Code through macOS iPhone Mirroring, plus the community skill library.",
+  "owner": {
+    "name": "Jean-Francois Arcand",
+    "url": "https://github.com/jfarcand"
+  },
+  "plugins": [
+    {
+      "name": "mirroir",
+      "source": "./plugins/mirroir",
+      "description": "Registers the mirroir MCP server (npx -y mirroir-mcp): screenshot, OCR, tap, swipe and type on a real iPhone through macOS iPhone Mirroring.",
+      "category": "automation"
+    },
+    {
+      "name": "skills",
+      "source": {
+        "source": "github",
+        "repo": "jfarcand/mirroir-skills"
+      },
+      "description": "Skill execution: teaches the AI how to interpret and run mirroir skills (SKILL.md and YAML) from the mirroir-skills library.",
+      "category": "automation"
+    }
+  ]
+}

@@ -1,7 +1,7 @@
 {
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
   "name": "io.github.jfarcand/mirroir-mcp",
-  "description": "Control a real iPhone through macOS iPhone Mirroring: screenshot, tap, swipe, type.",
+  "description": "Drive a stock iPhone via iPhone Mirroring: no Developer Mode, Xcode or WDA. LLM-free skill replay.",
   "repository": {
     "url": "https://github.com/jfarcand/mirroir-mcp",
     "source": "github"

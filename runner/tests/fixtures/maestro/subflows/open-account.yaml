@@ -1,0 +1,8 @@
+appId: com.example.shop
+env:
+  TAB: Account
+---
+- launchApp:
+    stopApp: false
+- tapOn: ${TAB}
+- assertVisible: ".*Settings.*"

@@ -1,0 +1,104 @@
+# ABOUTME: Exercises actions/setup-mirroir-run on every runner OS the mirroir-run release ships for.
+# ABOUTME: Installs latest and a pinned version, then asserts PATH, the outputs, and `mirroir-run --version`.
+name: Setup Action
+
+on:
+  push:
+    # Every branch, not just main: this repo squash-merges locally and opens no
+    # pull requests of its own, so a feature branch has no other way to reach
+    # this lane before it lands. Dependabot is excluded because it pushes its
+    # branch AND opens a PR, so the push run would duplicate the PR run.
+    branches-ignore: ['dependabot/**']
+    paths:
+      - 'actions/setup-mirroir-run/**'
+      - '.github/workflows/setup-action.yml'
+  pull_request:
+    branches: [main]
+    # Same list as `push` — the Actions parser has no YAML anchors.
+    paths:
+      - 'actions/setup-mirroir-run/**'
+      - '.github/workflows/setup-action.yml'
+  workflow_dispatch:
+
+# Cancel superseded runs on the same branch / PR to save runner-minutes.
+concurrency:
+  group: setup-action-${{ github.head_ref || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  latest:
+    name: latest on ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        # One runner per published release target: Linux x64 (musl),
+        # macOS arm64, macOS x64, Windows x64.
+        os: [ubuntu-latest, macos-latest, macos-15-intel, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Setup mirroir-run (latest)
+        id: setup
+        uses: ./actions/setup-mirroir-run
+
+      - name: Assert mirroir-run is on PATH and matches the outputs
+        shell: bash
+        env:
+          INSTALLED_VERSION: ${{ steps.setup.outputs.version }}
+          INSTALLED_PATH: ${{ steps.setup.outputs.path }}
+        run: |
+          set -euo pipefail
+          if ! [[ "$INSTALLED_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::outputs.version is '${INSTALLED_VERSION}', expected MAJOR.MINOR.PATCH"
+            exit 1
+          fi
+          if [ ! -x "$INSTALLED_PATH" ]; then
+            echo "::error::outputs.path '${INSTALLED_PATH}' is not an executable file"
+            exit 1
+          fi
+          reported=$(mirroir-run --version | tr -d '\r')
+          echo "PATH resolves mirroir-run to: $(command -v mirroir-run)"
+          if [ "$reported" != "mirroir-run ${INSTALLED_VERSION}" ]; then
+            echo "::error::mirroir-run --version printed '${reported}', expected 'mirroir-run ${INSTALLED_VERSION}'"
+            exit 1
+          fi
+          echo "OK: ${reported}"
+
+  pinned:
+    name: pinned ${{ matrix.requested }} on ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # Every accepted spelling of an exact version must install that version.
+        requested: ['0.3.0', 'v0.3.0', 'runner-v0.3.0']
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Setup mirroir-run (${{ matrix.requested }})
+        id: setup
+        uses: ./actions/setup-mirroir-run
+        with:
+          version: ${{ matrix.requested }}
+
+      - name: Assert the pinned version was installed
+        shell: bash
+        env:
+          INSTALLED_VERSION: ${{ steps.setup.outputs.version }}
+          EXPECTED_VERSION: '0.3.0'
+        run: |
+          set -euo pipefail
+          if [ "$INSTALLED_VERSION" != "$EXPECTED_VERSION" ]; then
+            echo "::error::outputs.version is '${INSTALLED_VERSION}', expected '${EXPECTED_VERSION}'"
+            exit 1
+          fi
+          reported=$(mirroir-run --version)
+          if [ "$reported" != "mirroir-run ${EXPECTED_VERSION}" ]; then
+            echo "::error::mirroir-run --version printed '${reported}', expected 'mirroir-run ${EXPECTED_VERSION}'"
+            exit 1
+          fi
+          echo "OK: ${reported}"

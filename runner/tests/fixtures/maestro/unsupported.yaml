@@ -1,0 +1,11 @@
+appId: com.example.shop
+name: Checkout with hierarchy selectors
+---
+- launchApp:
+    clearState: true
+- tapOn:
+    id: "checkout_button"
+- tapOn: "Continue"
+- back
+- evalScript: ${output.total = 42}
+- inputText: "hello"

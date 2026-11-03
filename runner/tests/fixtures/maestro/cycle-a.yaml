@@ -1,0 +1,4 @@
+appId: com.example.shop
+---
+- tapOn: "A"
+- runFlow: cycle-b.yaml

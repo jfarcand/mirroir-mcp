@@ -1,0 +1,18 @@
+appId: com.example.shop
+name: Log in
+tags:
+  - smoke
+  - auth
+env:
+  EMAIL: qa@example.com
+---
+- launchApp
+- tapOn: "Email"
+- inputText: ${EMAIL}
+- tapOn:
+    text: "Password"
+    label: Focus the password field
+- inputText: ${PASSWORD}
+- pressKey: Enter
+- assertVisible: "Welcome back"
+- takeScreenshot: logged-in

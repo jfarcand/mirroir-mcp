@@ -18,11 +18,11 @@ Skills can be installed via AI coding assistant plugin systems or manually.
 ### Claude Code
 
 ```bash
-claude plugin marketplace add jfarcand/mirroir-skills
-claude plugin install skills@mirroir-skills
+claude plugin marketplace add jfarcand/mirroir-mcp
+claude plugin install skills@mirroir
 ```
 
-Plugin metadata lives in `.claude-plugin/marketplace.json` in the skill repository. The `SKILL.md` file in the skill repo teaches Claude how to interpret skill steps.
+The `mirroir` marketplace is `.claude-plugin/marketplace.json` in the mirroir-mcp repository. It lists both the `mirroir` plugin (the MCP server) and the `skills` plugin, which it installs from the skill repository. The `SKILL.md` file in the skill repo teaches Claude how to interpret skill steps.
 
 ### GitHub Copilot CLI
 

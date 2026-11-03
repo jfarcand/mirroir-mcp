@@ -134,12 +134,22 @@ jobs:
       - name: Show the resulting registry state
         env:
           SERVER: ${{ inputs.server }}
+          STATUS: ${{ inputs.status }}
         run: |
           set -euo pipefail
           # Read the registry back rather than trusting the command's exit code.
           SEARCH="${SERVER#io.github.jfarcand/}"
           curl -sS "https://registry.modelcontextprotocol.io/v0/servers?search=${SEARCH}&limit=100" > /tmp/registry.json
           MATCHES=$(jq --arg want "$SERVER" '[.servers[] | select(.server.name == $want)] | length' /tmp/registry.json)
+          # A deleted entry leaves registry search, so absence is the success signal.
+          if [ "$STATUS" = "deleted" ]; then
+            if [ "$MATCHES" != "0" ]; then
+              echo "::error::$SERVER is still listed in the registry after status=deleted"
+              exit 1
+            fi
+            echo "$SERVER no longer appears in registry search"
+            exit 0
+          fi
           if [ "$MATCHES" = "0" ]; then
             echo "::error::$SERVER not found in the registry after the status change"
             exit 1

@@ -1,0 +1,26 @@
+appId: com.example.shop
+name: Account notification settings
+---
+- runFlow: subflows/open-account.yaml
+- scrollUntilVisible:
+    element: "Notifications"
+    direction: DOWN
+- tapOn: "Notifications"
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - back
+- runFlow:
+    label: Toggle the newsletter off and on
+    commands:
+      - tapOn: "Newsletter"
+      - tapOn: "Newsletter"
+- repeat:
+    times: 2
+    commands:
+      - scroll
+- extendedWaitUntil:
+    visible: "Saved"
+    timeout: 10000
+- assertNotVisible: "Error"

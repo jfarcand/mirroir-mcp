@@ -1,0 +1,181 @@
+# ABOUTME: Installs a released mirroir-run binary on a GitHub Actions runner and puts it on PATH.
+# ABOUTME: Resolves the runner-v* release, verifies the published .sha256, and checks `mirroir-run --version`.
+name: Setup mirroir-run
+description: >
+  Install mirroir-run — the CLI that replays mirroir scenarios against web
+  (Playwright), process and HTTP targets — from its GitHub release, verify the
+  archive checksum, and add it to PATH. Linux x64, macOS x64/arm64, Windows x64.
+author: jfarcand
+
+branding:
+  icon: smartphone
+  color: blue
+
+inputs:
+  version:
+    description: >
+      mirroir-run version to install: `latest` (the highest published,
+      non-prerelease `runner-v*` release) or an exact version such as `0.4.0`
+      (`v0.4.0` and `runner-v0.4.0` are accepted too).
+    required: false
+    default: latest
+  github-token:
+    description: >
+      Token used to query and download the release. The default job token is
+      enough for the public release; pass one only to lift API rate limits.
+    required: false
+    default: ${{ github.token }}
+
+outputs:
+  version:
+    description: The installed mirroir-run version, without a leading `v` (e.g. `0.4.0`).
+    value: ${{ steps.resolve.outputs.version }}
+  path:
+    description: Absolute path of the installed mirroir-run executable.
+    value: ${{ steps.install.outputs.path }}
+
+runs:
+  using: composite
+  steps:
+    - name: Resolve mirroir-run release and platform
+      id: resolve
+      shell: bash
+      env:
+        # The release source is fixed here rather than derived from
+        # github.action_repository, so the action resolves the same releases
+        # whether it is used from this repository or from a copy of it.
+        RELEASE_REPO: jfarcand/mirroir-mcp
+        TAG_PREFIX: runner-v
+        REQUESTED_VERSION: ${{ inputs.version }}
+        GH_TOKEN: ${{ inputs.github-token }}
+      run: |
+        set -euo pipefail
+
+        # Map the runner to the release target. Linux takes the static-musl
+        # build so it runs on any glibc (or none).
+        case "${RUNNER_OS}/${RUNNER_ARCH}" in
+          Linux/X64)     target=x86_64-unknown-linux-musl; archive=tar.gz; exe=mirroir-run ;;
+          macOS/X64)     target=x86_64-apple-darwin;       archive=tar.gz; exe=mirroir-run ;;
+          macOS/ARM64)   target=aarch64-apple-darwin;      archive=tar.gz; exe=mirroir-run ;;
+          Windows/X64)   target=x86_64-pc-windows-msvc;    archive=zip;    exe=mirroir-run.exe ;;
+          *)
+            echo "::error::setup-mirroir-run: no mirroir-run release build for ${RUNNER_OS}/${RUNNER_ARCH}. Published targets: Linux/X64, macOS/X64, macOS/ARM64, Windows/X64. On other platforms install from source with 'cargo install mirroir-run'."
+            exit 1
+            ;;
+        esac
+
+        if ! command -v gh > /dev/null 2>&1; then
+          echo "::error::setup-mirroir-run needs the GitHub CLI (gh) on PATH; GitHub-hosted runners ship it, a self-hosted runner must install it."
+          exit 1
+        fi
+
+        if [ "$REQUESTED_VERSION" = "latest" ]; then
+          # The repository's "latest" release is the Swift server (v*), so the
+          # newest runner release is found by listing them all and taking the
+          # highest version, not the most recently created one.
+          tag=$(gh api --paginate "repos/${RELEASE_REPO}/releases?per_page=100" \
+                  --jq ".[] | select(.draft | not) | select(.prerelease | not) | .tag_name | select(startswith(\"${TAG_PREFIX}\"))" \
+                | sort -V | tail -n 1)
+          if [ -z "$tag" ]; then
+            echo "::error::setup-mirroir-run: no published ${TAG_PREFIX}* release found in ${RELEASE_REPO}"
+            exit 1
+          fi
+        else
+          bare="${REQUESTED_VERSION#"${TAG_PREFIX}"}"
+          bare="${bare#v}"
+          if ! [[ "$bare" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::setup-mirroir-run: version '${REQUESTED_VERSION}' is neither 'latest' nor MAJOR.MINOR.PATCH"
+            exit 1
+          fi
+          tag="${TAG_PREFIX}${bare}"
+        fi
+
+        version="${tag#"${TAG_PREFIX}"}"
+        asset="mirroir-run-v${version}-${target}.${archive}"
+        {
+          echo "release-repo=${RELEASE_REPO}"
+          echo "tag=${tag}"
+          echo "version=${version}"
+          echo "target=${target}"
+          echo "archive=${archive}"
+          echo "asset=${asset}"
+          echo "exe=${exe}"
+        } >> "$GITHUB_OUTPUT"
+        echo "Resolved mirroir-run ${version} (${tag}) for ${target}"
+
+    - name: Download, verify and install mirroir-run
+      id: install
+      shell: bash
+      env:
+        GH_TOKEN: ${{ inputs.github-token }}
+        RELEASE_REPO: ${{ steps.resolve.outputs.release-repo }}
+        TAG: ${{ steps.resolve.outputs.tag }}
+        VERSION: ${{ steps.resolve.outputs.version }}
+        TARGET: ${{ steps.resolve.outputs.target }}
+        ARCHIVE: ${{ steps.resolve.outputs.archive }}
+        ASSET: ${{ steps.resolve.outputs.asset }}
+        EXE: ${{ steps.resolve.outputs.exe }}
+      run: |
+        set -euo pipefail
+
+        download_dir="${RUNNER_TEMP}/setup-mirroir-run-${VERSION}-${TARGET}"
+        mkdir -p "$download_dir"
+        if ! gh release download "$TAG" -R "$RELEASE_REPO" \
+               -p "$ASSET" -p "${ASSET}.sha256" -D "$download_dir" --clobber; then
+          echo "::error::setup-mirroir-run: could not download ${ASSET} (+ .sha256) from release ${TAG} of ${RELEASE_REPO}. Check that the version exists."
+          exit 1
+        fi
+
+        # Each release ships a <asset>.sha256 sidecar whose first field is the
+        # hex digest (Unix sidecars add the filename; the Windows one is CRLF).
+        expected=$(tr -d '\r' < "${download_dir}/${ASSET}.sha256" | awk '{print tolower($1)}')
+        # Hash from stdin: given a path with backslashes (Windows), sha256sum
+        # escapes its output line and prefixes the digest with '\'.
+        if command -v sha256sum > /dev/null 2>&1; then
+          actual=$(sha256sum < "${download_dir}/${ASSET}" | awk '{print $1}')
+        else
+          actual=$(shasum -a 256 < "${download_dir}/${ASSET}" | awk '{print $1}')
+        fi
+        if [ -z "$expected" ] || [ "$expected" != "$actual" ]; then
+          echo "::error::setup-mirroir-run: SHA-256 mismatch for ${ASSET}: release says '${expected}', downloaded file is '${actual}'"
+          exit 1
+        fi
+        echo "SHA-256 verified: ${actual}"
+
+        tool_root="${RUNNER_TOOL_CACHE:-${RUNNER_TEMP}}"
+        bin_dir="${tool_root}/mirroir-run/${VERSION}/${TARGET}"
+        mkdir -p "$bin_dir"
+        unpack_dir="${download_dir}/unpacked"
+        mkdir -p "$unpack_dir"
+        if [ "$ARCHIVE" = "zip" ]; then
+          unzip -o -q "${download_dir}/${ASSET}" -d "$unpack_dir"
+        else
+          tar xzf "${download_dir}/${ASSET}" -C "$unpack_dir"
+        fi
+        # tar archives nest the binary under mirroir-run-v<version>-<target>/;
+        # the Windows zip holds it at the top level.
+        binary=$(find "$unpack_dir" -type f -name "$EXE" | head -n 1)
+        if [ -z "$binary" ]; then
+          echo "::error::setup-mirroir-run: ${ASSET} does not contain ${EXE}"
+          exit 1
+        fi
+        cp "$binary" "${bin_dir}/${EXE}"
+        chmod +x "${bin_dir}/${EXE}"
+
+        echo "$bin_dir" >> "$GITHUB_PATH"
+        echo "path=${bin_dir}/${EXE}" >> "$GITHUB_OUTPUT"
+        echo "Installed ${bin_dir}/${EXE}"
+
+    - name: Check installed mirroir-run version
+      shell: bash
+      env:
+        BINARY: ${{ steps.install.outputs.path }}
+        VERSION: ${{ steps.resolve.outputs.version }}
+      run: |
+        set -euo pipefail
+        reported=$("$BINARY" --version | tr -d '\r')
+        if [ "$reported" != "mirroir-run ${VERSION}" ]; then
+          echo "::error::setup-mirroir-run: expected 'mirroir-run ${VERSION}', the installed binary reports '${reported}'"
+          exit 1
+        fi
+        echo "$reported"

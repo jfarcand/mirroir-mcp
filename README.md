@@ -13,15 +13,30 @@
 [![macOS 15+](https://img.shields.io/badge/macOS-15%2B-black?logo=apple)](https://support.apple.com/en-us/105071)
 [![Discord](https://img.shields.io/discord/1481795325953048627?logo=discord&label=Discord)](https://discord.gg/jVDBbMjPMf)
 
-Give your AI eyes, hands, and a real iPhone. An MCP server that lets any AI agent see the screen, tap what it needs, and figure the rest out — through macOS iPhone Mirroring. Experimental support for macOS windows. [38 tools](docs/tools.md), any MCP client.
+**Drive a real, stock iPhone from any AI agent — no Developer Mode, no Xcode, no WebDriverAgent, no jailbreak.** mirroir-mcp works through macOS iPhone Mirroring, so it reaches any app on your phone, App Store apps you could never build included. Any MCP client, [38 tools](docs/tools.md), and experimental support for macOS app windows.
 
-## Vision: agents that test — and play
+Give your AI eyes, hands, and a real iPhone: it sees the screen, taps what it needs, and figures the rest out.
 
-mirroir is growing archetype-aware coverage for **games**. A game splits into two surfaces. The **shell** — menu, shop, loadout, settings, win/lose screens — is ordinary text-labelled UI that today's skills already drive. The **scene** — the playfield — is a vision-driven loop an agent follows one touch at a time. The honest targets are **game QA smoke tests, tutorial walkthroughs, and scripted demos**, not real-time play: iPhone Mirroring exposes a single pointer, so twin-stick and twitch games stay out of reach (see [Games](#games)).
+## Why mirroir
 
-**Token reductions** make the scene loop affordable. Screenshots are ~90% of an agent's cost, so text-rich shell screens read through `describe_screen` with no image at all, and a region/scale capture knob trims the per-frame image cost where a screenshot is unavoidable. On the playfield, `describe_screen` in vision mode sends the frame to an LLM through embacle; measured on a live Brawl Stars match, one frame costs ~24k prompt tokens and 3–14 s, which GitHub Copilot bills as a single premium request on Claude Sonnet 5.5.
+- **Nothing to install on the phone.** The iPhone stays stock: no signing, no provisioning profile, no on-device agent. If iPhone Mirroring shows it, mirroir can drive it.
+- **Explore once, replay without an LLM.** `generate_skill` explores an app and writes [SKILL.md](#skills) files. A compiled skill replays from the CLI with no AI in the loop (`mirroir test`), so CI runs are deterministic and cost no tokens.
+- **Drift fails loudly.** [`mirroir-run`](#replay-anywhere-with-mirroir-run) has a third verdict beside pass and fail: `DRIFT`, exit code **65**, when every assertion held but the output moved past its baseline. Your CI lane decides whether drift blocks a merge.
+- **One scenario, many surfaces.** A single `mirroir-run` scenario can drive the iPhone, a browser (Playwright: chromium, firefox, webkit), HTTP endpoints and subprocesses, then compare what the page and the phone showed. Web, HTTP and process scenarios run on Linux CI; the iPhone leg runs on a Mac with iPhone Mirroring, and [FakeMirroring](docs/testing.md) stands in for the phone in CI.
 
-The rollout is tracked as Gaming Surface A–E — shell coverage ships first; the scene loop is measured on a real device before it widens.
+### How it compares
+
+| | mirroir | [Maestro](https://github.com/mobile-dev-inc/Maestro) | [mobile-mcp](https://github.com/mobile-next/mobile-mcp) | [Appium](https://github.com/appium/appium) |
+|---|---|---|---|---|
+| Physical iPhone, no Developer Mode or signing | Yes — stock phone via iPhone Mirroring | No — its README: *"Physical iOS devices are not yet supported."* | USB-connected, trusted device (see its README) | No — WebDriverAgent via Xcode, Developer Mode |
+| App Store apps you can't build | Yes | No — iOS runs on simulator builds | Yes | Yes, on a provisioned device |
+| Replay without an LLM | Yes — compiled skills, `mirroir test` | Yes — YAML flows | No — the agent drives every run | Yes — test code |
+| Distinct drift verdict | Yes — `DRIFT`, exit 65 | No — pass / fail | No | No — pass / fail |
+| One scenario across iPhone + web + HTTP | Yes — `mirroir-run` | Web in the same flow syntax | No | Via your own test code |
+| Android | No — an emulator window can be driven only as a generic macOS window | Yes | Yes | Yes |
+| iOS Simulator | No | Yes | Yes | Yes |
+
+Each tool has strengths the table doesn't capture. Maestro, mobile-mcp and Appium cover Android and simulators, which mirroir doesn't. mirroir is built for the case they leave open: a real, unmodified iPhone running apps you don't build.
 
 ## Requirements
 
@@ -45,6 +60,16 @@ or via [Homebrew](https://tap.mirroir.dev):
 ```bash
 brew tap jfarcand/tap && brew install mirroir-mcp
 ```
+
+or as a [Claude Code plugin](https://docs.claude.com/en/docs/claude-code/plugins):
+
+```
+/plugin marketplace add jfarcand/mirroir-mcp
+/plugin install mirroir@mirroir
+/plugin install skills@mirroir   # optional: the community skill library
+```
+
+or as an MCP Bundle for Claude Desktop and other MCPB hosts: download `mirroir-mcp.mcpb` from the [latest release](https://github.com/jfarcand/mirroir-mcp/releases/latest) and double-click it. The bundle carries the native Apple Silicon binary, so it needs no Node.js. To build one from a release build: `mcpb/build-mcpb.sh .build/release/mirroir-mcp mirroir-mcp.mcpb`.
 
 The first time you take a screenshot, macOS will prompt for **Screen Recording** and **Accessibility** permissions. Grant both.
 
@@ -100,6 +125,37 @@ Or add to `~/.codex/config.toml`:
 [mcp_servers.mirroir]
 command = "npx"
 args = ["-y", "mirroir-mcp"]
+```
+
+#### Goose
+
+Add to `~/.config/goose/config.yaml`:
+
+```yaml
+extensions:
+  mirroir:
+    name: mirroir
+    cmd: npx
+    args: [-y, mirroir-mcp]
+    enabled: true
+    type: stdio
+    timeout: 300
+```
+
+#### Cline
+
+Open **MCP Servers → Configure → Configure MCP Servers** and add to `cline_mcp_settings.json`:
+
+```json
+{
+  "mcpServers": {
+    "mirroir": {
+      "command": "npx",
+      "args": ["-y", "mirroir-mcp"],
+      "disabled": false
+    }
+  }
+}
 ```
 
 </details>
@@ -174,6 +230,14 @@ test@example.com / password123. Screenshot after each step.
 ```
 Start recording, open Settings, scroll to General > About, stop recording.
 ```
+
+## Vision: agents that test — and play
+
+mirroir is growing archetype-aware coverage for **games**. A game splits into two surfaces. The **shell** — menu, shop, loadout, settings, win/lose screens — is ordinary text-labelled UI that today's skills already drive. The **scene** — the playfield — is a vision-driven loop an agent follows one touch at a time. The honest targets are **game QA smoke tests, tutorial walkthroughs, and scripted demos**, not real-time play: iPhone Mirroring exposes a single pointer, so twin-stick and twitch games stay out of reach (see [Games](#games)).
+
+**Token reductions** make the scene loop affordable. Screenshots are ~90% of an agent's cost, so text-rich shell screens read through `describe_screen` with no image at all, and a region/scale capture knob trims the per-frame image cost where a screenshot is unavoidable. On the playfield, `describe_screen` in vision mode sends the frame to an LLM through embacle; measured on a live Brawl Stars match, one frame costs ~24k prompt tokens and 3–14 s, which GitHub Copilot bills as a single premium request on Claude Sonnet 5.5.
+
+The rollout is tracked as Gaming Surface A–E — shell coverage ships first; the scene loop is measured on a real device before it widens.
 
 ## Games
 
@@ -556,6 +620,28 @@ brew install jfarcand/tap/mirroir-run
 ```
 
 Prebuilt binaries for macOS (Intel + Apple Silicon), Linux (gnu + musl), and Windows are attached to each [`runner-v*` release](https://github.com/jfarcand/mirroir-mcp/releases). On Windows, subprocess teardown signals are not implemented, so process scenarios are not supported there. See [`runner/docs/`](runner/docs/) for the scenario grammar, `SAMPLE.md` schema, judge profiles, and CI integration.
+
+### Use `mirroir-run` in GitHub Actions
+
+```yaml
+- uses: jfarcand/mirroir-mcp/actions/setup-mirroir-run@main
+  with:
+    version: latest   # or pin: 0.4.0
+- run: mirroir-run    # replays the nearest .mirroir/mirroir.yaml
+```
+
+Installs the released `mirroir-run` binary (Linux x64, macOS arm64/x64, Windows x64), verifies its SHA-256 and adds it to `PATH`. Web scenarios also need Playwright: add `jfarcand/mirroir-mcp/.github/actions/setup-playwright@main`. See [`actions/setup-mirroir-run`](actions/setup-mirroir-run/README.md).
+
+### Bring your Maestro flows
+
+Maestro flows run on a real, stock iPhone through `mirroir-run`:
+
+```bash
+mirroir-run import maestro flows/*.yaml -o .mirroir/apps/shop/scenarios \
+  --app com.example.shop=Shop
+```
+
+Each flow becomes an `<stem>.ios.yaml` scenario, with `runFlow` includes inlined. Commands mirroir cannot run faithfully (id selectors, JavaScript, Android-only keys) fail the import, each listed with its file and line. `--skip-unsupported` imports without them and records each one as a comment. See [`runner/docs/maestro-import.md`](runner/docs/maestro-import.md) for the full mapping.
 
 ## Security
 

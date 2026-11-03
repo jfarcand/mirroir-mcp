@@ -76,12 +76,13 @@ jobs:
           sed -i '' "s/const VERSION = \"$OLD_VERSION\"/const VERSION = \"$VERSION\"/" npm/install.js
           sed -i '' "s/\"version\": \"$OLD_VERSION\"/\"version\": \"$VERSION\"/g" server.json
           sed -i '' "s/static let current = \"$OLD_VERSION\"/static let current = \"$VERSION\"/" Sources/mirroir-mcp/Version.swift
+          sed -i '' "s/\"version\": \"$OLD_VERSION\"/\"version\": \"$VERSION\"/" mcpb/manifest.json plugins/mirroir/.claude-plugin/plugin.json
 
       - name: Verify no stale version references
         env:
           OLD_VERSION: ${{ steps.current.outputs.version }}
         run: |
-          FILES="npm/package.json npm/install.js server.json Sources/mirroir-mcp/Version.swift"
+          FILES="npm/package.json npm/install.js server.json Sources/mirroir-mcp/Version.swift mcpb/manifest.json plugins/mirroir/.claude-plugin/plugin.json"
           if grep -l "$OLD_VERSION" $FILES; then
             echo "ERROR: Stale version references remain in the files above"
             exit 1
@@ -118,7 +119,8 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add npm/package.json npm/install.js server.json \
-            Sources/mirroir-mcp/Version.swift
+            Sources/mirroir-mcp/Version.swift \
+            mcpb/manifest.json plugins/mirroir/.claude-plugin/plugin.json
           git commit -m "chore: bump version to $VERSION"
           git push origin main
 
@@ -141,7 +143,8 @@ jobs:
           cd .build/release
           tar czf "$GITHUB_WORKSPACE/mirroir-mcp-darwin-arm64.tar.gz" mirroir-mcp
           cd "$GITHUB_WORKSPACE"
-          shasum -a 256 mirroir-mcp-darwin-arm64.tar.gz > SHA256SUMS
+          mcpb/build-mcpb.sh .build/release/mirroir-mcp mirroir-mcp.mcpb
+          shasum -a 256 mirroir-mcp-darwin-arm64.tar.gz mirroir-mcp.mcpb > SHA256SUMS
 
       - name: Generate release notes
         env:
@@ -211,6 +214,7 @@ jobs:
         run: |
           gh release create "v$VERSION" \
             mirroir-mcp-darwin-arm64.tar.gz \
+            mirroir-mcp.mcpb \
             SHA256SUMS \
             --title "v$VERSION" \
             --notes-file release-notes.md
@@ -270,12 +274,11 @@ jobs:
           token: ${{ secrets.RELEASE_PAT }}
           fetch-depth: 0
 
-      - name: Bump version in marketplace.json files
+      - name: Bump version in the Copilot marketplace.json
         env:
           VERSION: ${{ github.event.inputs.version }}
         run: |
           sed -i "s/\"version\": \"[0-9]\+\.[0-9]\+\.[0-9]\+\"/\"version\": \"${VERSION}\"/g" \
-            .claude-plugin/marketplace.json \
             .github/plugin/marketplace.json
 
       - name: Commit, tag, and release
@@ -285,7 +288,7 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add .claude-plugin/marketplace.json .github/plugin/marketplace.json
+          git add .github/plugin/marketplace.json
           git commit -m "chore: bump version to ${VERSION}"
           git push
           git tag "v${VERSION}"

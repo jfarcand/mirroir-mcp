@@ -29,6 +29,7 @@ mod cross_surface_error;
 mod emitted_scenario_contract;
 mod error;
 mod ios_error;
+mod maestro;
 mod mirroir;
 mod oracle;
 mod parser;
@@ -48,6 +49,7 @@ mod verdict;
 use crate::accept::{AcceptArgs, run_accept};
 use crate::compile::emit::emit_playwright;
 use crate::error::{Result, RunnerError};
+use crate::maestro::cli::{ImportArgs, run_import};
 use crate::mirroir::lock::LockfileMode;
 use crate::mirroir::pack_install::{PackArgs, run_pack};
 use crate::mirroir::run::{MirroirRunOptions, run_mirroir, run_mirroir_autodiscover};
@@ -75,6 +77,9 @@ enum Command {
     Accept(AcceptArgs),
     /// Manage the archetype packs installed under `~/.mirroir/skills/`.
     Pack(PackArgs),
+    /// Convert another tool's tests into mirroir-run scenarios:
+    /// `import maestro <flow.yaml>... [-o <dir>]`.
+    Import(ImportArgs),
 }
 
 /// Cross-platform replayer for mirroir `SkillStep` YAML scenarios.
@@ -82,7 +87,7 @@ enum Command {
 #[command(name = "mirroir-run", version, about, long_about = None)]
 #[command(args_conflicts_with_subcommands = true, subcommand_negates_reqs = true)]
 struct Cli {
-    /// The `accept` / `pack` subcommand; absent for every ordinary run.
+    /// The `accept` / `pack` / `import` subcommand; absent for every ordinary run.
     #[command(subcommand)]
     command: Option<Command>,
 
@@ -252,6 +257,7 @@ async fn run(cli: &Cli) -> Result<RunVerdict> {
     match &cli.command {
         Some(Command::Accept(args)) => return run_accept(args).await,
         Some(Command::Pack(args)) => return run_pack(args),
+        Some(Command::Import(args)) => return run_import(args),
         None => {}
     }
 

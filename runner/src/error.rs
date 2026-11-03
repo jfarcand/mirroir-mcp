@@ -13,6 +13,7 @@ use crate::compile::error::PlaywrightError;
 use crate::compile::report_error::ReportError;
 use crate::cross_surface_error::CrossSurfaceError;
 use crate::ios_error::IosError;
+use crate::maestro::error::MaestroError;
 use crate::mirroir::error::MirroirError;
 use crate::oracle::error::OracleError;
 use crate::parser::step::TargetKind;
@@ -470,6 +471,11 @@ pub enum RunnerError {
     /// An `ios` block that could not be written in mirroir-mcp's dialect or run.
     #[error(transparent)]
     Ios(#[from] IosError),
+
+    /// A `mirroir-run import maestro` failure — a flow that cannot be read,
+    /// or commands with no mirroir equivalent.
+    #[error(transparent)]
+    Maestro(#[from] MaestroError),
 
     /// A judge-scoring or drift-threshold failure.
     #[error(transparent)]

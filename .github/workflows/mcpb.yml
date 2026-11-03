@@ -1,0 +1,102 @@
+name: "CI: MCP Bundle and Plugin Manifests"
+
+# Guards the one-line install artifacts: the Claude Code plugin marketplace
+# (.claude-plugin/marketplace.json + plugins/mirroir) and the MCP Bundle
+# manifest (mcpb/manifest.json). release.yml packs mirroir-mcp.mcpb and
+# attaches it to every release; the workflow_dispatch path packs the bundle
+# for the current release when it predates the bundle, from that
+# release's own tarball.
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Existing release tag to attach mirroir-mcp.mcpb to (e.g. v0.42.0)'
+        required: true
+  push:
+    paths:
+      - '.claude-plugin/**'
+      - 'plugins/**'
+      - 'mcpb/**'
+      - 'server.json'
+      - '.github/workflows/mcpb.yml'
+  pull_request:
+    paths:
+      - '.claude-plugin/**'
+      - 'plugins/**'
+      - 'mcpb/**'
+      - 'server.json'
+      - '.github/workflows/mcpb.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    if: github.event_name != 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+
+      - name: Manifests parse as JSON
+        run: |
+          for f in .claude-plugin/marketplace.json plugins/mirroir/.claude-plugin/plugin.json mcpb/manifest.json; do
+            python3 -I -m json.tool "$f" > /dev/null
+            echo "ok: $f"
+          done
+
+      - name: Plugin version matches server.json
+        run: |
+          python3 -I - <<'EOF'
+          import json, sys
+          expected = json.load(open("server.json"))["version"]
+          found = json.load(open("plugins/mirroir/.claude-plugin/plugin.json"))["version"]
+          if found != expected:
+              sys.exit(f"plugin.json version {found} != server.json version {expected}")
+          print(f"plugin.json version matches {expected}")
+          EOF
+
+      - name: MCPB manifest validates
+        run: mcpb/build-mcpb.sh --check
+
+  attach:
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: macos-15
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v7
+
+      # The bundle manifest on the default branch carries the current
+      # version, so only the current release can be packed from it.
+      - name: Tag is the current release
+        env:
+          TAG: ${{ github.event.inputs.tag }}
+        run: |
+          current="v$(python3 -I -c 'import json; print(json.load(open("server.json"))["version"])')"
+          if [ "$TAG" != "$current" ]; then
+            echo "ERROR: $TAG is not the current release ($current)"
+            exit 1
+          fi
+
+      - name: Pack the release binary into mirroir-mcp.mcpb
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ github.event.inputs.tag }}
+        run: |
+          stage="$RUNNER_TEMP/release"
+          mkdir -p "$stage"
+          gh release download "$TAG" --pattern 'mirroir-mcp-darwin-arm64.tar.gz' --dir "$stage"
+          tar xzf "$stage/mirroir-mcp-darwin-arm64.tar.gz" -C "$stage"
+          mcpb/build-mcpb.sh "$stage/mirroir-mcp" "$GITHUB_WORKSPACE/mirroir-mcp.mcpb"
+
+      - name: Attach to the release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ github.event.inputs.tag }}
+        run: gh release upload "$TAG" mirroir-mcp.mcpb
