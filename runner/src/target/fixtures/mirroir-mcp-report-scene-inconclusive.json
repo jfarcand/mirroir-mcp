@@ -1,0 +1,41 @@
+{
+  "suites" : [
+    {
+      "file" : "scene-frames-impossible.yaml",
+      "specs" : [
+        {
+          "ok" : false,
+          "tests" : [
+            {
+              "projectName" : "ios",
+              "results" : [
+                {
+                  "attachments" : [
+                    {
+                      "body" : "eyJjcm9zc19zdXJmYWNlIjp7ImlvcyI6Ik1PVkUgRklSRVxuIn0sIm1ldHJpY3MiOnt9LCJzY2VuZXMiOnsiMiI6eyJjb21wbGV0aW9uX3Rva2VucyI6MTUwLCJldmlkZW5jZV9kaXIiOiJcL3RtcFwvbWlycm9pci1zY2VuZVwvc2NlbmUtMiIsImZyYW1lcyI6MywiZnJhbWVzX3RvX3ByZWRpY2F0ZSI6bnVsbCwibW9kZWwiOiJzY2VuZS1zdHViIiwicHJvbXB0X3Rva2VucyI6NzIwMDAsInJlYXNvbiI6Im1heF9mcmFtZXMiLCJyZWplY3RlZF9yZXBsaWVzIjowLCJyZXNwb25zZV9tb2RlbCI6InNjZW5lLXN0dWIiLCJzZWNvbmRzIjoxMi41LCJza2lsbCI6InNjZW5lLWZyYW1lcy1pbXBvc3NpYmxlIiwidG90YWxfdG9rZW5zIjo3MjE1MCwidmVyZGljdCI6ImluY29uY2x1c2l2ZSJ9fX0=",
+                      "contentType" : "application\/json",
+                      "name" : "mirroir-captures"
+                    }
+                  ],
+                  "duration" : 13000,
+                  "error" : {
+                    "message" : "step 2 (scene: \"scene-frames-impossible\"): INCONCLUSIVE: scene-frames-impossible: max_frames (3 frames, 72150 tokens)"
+                  },
+                  "errors" : [
+                    {
+                      "message" : "step 2 (scene: \"scene-frames-impossible\"): INCONCLUSIVE: scene-frames-impossible: max_frames (3 frames, 72150 tokens)"
+                    }
+                  ],
+                  "status" : "failed"
+                }
+              ],
+              "status" : "unexpected"
+            }
+          ],
+          "title" : "scene-frames-impossible"
+        }
+      ],
+      "title" : "scene-frames-impossible.yaml"
+    }
+  ]
+}

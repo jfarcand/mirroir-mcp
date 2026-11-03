@@ -107,7 +107,7 @@ enum SkillMdParser {
     // MARK: - Front Matter Extraction
 
     /// Extract the raw front matter string between `---` delimiters.
-    private static func extractFrontMatter(content: String) -> String {
+    static func extractFrontMatter(content: String) -> String {
         let lines = content.components(separatedBy: .newlines)
         var foundFirstDelimiter = false
         var frontMatterLines: [String] = []
@@ -132,7 +132,7 @@ enum SkillMdParser {
     }
 
     /// Extract a string value from YAML front matter using simple key: value parsing.
-    private static func extractStringValue(from frontMatter: String, key: String) -> String? {
+    static func extractStringValue(from frontMatter: String, key: String) -> String? {
         let lines = frontMatter.components(separatedBy: .newlines)
         for line in lines {
             let trimmed = line.trimmingCharacters(in: .whitespaces)
@@ -153,7 +153,7 @@ enum SkillMdParser {
     }
 
     /// Extract a YAML inline array value like `["tag1", "tag2"]`.
-    private static func extractArrayValue(from frontMatter: String, key: String) -> [String] {
+    static func extractArrayValue(from frontMatter: String, key: String) -> [String] {
         let lines = frontMatter.components(separatedBy: .newlines)
         for line in lines {
             let trimmed = line.trimmingCharacters(in: .whitespaces)

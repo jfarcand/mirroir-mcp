@@ -97,7 +97,7 @@ extension TestRunner {
             ConsoleReporter.reportStep(index: index, total: stepCount,
                                        result: result, verbose: verbose)
 
-            if result.status == .failed {
+            if result.status.isFailure {
                 stopOnFailure = true
             }
         }
@@ -169,7 +169,8 @@ extension TestRunner {
         warn: (String) -> Void = { fputs($0, stderr) }
     ) -> [String: CompiledSkill] {
         var compiledMap: [String: CompiledSkill] = [:]
-        for skill in skills {
+        // A skill that plays a scene runs live: a scene is never compiled.
+        for skill in skills where !skill.holdsScene {
             let compiled: CompiledSkill?
             do {
                 compiled = try CompiledSkillIO.load(for: skill.filePath)

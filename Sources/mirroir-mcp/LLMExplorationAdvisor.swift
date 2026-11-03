@@ -68,6 +68,9 @@ struct VisionExplorationAdvisor: ExplorationAdvising {
 
     private static var timeoutSeconds: Int { EnvConfig.embacleTimeoutSeconds }
 
+    /// The reply is one element's text, so a short completion is enough.
+    private static let replyMaxTokens = 100
+
     func suggest(
         screenshotBase64: String,
         elements: [TapPoint],
@@ -131,41 +134,20 @@ struct VisionExplorationAdvisor: ExplorationAdvising {
         )
     }
 
-    /// Build an OpenAI-compatible vision request and send via embacle FFI.
+    /// Ask the embedded runner about the screenshot; nil when it gives no answer.
     private func sendVisionRequest(imageBase64: String, prompt: String) -> String? {
-        let userContent: [[String: Any]] = [
-            ["type": "text", "text": prompt],
-            ["type": "image_url", "image_url": [
-                "url": "data:image/png;base64,\(imageBase64)",
-            ]],
-        ]
-
-        let requestBody: [String: Any] = [
-            "model": model,
-            "max_tokens": 100,
-            "messages": [
-                ["role": "user", "content": userContent],
-            ],
-        ]
-
-        guard let body = try? JSONSerialization.data(withJSONObject: requestBody) else {
-            return nil
-        }
-
-        guard let responseData = EmbacleFFI.chatCompletion(
-            requestJSON: body, timeoutSeconds: Self.timeoutSeconds
-        ) else {
-            return nil
-        }
-
-        // Extract text from OpenAI-format response
-        guard let json = try? JSONSerialization.jsonObject(with: responseData) as? [String: Any],
-              let choices = json["choices"] as? [[String: Any]],
-              let first = choices.first,
-              let message = first["message"] as? [String: Any],
-              let content = message["content"] as? String else {
-            return String(data: responseData, encoding: .utf8)
-        }
-        return content
+        requestChatCompletion(
+            systemPrompt: nil,
+            userText: "",
+            image: ChatCompletionImage(pngBase64: imageBase64, caption: prompt),
+            model: model,
+            maxTokens: Self.replyMaxTokens,
+            agentConfig: AgentConfig(
+                name: "vision-advisor", mode: .api, provider: nil, model: model,
+                apiKeyEnvVar: nil, baseURL: nil, systemPrompt: nil,
+                maxTokens: Self.replyMaxTokens, command: nil, args: nil),
+            transport: .embedded,
+            timeoutSeconds: Self.timeoutSeconds
+        )?.text
     }
 }

@@ -13,6 +13,9 @@ struct StepResult {
     let status: StepStatus
     let message: String?
     let durationSeconds: Double
+    /// What a `scene:` step played, reported in the run's captures; nil for
+    /// every other step.
+    var scene: SceneReport? = nil
 
     enum StepStatus: String, Equatable {
         case passed = "PASS"
@@ -21,6 +24,12 @@ struct StepResult {
         /// An AI-only step the CLI cannot run. Nothing was checked, so the skill
         /// holding it does not pass; later steps still run.
         case notEvaluated = "NOT EVALUATED"
+        /// A scene that ran out of budget before either predicate: a failure with
+        /// its own reason, never a pass.
+        case inconclusive = "INCONCLUSIVE"
+
+        /// Whether the step failed the skill and stops the steps after it.
+        var isFailure: Bool { self == .failed || self == .inconclusive }
     }
 
     /// The result of an AI-only step (`verify`, `remember`, ...): the CLI has no AI
@@ -63,39 +72,50 @@ final class StepExecutor {
         var bridge: any WindowBridging
         var input: any InputProviding
         var describer: any ScreenDescribing
+        /// Local OCR, whatever `describer` is: a scene judges its predicates on it.
+        var ocrDescriber: any ScreenDescribing
         var capture: any ScreenCapturing
     }
 
     private var subsystems: Subsystems
     let config: StepExecutorConfig
     let registry: TargetRegistry?
+    /// The model a `scene:` step plays with; nil when none is configured, and a
+    /// scene step then fails.
+    let vision: (any VisionCompleting)?
 
     init(bridge: any WindowBridging,
          input: InputProviding,
          describer: ScreenDescribing,
          capture: ScreenCapturing,
          config: StepExecutorConfig = .default,
-         registry: TargetRegistry? = nil) {
+         registry: TargetRegistry? = nil,
+         ocrDescriber: (any ScreenDescribing)? = nil,
+         vision: (any VisionCompleting)? = nil) {
         self.subsystems = Subsystems(
             bridge: bridge,
             input: input,
             describer: describer,
+            ocrDescriber: ocrDescriber ?? describer,
             capture: capture
         )
         self.config = config
         self.registry = registry
+        self.vision = vision
     }
 
     var bridge: any WindowBridging { subsystems.bridge }
     var input: any InputProviding { subsystems.input }
     var describer: any ScreenDescribing { subsystems.describer }
+    var ocrDescriber: any ScreenDescribing { subsystems.ocrDescriber }
     var capture: any ScreenCapturing { subsystems.capture }
 
     /// Swap subsystem references when switching targets.
     func switchSubsystems(bridge: any WindowBridging, input: any InputProviding,
-                          describer: any ScreenDescribing, capture: any ScreenCapturing) {
-        subsystems = Subsystems(bridge: bridge, input: input,
-                                describer: describer, capture: capture)
+                          describer: any ScreenDescribing, ocrDescriber: any ScreenDescribing,
+                          capture: any ScreenCapturing) {
+        subsystems = Subsystems(bridge: bridge, input: input, describer: describer,
+                                ocrDescriber: ocrDescriber, capture: capture)
     }
 
     /// Execute a single step and return the result.
@@ -110,6 +130,12 @@ final class StepExecutor {
 
         if config.dryRun {
             let duration = CFAbsoluteTimeGetCurrent() - startTime
+            // A dry run plays nothing, so a scene is not evaluated, never passed.
+            if case .scene = step {
+                return StepResult(step: step, status: .notEvaluated,
+                                  message: "not evaluated: a dry run plays no scene",
+                                  durationSeconds: duration)
+            }
             return StepResult(step: step, status: .passed,
                               message: "dry run", durationSeconds: duration)
         }
@@ -164,6 +190,9 @@ final class StepExecutor {
                                      skillName: skillName, startTime: startTime)
         case .switchTarget(let selector):
             result = executeSwitchTarget(selector: selector, startTime: startTime)
+        case .scene(let skill, let budget):
+            result = executeScene(skill: skill, budget: budget, stepIndex: stepIndex,
+                                  skillName: skillName, startTime: startTime)
         case .skipped(let stepType, let reason):
             let duration = CFAbsoluteTimeGetCurrent() - startTime
             result = StepResult(step: step, status: .skipped,
@@ -177,7 +206,7 @@ final class StepExecutor {
         }
 
         // Save failure screenshot for debugging
-        if result.status == .failed {
+        if result.status.isFailure {
             captureFailureScreenshot(stepIndex: stepIndex, skillName: skillName)
         }
 

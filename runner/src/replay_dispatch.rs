@@ -6,12 +6,13 @@ use std::path::Path;
 
 use tracing::info;
 
-use crate::compile::report::RunCaptures;
+use crate::compile::captures::RunCaptures;
 use crate::error::{Result, RunnerError};
 use crate::oracle::baseline::BaselineMode;
 use crate::oracle::drift_session::DriftSession;
 use crate::oracle::error::OracleError;
 use crate::oracle::judge::{JudgeRegistry, enforce_threshold, run_judge};
+use crate::oracle::thresholds::DriftMetric;
 use crate::parser::step::{JudgeArgs, SkillStep};
 
 /// Dispatch a `judge:` step: resolve the response, run the judge registry,
@@ -161,7 +162,7 @@ pub fn verify_measures(
                 max_seconds,
             });
         }
-        drift.observe_measure(&args.name, elapsed_ms)?;
+        drift.observe_measure(DriftMetric::StepLatencyPctIncrease, &args.name, elapsed_ms)?;
     }
     Ok(())
 }

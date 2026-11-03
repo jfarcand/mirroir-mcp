@@ -86,10 +86,12 @@ enum TestRunner {
         for filePath in skillFiles {
             do {
                 let skill = try SkillFileLoader.load(filePath: filePath)
-                if skill.kind == "game" {
-                    fputs("Skipping \(skill.name): kind:game is model-interpreted — "
-                        + "never replayed by the runner.\n", stderr)
-                    continue
+                // A scene skill is played only by a `scene:` step; run directly,
+                // it has no steps, and skipping it would let the run pass.
+                if skill.isGame {
+                    fputs("Refusing \(skill.name): kind:game is model-interpreted — "
+                        + "play it through a scene: step, never directly.\n", stderr)
+                    return 1
                 }
                 skills.append(skill)
             } catch {
@@ -98,12 +100,16 @@ enum TestRunner {
             }
         }
 
-        if skills.isEmpty {
-            fputs("No replayable skills: every skill given is kind:game.\n", stderr)
-            return 1
+        if let refusal = InvalidStepGate.refuse(skills: skills) {
+            return refusal
         }
 
-        if let refusal = InvalidStepGate.refuse(skills: skills) {
+        // A scene plays with the configured scene agent; it is resolved only when
+        // a skill holds a scene, and every scene is checked before any step runs.
+        let holdsScene = skills.contains { $0.holdsScene }
+        let vision: (any VisionCompleting)? = holdsScene ? AgentVisionClient.configured() : nil
+        if let refusal = SceneStepGate.refuse(
+            skills: skills, dryRun: config.dryRun, visionAvailable: vision != nil) {
             return refusal
         }
 
@@ -141,7 +147,9 @@ enum TestRunner {
             bridge: bridge, input: input,
             describer: describer, capture: capture,
             config: executorConfig,
-            registry: registry
+            registry: registry,
+            ocrDescriber: describer,
+            vision: vision
         )
 
         // Load compiled skills if available. Only read: a test run writes one only
@@ -297,7 +305,7 @@ enum TestRunner {
             ConsoleReporter.reportStep(index: index, total: stepCount,
                                        result: result, verbose: verbose)
 
-            if result.status == .failed {
+            if result.status.isFailure {
                 stopOnFailure = true
             }
         }

@@ -124,6 +124,7 @@ pub fn emit_step(step: &SkillStep, ctx: &mut EmitContext, out: &mut String) -> R
         | SkillStep::Shake(_)
         | SkillStep::ResetApp(_)
         | SkillStep::SetNetwork(_)
+        | SkillStep::Scene(_)
         | SkillStep::Condition(_)
         | SkillStep::Spawn(_)
         | SkillStep::WaitPort(_)

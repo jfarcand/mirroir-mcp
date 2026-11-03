@@ -3,7 +3,7 @@
 
 use tracing::info;
 
-use crate::compile::report::RunCaptures;
+use crate::compile::captures::RunCaptures;
 use crate::error::{Result, RunnerError};
 use crate::oracle::baseline::BaselineMode;
 use crate::oracle::drift_session::DriftSession;
@@ -143,6 +143,7 @@ pub async fn dispatch_step(
         | SkillStep::Shake(_)
         | SkillStep::ResetApp(_)
         | SkillStep::SetNetwork(_)
+        | SkillStep::Scene(_)
         | SkillStep::Condition(_)
         | SkillStep::Target(_)
         | SkillStep::Tap(_)
@@ -204,7 +205,7 @@ mod tests {
     use super::{
         BaselineMode, DriftSession, StepDispatch, StepVerdict, dispatch_report, dispatch_step,
     };
-    use crate::compile::report::RunCaptures;
+    use crate::compile::captures::RunCaptures;
     use crate::error::RunnerError;
     use crate::oracle::thresholds::DriftPolicy;
     use crate::parser::step::{ReportArgs, SkillStep, TapArgs};

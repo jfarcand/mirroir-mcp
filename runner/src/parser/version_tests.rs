@@ -224,7 +224,8 @@ fn every_loader_refuses_a_newer_major_before_parsing_its_keys() -> TestResult {
 #[test]
 fn every_loader_ignores_unknown_keys_at_a_newer_minor() -> TestResult {
     for loader in loaders() {
-        let raw = format!("version: \"1.1\"\n{}", loader.body_with_unknown_key);
+        let newer = loader.kind.known_minor() + 1;
+        let raw = format!("version: \"1.{newer}\"\n{}", loader.body_with_unknown_key);
         (loader.load)(&raw)
             .map_err(|e| format!("{}: a newer minor should load, got {e}", loader.kind))?;
     }

@@ -119,8 +119,14 @@ final class StubInput: InputProviding, @unchecked Sendable {
                                     toX: toX, toY: toY, durationMs: durationMs))
         return swipeResult
     }
+    /// Records every drag() invocation as from and to points.
+    var dragCalls: [(fromX: Double, fromY: Double, toX: Double, toY: Double)] = []
+
     func drag(fromX: Double, fromY: Double, toX: Double, toY: Double,
-              durationMs: Int, cursorMode: CursorMode? = nil) -> String? { dragResult }
+              durationMs: Int, cursorMode: CursorMode? = nil) -> String? {
+        dragCalls.append((fromX: fromX, fromY: fromY, toX: toX, toY: toY))
+        return dragResult
+    }
     func longPress(x: Double, y: Double, durationMs: Int, cursorMode: CursorMode? = nil) -> String? { longPressResult }
     func doubleTap(x: Double, y: Double, cursorMode: CursorMode? = nil) -> String? { doubleTapResult }
     func shake() -> TypeResult { shakeResult }

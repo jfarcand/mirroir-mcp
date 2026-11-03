@@ -1,6 +1,7 @@
 // ABOUTME: Compilation targets — Playwright for a web block, the mirroir-mcp skill dialect for an iOS block.
 // ABOUTME: Both engines report in the Playwright JSON-reporter shape, ingested by `report`.
 
+pub mod captures;
 pub mod emit;
 pub mod error;
 pub mod invoke;

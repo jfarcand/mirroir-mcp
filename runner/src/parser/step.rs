@@ -14,6 +14,7 @@ pub use crate::parser::step_args::{
 pub use crate::parser::step_process_args::{
     AssertLogArgs, AssertLogCleanArgs, KillArgs, PortState, SpawnArgs, WaitPortArgs,
 };
+pub use crate::parser::step_scene_args::SceneArgs;
 pub use crate::parser::step_web_args::{AssertArgs, TapArgs, TypeArgs, WaitForArgs};
 
 /// The grammar mirroir emits and mirroir-run replays.
@@ -66,6 +67,8 @@ pub enum SkillStep {
     Target(TargetArgs),
     /// `- remember: "AI observation text"`.
     Remember(String),
+    /// `- scene: { skill, budget: { max_frames, max_tokens, max_seconds } }`.
+    Scene(SceneArgs),
 
     // ── condition: if_visible / then / else (mirroir-skills legacy YAML) ──
     /// `- condition: { if_visible, then, else? }`.

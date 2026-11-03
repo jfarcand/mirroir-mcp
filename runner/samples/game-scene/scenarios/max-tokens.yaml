@@ -1,0 +1,7 @@
+version: 1
+name: "scene-max-tokens"
+steps:
+  - target: { kind: ios, app: "Scene Frames" }
+  - reset_app: "Scene Frames"
+  - launch: "Scene Frames"
+  - scene: { skill: scene-frames-impossible, budget: { max_frames: 10, max_tokens: 50000, max_seconds: 120 } }

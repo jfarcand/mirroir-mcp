@@ -68,10 +68,10 @@ enum SaveCompiledHandler {
         // A kind:game skill is model-interpreted: it is never compiled
         // to a .compiled.json. Refuse rather than writing a dead artifact.
         if let content = try? String(contentsOfFile: skillPath),
-           SkillParser.headerKind(from: content) == "game" {
+           SkillParser.isGame(content: content) {
             return .error(
                 "'\(skillName)' is a kind:game skill — model-interpreted and "
-                + "never compiled. Run it via the game model loop instead.")
+                + "never compiled. Play it through a scene: step instead.")
         }
 
         // A SKILL.md replays only from what was recorded, so each step must hold

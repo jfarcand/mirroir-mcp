@@ -1,15 +1,13 @@
 // ABOUTME: Playwright JSON-reporter ingest — per-test verdicts, failure text, and mirroir-captures.
 // ABOUTME: Owns the reporter deserialization shapes so invoke.rs only spawns npx and hands the body here.
 
-use std::collections::BTreeMap;
-
 use base64::Engine as _;
 use base64::engine::general_purpose::STANDARD as BASE64;
 use serde::Deserialize;
 
+use crate::compile::captures::RunCaptures;
 use crate::compile::report_error::{ReportEngine, ReportError};
 use crate::error::Result;
-use crate::parser::compiled::{DeviceInfo, ScreenFingerprint};
 
 /// Name of the attachment the emitted spec writes its captures to.
 ///
@@ -52,60 +50,6 @@ pub struct TestFailure {
     pub message: String,
 }
 
-/// Values the emitted spec attached under [`CAPTURES_ATTACHMENT`].
-///
-/// `metrics` is keyed by the `measure:` step's `name` and holds milliseconds.
-/// `judge` and `cross_surface` are keyed by the *step index* the capture was
-/// emitted for, as the scenario file reads — a scenario may carry several of
-/// each, and the index is the only collision-free key.
-///
-/// When a scenario runs across several browser projects each project attaches
-/// its own captures; they merge in reporter order, so the last project's
-/// values win for a key every project wrote.
-#[derive(Debug, Clone, Default, Deserialize, PartialEq)]
-pub struct RunCaptures {
-    /// `measure:` latencies in milliseconds, keyed by measure name.
-    #[serde(default)]
-    pub metrics: BTreeMap<String, f64>,
-    /// `judge:` response text, keyed by step index.
-    #[serde(default)]
-    pub judge: BTreeMap<String, String>,
-    /// `cross_surface:` capture text, keyed by step index.
-    #[serde(default)]
-    pub cross_surface: BTreeMap<String, String>,
-    /// Uncaught exceptions the page raised during the run, newest last. The
-    /// spec asserts this is empty, so a non-empty value here means the run
-    /// already failed — it carries the detail.
-    #[serde(default)]
-    pub page_errors: Vec<String>,
-    /// `<status> <method> <url>` for every failed response to a resource the
-    /// page depends on.
-    #[serde(default)]
-    pub failed_requests: Vec<String>,
-    /// The screens an `ios` block left, keyed `start` (before step 0) and by
-    /// the block step index each followed. Only `mirroir-mcp test` writes it.
-    #[serde(default)]
-    pub screens: BTreeMap<String, ScreenFingerprint>,
-    /// The mirroring window an `ios` block drove.
-    #[serde(default)]
-    pub device: Option<DeviceInfo>,
-}
-
-impl RunCaptures {
-    /// Fold another block's captures in; a key both carry takes `other`'s.
-    pub fn merge(&mut self, other: Self) {
-        self.metrics.extend(other.metrics);
-        self.judge.extend(other.judge);
-        self.cross_surface.extend(other.cross_surface);
-        self.page_errors.extend(other.page_errors);
-        self.failed_requests.extend(other.failed_requests);
-        self.screens.extend(other.screens);
-        if other.device.is_some() {
-            self.device = other.device;
-        }
-    }
-}
-
 /// Everything one Playwright invocation reported.
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct ReporterOutcome {
@@ -125,7 +69,8 @@ pub struct ReporterOutcome {
 /// * [`ReportError::CaptureDecode`] when a `mirroir-captures` attachment
 ///   can't be base64-, UTF-8-, or JSON-decoded.
 /// * [`ReportError::TestFailures`] when at least one result failed, with
-///   each failure's title + reporter message attached.
+///   each failure's title + reporter message attached, and the captures the
+///   run still wrote — a failed `ios` block's scene reports among them.
 /// * [`ReportError::Empty`] when the reporter recorded no results.
 pub fn parse_report_body(engine: ReportEngine, path: &str, body: &str) -> Result<ReporterOutcome> {
     let parsed: ReporterRoot =
@@ -148,6 +93,7 @@ pub fn parse_report_body(engine: ReportEngine, path: &str, body: &str) -> Result
             failed: ingest.outcome.verdict.failed,
             total,
             failures: ingest.failures,
+            captures: Box::new(ingest.outcome.captures),
         }
         .into());
     }
@@ -313,7 +259,8 @@ struct ReporterAttachment {
 mod tests {
     use std::result::Result as StdResult;
 
-    use super::{RunCaptures, parse_report_body};
+    use super::parse_report_body;
+    use crate::compile::captures::RunCaptures;
     use crate::compile::report_error::{ReportEngine, ReportError};
     use crate::error::RunnerError;
 

@@ -62,6 +62,7 @@ enum CompiledRunRecord {
         outputPath: String,
         compiledAt: Date = Date()
     ) throws {
+        guard !skill.holdsScene else { throw CompiledRunRecordError.holdsScene(skill: skill.name) }
         guard result.passed else { throw CompiledRunRecordError.runFailed(skill: skill.name) }
         guard let device else { throw CompiledRunRecordError.noWindow }
         guard screens.start != nil else { throw CompiledRunRecordError.startScreenUnread }
@@ -80,6 +81,7 @@ enum CompiledRunRecord {
 /// Why `--compiled-out` wrote no compiled skill.
 enum CompiledRunRecordError: LocalizedError, Equatable {
     case runFailed(skill: String)
+    case holdsScene(skill: String)
     case noWindow
     case startScreenUnread
     case stepScreenUnread(index: Int)
@@ -88,6 +90,8 @@ enum CompiledRunRecordError: LocalizedError, Equatable {
         switch self {
         case .runFailed(let skill):
             return "\(skill) did not pass, so no compiled skill was recorded"
+        case .holdsScene(let skill):
+            return "\(skill) plays a scene, a model loop that is never compiled"
         case .noWindow:
             return "the iPhone Mirroring window could not be read, so the compiled skill "
                 + "has no device to record"

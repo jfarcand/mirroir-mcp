@@ -12,12 +12,14 @@ use thiserror::Error;
 use crate::compile::error::PlaywrightError;
 use crate::compile::report_error::ReportError;
 use crate::cross_surface_error::CrossSurfaceError;
+use crate::http_error::HttpError;
 use crate::ios_error::IosError;
 use crate::maestro::error::MaestroError;
 use crate::mirroir::error::MirroirError;
 use crate::oracle::error::OracleError;
 use crate::parser::step::TargetKind;
 use crate::parser::version::{ArtifactKind, SchemaVersion};
+use crate::scene_error::SceneError;
 
 /// `Result` alias used throughout the `mirroir-run` binary.
 ///
@@ -176,62 +178,6 @@ pub enum RunnerError {
         reason: String,
     },
 
-    /// Building the underlying `reqwest::Client` failed (TLS, DNS resolver init, …).
-    #[error("HTTP client initialization failed")]
-    HttpClient {
-        /// Underlying `reqwest` error.
-        #[source]
-        source: reqwest::Error,
-    },
-
-    /// Building the rustls client config every HTTP client shares failed.
-    #[error("TLS configuration failed")]
-    TlsConfig {
-        /// Underlying `rustls` error.
-        #[source]
-        source: rustls::Error,
-    },
-
-    /// An `http:` step could not complete the request (DNS, refused connect, timeout, …).
-    #[error("HTTP request to `{url}` failed")]
-    HttpRequest {
-        /// Target URL.
-        url: String,
-        /// Underlying `reqwest` error.
-        #[source]
-        source: reqwest::Error,
-    },
-
-    /// An `http:` step's response had a different status code than `expect_status:`.
-    #[error("HTTP `{url}` returned status {actual}, expected {expected}")]
-    HttpStatusMismatch {
-        /// Target URL.
-        url: String,
-        /// Status code declared in the YAML.
-        expected: u16,
-        /// Status code the server actually returned.
-        actual: u16,
-    },
-
-    /// Reading an `http:` step's response body failed (connection drop, decode error, …).
-    #[error("HTTP `{url}` body read failed")]
-    HttpBodyRead {
-        /// Target URL.
-        url: String,
-        /// Underlying `reqwest` error.
-        #[source]
-        source: reqwest::Error,
-    },
-
-    /// An `http:` step's response body did not contain a required substring.
-    #[error("HTTP `{url}` body missing required substring `{expected}`")]
-    HttpBodyMismatch {
-        /// Target URL.
-        url: String,
-        /// The substring from `expect_body_contains:` that was missing.
-        expected: String,
-    },
-
     /// `SAMPLE.md` had no fenced `yaml` code block to parse as the manifest.
     #[error("SAMPLE.md at `{path}` has no fenced yaml block")]
     SampleMissingYaml {
@@ -290,10 +236,14 @@ pub enum RunnerError {
     /// `first_error` carries the first failing scenario's own message so the
     /// locator, status code, or judge score that actually failed reaches the
     /// run summary instead of a bare count.
-    #[error("sample run: {failed} of {total} scenarios failed; first failure: {first_error}")]
+    #[error(
+        "sample run: {failed} of {total} scenarios failed ({inconclusive} inconclusive); first failure: {first_error}"
+    )]
     SampleScenarioFailures {
         /// Number of scenarios that returned `Err`.
         failed: usize,
+        /// How many of the `failed` were inconclusive scenes.
+        inconclusive: usize,
         /// Total scenarios attempted in the run.
         total: usize,
         /// Display text of the first scenario failure, verbatim.
@@ -472,6 +422,10 @@ pub enum RunnerError {
     #[error(transparent)]
     Ios(#[from] IosError),
 
+    /// An HTTP client, TLS config or `http:` step failure.
+    #[error(transparent)]
+    Http(#[from] HttpError),
+
     /// A `mirroir-run import maestro` failure — a flow that cannot be read,
     /// or commands with no mirroir equivalent.
     #[error(transparent)]
@@ -494,4 +448,8 @@ pub enum RunnerError {
     /// resolution, lockfile freshness, compose, or plan aggregation.
     #[error(transparent)]
     Mirroir(#[from] MirroirError),
+
+    /// A `scene:` step that failed, ran out of budget, or went unreported.
+    #[error(transparent)]
+    Scene(#[from] SceneError),
 }

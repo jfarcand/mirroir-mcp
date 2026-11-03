@@ -232,7 +232,7 @@ extension MirroirMCP {
     static func markSkillStart(
         skillPath: String, content: String, session: CompilationSession, target: any Target
     ) {
-        guard SkillParser.headerKind(from: content) != "game" else { return }
+        guard !SkillParser.isGame(content: content) else { return }
         session.markStart(skillPath: skillPath) {
             captureScreen(target: target)
         }
@@ -303,6 +303,8 @@ extension MirroirMCP {
                 return "a measure needs `until:`, the element that ends it"
             }
             return recordProblem(action).map { "its action: \($0)" }
+        case .scene:
+            return "a scene step is a model loop and is never compiled"
         default:
             return nil
         }

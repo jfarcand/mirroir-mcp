@@ -32,10 +32,6 @@ final class VisionScreenDescriber: @unchecked Sendable {
         Include every tappable element. For cards with data values, combine title and value (e.g. "Activité — 1 030 cal"). For back chevrons, use type "back_button".
         """
 
-    /// Sends one chat-completion request (transport, url, headers, body, timeout seconds)
-    /// and returns the response body, or nil on failure.
-    typealias AgentRequestSending = @Sendable (AgentTransport, URL, [String: String], Data, Int) -> Data?
-
     private let bridge: any WindowBridging
     private let capture: any ScreenCapturing
     /// Local OCR/icon pass that confirms a near-uniform frame is really empty
@@ -51,9 +47,7 @@ final class VisionScreenDescriber: @unchecked Sendable {
         localDescriber: ScreenDescriber,
         agentConfig: AgentConfig,
         targetImageWidth: Int = EnvConfig.visionImageWidth,
-        sendRequest: @escaping AgentRequestSending = {
-            sendAgentRequest(transport: $0, url: $1, headers: $2, body: $3, timeoutSeconds: $4)
-        }
+        sendRequest: @escaping AgentRequestSending = liveAgentRequestSender
     ) {
         self.bridge = bridge
         self.capture = capture
@@ -169,57 +163,26 @@ final class VisionScreenDescriber: @unchecked Sendable {
 
     /// Send the screenshot to the configured vision model and return the
     /// response text plus the token usage the provider reported, if any.
+    /// The caption carries the resized image's dimensions so the model returns
+    /// coordinates in that pixel space regardless of macOS zoom mode.
     private func sendVisionRequest(
         imageBase64: String, imageWidth: Int, imageHeight: Int
     ) -> (text: String, usage: ChatCompletionUsage?)? {
-        let baseURL = agentConfig.baseURL ?? defaultAgentBaseURL
-        guard let url = URL(string: baseURL + "/v1/chat/completions") else { return nil }
-
-        let systemPrompt = loadSystemPrompt(.screenDescribe)
-
-        // Build multipart content with image for OpenAI-compatible vision API.
-        // Include the resized image dimensions so the model returns coordinates
-        // in the correct pixel space regardless of macOS zoom mode.
-        let userContent: [[String: Any]] = [
-            ["type": "text", "text": "This image is \(imageWidth)x\(imageHeight) pixels. "
-                + "Coordinates are in pixel space (0 to \(imageWidth) for x, 0 to \(imageHeight) for y)."],
-            ["type": "image_url", "image_url": [
-                "url": "data:image/png;base64,\(imageBase64)",
-            ]],
-        ]
-
         let route = Self.visionRoute(agentConfig: agentConfig, visionModelOverride: EnvConfig.visionModel)
-
-        let requestBody: [String: Any] = [
-            "model": route.model,
-            "max_tokens": EnvConfig.visionMaxTokens,
-            "messages": [
-                ["role": "system", "content": systemPrompt],
-                ["role": "user", "content": userContent],
-            ],
-        ]
-
-        guard let body = try? JSONSerialization.data(withJSONObject: requestBody) else {
-            return nil
-        }
-
-        var headers = ["Content-Type": "application/json"]
-
-        // Support optional auth
-        if let apiKeyEnv = agentConfig.apiKeyEnvVar,
-           let apiKey = ProcessInfo.processInfo.environment[apiKeyEnv],
-           !apiKey.isEmpty {
-            headers["Authorization"] = "Bearer \(apiKey)"
-        }
-
-        guard let responseData = sendRequest(
-            route.transport, url, headers, body, EnvConfig.embacleTimeoutSeconds
-        ) else {
-            return nil
-        }
-
-        guard let text = extractChatCompletionText(from: responseData) else { return nil }
-        return (text, ChatCompletionUsage.parse(from: responseData))
+        let caption = "This image is \(imageWidth)x\(imageHeight) pixels. "
+            + "Coordinates are in pixel space (0 to \(imageWidth) for x, 0 to \(imageHeight) for y)."
+        guard let reply = requestChatCompletion(
+            systemPrompt: loadSystemPrompt(.screenDescribe),
+            userText: "",
+            image: ChatCompletionImage(pngBase64: imageBase64, caption: caption),
+            model: route.model,
+            maxTokens: EnvConfig.visionMaxTokens,
+            agentConfig: agentConfig,
+            transport: route.transport,
+            timeoutSeconds: EnvConfig.embacleTimeoutSeconds,
+            send: sendRequest
+        ) else { return nil }
+        return (reply.text, reply.usage)
     }
 
     /// The model a vision request sends and the transport that carries it.

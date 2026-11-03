@@ -131,9 +131,16 @@ enum CompileCommand {
                 continue
             }
 
-            if skill.kind == "game" {
+            if skill.isGame {
                 fputs("Skipping \(skill.name): kind:game is model-interpreted — "
                     + "never compiled to a .compiled.json.\n", stderr)
+                continue
+            }
+
+            if skill.holdsScene {
+                fputs("Refusing to compile \(filePath): a scene step is a model loop, never "
+                    + "compiled; run the skill with mirroir test instead.\n", stderr)
+                anyFailed = true
                 continue
             }
 
@@ -225,7 +232,7 @@ enum CompileCommand {
 
             fputs("  [\(index + 1)/\(skill.steps.count)] \(step.displayName)  \(statusTag)\n", stderr)
 
-            if result.status == .failed {
+            if result.status.isFailure {
                 fputs("    Error: \(result.message ?? "unknown")\n", stderr)
                 return nil
             }
@@ -329,6 +336,10 @@ enum CompileCommand {
 
         case .skipped, .invalid:
             // AI-only steps cannot be compiled
+            return nil
+
+        case .scene:
+            // A scene is a model loop: never compiled (compile refuses its skill).
             return nil
 
         case .longPress, .drag:

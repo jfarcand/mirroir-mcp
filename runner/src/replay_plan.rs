@@ -62,7 +62,7 @@ impl ScenarioPlan {
     ///   `target:` opens a block for them.
     /// * [`crate::ios_error::IosError::DeviceStepOutsideIosBlock`] when a
     ///   phone-only step (`launch:`, `home:`, `shake:`, `reset_app:`,
-    ///   `set_network:`) appears before any `ios` block opens.
+    ///   `set_network:`, `scene:`) appears before any `ios` block opens.
     /// * [`RunnerError::ConditionHasNoEvaluator`] for a `condition:`: nothing
     ///   here checks `if_visible`, so its branches would never run.
     /// * [`RunnerError::BlockNotContiguous`] when a device step follows a

@@ -5,6 +5,7 @@ use std::fmt;
 
 use thiserror::Error;
 
+use crate::compile::captures::RunCaptures;
 use crate::compile::report::TestFailure;
 
 /// Which engine wrote the reporter document being ingested.
@@ -84,6 +85,10 @@ pub enum ReportError {
         total: usize,
         /// Title + message of each failed test case, in reporter order.
         failures: Vec<TestFailure>,
+        /// What the failed run still attached. A failed `ios` block's scene
+        /// reports live here: an inconclusive scene fails the block, and the
+        /// runner reads its verdict back out of them.
+        captures: Box<RunCaptures>,
     },
 
     /// A `mirroir-captures` attachment was present but its body could not be
@@ -132,6 +137,7 @@ mod tests {
                     message: "Timeout 5000ms exceeded".to_owned(),
                 },
             ],
+            captures: Box::default(),
         };
         let rendered = err.to_string();
         for needle in [
@@ -157,6 +163,7 @@ mod tests {
                 title: "check-alarms".to_owned(),
                 message: "step 2 (tap: \"Alarmes\"): not found".to_owned(),
             }],
+            captures: Box::default(),
         };
         let rendered = err.to_string();
         if !rendered.starts_with("mirroir-mcp: 1 of 1 test cases failed") {

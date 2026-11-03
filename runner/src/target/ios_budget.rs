@@ -55,8 +55,9 @@ pub fn step_allowance(value: Option<OsString>) -> Result<Duration> {
 ///
 /// Each step earns `allowance`, or its own declared ceiling when that is
 /// longer — a `wait_for:` timeout, a `measure:` `max_seconds`. A `scroll_to:`
-/// reads the screen once per attempt, so it earns one allowance per attempt.
-/// The final-screen capture earns one more.
+/// reads the screen once per attempt, so it earns one allowance per attempt,
+/// and a `scene:` its `max_seconds` on top of one allowance. The final-screen
+/// capture earns one more.
 #[must_use]
 pub fn block_budget(steps: &[SkillStep], allowance: Duration) -> Duration {
     // Saturating throughout: an absurd override or `max_scrolls` caps the
@@ -68,7 +69,15 @@ pub fn block_budget(steps: &[SkillStep], allowance: Duration) -> Duration {
 }
 
 /// What one step earns: its own declared ceiling, never less than `allowance`.
+///
+/// A `scene:` earns its `max_seconds` plus one allowance: mirroir-mcp stops
+/// the scene inside its budget and still has to settle, read the frame back,
+/// and write the evidence, so a killed block never takes the scene's report
+/// and evidence with it.
 fn step_ceiling(step: &SkillStep, allowance: Duration) -> Duration {
+    if let SkillStep::Scene(args) = step {
+        return Duration::from_secs(args.budget.seconds.get()).saturating_add(allowance);
+    }
     let declared = match step {
         SkillStep::WaitFor(args) => args
             .timeout_s
@@ -137,6 +146,17 @@ mod tests {
     fn a_scroll_earns_one_allowance_per_attempt() -> TestResult {
         let total = budget("  - scroll_to: \"About\"\n")?;
         assert_eq!(total, ALLOWANCE * 10 + ALLOWANCE);
+        Ok(())
+    }
+
+    /// A scene earns its whole `max_seconds` on top of one allowance, so the
+    /// block outlives the scene's own budget and the report survives it.
+    #[test]
+    fn a_scene_earns_its_budget_plus_one_allowance() -> TestResult {
+        let total = budget(
+            "  - scene: { skill: s, budget: { max_frames: 3, max_tokens: 1000, max_seconds: 60 } }\n",
+        )?;
+        assert_eq!(total, Duration::from_secs(60) + ALLOWANCE + ALLOWANCE);
         Ok(())
     }
 

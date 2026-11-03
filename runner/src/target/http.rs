@@ -7,6 +7,7 @@ use reqwest::{Client, Method};
 use tracing::{debug, info};
 
 use crate::error::{Result, RunnerError};
+use crate::http_error::HttpError;
 use crate::parser::step::{HttpArgs, HttpMethod};
 use crate::tls;
 
@@ -26,15 +27,15 @@ impl HttpClient {
     ///
     /// # Errors
     ///
-    /// * [`RunnerError::TlsConfig`] if the shared rustls config cannot be built.
-    /// * [`RunnerError::HttpClient`] if the underlying `reqwest` build fails —
+    /// * [`HttpError::Tls`] if the shared rustls config cannot be built.
+    /// * [`HttpError::Client`] if the underlying `reqwest` build fails —
     ///   e.g. TLS backend init refused.
     pub fn new() -> Result<Self> {
         let user_agent = format!("mirroir-run/{}", env!("CARGO_PKG_VERSION"));
         let client = tls::client_builder()?
             .user_agent(user_agent)
             .build()
-            .map_err(|source| RunnerError::HttpClient { source })?;
+            .map_err(|source| HttpError::Client { source })?;
         Ok(Self { client })
     }
 
@@ -47,10 +48,10 @@ impl HttpClient {
     ///
     /// # Errors
     ///
-    /// * [`RunnerError::HttpRequest`] when `send()` fails (DNS, refused, timeout).
-    /// * [`RunnerError::HttpStatusMismatch`] when `expect_status` disagrees with the response.
-    /// * [`RunnerError::HttpBodyRead`] when decoding the response body fails.
-    /// * [`RunnerError::HttpBodyMismatch`] when a required substring is absent.
+    /// * [`HttpError::Request`] when `send()` fails (DNS, refused, timeout).
+    /// * [`HttpError::StatusMismatch`] when `expect_status` disagrees with the response.
+    /// * [`HttpError::BodyRead`] when decoding the response body fails.
+    /// * [`HttpError::BodyMismatch`] when a required substring is absent.
     pub async fn dispatch(&self, args: &HttpArgs) -> Result<()> {
         let method = map_method(args.method);
         let timeout =
@@ -63,7 +64,7 @@ impl HttpClient {
             .timeout(timeout)
             .send()
             .await
-            .map_err(|source| RunnerError::HttpRequest {
+            .map_err(|source| HttpError::Request {
                 url: args.url.clone(),
                 source,
             })?;
@@ -72,11 +73,11 @@ impl HttpClient {
         if let Some(expected) = args.expect_status
             && status != expected
         {
-            return Err(RunnerError::HttpStatusMismatch {
+            return Err(RunnerError::Http(HttpError::StatusMismatch {
                 url: args.url.clone(),
                 expected,
                 actual: status,
-            });
+            }));
         }
 
         if args.expect_body_contains.is_empty() {
@@ -87,17 +88,17 @@ impl HttpClient {
         let body = response
             .text()
             .await
-            .map_err(|source| RunnerError::HttpBodyRead {
+            .map_err(|source| HttpError::BodyRead {
                 url: args.url.clone(),
                 source,
             })?;
 
         for substring in &args.expect_body_contains {
             if !body.contains(substring) {
-                return Err(RunnerError::HttpBodyMismatch {
+                return Err(RunnerError::Http(HttpError::BodyMismatch {
                     url: args.url.clone(),
                     expected: substring.clone(),
-                });
+                }));
             }
         }
 
@@ -194,11 +195,11 @@ mod tests {
                 ..args(HttpMethod::Get, format!("http://127.0.0.1:{port}/"))
             })
             .await;
-        let Err(RunnerError::HttpStatusMismatch {
+        let Err(RunnerError::Http(HttpError::StatusMismatch {
             actual, expected, ..
-        }) = res
+        })) = res
         else {
-            return Err(format!("expected HttpStatusMismatch, got {res:?}").into());
+            return Err(format!("expected HttpError::StatusMismatch, got {res:?}").into());
         };
         if actual != 503 || expected != 200 {
             return Err(format!("wrong codes: actual={actual} expected={expected}").into());
@@ -239,8 +240,8 @@ mod tests {
                 ..args(HttpMethod::Get, format!("http://127.0.0.1:{port}/"))
             })
             .await;
-        let Err(RunnerError::HttpBodyMismatch { expected, .. }) = res else {
-            return Err(format!("expected HttpBodyMismatch, got {res:?}").into());
+        let Err(RunnerError::Http(HttpError::BodyMismatch { expected, .. })) = res else {
+            return Err(format!("expected HttpError::BodyMismatch, got {res:?}").into());
         };
         if expected != "goodbye" {
             return Err(format!("wrong substring `{expected}`").into());
@@ -259,8 +260,8 @@ mod tests {
         let res = client
             .dispatch(&args(HttpMethod::Get, format!("http://127.0.0.1:{port}/")))
             .await;
-        if !matches!(res, Err(RunnerError::HttpRequest { .. })) {
-            return Err(format!("expected HttpRequest error, got {res:?}").into());
+        if !matches!(res, Err(RunnerError::Http(HttpError::Request { .. }))) {
+            return Err(format!("expected HttpError::Request, got {res:?}").into());
         }
         Ok(())
     }

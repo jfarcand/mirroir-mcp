@@ -160,6 +160,7 @@ extension EnvConfig {
                 ("visionImageWidth", "\(visionImageWidth)"),
                 ("visionMaxTokens", "\(visionMaxTokens)"),
                 ("agent", agent.isEmpty ? "(none)" : agent),
+                ("sceneAgent", sceneAgent),
                 ("agentTransport", agentTransport),
             ]),
             ("Compiled Safety", [

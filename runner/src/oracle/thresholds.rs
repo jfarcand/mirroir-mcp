@@ -33,6 +33,12 @@ pub enum DriftMetric {
     /// Fractional increase of a `measure:` latency over its baseline. A
     /// ceiling on `(current - baseline) / baseline`.
     StepLatencyPctIncrease,
+    /// Fractional increase of a passing `scene:` step's total tokens over its
+    /// last green run with the same model. A ceiling.
+    SceneTokensPctIncrease,
+    /// Fractional increase of the frames a passing `scene:` step took to see
+    /// its success predicate, against the same model. A ceiling.
+    SceneFramesPctIncrease,
 }
 
 impl DriftMetric {
@@ -44,17 +50,21 @@ impl DriftMetric {
             Self::JudgeScoreSwing => "judge_score_swing",
             Self::ResponseLevenshteinPct => "response_levenshtein_pct",
             Self::StepLatencyPctIncrease => "step_latency_pct_increase",
+            Self::SceneTokensPctIncrease => "scene_tokens_pct_increase",
+            Self::SceneFramesPctIncrease => "scene_frames_pct_increase",
         }
     }
 
     /// Every metric, for exhaustive reporting and tests.
     #[must_use]
-    pub const fn all() -> [Self; 4] {
+    pub const fn all() -> [Self; 6] {
         [
             Self::FingerprintSimilarity,
             Self::JudgeScoreSwing,
             Self::ResponseLevenshteinPct,
             Self::StepLatencyPctIncrease,
+            Self::SceneTokensPctIncrease,
+            Self::SceneFramesPctIncrease,
         ]
     }
 }
@@ -104,6 +114,12 @@ pub struct DriftThresholds {
     /// `step_latency_pct_increase: { max: … }`.
     #[serde(default)]
     pub step_latency_pct_increase: Option<MaxThreshold>,
+    /// `scene_tokens_pct_increase: { max: … }`.
+    #[serde(default)]
+    pub scene_tokens_pct_increase: Option<MaxThreshold>,
+    /// `scene_frames_pct_increase: { max: … }`.
+    #[serde(default)]
+    pub scene_frames_pct_increase: Option<MaxThreshold>,
 }
 
 impl DriftThresholds {
@@ -115,6 +131,8 @@ impl DriftThresholds {
             DriftMetric::JudgeScoreSwing => self.judge_score_swing.map(|t| t.max_delta),
             DriftMetric::ResponseLevenshteinPct => self.response_levenshtein_pct.map(|t| t.max),
             DriftMetric::StepLatencyPctIncrease => self.step_latency_pct_increase.map(|t| t.max),
+            DriftMetric::SceneTokensPctIncrease => self.scene_tokens_pct_increase.map(|t| t.max),
+            DriftMetric::SceneFramesPctIncrease => self.scene_frames_pct_increase.map(|t| t.max),
         }
     }
 }
@@ -140,7 +158,7 @@ struct AppFrontmatter {
 /// A step may additionally carry its own value — `judge.response_drift`, for
 /// instance — which sits above all three; [`DriftPolicy::resolve`] takes it as
 /// an argument rather than a layer, because it is per-step and not per-scenario.
-#[derive(Debug, Clone, Copy, Default, PartialEq)]
+#[derive(Debug, Clone, Default, PartialEq)]
 pub struct DriftPolicy {
     scenario: DriftThresholds,
     app: DriftThresholds,

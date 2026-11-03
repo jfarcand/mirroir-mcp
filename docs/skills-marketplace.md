@@ -152,6 +152,7 @@ Each step is a single key-value pair in the `steps` list. The AI interprets each
 | `reset_app` | App name (string) | `reset_app` | Force-quit an app via the App Switcher |
 | `set_network` | Mode (string) | `set_network` | Toggle network settings (airplane_on/off, wifi_on/off, cellular_on/off) |
 | `measure` | Object with `action`, `until`, `max`? | `measure` | Time a screen transition after an action |
+| `scene` | Object with `skill` and `max_frames`, `max_tokens`, `max_seconds` | _(scene loop)_ | Play a `kind: game` skill frame by frame under a hard budget — see [Scenes](#scenes) |
 | `target` | Target name (string) | `switch_target` | Switch to a different automation target window |
 | `remember` | Instruction (string) | _(AI-interpreted)_ | Tell the AI to extract and remember data from the current screen |
 | `verify` | Instruction (string) | _(AI-interpreted)_ | Tell the AI to confirm a non-textual condition holds (cannot run deterministically) |
@@ -160,6 +161,58 @@ Each step is a single key-value pair in the `steps` list. The AI interprets each
 | `drag` | Object with `from`/`to` | `describe_screen` + `drag` | Find elements by OCR, drag between them |
 | `condition` | Object with `if_visible`/`if_not_visible` + `then`/`else` | `describe_screen` | Branch based on screen state — see below |
 | `repeat` | Object with loop mode + `max` + `steps` | `describe_screen` (poll) | Loop over steps until a screen condition is met — see below |
+
+### Scenes
+
+A game's playfield has almost no text and one touch at a time, so it is not a
+list of steps: it is a `kind: game` skill that a `scene:` step plays. Each frame
+is read once by local OCR, which judges the skill's `success` and `fail`
+predicates; the vision model (the `sceneAgent` setting, the built-in Anthropic
+agent by default, which needs `ANTHROPIC_API_KEY`) only names one calibrated
+control per frame, and exactly that one touch is made. The step stops at its
+first limit:
+
+```yaml
+- scene: { skill: "brawl-stars-probe", max_frames: 12, max_tokens: 288000, max_seconds: 240 }
+```
+
+| Verdict | When | Step |
+|---|---|---|
+| pass | the `success` text shows | PASS |
+| fail | the `fail` text shows, a frame cannot be read, the model reports no token usage, or a touch cannot be posted | FAIL |
+| inconclusive | the budget runs out first | INCONCLUSIVE — a failure, never a pass |
+
+The step's budget may only narrow the skill's own `budget:`. Every scene step
+is checked before any step runs (`SceneStepGate`): an unknown or invalid scene
+skill, a wider budget, a scene inside `measure`, or no configured vision model
+refuses the whole run. A scene is never compiled, and `mirroir-mcp test` given
+a `kind: game` skill directly refuses it. Each frame's PNG and a `frames.jsonl`
+line (OCR, reply, control, touch, tokens) are written under the run's
+screenshot directory.
+
+The scene skill declares its predicates and calibrated controls, in window
+fractions so they follow the window's orientation:
+
+```markdown
+---
+kind: game
+surface: scene
+playable: single-control
+controls: [move, fire]
+budget: { max_frames: 12, max_tokens: 288000, max_seconds: 240 }
+success: { visible: "VICTOIRE" }
+fail: { visible: "DÉFAITE" }
+---
+
+## Objective
+
+What the model plays toward.
+
+## Controls
+
+- move: drag from 0.18,0.80 radius 0.08
+- fire: tap at 0.85,0.72
+```
 
 ### Conditions
 

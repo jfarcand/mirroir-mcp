@@ -34,7 +34,7 @@ pub struct JudgeOutcome {
 ///
 /// * [`OracleError::UnknownProfile`] when `args.profile` isn't registered.
 /// * [`OracleError::MissingApiKey`] when the profile needs an env key.
-/// * [`crate::error::RunnerError::TlsConfig`] when the shared rustls config cannot be built.
+/// * [`crate::http_error::HttpError::Tls`] when the shared rustls config cannot be built.
 /// * [`OracleError::Transport`] on HTTP transport failure.
 /// * [`OracleError::Decode`] when the model's reply can't be parsed as a score.
 pub async fn run_judge(

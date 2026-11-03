@@ -1,0 +1,7 @@
+version: 1
+name: "scene-forbidden"
+steps:
+  - target: { kind: ios, app: "Scene Frames" }
+  - reset_app: "Scene Frames"
+  - launch: "Scene Frames"
+  - scene: { skill: scene-frames-forbidden, budget: { max_frames: 3, max_tokens: 200000, max_seconds: 60 } }

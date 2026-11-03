@@ -286,31 +286,9 @@ final class SkillFileTests: XCTestCase {
         }
     }
 
-    /// Map a SkillStep to its string kind for comparison.
+    /// A SkillStep's YAML kind, for comparison.
     private func stepKind(_ step: SkillStep) -> String {
-        switch step {
-        case .launch: return "launch"
-        case .tap: return "tap"
-        case .type: return "type"
-        case .pressKey: return "press_key"
-        case .swipe: return "swipe"
-        case .waitFor: return "wait_for"
-        case .assertVisible: return "assert_visible"
-        case .assertNotVisible: return "assert_not_visible"
-        case .screenshot: return "screenshot"
-        case .home: return "home"
-        case .openURL: return "open_url"
-        case .shake: return "shake"
-        case .scrollTo: return "scroll_to"
-        case .resetApp: return "reset_app"
-        case .setNetwork: return "set_network"
-        case .measure: return "measure"
-        case .longPress: return "long_press"
-        case .drag: return "drag"
-        case .switchTarget: return "target"
-        case .skipped(let type, _): return type
-        case .invalid(let type, _): return type
-        }
+        step.typeKey
     }
 
     func assertContains(

@@ -21,7 +21,7 @@ enum ConsoleReporter {
         /// evaluated nothing, and one holding an AI-only step the CLI could not
         /// evaluate checked less than it says, so neither is a pass.
         var passed: Bool {
-            !stepResults.contains { $0.status == .failed || $0.status == .notEvaluated }
+            !stepResults.contains { $0.status.isFailure || $0.status == .notEvaluated }
                 && stepResults.contains { $0.status == .passed }
         }
 
@@ -29,7 +29,7 @@ enum ConsoleReporter {
         /// named by its index in the skill, or why nothing ran.
         var failureReasons: [String] {
             let failedSteps = stepResults.enumerated().filter {
-                $0.element.status == .failed || $0.element.status == .notEvaluated
+                $0.element.status.isFailure || $0.element.status == .notEvaluated
             }
             if failedSteps.isEmpty {
                 return ["no step executed: every step was skipped"]
@@ -67,12 +67,13 @@ enum ConsoleReporter {
         let failed = result.stepResults.filter { $0.status == .failed }.count
         let skipped = result.stepResults.filter { $0.status == .skipped }.count
         let notEvaluated = result.stepResults.filter { $0.status == .notEvaluated }.count
+        let inconclusive = result.stepResults.filter { $0.status == .inconclusive }.count
         let duration = String(format: "%.1fs", result.durationSeconds)
 
         let overallStatus = result.passed ? "PASS" : "FAIL"
 
         fputs("  Result: \(overallStatus) (\(duration)) — \(passed) passed, \(failed) failed, "
-            + "\(notEvaluated) not evaluated, \(skipped) skipped\n", stderr)
+            + "\(notEvaluated) not evaluated, \(skipped) skipped, \(inconclusive) inconclusive\n", stderr)
     }
 
     /// Print a final summary across all skills, ending the counts with how the
@@ -90,12 +91,15 @@ enum ConsoleReporter {
         let skippedSteps = results.flatMap { $0.stepResults }.filter { $0.status == .skipped }.count
         let notEvaluatedSteps = results.flatMap { $0.stepResults }
             .filter { $0.status == .notEvaluated }.count
+        let inconclusiveSteps = results.flatMap { $0.stepResults }
+            .filter { $0.status == .inconclusive }.count
 
         fputs("\n", stderr)
         fputs("Summary: \(totalSkills) skill(s), \(totalSteps) step(s)\n", stderr)
         fputs("  Skills — PASSED: \(passedSkills), FAILED: \(failedSkills)\n", stderr)
         fputs("  Steps — PASSED: \(passedSteps), FAILED: \(failedSteps), "
-            + "NOT EVALUATED: \(notEvaluatedSteps), SKIPPED: \(skippedSteps)\n", stderr)
+            + "NOT EVALUATED: \(notEvaluatedSteps), SKIPPED: \(skippedSteps), "
+            + "INCONCLUSIVE: \(inconclusiveSteps)\n", stderr)
         fputs("  \(captures.summaryLine)\n", stderr)
 
         if failedSkills > 0 {

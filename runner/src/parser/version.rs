@@ -176,12 +176,13 @@ impl ArtifactKind {
             | Self::Lockfile
             | Self::Archetype
             | Self::PackIndex
-            | Self::DriftDefaults
             | Self::JudgeProfiles
             | Self::AppMd
             | Self::LastGreen
             | Self::ComposeManifest
             | Self::CompiledSkill => 0,
+            // 1.1 adds `scene_tokens_pct_increase` and `scene_frames_pct_increase`.
+            Self::DriftDefaults => 1,
         }
     }
 

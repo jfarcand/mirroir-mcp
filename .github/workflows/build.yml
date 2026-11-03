@@ -233,7 +233,7 @@ jobs:
             # Negative checks are `if` blocks: a bare `grep … && exit` that
             # finds nothing returns 1, which would fail the step as the
             # loop's last command.
-            if grep -E "Steps — PASSED: [0-9]+, FAILED: [1-9]|NOT EVALUATED: [1-9]|SKIPPED: [1-9]" <<<"$plain"; then
+            if grep -E "Steps — PASSED: [0-9]+, FAILED: [1-9]|NOT EVALUATED: [1-9]|SKIPPED: [1-9]|INCONCLUSIVE: [1-9]" <<<"$plain"; then
               echo "$sample: a step did not pass"; exit 1
             fi
             grep -qE "capture: sck=[1-9][0-9]* fallback=0" <<<"$plain" \
@@ -242,6 +242,85 @@ jobs:
               echo "$sample: a block fell back to the screencapture CLI"; exit 1
             fi
           done
+
+      # The scene: step's loop mechanics, deterministically: FakeMirroring's
+      # Scene Frames pack advances one frame per touch, and a stub vision
+      # model (samples/game-scene/fixtures/stub_vision.py, test-only) always
+      # names MOVE at 24050 tokens a frame. Each case asserts its exit code:
+      # the goal reached passes (0), a budget spent first is inconclusive (66,
+      # never green), an unplayable control is refused before any touch (1),
+      # and a budget key typo is refused at parse. Play quality is never
+      # judged here; only the real device does that.
+      - name: mirroir-run → scene step loop mechanics (FakeMirroring)
+        timeout-minutes: 20
+        working-directory: runner
+        env:
+          MIRROIR_BUNDLE_ID: com.jfarcand.FakeMirroring
+          MIRROIR_PROCESS_NAME: FakeMirroring
+          MIRROIR_MCP_BIN: ${{ github.workspace }}/.build/release/mirroir-mcp
+          # The built-in ollama:<model> agent posts to localhost:11434, where
+          # the stub listens; no agent profile is needed.
+          MIRROIR_SCENE_AGENT: ollama:scene-stub
+          RUST_LOG: info,mirroir_run::target::ios=debug
+        run: |
+          set -euo pipefail
+          # The scene skills live with the sample; the runner also needs the
+          # global drift-defaults layer from the skills clone.
+          export MIRROIR_SKILLS="$RUNNER_TEMP/scene-skills"
+          mkdir -p "$MIRROIR_SKILLS"
+          cp samples/game-scene/skills/*.md "$MIRROIR_SKILLS/"
+          cp "${{ github.workspace }}/../mirroir-skills/drift-defaults.yaml" "$MIRROIR_SKILLS/"
+          python3 -I samples/game-scene/fixtures/stub_vision.py 11434 move &
+          python3 -I -c "import socket, time
+          for _ in range(60):
+              try:
+                  socket.create_connection(('127.0.0.1', 11434), 1).close(); break
+              except OSError:
+                  time.sleep(0.5)
+          else:
+              raise SystemExit('stub vision never listened')"
+
+          run_case() {
+            local scenario=$1 expected=$2
+            rm -rf target/mirroir-ios
+            set +e
+            ./target/debug/mirroir-run --run-scenario "samples/game-scene/scenarios/$scenario.yaml" \
+              > "scene-$scenario.log" 2>&1
+            local code=$?
+            set -e
+            cat "scene-$scenario.log"
+            [ "$code" -eq "$expected" ] || { echo "$scenario exited $code, expected $expected"; exit 1; }
+          }
+          # The scene's captures in the report mirroir-mcp wrote for the block.
+          scene_field() {
+            python3 -I - "$1" <<'EOF'
+          import base64, glob, json, sys
+          report = json.load(open(sorted(glob.glob("target/mirroir-ios/**/ios-report.json", recursive=True))[-1]))
+          body = report["suites"][0]["specs"][0]["tests"][0]["results"][0]["attachments"][0]["body"]
+          scene = next(iter(json.loads(base64.b64decode(body))["scenes"].values()))
+          print(scene[sys.argv[1]])
+          EOF
+          }
+
+          run_case reach 0
+          [ "$(scene_field verdict)" = pass ] && [ "$(scene_field frames_to_predicate)" = 3 ] \
+            || { echo "reach: expected a pass on frame 3"; exit 1; }
+
+          run_case impossible 66
+          [ "$(scene_field reason)" = max_frames ] || { echo "impossible: expected max_frames"; exit 1; }
+
+          run_case max-tokens 66
+          [ "$(scene_field reason)" = max_tokens ] && [ "$(scene_field frames)" = 2 ] \
+            && [ "$(scene_field total_tokens)" -le 50000 ] \
+            || { echo "max-tokens: expected 2 frames within 50000 tokens"; exit 1; }
+
+          run_case forbidden 1
+          grep -qF "Refusing to run: 1 scene step(s) cannot play." scene-forbidden.log \
+            || { echo "forbidden: no scene refusal"; exit 1; }
+
+          if ./target/debug/mirroir-run --validate samples/game-scene/scenarios/budget-typo.yaml; then
+            echo "budget-typo: a max_touches budget key validated"; exit 1
+          fi
 
       # The recorder's emit, off-device: a checked-in recording renders a
       # .mirroir/ scenario that mirroir-run's own validator accepts, and a

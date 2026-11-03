@@ -274,52 +274,6 @@ enum AIAgentRegistry {
     }
 }
 
-// MARK: - Shared Chat Completion
-
-/// Ask the configured agent a text-only question and return its reply.
-///
-/// Wraps the OpenAI-compatible `/v1/chat/completions` shape every provider
-/// speaks, so a caller needing a one-shot completion states the prompts and
-/// nothing else. The request travels over the agent's
-/// `AgentConfig.transport()`.
-///
-/// - Returns: The assistant's text, or nil when the agent is unreachable or
-///   answers in a shape with no message content.
-func requestChatCompletion(
-    systemPrompt: String,
-    userPrompt: String,
-    maxTokens: Int,
-    agentConfig: AgentConfig,
-    timeoutSeconds: Int
-) -> String? {
-    let baseURL = agentConfig.baseURL ?? defaultAgentBaseURL
-    guard let url = URL(string: baseURL + "/v1/chat/completions") else { return nil }
-
-    let requestBody: [String: Any] = [
-        "model": agentConfig.model ?? defaultAgentModel,
-        "max_tokens": maxTokens,
-        "messages": [
-            ["role": "system", "content": systemPrompt],
-            ["role": "user", "content": userPrompt],
-        ],
-    ]
-    guard let body = try? JSONSerialization.data(withJSONObject: requestBody) else { return nil }
-
-    var headers = ["Content-Type": "application/json"]
-    if let apiKeyEnv = agentConfig.apiKeyEnvVar,
-       let apiKey = ProcessInfo.processInfo.environment[apiKeyEnv],
-       !apiKey.isEmpty {
-        headers["Authorization"] = "Bearer \(apiKey)"
-    }
-
-    guard let responseData = sendAgentRequest(
-        transport: agentConfig.transport(),
-        url: url, headers: headers, body: body, timeoutSeconds: timeoutSeconds
-    ) else { return nil }
-
-    return extractChatCompletionText(from: responseData)
-}
-
 /// Endpoint used when a target declares no `baseURL`.
 let defaultAgentBaseURL = "http://localhost:3000"
 

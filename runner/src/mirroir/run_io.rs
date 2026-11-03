@@ -200,6 +200,7 @@ mod tests {
         // `run_sample` records the first failing scenario's message verbatim.
         let sample_failure = RunnerError::SampleScenarioFailures {
             failed: 1,
+            inconclusive: 0,
             total: 1,
             first_error: format!("scenarios/checkout.yaml: {playwright}"),
         };

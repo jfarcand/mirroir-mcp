@@ -133,7 +133,8 @@ lane's threat model calls for it.
 | 0 | `PASS` | All scenarios in the chosen set passed and nothing drifted |
 | 1 | `FAIL` | One or more scenarios failed; check stderr for the typed `RunnerError` |
 | 65 | `DRIFT` | Every structural assertion held and at least one drift metric moved past its threshold |
-| 64, 66-71 | — | Reserved (per `sysexits.h` convention; not currently used by the runner) |
+| 66 | `INCONCLUSIVE` | Every failure was a `scene:` step that ran out of budget before either predicate showed; any other failure makes it 1 |
+| 64, 67-71 | — | Reserved (per `sysexits.h` convention; not currently used by the runner) |
 
 The runner never returns successfully with a partial pass — `must_pass`
 scenarios must all be green. It does return a *third* code, and the lane
@@ -152,6 +153,8 @@ decides what that means:
       # candidate rows and continuing is the usual choice; `exit 1` here makes
       # drift block the merge instead.
       65) echo "DRIFT — review .harness/drift-log.md"; cat .harness/drift-log.md ;;
+      # A scene that ran out of budget proved neither a pass nor a regression.
+      66) echo "INCONCLUSIVE — a scene ran out of budget"; exit 66 ;;
       *)  exit "$code" ;;
     esac
 

@@ -134,6 +134,10 @@ enum DestructiveStepDetector {
              .screenshot, .home, .shake, .scrollTo, .resetApp, .setNetwork,
              .switchTarget, .skipped, .invalid:
             return nil
+        // A scene's touches land on calibrated game controls, never on a labelled
+        // app control a skip pattern could name.
+        case .scene:
+            return nil
         }
     }
 

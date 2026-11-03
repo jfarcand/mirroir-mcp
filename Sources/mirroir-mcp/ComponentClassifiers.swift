@@ -151,11 +151,13 @@ final class AgentClassifier: ComponentClassifying, @unchecked Sendable {
 
         guard let responseText = requestChatCompletion(
             systemPrompt: ClassificationPrompt.systemPrompt,
-            userPrompt: prompt,
+            userText: prompt,
+            model: agentConfig.model ?? defaultAgentModel,
             maxTokens: Self.maxTokens,
             agentConfig: agentConfig,
+            transport: agentConfig.transport(),
             timeoutSeconds: EnvConfig.embacleTimeoutSeconds
-        ) else {
+        )?.text else {
             DebugLog.log("classifier", "Agent request failed, falling back to heuristics")
             return nil
         }

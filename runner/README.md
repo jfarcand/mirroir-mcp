@@ -138,8 +138,10 @@ exit code so a CI lane can decide for itself whether drift blocks a merge.
 | `PASS` | **0** | Every Playwright test passed, every judge score held, every log clean, and no drift metric moved | run summary JSON; `.harness/last-green.json` updated with what this run observed |
 | `FAIL` | **1** | A Playwright test failed / timed out / was interrupted, a judge scored below `pass_threshold - tolerance`, a log was dirty, an HTTP status mismatched, a `measure:` blew its `max_seconds` budget, or the runner errored | run summary JSON with the failure verbatim; Playwright trace / screenshot / video |
 | `DRIFT` | **65** | Everything above held **and** at least one drift metric moved past its resolved threshold | run summary JSON (`"verdict": "drift"`); a candidate row appended to `.harness/drift-log.md`; the baseline left untouched for review |
+| `INCONCLUSIVE` | **66** | Only `scene:` steps failed, and each ran out of its budget (`max_frames` / `max_tokens` / `max_seconds`) before either predicate showed; a `--sample` or plan run exits 66 only when every failure is one | run summary JSON (`"verdict": "fail"`, the scene's reason, frames and tokens verbatim); the scene's evidence directory |
 
-Exit code 65 is drawn from the `sysexits.h` band this runner reserves (64-71).
+Exit codes 65 and 66 are drawn from the `sysexits.h` band this runner reserves (64-71).
+Any failure that is not an inconclusive scene outranks 66 and exits 1.
 `--diff-text` uses the same code, so `DRIFT` means one thing everywhere.
 
 ### Drift metrics
@@ -154,6 +156,8 @@ it saw and passes.
 | `judge_score_swing` | ceiling (`max_delta`) | absolute change in the judge's score |
 | `response_levenshtein_pct` | ceiling (`max`) | normalized Levenshtein distance of the judged response |
 | `step_latency_pct_increase` | ceiling (`max`) | fractional growth of a `measure:` latency |
+| `scene_tokens_pct_increase` | ceiling (`max`) | fractional growth of a passing `scene:` step's total tokens, against runs of the same model |
+| `scene_frames_pct_increase` | ceiling (`max`) | fractional growth of the frames a passing `scene:` took to see its success predicate, same model |
 
 An `ios` block's screens are held to a different store: the
 `<scenario>.compiled.json` next to the scenario, which mirroir-mcp records on

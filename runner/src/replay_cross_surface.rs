@@ -7,7 +7,7 @@ use std::path::Path;
 
 use tracing::{info, warn};
 
-use crate::compile::report::RunCaptures;
+use crate::compile::captures::RunCaptures;
 use crate::cross_surface_error::CrossSurfaceError;
 use crate::error::{Result, RunnerError};
 use crate::oracle::baseline::BaselineMode;

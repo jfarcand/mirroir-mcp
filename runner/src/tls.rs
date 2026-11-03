@@ -7,7 +7,8 @@ use reqwest::{Client, ClientBuilder};
 use rustls::crypto::ring;
 use rustls::{ClientConfig, RootCertStore};
 
-use crate::error::{Result, RunnerError};
+use crate::error::Result;
+use crate::http_error::HttpError;
 
 /// Start a `reqwest` client builder whose TLS is already configured.
 ///
@@ -19,7 +20,7 @@ use crate::error::{Result, RunnerError};
 ///
 /// # Errors
 ///
-/// [`RunnerError::TlsConfig`] if the ring provider rejects rustls's default
+/// [`HttpError::Tls`] if the ring provider rejects rustls's default
 /// protocol versions.
 pub fn client_builder() -> Result<ClientBuilder> {
     let roots = RootCertStore {
@@ -27,7 +28,7 @@ pub fn client_builder() -> Result<ClientBuilder> {
     };
     let config = ClientConfig::builder_with_provider(Arc::new(ring::default_provider()))
         .with_safe_default_protocol_versions()
-        .map_err(|source| RunnerError::TlsConfig { source })?
+        .map_err(|source| HttpError::Tls { source })?
         .with_root_certificates(roots)
         .with_no_client_auth();
     Ok(Client::builder().tls_backend_preconfigured(config))
@@ -44,7 +45,7 @@ mod tests {
         // `build()` fails. Building here proves the two stay in step.
         client_builder()?
             .build()
-            .map_err(|source| RunnerError::HttpClient { source })?;
+            .map_err(|source| HttpError::Client { source })?;
         Ok(())
     }
 }

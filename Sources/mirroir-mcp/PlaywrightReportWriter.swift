@@ -78,11 +78,13 @@ enum PlaywrightReportWriter {
         device: DeviceInfo?
     ) throws -> Suite {
         let screenMap = screens.flatMap { $0.isEmpty ? nil : $0.reportMap }
+        let sceneMap = scenes(in: result)
         let captures = Captures(
             metrics: measureMetrics(in: result),
             crossSurface: capture.map { [$0.key: $0.text] } ?? [:],
             screens: screenMap,
-            device: screenMap == nil ? nil : device)
+            device: screenMap == nil ? nil : device,
+            scenes: sceneMap.isEmpty ? nil : sceneMap)
         let inner = JSONEncoder()
         inner.outputFormatting = [.sortedKeys]
         let body = try inner.encode(captures).base64EncodedString()
@@ -111,6 +113,16 @@ enum PlaywrightReportWriter {
             }
         }
         return metrics
+    }
+
+    /// What each scene played, keyed by its step index as `screens` is, for
+    /// every verdict: the runner reads the reason and the totals from here.
+    private static func scenes(in result: ConsoleReporter.SkillResult) -> [String: SceneReport] {
+        var scenes: [String: SceneReport] = [:]
+        for (index, step) in result.stepResults.enumerated() {
+            if let report = step.scene { scenes[String(index)] = report }
+        }
+        return scenes
     }
 
     // MARK: - Reporter shapes
@@ -155,20 +167,23 @@ enum PlaywrightReportWriter {
         let body: String
     }
 
-    /// The `mirroir-captures` body. `screens` and `device` are left out when
-    /// nil, so a reader that predates them sees the document it always did.
+    /// The `mirroir-captures` body. `screens`, `device` and `scenes` are left out
+    /// when nil, so a reader that predates them sees the document it always did.
     private struct Captures: Encodable {
         let metrics: [String: Double]
         let crossSurface: [String: String]
         /// `start` and each step index → the structural fingerprint of that screen.
         let screens: [String: ScreenFingerprint]?
         let device: DeviceInfo?
+        /// Each scene step's index → what it played.
+        let scenes: [String: SceneReport]?
 
         enum CodingKeys: String, CodingKey {
             case metrics
             case crossSurface = "cross_surface"
             case screens
             case device
+            case scenes
         }
     }
 }

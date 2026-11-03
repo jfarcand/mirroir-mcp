@@ -56,7 +56,8 @@ pub struct ScenarioBaseline {
     /// Judged response text per judge step index.
     #[serde(default)]
     pub responses: BTreeMap<String, String>,
-    /// `measure:` latency in milliseconds per measure name.
+    /// `measure:` latency in milliseconds per measure name, and a passing
+    /// `scene:` step's tokens and frames per `scene.<index>.<skill>@<model>.…` key.
     #[serde(default)]
     pub metrics: BTreeMap<String, f64>,
 }

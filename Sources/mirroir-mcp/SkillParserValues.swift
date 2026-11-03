@@ -1,7 +1,7 @@
 // Copyright 2026 jfarcand@apache.org
 // Licensed under the Apache License, Version 2.0
 //
-// ABOUTME: Parsers for the step values that carry more than one field: press_key, wait_for, long_press, drag, measure.
+// ABOUTME: Parsers for the step values that carry more than one field: press_key, wait_for, long_press, drag, measure, scene.
 // ABOUTME: Each reads the value half of a `key: value` step line, as SkillParser.parseStep hands it over.
 
 import Foundation
@@ -90,25 +90,12 @@ extension SkillParser {
     /// Parse a drag value with from/to labels.
     /// Format: `{ from: "Source", to: "Target" }`
     static func parseDrag(_ value: String) -> SkillStep {
-        var inner = value
-        if inner.hasPrefix("{") && inner.hasSuffix("}") {
-            inner = String(inner.dropFirst().dropLast())
-        }
-
-        let parts = TargetSelector.splitTopLevel(inner)
-
         var fromLabel = ""
         var toLabel = ""
 
-        for part in parts {
-            guard let colonIdx = part.firstIndex(of: ":") else { continue }
-            let key = String(part[part.startIndex..<colonIdx])
-                .trimmingCharacters(in: .whitespaces)
-            let val = stripQuotes(
-                String(part[part.index(after: colonIdx)...])
-                    .trimmingCharacters(in: .whitespaces)
-            )
-            switch key {
+        for entry in inlineMapEntries(value) {
+            guard let val = entry.value.map(stripQuotes) else { continue }
+            switch entry.key {
             case "from": fromLabel = val
             case "to": toLabel = val
             default: break
@@ -124,29 +111,16 @@ extension SkillParser {
     /// Parse a measure step value.
     /// Format: `{ tap: "Login", until: "Dashboard", max: 5, name: "login_time" }`
     static func parseMeasure(_ value: String) -> SkillStep {
-        var inner = value
-        // Strip surrounding braces if present
-        if inner.hasPrefix("{") && inner.hasSuffix("}") {
-            inner = String(inner.dropFirst().dropLast())
-        }
-
-        // Extract components separated by commas
-        let parts = TargetSelector.splitTopLevel(inner)
-
         var actionStep: SkillStep?
         var until = ""
         var maxSeconds: Double?
         var name = "measure"
 
-        for part in parts {
-            guard let colonIdx = part.firstIndex(of: ":") else { continue }
-            let key = String(part[part.startIndex..<colonIdx])
-                .trimmingCharacters(in: .whitespaces)
-            let val = String(part[part.index(after: colonIdx)...])
-                .trimmingCharacters(in: .whitespaces)
+        for entry in inlineMapEntries(value) {
+            guard let val = entry.value else { continue }
             let stripped = stripQuotes(val)
 
-            switch key {
+            switch entry.key {
             case "until":
                 until = stripped
             case "max":
@@ -155,7 +129,7 @@ extension SkillParser {
                 name = stripped
             default:
                 // Try to parse as an action step (e.g., tap: "Login")
-                if let step = parseStep(part) {
+                if let step = parseStep("\(entry.key): \(val)") {
                     actionStep = step
                 }
             }
@@ -164,5 +138,50 @@ extension SkillParser {
         let action = actionStep ?? .skipped(stepType: "measure",
                                              reason: "No action found in measure step")
         return .measure(name: name, action: action, until: until, maxSeconds: maxSeconds)
+    }
+
+    /// The entries of an inline `{ key: value, ... }` map, in order. The braces
+    /// are optional; commas inside quoted values do not split. An entry with no
+    /// `:` comes back with a nil value, for the caller to refuse or skip.
+    static func inlineMapEntries(_ value: String) -> [(key: String, value: String?)] {
+        var inner = value.trimmingCharacters(in: .whitespaces)
+        if inner.hasPrefix("{") && inner.hasSuffix("}") {
+            inner = String(inner.dropFirst().dropLast())
+        }
+        return TargetSelector.splitTopLevel(inner).map { part in
+            guard let colonIdx = part.firstIndex(of: ":") else { return (part, nil) }
+            let key = String(part[part.startIndex..<colonIdx])
+                .trimmingCharacters(in: .whitespaces)
+            let val = String(part[part.index(after: colonIdx)...])
+                .trimmingCharacters(in: .whitespaces)
+            return (key, val)
+        }
+    }
+
+    /// Parse a scene step value, its budget written flat beside the skill.
+    /// Format: `{ skill: "name", max_frames: 6, max_tokens: 150000, max_seconds: 60 }`.
+    /// Every field is required and positive; any other key is refused.
+    static func parseScene(_ value: String) -> SkillStep {
+        var skill: String?
+        var budgetEntries: [String] = []
+        for entry in inlineMapEntries(value) {
+            guard let val = entry.value else {
+                return .invalid(stepType: "scene", reason: "'\(entry.key)' is not key: value")
+            }
+            if entry.key == "skill" {
+                skill = stripQuotes(val)
+            } else {
+                budgetEntries.append("\(entry.key): \(val)")
+            }
+        }
+        guard let skill, !skill.isEmpty else {
+            return .invalid(stepType: "scene", reason: "names no skill")
+        }
+        do {
+            let budget = try SceneHeaderParser.parseBudget(budgetEntries.joined(separator: ", "))
+            return .scene(skill: skill, budget: budget)
+        } catch {
+            return .invalid(stepType: "scene", reason: error.localizedDescription)
+        }
     }
 }

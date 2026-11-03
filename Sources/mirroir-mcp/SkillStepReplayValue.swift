@@ -58,6 +58,9 @@ extension SkillStep {
              .home, .shake, .skipped, .invalid:
             // Plain values return above; these have none.
             return nil
+        case .scene:
+            // A scene is a model loop, never compiled: it has nothing to replay.
+            return nil
         }
     }
 
@@ -76,7 +79,7 @@ extension SkillStep {
             return ([key] + modifiers).joined(separator: "+")
         case .waitFor(let label, _), .longPress(let label, _):
             return label
-        case .drag, .switchTarget, .measure, .home, .shake, .skipped, .invalid:
+        case .drag, .switchTarget, .measure, .scene, .home, .shake, .skipped, .invalid:
             return nil
         }
     }
@@ -121,7 +124,7 @@ extension SkillStep {
                             until: transform(until), maxSeconds: maxSeconds)
         case .pressKey(let key, let modifiers):
             return .pressKey(keyName: transform(key), modifiers: modifiers)
-        case .home, .shake, .switchTarget, .skipped, .invalid:
+        case .home, .shake, .switchTarget, .scene, .skipped, .invalid:
             return self
         }
     }

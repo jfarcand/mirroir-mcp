@@ -6,7 +6,7 @@ use std::ops::Range;
 
 use crate::error::Result;
 use crate::ios_error::IosError;
-use crate::parser::step::{MeasureArgs, SkillStep};
+use crate::parser::step::{MeasureArgs, SceneArgs, SkillStep};
 use crate::parser::surface::step_kind;
 
 /// The scroll direction mirroir-mcp's `scroll_to:` uses; the dialect has no
@@ -21,8 +21,9 @@ const DEFAULT_MAX_SCROLLS: u32 = 10;
 ///
 /// mirroir-mcp's parser reads one step per line, so every step is written on
 /// one line in the shapes it parses: `tap: "Label"`, `wait_for: "Label"
-/// timeout: 30`, `measure: { tap: "A", until: "B", max: 5, name: "n" }`, and
-/// the opening `target: { kind: ios, app: "…" }`.
+/// timeout: 30`, `measure: { tap: "A", until: "B", max: 5, name: "n" }`,
+/// `scene: { skill: "s", max_frames: 6, max_tokens: 150000, max_seconds: 60 }`,
+/// and the opening `target: { kind: ios, app: "…" }`.
 ///
 /// # Errors
 ///
@@ -137,6 +138,7 @@ fn step_line(index: usize, step: &SkillStep) -> Result<String> {
             )
         }
         SkillStep::Measure(args) => measure_line(index, args)?,
+        SkillStep::Scene(args) => scene_line(index, args)?,
         SkillStep::Condition(_)
         | SkillStep::Spawn(_)
         | SkillStep::WaitPort(_)
@@ -180,6 +182,20 @@ fn measure_line(index: usize, args: &MeasureArgs) -> Result<String> {
     }
     write!(line, ", name: {} }}", comma_free(index, kind, &args.name)?)?;
     Ok(line)
+}
+
+/// `scene: { skill: "…", max_frames: N, max_tokens: N, max_seconds: N }` —
+/// the budget flattened into the step's own map, which mirroir-mcp splits on
+/// top-level commas without descending into a nested `{ … }`.
+fn scene_line(index: usize, args: &SceneArgs) -> Result<String> {
+    let budget = &args.budget;
+    Ok(format!(
+        "scene: {{ skill: {}, max_frames: {}, max_tokens: {}, max_seconds: {} }}",
+        comma_free(index, "scene", &args.skill)?,
+        budget.frames,
+        budget.tokens,
+        budget.seconds
+    ))
 }
 
 /// Quote `value` as one scalar mirroir-mcp's parser reads back unchanged.
@@ -256,6 +272,7 @@ mod tests {
             "  - measure: { name: open, action: \"tap:Alarmes\", until: \"Aucune alarme\", max_seconds: 5 }\n",
             "  - assert_visible: 'Say \"hi\"'\n",
             "  - home:\n",
+            "  - scene: { skill: scene-frames-reach, budget: { max_frames: 6, max_tokens: 150000, max_seconds: 60 } }\n",
         ))?
         .map_err(|e| e.to_string())?;
         let expected = concat!(
@@ -270,6 +287,7 @@ mod tests {
             "  - measure: { tap: \"Alarmes\", until: \"Aucune alarme\", max: 5, name: \"open\" }\n",
             "  - assert_visible: 'Say \"hi\"'\n",
             "  - home\n",
+            "  - scene: { skill: \"scene-frames-reach\", max_frames: 6, max_tokens: 150000, max_seconds: 60 }\n",
         );
         assert_eq!(yaml, expected);
         Ok(())
@@ -314,6 +332,9 @@ mod tests {
     fn a_value_the_line_format_cannot_carry_is_refused() -> TestResult {
         refused("  - tap: \"both \\\" and '\"\n")?;
         refused("  - drag: { from: \"a, b\", to: \"c\" }\n")?;
+        refused(
+            "  - scene: { skill: \"a, b\", budget: { max_frames: 1, max_tokens: 1, max_seconds: 1 } }\n",
+        )?;
         Ok(())
     }
 }

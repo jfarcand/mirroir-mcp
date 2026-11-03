@@ -15,6 +15,7 @@ pub mod shorthand;
 pub mod step;
 pub mod step_args;
 pub mod step_process_args;
+pub mod step_scene_args;
 pub mod step_web_args;
 pub mod substitute;
 pub mod surface;

@@ -77,10 +77,12 @@ pub enum MirroirError {
     },
 
     /// At least one sample in a `mirroir-run` invocation reported failures.
-    #[error("mirroir plan: {failed} of {total} plan entries failed")]
+    #[error("mirroir plan: {failed} of {total} plan entries failed ({inconclusive} inconclusive)")]
     PlanFailures {
         /// Number of plan entries whose sample failed.
         failed: usize,
+        /// How many of the `failed` failed only on inconclusive scenes.
+        inconclusive: usize,
         /// Total plan entries accounted for, replayed or skipped.
         total: usize,
     },

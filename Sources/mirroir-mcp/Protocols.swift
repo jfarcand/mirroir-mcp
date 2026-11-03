@@ -377,6 +377,22 @@ extension ScreenDescribing {
     }
 }
 
+// MARK: - Vision Completion
+
+/// A vision model a `scene:` step asks to pick one control per frame.
+/// The system boundary is a paid, non-deterministic model call; tests stand it in.
+protocol VisionCompleting: Sendable {
+    /// The model requests are sent to: a scene's drift key, so runs are compared
+    /// only with runs of the same model.
+    var model: String { get }
+
+    /// Ask about one frame and return the reply, or nil when the model gave none
+    /// within `timeoutSeconds`.
+    func complete(
+        systemPrompt: String, image: ChatCompletionImage, timeoutSeconds: Int
+    ) -> ChatCompletionReply?
+}
+
 // MARK: - Conformances
 
 extension MirroringBridge: MenuActionCapable {}

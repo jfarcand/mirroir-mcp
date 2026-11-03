@@ -42,7 +42,7 @@ pub enum IosError {
     },
 
     /// A phone-only step (`launch:`, `home:`, `shake:`, `reset_app:`,
-    /// `set_network:`) sits where no `ios` block carries it. Outside a block
+    /// `set_network:`, `scene:`) sits where no `ios` block carries it. Outside a block
     /// there is no device to drive, so as a runner-side step it would run
     /// nothing; the plan refuses it instead.
     #[error(

@@ -245,7 +245,7 @@ extension StepExecutor {
         // Execute the nested action
         let actionResult = execute(step: action, stepIndex: stepIndex,
                                     skillName: skillName)
-        if actionResult.status == .failed {
+        if actionResult.status.isFailure {
             return StepResult(step: step, status: .failed,
                               message: "Action failed: \(actionResult.message ?? "unknown")",
                               durationSeconds: elapsed(startTime))
@@ -301,7 +301,8 @@ extension StepExecutor {
         }
 
         switchSubsystems(bridge: ctx.bridge, input: ctx.input,
-                         describer: ctx.describer, capture: ctx.capture)
+                         describer: ctx.describer, ocrDescriber: ctx.ocrDescriber,
+                         capture: ctx.capture)
 
         return StepResult(step: step, status: .passed,
                           message: "Switched to target '\(ctx.name)'",

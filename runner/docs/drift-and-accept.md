@@ -23,6 +23,7 @@ whether it blocks a merge.
 | `PASS` | **0** | Every assertion held; nothing moved past a threshold | run summary JSON; `.harness/last-green.json` updated with what this run observed |
 | `FAIL` | **1** | An assertion failed, a judge scored under `pass_threshold - tolerance`, a log was dirty, an HTTP status mismatched, a `measure:` blew its budget, a `cross_surface:` pair fell below `min_similarity`, or the runner errored | run summary JSON with the failure verbatim; Playwright trace / screenshot / video |
 | `DRIFT` | **65** | Everything above held **and** at least one drift metric moved past its resolved threshold | run summary JSON (`"verdict": "drift"`); a candidate row in `.harness/drift-log.md`; the baseline left untouched |
+| `INCONCLUSIVE` | **66** | The only failures are `scene:` steps that ran out of budget before either predicate showed | run summary JSON (`"verdict": "fail"`, the scene's reason verbatim); the scene's evidence directory |
 
 Exit code 65 comes from the `sysexits.h` band this runner reserves (64-71);
 `EX_DATAERR` is the closest classical meaning — the run's data moved.

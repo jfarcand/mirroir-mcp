@@ -173,7 +173,7 @@ REST probe with optional status + body substring assertions.
     timeout_s: 30                            # optional per-request timeout (default 30)
 ```
 
-Errors: `HttpClient`, `HttpRequest`, `HttpStatusMismatch`, `HttpBodyRead`, `HttpBodyMismatch`.
+Errors (`HttpError`): `Client`, `Tls`, `Request`, `StatusMismatch`, `BodyRead`, `BodyMismatch`.
 
 ---
 
@@ -243,8 +243,8 @@ APP.md) read the same checkout as the runner's threshold layers.
 Each `mirroir-mcp test` run is bounded. Every step of the block earns an
 allowance — 30 s by default, the same ceiling a web step gets — or its own
 longer ceiling (a `wait_for:` `timeout_s`, a `measure:` `max_seconds`, one
-allowance per `scroll_to:` attempt), and the final-screen capture earns one
-more. Past that budget the child's whole process group is killed and the block
+allowance per `scroll_to:` attempt, a `scene:`'s `max_seconds` plus one
+allowance), and the final-screen capture earns one more. Past that budget the child's whole process group is killed and the block
 fails with `IosError::BlockTimeout`, naming the elapsed time, the budget and
 the stderr tail. `MIRROIR_IOS_STEP_ALLOWANCE_S` overrides the per-step
 allowance in whole seconds.
@@ -431,6 +431,30 @@ both.
 
 ---
 
+## `scene`
+
+Runs a kind:game skill frame by frame under a hard budget. Only inside an
+`ios` block: `mirroir-mcp test` resolves the skill, shows each frame to the
+vision model, posts the one touch it picks, and stops when the skill's success
+or fail predicate shows or the budget runs out. Every budget field is required
+and positive, and an unknown key is a parse error.
+
+```yaml
+- scene: { skill: scene-frames-reach, budget: { max_frames: 6, max_tokens: 150000, max_seconds: 60 } }
+```
+
+| Scene verdict | Run |
+|---|---|
+| `pass` — the success predicate showed | passes; its total tokens and frames-to-predicate feed `scene_tokens_pct_increase` / `scene_frames_pct_increase`, compared only against green runs of the same model |
+| `fail` — the fail predicate showed, or a frame could not be read, priced or acted on | FAIL, exit 1 (`SceneError::Failed`) |
+| `inconclusive` — the budget ran out first | FAIL, exit **66** (`SceneError::Inconclusive`) unless another failure exits 1 |
+
+A block that passes with no report for one of its scenes fails
+(`SceneError::NotReported`). A scene is never compiled: a block holding one
+neither records nor compares a `<scenario>.compiled.json` screen reference.
+
+---
+
 ## Control-flow steps
 
 ### `condition`
@@ -582,9 +606,9 @@ Errors (`CrossSurfaceError`): `TooFewFiles`, `CaptureTargetNotListed`,
 | `spawn`, `kill`, `wait_port`, `assert_log`, `assert_log_clean` | `target::process` (tokio) | Per-scenario `ProcessRegistry`; shared in `boot_once` mode |
 | `http` | `target::http` (reqwest) | One `HttpClient` per scenario |
 | `target` (kind=web), `tap`, `type`, `wait_for`, `assert_visible`, `assert_not_visible`, `screenshot`, `press_key`, `swipe`, `scroll_to`, `long_press`, `drag`, `open_url`, `measure` — inside a web block | `compile::playwright` + `compile::invoke` | One spec, one `npx playwright test` per web block |
-| `target` (kind=ios), the same interaction verbs, `launch`, `home`, `shake`, `reset_app`, `set_network` — inside an ios block | `compile::mirroir_block` + `target::ios` | One `mirroir-mcp test` per ios block, macOS host only |
+| `target` (kind=ios), the same interaction verbs, `launch`, `home`, `shake`, `reset_app`, `set_network`, `scene` — inside an ios block | `compile::mirroir_block` + `target::ios` | One `mirroir-mcp test` per ios block, macOS host only |
 | `remember` | annotation | Neither surface: a comment in the spec when it sits inside the web run, a logged note when it sits outside, refused inside an ios block. Never splits the run. |
 | `judge` | `oracle::judge` | OpenAI-compatible chat completions |
 | `cross_surface` | `oracle::drift` | Jaccard over `Fingerprint` |
 | `report` | `replay_step` | Applies the declared verdict to the scenario. |
-| `launch`, `home`, `shake`, `reset_app`, `set_network` outside an ios block, `condition` | none | Refused at plan time: `DeviceStepOutsideIosBlock` (before the ios block), `BlockNotContiguous` (after it ended), `ConditionHasNoEvaluator` (`condition`). |
+| `launch`, `home`, `shake`, `reset_app`, `set_network`, `scene` outside an ios block, `condition` | none | Refused at plan time: `DeviceStepOutsideIosBlock` (before the ios block), `BlockNotContiguous` (after it ended), `ConditionHasNoEvaluator` (`condition`). |

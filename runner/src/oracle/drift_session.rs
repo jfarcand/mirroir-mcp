@@ -94,37 +94,38 @@ impl DriftSession {
         Ok(())
     }
 
-    /// Record what a `measure:` step timed and compare it to the baseline.
+    /// Record one numeric observation under `key` and compare it to the
+    /// baseline's value for the same key, as a fractional increase checked
+    /// against `metric`'s ceiling.
     ///
-    /// A baseline latency of zero has no percentage increase to compute, so the
-    /// observation is recorded and left uncompared.
+    /// `measure:` latencies come here under [`DriftMetric::StepLatencyPctIncrease`]
+    /// keyed by measure name; a passing `scene:` step's tokens and frames come
+    /// here under the scene metrics, keyed by step, skill and model. A
+    /// baseline value of zero has no percentage increase to compute, so the
+    /// observation is recorded and left uncompared, as is a key the baseline
+    /// lacks — a first run, or a scene on a model it never ran with.
     ///
     /// # Errors
     ///
     /// [`crate::oracle::error::OracleError::ThresholdUnspecified`] when a
-    /// comparison is due and no layer declares `step_latency_pct_increase`.
-    pub fn observe_measure(&mut self, name: &str, elapsed_ms: f64) -> Result<()> {
-        self.observed.metrics.insert(name.to_owned(), elapsed_ms);
-        let Some(&previous) = self.baseline.as_ref().and_then(|b| b.metrics.get(name)) else {
+    /// comparison is due and no layer declares `metric`.
+    pub fn observe_measure(&mut self, metric: DriftMetric, key: &str, value: f64) -> Result<()> {
+        self.observed.metrics.insert(key.to_owned(), value);
+        let Some(&previous) = self.baseline.as_ref().and_then(|b| b.metrics.get(key)) else {
             return Ok(());
         };
         if previous <= 0.0 {
             return Ok(());
         }
-        let increase = (elapsed_ms - previous) / previous;
-        let threshold = self
-            .policy
-            .resolve(DriftMetric::StepLatencyPctIncrease, None)?;
-        info!(
-            measure = name,
-            increase, threshold, "drift check: step_latency_pct_increase"
-        );
+        let increase = (value - previous) / previous;
+        let threshold = self.policy.resolve(metric, None)?;
+        info!(key, %metric, increase, threshold, "drift check");
         if increase > threshold {
             self.findings.push(DriftFinding::Metric {
-                metric: DriftMetric::StepLatencyPctIncrease,
+                metric,
                 observed: increase,
                 threshold,
-                detail: format!("measure `{name}`: {previous:.0}ms → {elapsed_ms:.0}ms"),
+                detail: format!("`{key}`: {previous:.0} → {value:.0}"),
             });
         }
         Ok(())
@@ -240,6 +241,8 @@ mod tests {
                 judge_score_swing: Some(MaxDeltaThreshold { max_delta: 0.10 }),
                 response_levenshtein_pct: Some(MaxThreshold { max: 0.25 }),
                 step_latency_pct_increase: Some(MaxThreshold { max: 0.30 }),
+                scene_tokens_pct_increase: Some(MaxThreshold { max: 0.50 }),
+                scene_frames_pct_increase: Some(MaxThreshold { max: 0.50 }),
             }),
         )
     }
@@ -312,7 +315,7 @@ mod tests {
             .observe_judge(3, 0.95, "anything at all", None, None)
             .map_err(|e| format!("a first run must not need a threshold: {e}"))?;
         session
-            .observe_measure("first_token", 900.0)
+            .observe_measure(DriftMetric::StepLatencyPctIncrease, "first_token", 900.0)
             .map_err(|e| format!("a first measure must not need a threshold: {e}"))?;
         if session.verdict() != RunVerdict::Pass {
             return Err("a first run cannot drift".to_owned());
@@ -372,7 +375,7 @@ mod tests {
         previous.metrics.insert("first_token".to_owned(), 1000.0);
         let mut session = DriftSession::new(full_policy(), Some(previous.clone()));
         session
-            .observe_measure("first_token", 1200.0)
+            .observe_measure(DriftMetric::StepLatencyPctIncrease, "first_token", 1200.0)
             .map_err(|e| e.to_string())?;
         if session.verdict() != RunVerdict::Pass {
             return Err("a 20% increase is inside the 30% ceiling".to_owned());
@@ -380,7 +383,7 @@ mod tests {
 
         let mut session = DriftSession::new(full_policy(), Some(previous));
         session
-            .observe_measure("first_token", 1800.0)
+            .observe_measure(DriftMetric::StepLatencyPctIncrease, "first_token", 1800.0)
             .map_err(|e| e.to_string())?;
         if session.verdict() != RunVerdict::Drift {
             return Err("an 80% increase must drift".to_owned());

@@ -1,0 +1,36 @@
+{
+  "suites" : [
+    {
+      "file" : "scene-frames-reach.yaml",
+      "specs" : [
+        {
+          "ok" : true,
+          "tests" : [
+            {
+              "projectName" : "ios",
+              "results" : [
+                {
+                  "attachments" : [
+                    {
+                      "body" : "eyJjcm9zc19zdXJmYWNlIjp7ImlvcyI6IkdPQUxcbiJ9LCJtZXRyaWNzIjp7fSwic2NlbmVzIjp7IjIiOnsiY29tcGxldGlvbl90b2tlbnMiOjE1MCwiZXZpZGVuY2VfZGlyIjoiXC90bXBcL21pcnJvaXItc2NlbmVcL3NjZW5lLTIiLCJmcmFtZXMiOjMsImZyYW1lc190b19wcmVkaWNhdGUiOjMsIm1vZGVsIjoic2NlbmUtc3R1YiIsInByb21wdF90b2tlbnMiOjcyMDAwLCJyZWFzb24iOiJzdWNjZXNzIiwicmVqZWN0ZWRfcmVwbGllcyI6MCwicmVzcG9uc2VfbW9kZWwiOiJzY2VuZS1zdHViIiwic2Vjb25kcyI6MTIuNSwic2tpbGwiOiJzY2VuZS1mcmFtZXMtcmVhY2giLCJ0b3RhbF90b2tlbnMiOjcyMTUwLCJ2ZXJkaWN0IjoicGFzcyJ9fX0=",
+                      "contentType" : "application\/json",
+                      "name" : "mirroir-captures"
+                    }
+                  ],
+                  "duration" : 13000,
+                  "errors" : [
+
+                  ],
+                  "status" : "passed"
+                }
+              ],
+              "status" : "expected"
+            }
+          ],
+          "title" : "scene-frames-reach"
+        }
+      ],
+      "title" : "scene-frames-reach.yaml"
+    }
+  ]
+}

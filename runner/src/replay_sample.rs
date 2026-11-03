@@ -34,7 +34,9 @@ use crate::verdict::RunVerdict;
 ///   surface committed under `baselines/` that no declared scenario compares
 ///   is refused before the session boots, and so is a selected scenario that
 ///   will not parse, since the guard reads it to answer that question.
-/// * [`RunnerError::SampleScenarioFailures`] when one or more scenarios failed.
+/// * [`RunnerError::SampleScenarioFailures`] when one or more scenarios failed;
+///   it counts the inconclusive ones, so a sample whose every failure was an
+///   inconclusive scene exits 66 rather than 1.
 pub async fn run_sample(
     sample_dir: &Path,
     set: ScenarioSet,
@@ -65,6 +67,7 @@ pub async fn run_sample(
     };
 
     let mut failed = 0usize;
+    let mut inconclusive = 0usize;
     let mut verdict = RunVerdict::Pass;
     let mut first_error: Option<String> = None;
     let total = selected.len();
@@ -87,6 +90,9 @@ pub async fn run_sample(
                 error!(scenario = %scenario_rel.display(), error = %err, "scenario failed");
                 first_error.get_or_insert(message);
                 failed += 1;
+                if err.is_inconclusive() {
+                    inconclusive += 1;
+                }
             }
         }
     }
@@ -109,6 +115,7 @@ pub async fn run_sample(
     } else {
         Err(RunnerError::SampleScenarioFailures {
             failed,
+            inconclusive,
             total,
             first_error: first_error.unwrap_or_else(|| "no failure detail recorded".to_owned()),
         })

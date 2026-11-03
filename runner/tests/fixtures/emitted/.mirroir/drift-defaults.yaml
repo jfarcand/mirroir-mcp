@@ -14,7 +14,7 @@
 # first that exists: the sample directory, `--skills <dir>` / `$MIRROIR_SKILLS`,
 # the working directory, `<cwd>/.mirroir/`, then `$HOME/.mirroir/`. A run that
 # finds none is refused at load: this global layer is required.
-version: 1
+version: "1.1"
 
 # Jaccard similarity against the last accepted reference: a judge response's
 # token set, and each iOS screen's structural texts against the scenario's
@@ -32,3 +32,11 @@ response_levenshtein_pct: { max: 0.25 }
 # How much a `measure:` latency may grow over its last green reading, as a
 # fraction. A ceiling: 0.30 is a 30% regression.
 step_latency_pct_increase: { max: 0.30 }
+
+# How much a `scene:` step may spend over its last green run with the same
+# vision model, as a fraction: its total tokens, and the frames it took to meet
+# its success predicate. Ceilings: 0.50 is a 50% regression. Scenes are only
+# compared with runs of the same model, so a model change records a new
+# baseline instead of reporting drift.
+scene_tokens_pct_increase: { max: 0.50 }
+scene_frames_pct_increase: { max: 0.50 }

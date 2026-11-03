@@ -291,6 +291,10 @@ fn a_phone_only_step_outside_an_ios_block_is_refused() -> TestResult {
         ("  - shake:\n", "shake"),
         ("  - reset_app: \"Acme\"\n", "reset_app"),
         ("  - set_network: \"airplane_on\"\n", "set_network"),
+        (
+            "  - scene: { skill: s, budget: { max_frames: 1, max_tokens: 1, max_seconds: 1 } }\n",
+            "scene",
+        ),
     ];
     for (step, expected) in cases {
         for (body, index) in [(format!("{step}{web}"), 0), (format!("{web}{step}"), 2)] {

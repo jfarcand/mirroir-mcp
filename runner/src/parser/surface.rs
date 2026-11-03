@@ -46,6 +46,7 @@ pub const fn step_surface(step: &SkillStep) -> StepSurface {
         | SkillStep::Shake(_)
         | SkillStep::ResetApp(_)
         | SkillStep::SetNetwork(_)
+        | SkillStep::Scene(_)
         | SkillStep::Condition(_)
         | SkillStep::Spawn(_)
         | SkillStep::WaitPort(_)
@@ -70,8 +71,9 @@ pub const fn is_web(step: &SkillStep) -> bool {
 ///
 /// A web block runs the steps Playwright compiles. An iOS block runs those
 /// same interaction verbs plus the device-level ones only a phone has —
-/// `launch:`, `home:`, `shake:`, `reset_app:`, `set_network:` — which the
-/// plan refuses outside an iOS block (`DeviceStepOutsideIosBlock` before the
+/// `launch:`, `home:`, `shake:`, `reset_app:`, `set_network:`, and the
+/// `scene:` vision loop mirroir-mcp drives — which the plan refuses outside an
+/// iOS block (`DeviceStepOutsideIosBlock` before the
 /// block opens, `BlockNotContiguous` after it ends).
 #[must_use]
 pub const fn is_device_step(step: &SkillStep, kind: TargetKind) -> bool {
@@ -86,6 +88,7 @@ pub const fn is_device_step(step: &SkillStep, kind: TargetKind) -> bool {
                         | SkillStep::Shake(_)
                         | SkillStep::ResetApp(_)
                         | SkillStep::SetNetwork(_)
+                        | SkillStep::Scene(_)
                 )
         }
         TargetKind::Process | TargetKind::Http | TargetKind::Macos => false,
@@ -141,6 +144,7 @@ pub const fn step_kind(step: &SkillStep) -> &'static str {
         SkillStep::Drag(_) => "drag",
         SkillStep::Target(_) => "target",
         SkillStep::Remember(_) => "remember",
+        SkillStep::Scene(_) => "scene",
         SkillStep::Condition(_) => "condition",
         SkillStep::Spawn(_) => "spawn",
         SkillStep::WaitPort(_) => "wait_port",

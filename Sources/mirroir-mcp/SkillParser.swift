@@ -15,10 +15,23 @@ struct SkillDefinition {
     let steps: [SkillStep]
     /// Target names declared in the skill header (for multi-target skills).
     let targets: [String]
-    /// Skill variant from the `kind:` header. "game" marks a model-interpreted
-    /// scene skill that is never compiled to a .compiled.json and never replayed
-    /// by the runner; empty for an ordinary, compilable/replayable skill.
+    /// Skill variant from the `kind:` header. `SkillParser.gameKind` marks a
+    /// model-interpreted scene skill that is never compiled to a .compiled.json
+    /// and never run by `mirroir test` itself: only a `scene:` step plays it.
+    /// Empty for an ordinary, compilable/replayable skill.
     let kind: String
+
+    /// Whether this is a `kind: game` scene skill.
+    var isGame: Bool { kind == SkillParser.gameKind }
+
+    /// Whether any step plays a scene: such a skill is never compiled.
+    var holdsScene: Bool {
+        steps.contains { step in
+            if case .scene = step { return true }
+            if case .measure(_, .scene, _, _) = step { return true }
+            return false
+        }
+    }
 }
 
 /// A single executable step within a skill.
@@ -42,6 +55,9 @@ enum SkillStep {
     case longPress(label: String, durationMs: Int?)
     case drag(fromLabel: String, toLabel: String)
     case switchTarget(TargetSelector)
+    /// Play the kind:game skill `skill` (a skill name) under `budget`. Never
+    /// compiled: a scene is a model loop, not a replayable action.
+    case scene(skill: String, budget: SceneBudget)
     case skipped(stepType: String, reason: String)
     /// A step the parser could not turn into an action: an unknown verb or a
     /// malformed value. A skill holding one is refused before it runs.
@@ -69,6 +85,7 @@ enum SkillStep {
         case .longPress: return "long_press"
         case .drag: return "drag"
         case .switchTarget: return "target"
+        case .scene: return "scene"
         case .skipped(let stepType, _): return stepType
         case .invalid(let stepType, _): return stepType
         }
@@ -104,6 +121,7 @@ enum SkillStep {
         case .longPress(let label, _): return label
         case .drag(let fromLabel, _): return fromLabel
         case .switchTarget(let selector): return selector.labelValue
+        case .scene(let skill, _): return skill
         case .skipped, .invalid: return nil
         }
     }
@@ -132,6 +150,7 @@ enum SkillStep {
         case .longPress(let label, _): return "long_press: \"\(label)\""
         case .drag(let from, let to): return "drag: \"\(from)\" -> \"\(to)\""
         case .switchTarget(let selector): return "target: \(selector.displayName)"
+        case .scene(let skill, _): return "scene: \"\(skill)\""
         case .skipped(let type, _): return "\(type) (skipped)"
         case .invalid(let type, _): return "\(type) (invalid)"
         }
@@ -168,6 +187,15 @@ enum SkillParser {
             targets: targets,
             kind: kind
         )
+    }
+
+    /// The `kind:` value of a scene skill: model-interpreted, played only by a
+    /// `scene:` step, never compiled.
+    static let gameKind = "game"
+
+    /// Whether `content`'s header declares `kind: game`.
+    static func isGame(content: String) -> Bool {
+        headerKind(from: content) == gameKind
     }
 
     /// Extract the `kind:` header field (e.g. "game"), scanning the header
@@ -332,6 +360,8 @@ enum SkillParser {
             }
         case "measure":
             return parseMeasure(value)
+        case "scene":
+            return parseScene(value)
         // AI-only steps that cannot run deterministically
         case _ where aiOnlyStepTypes.contains(key):
             return .skipped(stepType: key,

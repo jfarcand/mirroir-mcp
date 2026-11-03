@@ -55,7 +55,7 @@ enum SkillFileLoader {
         let targets = SkillParser.parseTargets(from: content)
 
         let steps: [SkillStep]
-        if kind == "game" {
+        if kind == SkillParser.gameKind {
             steps = []
         } else {
             steps = Self.steps(from: try freshCompiled(for: filePath),
@@ -93,6 +93,11 @@ enum SkillFileLoader {
                     .mappingValues { MirroirMCP.substituteEnvVars(in: $0) }
             }
             let step = parsed
+            // A scene is never compiled: one found in a compiled file did not come
+            // from a compile, and is refused rather than played.
+            if case .scene = step {
+                return .invalid(stepType: compiledStep.type, reason: "a scene step is never compiled")
+            }
             if case .scrollTo(let label, _, let maxScrolls) = step,
                let direction = compiledStep.hints?.scrollDirection {
                 return .scrollTo(label: label, direction: direction, maxScrolls: maxScrolls)
@@ -109,7 +114,7 @@ enum SkillFileLoader {
     static func isReplayable(filePath: String) -> Bool {
         guard filePath.hasSuffix(".md") else { return true }
         guard let skill = try? load(filePath: filePath) else { return false }
-        return skill.kind != "game"
+        return !skill.isGame
     }
 
     /// The first step of a loadable SKILL.md that `mirroir test` cannot replay (a tool

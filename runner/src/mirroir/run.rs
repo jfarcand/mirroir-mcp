@@ -74,7 +74,8 @@ impl Default for MirroirRunOptions {
 ///    [`run_sample`] using the existing `ScenarioSet::MustPass` (or as
 ///    selected) machinery.
 /// 8. Emit the summary JSON to `summary_path` and return
-///    [`MirroirError::PlanFailures`] when any sample failed,
+///    [`MirroirError::PlanFailures`] when any sample failed (exit 66 when
+///    every failed sample failed only on inconclusive scenes),
 ///    [`MirroirError::NothingReplayed`] when every selected entry was skipped,
 ///    or [`RunVerdict::Drift`] when none failed and at least one drifted.
 ///
@@ -147,6 +148,9 @@ pub async fn run_mirroir(
         skipped: filtered.len(),
         ..RunTotals::default()
     };
+    // Failed entries whose every failure was an inconclusive scene. The
+    // summary records them as `fail`; only the exit code tells them apart.
+    let mut inconclusive = 0usize;
     let mut verdicts: Vec<SampleVerdict> = Vec::with_capacity(composed.len() + filtered.len());
 
     if options.compose_only {
@@ -203,6 +207,9 @@ pub async fn run_mirroir(
             }
             Err(err) => {
                 totals.failed += 1;
+                if err.is_inconclusive() {
+                    inconclusive += 1;
+                }
                 let msg = err.to_string();
                 tracing::error!(sample = %entry.name, error = %msg, "sample failed");
                 verdicts.push(SampleVerdict {
@@ -222,7 +229,12 @@ pub async fn run_mirroir(
     write_summary_full(summary_path, config_path, verdicts, totals)?;
 
     if failed > 0 {
-        return Err(MirroirError::PlanFailures { failed, total }.into());
+        return Err(MirroirError::PlanFailures {
+            failed,
+            inconclusive,
+            total,
+        }
+        .into());
     }
     // The selection guard counts entries the set *selects*; an entry marked
     // `skip: true` is selected and then never replayed. When that covers every

@@ -28,6 +28,7 @@ mod cross_surface_error;
 #[cfg(test)]
 mod emitted_scenario_contract;
 mod error;
+mod http_error;
 mod ios_error;
 mod maestro;
 mod mirroir;
@@ -39,9 +40,11 @@ mod replay_dispatch;
 mod replay_ios;
 mod replay_plan;
 mod replay_sample;
+mod replay_scene;
 mod replay_step;
 mod replay_target;
 mod scenario_set;
+mod scene_error;
 mod target;
 mod tls;
 mod verdict;
@@ -58,7 +61,7 @@ use crate::oracle::drift::{DriftVerdict, detect_drift};
 use crate::parser::step::{ResponseDriftConfig, TargetKind};
 use crate::replay::{ReplayRoots, ScenarioSet, load_scenario, run_sample, run_scenario};
 use crate::replay_plan::ScenarioPlan;
-use crate::verdict::{EXIT_FAIL, RunVerdict};
+use crate::verdict::RunVerdict;
 
 /// Formats `--emit` can compile a scenario into.
 #[derive(Copy, Clone, Debug, ValueEnum)]
@@ -242,8 +245,8 @@ fn main() -> ExitCode {
             ExitCode::from(verdict.exit_code())
         }
         Err(e) => {
-            error!(error = %e, "mirroir-run failed");
-            ExitCode::from(EXIT_FAIL)
+            error!(error = %e, exit_code = e.exit_code(), "mirroir-run failed");
+            ExitCode::from(e.exit_code())
         }
     }
 }
@@ -251,8 +254,9 @@ fn main() -> ExitCode {
 /// Top-level fallible entry point. All module-level dispatch hangs off this function
 /// so the binary's `main()` only handles the verdict → `ExitCode` translation.
 ///
-/// The three states are distinguishable from the shell: `Ok(RunVerdict::Pass)`
-/// exits 0, `Ok(RunVerdict::Drift)` exits 65, and any `Err` exits 1.
+/// The four outcomes are distinguishable from the shell: `Ok(RunVerdict::Pass)`
+/// exits 0, `Ok(RunVerdict::Drift)` exits 65, an `Err` whose every failure is
+/// an inconclusive `scene:` exits 66, and any other `Err` exits 1.
 async fn run(cli: &Cli) -> Result<RunVerdict> {
     match &cli.command {
         Some(Command::Accept(args)) => return run_accept(args).await,

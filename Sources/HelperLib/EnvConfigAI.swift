@@ -140,4 +140,11 @@ extension EnvConfig {
     public static var agent: String {
         readString("agent", envVar: "MIRROIR_AGENT", default: "")
     }
+
+    /// AI agent a `scene:` step plays with: it sees each frame and picks one
+    /// control. Resolved via AIAgentRegistry, like `agent`; the default is the
+    /// built-in Anthropic agent, which needs ANTHROPIC_API_KEY.
+    public static var sceneAgent: String {
+        readString("sceneAgent", envVar: "MIRROIR_SCENE_AGENT", default: "claude-sonnet-5-5")
+    }
 }

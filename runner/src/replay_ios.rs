@@ -7,8 +7,8 @@ use std::path::{self, Path, PathBuf};
 
 use tracing::info;
 
+use crate::compile::captures::RunCaptures;
 use crate::compile::mirroir_block::ios_block_yaml;
-use crate::compile::report::RunCaptures;
 use crate::error::{Result, RunnerError};
 use crate::oracle::baseline::BaselineMode;
 use crate::oracle::drift_session::DriftSession;
@@ -16,6 +16,8 @@ use crate::oracle::error::OracleError;
 use crate::oracle::screen_drift::ScreenCheck;
 use crate::parser::compiled::{CompiledSkill, compiled_path, load_compiled, sha256_hex};
 use crate::parser::scenario::Scenario;
+use crate::parser::step::SkillStep;
+use crate::replay_scene::verify_scenes;
 use crate::target::ios::{CompiledRecording, MirroirMcpRunner};
 
 /// File `mirroir-mcp test --compiled-out` writes inside the block workspace.
@@ -57,6 +59,10 @@ enum ScreenReference {
     },
     /// No reference yet, or `accept`: the passing block records one.
     Record(PendingReference),
+    /// The block runs a `scene:`. A scene is never compiled — its frames are
+    /// the model's choices, not a replayable path — so the block neither
+    /// records a reference nor compares one, whatever the mode.
+    Untracked,
 }
 
 /// Write the block in mirroir-mcp's dialect, run it once with `mirroir-mcp
@@ -66,10 +72,16 @@ enum ScreenReference {
 /// block left is compared against it and what moved lands in `drift`. In
 /// accept mode, or when no reference exists yet, mirroir-mcp is told to record
 /// one; it comes back as a [`PendingReference`] for [`promote_reference`].
+/// A block that runs a `scene:` does neither: a scene is never compiled.
+///
+/// Each `scene:` step's verdict is read back out of the report by
+/// [`verify_scenes`]; a passing scene's cost lands in `drift`.
 ///
 /// # Errors
 ///
-/// * Anything [`MirroirMcpRunner::run`] returns.
+/// * Anything [`MirroirMcpRunner::run`] returns, unless a scene's own verdict
+///   explains the failure.
+/// * Any [`crate::scene_error::SceneError`] [`verify_scenes`] returns.
 /// * [`OracleError::CompiledParse`] (or a version-gate error) for an existing
 ///   reference that does not load.
 /// * [`OracleError::CompiledNotRecorded`] when a block asked to record passed
@@ -89,7 +101,7 @@ pub async fn run_ios_block(
                 source: absolute(run.scenario_path)?,
             })
         }
-        ScreenReference::Compare { .. } => None,
+        ScreenReference::Compare { .. } | ScreenReference::Untracked => None,
     };
     let yaml = ios_block_yaml(&run.scenario.name, &run.scenario.steps, run.block.clone())?;
     let runner = MirroirMcpRunner::from_env()?
@@ -101,9 +113,10 @@ pub async fn run_ios_block(
         records_reference = matches!(reference, ScreenReference::Record(_)),
         "dispatching the scenario's ios block to mirroir-mcp"
     );
-    let outcome = runner
+    let ran = runner
         .run(&yaml, &run.scenario.steps[run.block.clone()], run.dir)
-        .await?;
+        .await;
+    let outcome = verify_scenes(&run.scenario.steps, run.block.clone(), ran, drift)?;
     info!(
         passed = outcome.verdict.passed,
         failed = outcome.verdict.failed,
@@ -139,6 +152,7 @@ pub async fn run_ios_block(
             load_compiled(&pending.staged)?;
             Ok((outcome.captures, Some(pending)))
         }
+        ScreenReference::Untracked => Ok((outcome.captures, None)),
     }
 }
 
@@ -162,6 +176,12 @@ pub fn promote_reference(pending: &PendingReference) -> Result<()> {
 }
 
 fn screen_reference(run: &IosBlock<'_>) -> Result<ScreenReference> {
+    if run.scenario.steps[run.block.clone()]
+        .iter()
+        .any(|step| matches!(step, SkillStep::Scene(_)))
+    {
+        return Ok(ScreenReference::Untracked);
+    }
     let destination = compiled_path(&absolute(run.scenario_path)?);
     if run.mode == BaselineMode::Compare && destination.is_file() {
         let bytes = fs::read(run.scenario_path).map_err(|source| RunnerError::Io {

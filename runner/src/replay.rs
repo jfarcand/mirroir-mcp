@@ -8,10 +8,10 @@ use std::path::{Path, PathBuf};
 
 use tracing::{info, warn};
 
+use crate::compile::captures::RunCaptures;
 use crate::compile::invoke::PlaywrightRunner;
 use crate::compile::playwright::compile_scenario;
 use crate::compile::playwright_prelude::ScenarioSource;
-use crate::compile::report::RunCaptures;
 use crate::compile::workspace::{PlaywrightWorkspace, path_stem};
 use crate::error::{Result, RunnerError};
 use crate::oracle::baseline::{BaselineMode, load_baseline, record_baseline};

@@ -1,0 +1,6 @@
+version: 1
+name: "scene-budget-typo"
+steps:
+  - target: { kind: ios, app: "Scene Frames" }
+  - launch: "Scene Frames"
+  - scene: { skill: scene-frames-reach, budget: { max_frames: 3, max_touches: 3, max_tokens: 200000, max_seconds: 60 } }
