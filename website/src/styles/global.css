@@ -1118,6 +1118,11 @@ footer .trademark {
   background: var(--color-code-bg);
 }
 
+.hero-flow {
+  max-width: 640px;
+  margin: 1.25rem auto 0;
+}
+
 .snippet {
   background: var(--color-code-bg);
   border: 1px solid var(--color-border);

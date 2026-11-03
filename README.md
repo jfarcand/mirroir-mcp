@@ -13,6 +13,17 @@
 [![macOS 15+](https://img.shields.io/badge/macOS-15%2B-black?logo=apple)](https://support.apple.com/en-us/105071)
 [![Discord](https://img.shields.io/discord/1481795325953048627?logo=discord&label=Discord)](https://discord.gg/jVDBbMjPMf)
 
+### Let your agent use your real iPhone, then replay what it did without an LLM.
+
+```
+  ● you: "open Weather and tell me if it rains tomorrow"
+  │
+  ● describe_screen → "Weather" at (71, 149)
+  │
+  ● tap(71, 149) → describe_screen → forecast is up
+  ✓ done, and the run can be saved as a skill that replays with no AI in the loop
+```
+
 **Drive a real, stock iPhone from any AI agent — no Developer Mode, no Xcode, no WebDriverAgent, no jailbreak.** mirroir-mcp works through macOS iPhone Mirroring, so it reaches any app on your phone, App Store apps you could never build included. Any MCP client, [38 tools](docs/tools.md), and experimental support for macOS app windows.
 
 Give your AI eyes, hands, and a real iPhone: it sees the screen, taps what it needs, and figures the rest out.
@@ -22,6 +33,7 @@ Give your AI eyes, hands, and a real iPhone: it sees the screen, taps what it ne
 - **Nothing to install on the phone.** The iPhone stays stock: no signing, no provisioning profile, no on-device agent. If iPhone Mirroring shows it, mirroir can drive it.
 - **Explore once, replay without an LLM.** `generate_skill` explores an app and writes [SKILL.md](#skills) files. A compiled skill replays from the CLI with no AI in the loop (`mirroir test`), so CI runs are deterministic and cost no tokens.
 - **Drift fails loudly.** [`mirroir-run`](#replay-anywhere-with-mirroir-run) has a third verdict beside pass and fail: `DRIFT`, exit code **65**, when every assertion held but the output moved past its baseline. Your CI lane decides whether drift blocks a merge.
+- **It plays games, too.** A `scene:` step plays a turn-based or tap-driven game, frame by frame, under a hard budget — on an unmodified App Store game you could never instrument. See [Vision: agents that test — and play](#vision-agents-that-test--and-play).
 - **One scenario, many surfaces.** A single `mirroir-run` scenario can drive the iPhone, a browser (Playwright: chromium, firefox, webkit), HTTP endpoints and subprocesses, then compare what the page and the phone showed. Web, HTTP and process scenarios run on Linux CI; the iPhone leg runs on a Mac with iPhone Mirroring, and [FakeMirroring](docs/testing.md) stands in for the phone in CI.
 
 ### How it compares
@@ -44,6 +56,14 @@ Each tool has strengths the table doesn't capture. Maestro, mobile-mcp and Appiu
 - iPhone connected via [iPhone Mirroring](https://support.apple.com/en-us/105071)
 
 ## Install
+
+The fastest path: paste this into your coding agent (Claude Code, Codex, Cursor, …) and let it do the setup.
+
+```text
+Install mirroir-mcp (https://github.com/jfarcand/mirroir-mcp) with `npx -y mirroir-mcp install`, add it as an MCP server to this client following the README's per-client setup, then run `mirroir doctor` and walk me through anything it flags (iPhone Mirroring, Screen Recording, Accessibility).
+```
+
+Or install it yourself:
 
 ```bash
 /bin/bash -c "$(curl -fsSL https://mirroir.dev/get-mirroir.sh)"
@@ -237,7 +257,7 @@ mirroir is growing archetype-aware coverage for **games**. A game splits into tw
 
 **Token reductions** make the scene loop affordable. Screenshots are ~90% of an agent's cost, so text-rich shell screens read through `describe_screen` with no image at all, and a region/scale capture knob trims the per-frame image cost where a screenshot is unavoidable. On the playfield, `describe_screen` in vision mode sends the frame to an LLM through embacle; measured on a live Brawl Stars match, one frame costs ~24k prompt tokens and 3–14 s, which GitHub Copilot bills as a single premium request on Claude Sonnet 5.5.
 
-The rollout is tracked as Gaming Surface A–E — shell coverage ships first; the scene loop is measured on a real device before it widens.
+The scene loop ships as the [`scene:` step](docs/skills-marketplace.md#scenes): a `kind: game` skill names its objective, its calibrated controls and its win/lose screens, and the vision model picks one control per frame until the game is won, lost, or the step's frame, token or time budget runs out. A run that exhausts its budget is inconclusive (exit 66), never a silent pass. A scene is never compiled: every frame is a fresh decision.
 
 ## Games
 

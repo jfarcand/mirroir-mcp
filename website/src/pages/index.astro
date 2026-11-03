@@ -19,6 +19,13 @@ const runnerCargoCmd = "cargo install mirroir-run";
 const runnerBrewCmd = "brew install jfarcand/tap/mirroir-run";
 const pluginCmd = "claude plugin marketplace add jfarcand/mirroir-mcp && claude plugin install mirroir@mirroir";
 const maestroCmd = "mirroir-run import maestro flows/*.yaml -o .mirroir/apps/shop/scenarios --app com.example.shop=Shop";
+const agentFlow = `● you: "open Weather and tell me if it rains tomorrow"
+│
+● describe_screen → "Weather" at (71, 149)
+│
+● tap(71, 149) → describe_screen → forecast is up
+✓ done, and the run can be saved as a skill that replays with no AI in the loop`;
+const setupPrompt = "Install mirroir-mcp (https://github.com/jfarcand/mirroir-mcp) with `npx -y mirroir-mcp install`, add it as an MCP server to this client following the README's per-client setup, then run `mirroir doctor` and walk me through anything it flags (iPhone Mirroring, Screen Recording, Accessibility).";
 const actionSnippet = `- uses: jfarcand/mirroir-mcp/actions/setup-mirroir-run@main
   with:
     version: latest
@@ -242,7 +249,7 @@ if (!skillsAvailable) {
 ---
 
 <Layout
-  title="mirroir-mcp — Give your AI eyes, hands, and a real iPhone"
+  title="mirroir-mcp — Let your agent use your real iPhone"
   description="Drive a real, stock iPhone from any AI agent through macOS iPhone Mirroring — no Developer Mode, no Xcode, no WebDriverAgent. Explore an app once, then replay the flows in CI without an LLM."
 >
   <!-- Star banner -->
@@ -258,11 +265,12 @@ if (!skillsAvailable) {
     <img src={`${import.meta.env.BASE_URL}mirroir-wordmark.svg`} alt="mirroir-mcp" class="logo" width="80" height="100" />
     <h1>mirroir-mcp</h1>
     <p class="tagline">
-      Give your AI eyes, hands, and a real iPhone.
+      Let your agent use your real iPhone, then replay what it did without an LLM.
     </p>
     <p class="subtitle">
       Drive a real, stock iPhone from any AI agent &mdash; <strong>no Developer Mode, no Xcode, no WebDriverAgent, no jailbreak</strong>. mirroir works through macOS iPhone Mirroring, so it reaches any app on your phone, App Store apps you could never build included. Tell your AI to test a login flow or explore an app &mdash; it sees the screen, taps what it needs, and figures the rest out.
     </p>
+    <pre class="snippet hero-flow"><code>{agentFlow}</code></pre>
   </header>
 
   <!-- Demo Videos -->
@@ -454,6 +462,9 @@ if (!skillsAvailable) {
       mirroir is growing archetype-aware coverage for <strong>games</strong>. A game splits into two surfaces. The <strong>shell</strong> &mdash; menu, shop, settings, win/lose screens &mdash; is ordinary text-labelled UI that today's skills already drive. The <strong>scene</strong> &mdash; the playfield &mdash; is a vision-driven loop an agent follows one touch at a time. The honest targets are game <strong>QA smoke tests, tutorial walkthroughs, and scripted demos</strong> &mdash; not real-time play: iPhone Mirroring exposes a single pointer, so twin-stick and twitch games stay out of reach.
     </p>
     <p>
+      The scene loop ships as the <a href="https://github.com/jfarcand/mirroir-mcp/blob/main/docs/skills-marketplace.md#scenes" rel="noopener noreferrer"><code>scene:</code> step</a>: a <code>kind: game</code> skill names its objective, its calibrated controls and its win/lose screens, and the vision model picks one control per frame until the game is won, lost, or the step's frame, token or time budget runs out. A run that exhausts its budget is inconclusive (exit 66), never a silent pass.
+    </p>
+    <p>
       Token efficiency makes the scene loop affordable. Screenshots are roughly 90% of an agent's cost, so text-rich shell screens read through <code>describe_screen</code> with no image at all, and a region/scale capture knob trims the per-frame image cost where a screenshot is unavoidable. On the playfield, <code>describe_screen</code> in vision mode sends the frame to an LLM through embacle &mdash; measured on a live Brawl Stars match, one frame costs ~24k prompt tokens and 3&ndash;14 s, which GitHub Copilot bills as a single premium request on Claude Sonnet 5.5.
     </p>
   </section>
@@ -497,6 +508,12 @@ if (!skillsAvailable) {
   <!-- Install -->
   <section id="install">
     <h2>Install mirroir-mcp <span class="version-badge">v{version}</span></h2>
+    <p class="alt-install">The fastest path: paste this into your coding agent (Claude Code, Codex, Cursor, &hellip;) and let it do the setup.</p>
+    <div class="install-block">
+      <code>{setupPrompt}</code>
+      <button class="copy-btn" data-copy={setupPrompt}>Copy</button>
+    </div>
+    <p class="alt-install">Or install it yourself:</p>
     <div class="install-block">
       <code><span class="prompt">$</span> {brewCmd}</code>
       <button class="copy-btn" data-copy={brewCmd}>Copy</button>
