@@ -1073,3 +1073,58 @@ footer .trademark {
     align-items: center;
   }
 }
+
+/* Why mirroir: comparison table */
+.compare-title {
+  margin-top: 2rem;
+  text-align: center;
+}
+
+.compare-wrap {
+  overflow-x: auto;
+  margin: 1rem 0 1.5rem;
+}
+
+.compare-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.82rem;
+  line-height: 1.45;
+}
+
+.compare-table th,
+.compare-table td {
+  padding: 0.6rem 0.7rem;
+  border-bottom: 1px solid var(--color-border);
+  text-align: left;
+  vertical-align: top;
+  color: var(--color-muted);
+}
+
+.compare-table thead th {
+  color: var(--color-text);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.compare-table tbody th {
+  color: var(--color-text);
+  font-weight: 600;
+  min-width: 11rem;
+}
+
+.compare-table td:nth-child(2) {
+  color: var(--color-text);
+  background: var(--color-code-bg);
+}
+
+.snippet {
+  background: var(--color-code-bg);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  padding: 1rem 1.15rem;
+  overflow-x: auto;
+  font-family: var(--font-mono);
+  font-size: 0.85rem;
+  text-align: left;
+}

@@ -17,6 +17,12 @@ const npxCmd = "npx -y mirroir-mcp install";
 const brewCmd = "brew tap jfarcand/tap && brew install mirroir-mcp";
 const runnerCargoCmd = "cargo install mirroir-run";
 const runnerBrewCmd = "brew install jfarcand/tap/mirroir-run";
+const pluginCmd = "claude plugin marketplace add jfarcand/mirroir-mcp && claude plugin install mirroir@mirroir";
+const maestroCmd = "mirroir-run import maestro flows/*.yaml -o .mirroir/apps/shop/scenarios --app com.example.shop=Shop";
+const actionSnippet = `- uses: jfarcand/mirroir-mcp/actions/setup-mirroir-run@main
+  with:
+    version: latest
+- run: mirroir-run`;
 
 const permissionsCode = `{
   "allow": ["tap", "swipe", "type_text", "press_key", "launch_app"],
@@ -237,7 +243,7 @@ if (!skillsAvailable) {
 
 <Layout
   title="mirroir-mcp — Give your AI eyes, hands, and a real iPhone"
-  description="An MCP server that gives AI agents full control of a real iPhone through macOS iPhone Mirroring — automating apps and games. The agent sees the screen, taps what it needs, and runs QA, tutorial, and end-to-end flows."
+  description="Drive a real, stock iPhone from any AI agent through macOS iPhone Mirroring — no Developer Mode, no Xcode, no WebDriverAgent. Explore an app once, then replay the flows in CI without an LLM."
 >
   <!-- Star banner -->
   <a class="star-banner" href="https://github.com/jfarcand/mirroir-mcp" rel="noopener noreferrer">
@@ -255,7 +261,7 @@ if (!skillsAvailable) {
       Give your AI eyes, hands, and a real iPhone.
     </p>
     <p class="subtitle">
-      Tell your AI to send a message, test a login flow, or explore an app &mdash; it sees the screen, taps what it needs, and figures the rest out. An MCP server for macOS iPhone Mirroring, compatible with any MCP client.
+      Drive a real, stock iPhone from any AI agent &mdash; <strong>no Developer Mode, no Xcode, no WebDriverAgent, no jailbreak</strong>. mirroir works through macOS iPhone Mirroring, so it reaches any app on your phone, App Store apps you could never build included. Tell your AI to test a login flow or explore an app &mdash; it sees the screen, taps what it needs, and figures the rest out.
     </p>
   </header>
 
@@ -365,6 +371,54 @@ if (!skillsAvailable) {
     </script>
   </section>
 
+  <!-- Why mirroir -->
+  <section id="why">
+    <h2>Why mirroir</h2>
+    <div class="example-cards">
+      <div class="example-card">
+        <p class="example-prompt">Nothing to install on the phone</p>
+        <p class="example-steps">The iPhone stays stock: no signing, no provisioning profile, no on-device agent. If iPhone Mirroring shows it, mirroir can drive it.</p>
+      </div>
+      <div class="example-card">
+        <p class="example-prompt">Explore once, replay without an LLM</p>
+        <p class="example-steps"><code>generate_skill</code> explores an app and writes SKILL.md files. A compiled skill replays from the CLI with no AI in the loop, so CI runs are deterministic and cost no tokens.</p>
+      </div>
+      <div class="example-card">
+        <p class="example-prompt">Drift fails loudly</p>
+        <p class="example-steps"><code>mirroir-run</code> has a third verdict beside pass and fail: <code>DRIFT</code>, exit code 65, when every assertion held but the output moved past its baseline.</p>
+      </div>
+      <div class="example-card">
+        <p class="example-prompt">One scenario, many surfaces</p>
+        <p class="example-steps">A single scenario can drive the iPhone, a browser (Playwright), HTTP endpoints and subprocesses, then compare what the page and the phone showed.</p>
+      </div>
+    </div>
+
+    <h3 class="compare-title">How it compares</h3>
+    <div class="compare-wrap">
+      <table class="compare-table">
+        <thead>
+          <tr>
+            <th></th>
+            <th>mirroir</th>
+            <th><a href="https://github.com/mobile-dev-inc/Maestro" rel="noopener noreferrer">Maestro</a></th>
+            <th><a href="https://github.com/mobile-next/mobile-mcp" rel="noopener noreferrer">mobile-mcp</a></th>
+            <th><a href="https://github.com/appium/appium" rel="noopener noreferrer">Appium</a></th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><th>Physical iPhone, no Developer Mode or signing</th><td>Yes &mdash; stock phone via iPhone Mirroring</td><td>No &mdash; physical iOS devices not supported</td><td>USB-connected, trusted device</td><td>No &mdash; WebDriverAgent via Xcode, Developer Mode</td></tr>
+          <tr><th>App Store apps you can't build</th><td>Yes</td><td>No &mdash; iOS runs on simulator builds</td><td>Yes</td><td>Yes, on a provisioned device</td></tr>
+          <tr><th>Replay without an LLM</th><td>Yes &mdash; compiled skills</td><td>Yes &mdash; YAML flows</td><td>No &mdash; the agent drives every run</td><td>Yes &mdash; test code</td></tr>
+          <tr><th>Distinct drift verdict</th><td>Yes &mdash; <code>DRIFT</code>, exit 65</td><td>No</td><td>No</td><td>No</td></tr>
+          <tr><th>One scenario across iPhone + web + HTTP</th><td>Yes &mdash; <code>mirroir-run</code></td><td>Web in the same flow syntax</td><td>No</td><td>Via your own test code</td></tr>
+          <tr><th>Android</th><td>No</td><td>Yes</td><td>Yes</td><td>Yes</td></tr>
+          <tr><th>iOS Simulator</th><td>No</td><td>Yes</td><td>Yes</td><td>Yes</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p>Maestro, mobile-mcp and Appium cover Android and simulators, which mirroir doesn't. mirroir is built for the case they leave open: a real, unmodified iPhone running apps you don't build.</p>
+  </section>
+
   <!-- How it works -->
   <section>
     <h2>How it works</h2>
@@ -461,6 +515,16 @@ if (!skillsAvailable) {
       <code><span class="prompt">$</span> {curlCmd}</code>
       <button class="copy-btn" data-copy={curlCmd}>Copy</button>
     </div>
+    <p class="alt-install">
+      or as a <a href="https://docs.claude.com/en/docs/claude-code/plugins" rel="noopener noreferrer">Claude Code plugin</a>:
+    </p>
+    <div class="install-block install-block-alt">
+      <code><span class="prompt">$</span> {pluginCmd}</code>
+      <button class="copy-btn" data-copy={pluginCmd}>Copy</button>
+    </div>
+    <p class="alt-install">
+      or, for Claude Desktop, download <code>mirroir-mcp.mcpb</code> from the <a href="https://github.com/jfarcand/mirroir-mcp/releases/latest" rel="noopener noreferrer">latest release</a> (v0.43.0 and later) and double-click it.
+    </p>
   </section>
 
   <!-- Just tell your AI -->
@@ -611,6 +675,21 @@ if (!skillsAvailable) {
     <p class="alt-install">
       or grab a prebuilt binary for macOS / Linux / Windows from the <a href="https://github.com/jfarcand/mirroir-mcp/releases" rel="noopener noreferrer"><code>runner-v*</code> releases</a>.
     </p>
+
+    <h3 class="compare-title">In GitHub Actions</h3>
+    <p>
+      <a href="https://github.com/jfarcand/mirroir-mcp/tree/main/actions/setup-mirroir-run" rel="noopener noreferrer"><code>setup-mirroir-run</code></a> installs the released binary on Linux, macOS or Windows, verifies its SHA-256 and adds it to <code>PATH</code>.
+    </p>
+    <pre class="snippet"><code>{actionSnippet}</code></pre>
+
+    <h3 class="compare-title">Bring your Maestro flows</h3>
+    <p>
+      Maestro flows run on a real, stock iPhone. Each flow becomes an <code>.ios.yaml</code> scenario; commands mirroir cannot run faithfully fail the import with their file and line. Full mapping: <a href="https://github.com/jfarcand/mirroir-mcp/blob/main/runner/docs/maestro-import.md" rel="noopener noreferrer"><code>maestro-import.md</code></a>.
+    </p>
+    <div class="install-block">
+      <code><span class="prompt">$</span> {maestroCmd}</code>
+      <button class="copy-btn" data-copy={maestroCmd}>Copy</button>
+    </div>
   </section>
 
   <!-- Skills -->
@@ -870,6 +949,10 @@ if (!skillsAvailable) {
       <details>
         <summary>Does it work with any iPhone app?</summary>
         <p>Yes. It operates at the screen level through iPhone Mirroring — no source code, SDK, or jailbreak required. If you can see it on screen, the AI can interact with it.</p>
+      </details>
+      <details>
+        <summary>How is it different from Maestro or Appium?</summary>
+        <p>Maestro does not support physical iOS devices, and Appium needs WebDriverAgent built with Xcode and Developer Mode on the phone. mirroir drives a stock iPhone through iPhone Mirroring, so nothing is installed or enabled on the device. They cover Android and simulators, which mirroir doesn't. Already have Maestro flows? <code>mirroir-run import maestro</code> converts them.</p>
       </details>
       <details>
         <summary>Does it need any kernel extensions or root access?</summary>
