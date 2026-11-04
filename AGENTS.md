@@ -344,6 +344,11 @@ other way) and don't suggest one.
    A squash merge leaves no merge parent, so `git branch -d` will not recognize
    the branch as merged — verify with the empty diff above, then use `-D`.
 
+   If the branch had a worktree, remove it in the same step, once `git status
+   --porcelain` in it is empty: `git worktree remove --force <path>`. Git requires
+   the flag because of the `.registre` submodule. This one command is pre-approved,
+   so don't ask; every other `--force` still needs permission.
+
 The merge itself is a documented procedure, not an approval gate. Whoever is
 holding a validated branch performs steps 3 and 4; do not park a green branch
 waiting for someone to authorize the merge.
