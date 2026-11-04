@@ -103,7 +103,7 @@ The build detects `libembacle.a` at configure time, so installing it is what
 enables the FFI and removing it returns you to OCR. To build the OCR-only
 variant on a machine that has the library, set `MIRROIR_DISABLE_EMBACLE=1`.
 
-See [AI Vision Mode](../README.md#ai-vision-mode-embacle) for full setup.
+See [AI Vision Mode](screen-intelligence.md#ai-vision-mode-embacle) for full setup.
 
 ## Should I use AI vision mode or local OCR?
 

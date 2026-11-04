@@ -102,7 +102,7 @@ one emitter, one formatter and one set of refusals:
   on `explore`, each interesting explored path;
 - `save_compiled` with `emit: true` — the walk of a skill an AI ran step by step, its app taken
   from the skill's opening `launch:` (see [Compiled Skills](compiled-skills.md#emitting-the-walk-into-mirroir));
-- `mirroir record` — a walk driven by hand on the mirrored phone (see the README's Recorder).
+- `mirroir record` — a walk driven by hand on the mirrored phone (see [the Recorder](cli.md#recorder)).
 
 Each writes:
 

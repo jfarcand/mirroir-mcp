@@ -96,7 +96,7 @@ Single-class models (like OmniParser's `icon`) work well for UI detection. Multi
 
 ## Alternative: AI Vision Mode
 
-For most use cases, [AI vision mode](../README.md#ai-vision-mode-embacle) produces richer results than YOLO without any model management. It identifies elements semantically (cards, tabs, buttons, navigation structure) rather than just bounding boxes.
+For most use cases, [AI vision mode](screen-intelligence.md#ai-vision-mode-embacle) produces richer results than YOLO without any model management. It identifies elements semantically (cards, tabs, buttons, navigation structure) rather than just bounding boxes.
 
 YOLO is best when:
 - You need fully local detection with no API calls

@@ -81,4 +81,4 @@ The script uses `fswatch` to monitor `Sources/` for `.swift` file changes, rebui
 mirroir test --agent skill.yaml                    # deterministic OCR diagnosis (YAML or SKILL.md)
 mirroir test --agent claude-sonnet-5-5 skill.yaml  # deterministic + AI diagnosis
 ```
-See the [AI-Assisted Diagnosis](../README.md#ai-assisted-diagnosis) section for all supported providers and custom agent configuration.
+See the [AI-Assisted Diagnosis](skills-and-ci.md#ai-assisted-diagnosis) section for all supported providers and custom agent configuration.

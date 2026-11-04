@@ -36,7 +36,6 @@ scratch/
 !.claude/skills/carnet/
 !.claude/skills/bilan/
 mirroir-test-results/
-integrations/
 scripts/test-vd*
 scripts/*.o
 opencode.json

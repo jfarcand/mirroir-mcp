@@ -50,7 +50,7 @@ codex mcp add mirroir -- npx -y mirroir-mcp
 openclaw mcp add mirroir --command mirroir-mcp
 ```
 
-For Cursor, VS Code and Claude Desktop, use the configuration block for that client in the [README](../README.md#install).
+For Cursor, VS Code and Claude Desktop, use the configuration block for that client in the [Install guide](install.md#install).
 
 Then install the operating manual, which teaches you (and later sessions) how to drive the phone:
 
