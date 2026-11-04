@@ -241,6 +241,13 @@ final class StepExecutor {
                               durationSeconds: elapsed(startTime))
         }
 
+        if let point = TapStepPoint.parse(label) {
+            let error = input.tap(x: point.x, y: point.y)
+            return StepResult(step: step, status: error == nil ? .passed : .failed,
+                              message: error ?? "tapped by coordinates",
+                              durationSeconds: elapsed(startTime))
+        }
+
         guard let describeResult = describer.describe() else {
             return StepResult(step: step, status: .failed,
                               message: "Failed to capture screen for OCR",

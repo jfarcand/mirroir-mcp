@@ -41,9 +41,12 @@ final class RecordingWindowPoster: WindowEventPosting, @unchecked Sendable {
 /// Records each key press and the process it was addressed to; nothing is posted.
 final class RecordingKeyPoster: KeyEventPosting, @unchecked Sendable {
     private(set) var targets: [pid_t?] = []
+    /// The single keys pressed, in order; typed text goes through key sequences.
+    private(set) var keycodes: [UInt16] = []
 
     func postKey(keycode: UInt16, flags: CGEventFlags, targetPID: pid_t?) -> Bool {
         targets.append(targetPID)
+        keycodes.append(keycode)
         return true
     }
 

@@ -193,3 +193,26 @@ extension SkillParser {
         }
     }
 }
+
+/// A tap step that names a point instead of text: `tap: @324,113`, in the points
+/// describe_screen reports. Controls without readable text (a search field that
+/// is showing a query, an icon) can only be named this way. The `@` keeps it
+/// apart from text that reads like coordinates, such as a price of "12,41".
+enum TapStepPoint {
+    static let prefix = "@"
+
+    /// The point `value` names, or nil when it is ordinary text.
+    static func parse(_ value: String) -> (x: Double, y: Double)? {
+        guard value.hasPrefix(prefix) else { return nil }
+        let parts = value.dropFirst(prefix.count).split(separator: ",")
+        guard parts.count == 2,
+              let x = Double(parts[0].trimmingCharacters(in: .whitespaces)),
+              let y = Double(parts[1].trimmingCharacters(in: .whitespaces)) else { return nil }
+        return (x, y)
+    }
+
+    /// The step value for a point.
+    static func format(x: Double, y: Double) -> String {
+        "\(prefix)\(Int(x)),\(Int(y))"
+    }
+}

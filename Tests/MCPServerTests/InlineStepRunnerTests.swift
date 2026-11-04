@@ -74,6 +74,25 @@ final class InlineStepRunnerTests: XCTestCase {
         XCTAssertTrue(result.text.contains("2. SKIP type: \"never typed\""), result.text)
     }
 
+    /// A search field showing its query has no text to name it by (App Store,
+    /// measured on an XR): a point is the only way to reach it from a step.
+    func testATapStepCanNameAPoint() {
+        let result = call(makeServer(policy: allowAll), "run_steps",
+                          steps(["tap: @324,113", "type: weather"]))
+        XCTAssertFalse(result.isError, result.text)
+        XCTAssertEqual(input.tapCalls.first?.x, 324)
+        XCTAssertEqual(input.tapCalls.first?.y, 113)
+        XCTAssertEqual(input.typeCalls, ["weather"])
+        XCTAssertEqual(describer.describeCallCount, 1, "only the final read: a point needs no OCR")
+    }
+
+    func testTextThatLooksLikeNumbersIsStillText() {
+        XCTAssertNil(TapStepPoint.parse("12,41"))
+        XCTAssertNil(TapStepPoint.parse("@12"))
+        XCTAssertNil(TapStepPoint.parse("@mention,here"))
+        XCTAssertEqual(TapStepPoint.parse("@ 12, 41")?.y, 41)
+    }
+
     // MARK: - Refusing before anything runs
 
     func testAnUnknownStepRefusesTheWholeList() {

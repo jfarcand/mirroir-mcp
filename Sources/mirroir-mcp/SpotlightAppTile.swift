@@ -41,26 +41,50 @@ enum SpotlightAppTile {
     /// below an icon about 64pt tall, so this lands inside the icon.
     static let iconTapLift = 30.0
 
+    /// How far below the top-hit heading its tile's label sits at most, in points
+    /// (112pt measured on an XR).
+    static let topHitReach = 150.0
+
     /// The label to tap for `name`, or nil when no tile shows it. With several
     /// tiles, the highest one (the top hit) wins.
     static func label(for name: String, in elements: [TapPoint]) -> TapPoint? {
         let target = normalize(name)
         guard !target.isEmpty else { return nil }
+        let labels = iconLabels(in: elements)
+        let tiles = elements
+            .filter { $0.text != CoreMLElementDetector.iconLabel && normalize($0.text) == target }
+            .filter { label in
+                labels.contains { $0 == label || onSameRow($0, label) }
+            }
+        return tiles.min { $0.tapY < $1.tapY }
+    }
+
+    /// The text elements with a tile's icon above them.
+    private static func iconLabels(in elements: [TapPoint]) -> [TapPoint] {
         let icons = elements.filter { $0.text == CoreMLElementDetector.iconLabel }
         let texts = elements.filter { $0.text != CoreMLElementDetector.iconLabel }
         let tileIcons = icons.filter { icon in !texts.contains { isBeside(icon, $0) } }
-        let iconLabels = texts.filter { label in tileIcons.contains { isAbove($0, label) } }
-        let tiles = texts
-            .filter { normalize($0.text) == target }
-            .filter { label in
-                iconLabels.contains { $0 == label || onSameRow($0, label) }
-            }
-        return tiles.min { $0.tapY < $1.tapY }
+        return texts.filter { label in tileIcons.contains { isAbove($0, label) } }
     }
 
     /// Where to tap the tile `label` names: inside its icon, above the label.
     static func tapPoint(for label: TapPoint) -> (x: Double, y: Double) {
         (label.tapX, label.tapY - iconTapLift)
+    }
+
+    /// The label of the tile that is Spotlight's top result: the first tile under
+    /// the top-hit heading, within `topHitReach`. Nil when the top result is not a
+    /// tile (a message or a web row has its image beside its text).
+    static func topHit(in elements: [TapPoint]) -> TapPoint? {
+        guard let heading = elements.first(where: { element in
+            SpotlightDetector.topHitHeadings.contains {
+                element.text.lowercased().contains($0.lowercased())
+            }
+        }) else { return nil }
+        let reach = heading.tapY ... (heading.tapY + topHitReach)
+        return iconLabels(in: elements)
+            .filter { reach.contains($0.tapY) }
+            .min { $0.tapY < $1.tapY }
     }
 
     /// Whether two labels share a baseline: tiles of one row.

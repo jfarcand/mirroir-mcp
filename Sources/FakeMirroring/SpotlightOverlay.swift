@@ -50,12 +50,16 @@ final class SpotlightOverlay {
     /// SpotlightDetector recognize that Spotlight is up.
     func sceneData() -> ScenarioData {
         var plainTexts: [(String, CGPoint)] = []
-        // SpotlightDetector indicators — must be present verbatim
-        plainTexts.append(("Top Hit", CGPoint(x: 20, y: 80)))
+        // SpotlightDetector indicators — must be present verbatim. As on the iPhone,
+        // only a query with an app behind it has a top hit, and the field then says
+        // Return opens it; the idle page shows Siri's suggestions.
+        let heading = topResult != nil ? "Top Hit" : (query.isEmpty ? "Siri Suggestions" : "Suggestions")
+        plainTexts.append((heading, CGPoint(x: 20, y: 80)))
         plainTexts.append(("Search in App", CGPoint(x: 20, y: 110)))
         // Search query echo
         let displayQuery = query.isEmpty ? "Search" : query
-        plainTexts.append((displayQuery, CGPoint(x: 20, y: 160)))
+        let field = topResult != nil ? "\(displayQuery) - Open" : displayQuery
+        plainTexts.append((field, CGPoint(x: 20, y: 160)))
         // Top result line
         if let top = topResult {
             plainTexts.append((top.spec.appName, CGPoint(x: 20, y: 220)))

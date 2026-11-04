@@ -12,6 +12,7 @@ import os
 
 final class MCPServer: Sendable {
     private let tools = OSAllocatedUnfairLock(initialState: [String: MCPToolDefinition]())
+    private let sequenceAdvisor = RepeatedSequenceAdvisor()
     private let encoder: JSONEncoder
     private let decoder: JSONDecoder
     private let policy: PermissionPolicy
@@ -100,6 +101,14 @@ final class MCPServer: Sendable {
     /// design: the visible tool set is derived from the permission policy on
     /// disk, so an edited `permissions.json` must take effect promptly.
     private static let toolsListTtlMs = 60_000
+
+    /// Tools a client with tool search should load before the model asks. Claude
+    /// Code defers MCP tools and the model loads only those it already expects
+    /// to use; measured on the iPhone, it never loaded run_steps by itself.
+    static let alwaysLoadedTools: Set<String> = ["run_steps"]
+
+    /// The `_meta` key Claude Code (2.1.285 and later) reads on a tools/list entry.
+    static let alwaysLoadKey = "anthropic/alwaysLoad"
 
     func handleRequest(_ request: JSONRPCRequest) -> JSONRPCResponse? {
         // Notifications have no id — the spec says receivers MUST NOT respond
@@ -294,12 +303,16 @@ final class MCPServer: Sendable {
             snapshot.values
                 .filter { policy.isToolVisible($0.name) }
                 .map { tool in
-                    .object([
+                    var entry: [String: JSONValue] = [
                         "name": .string(tool.name),
                         "description": .string(tool.description),
                         "inputSchema": .object(tool.inputSchema),
                         "annotations": .object(PermissionPolicy.annotations(for: tool.name)),
-                    ])
+                    ]
+                    if Self.alwaysLoadedTools.contains(tool.name) {
+                        entry["_meta"] = .object([Self.alwaysLoadKey: .bool(true)])
+                    }
+                    return .object(entry)
                 }
         }
         var fields: [String: JSONValue] = ["tools": .array(toolList)]
@@ -352,7 +365,13 @@ final class MCPServer: Sendable {
             return inputRequiredResponse(request, toolResult: toolResult, modern: modern)
         }
 
-        let content: JSONValue = .array(toolResult.content.map { $0.toJSON() })
+        var replyContent = toolResult.content
+        let advice = sequenceAdvisor.observe(
+            tool: toolName, arguments: arguments, failed: toolResult.isError)
+        if let advice, policy.isToolVisible("run_steps") {
+            replyContent.append(.text(advice))
+        }
+        let content: JSONValue = .array(replyContent.map { $0.toJSON() })
         let result = completeResult([
             "content": content,
             "isError": .bool(toolResult.isError),

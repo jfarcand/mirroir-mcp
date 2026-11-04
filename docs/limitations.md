@@ -65,8 +65,9 @@ After an app is launched from Spotlight, iOS can reopen Spotlight still showing 
 `launch_app` (and a skill's `launch` step) therefore works like this:
 
 - It waits for Spotlight to appear, and opens it once more if a Home transition closed it.
-- When Spotlight already shows the app as a tile (its name with an app icon above it: the held query's top hit, or a Siri suggestion), it taps that label instead of typing, then confirms Spotlight closed.
-- Otherwise it types the name and presses Return only when the name appeared one more time than before; if it did not, it looks for the app's tile once more before failing without pressing Return.
+- When Spotlight holds a query and shows the app as a tile (its name with an app icon above it), it taps that tile instead of typing, then confirms Spotlight closed.
+- Otherwise it types the name. If the name never appears, it looks for the app's tile once more before failing without pressing Return.
+- It presses Return only when Spotlight's top result is an app: the "Top Hit" heading shows and either the search field reads "*name* — Open" or the result is a tile. An app that is not installed has no top hit, only web suggestions and App Store rows, so the call fails and says so instead of opening one of them.
 
 A held query for a *different* app still fails the launch. Recover by quitting and relaunching iPhone Mirroring.
 

@@ -73,7 +73,7 @@ enum OperatingManual {
 
         ## Acting
 
-        - `tap(text: "Search")` finds the text by OCR and taps it; a miss lists the text \
+        - `tap(text:)` finds text that describe_screen listed and taps it; a miss lists the text \
         that is on screen. `tap(x:, y:)` takes a point from describe_screen.
         - `launch_app(name:)` opens an app through Spotlight. `open_url` opens a link in Safari.
         - `press_back` taps the back chevron; `press_home` goes to the Home Screen; \
@@ -83,7 +83,9 @@ enum OperatingManual {
         - `long_press` opens context menus; `double_tap` zooms or selects; `drag` moves \
         icons and sliders.
         - `run_steps` runs a list of steps you have already seen work, such as \
-        `["tap: Search", "type: calculator", "press_key: return", "wait_for: Get"]`. Every \
+        `["tap: @324,113", "type: calculator", "press_key: return"]`. A control \
+        with no readable text is named by its point: `"tap: @324,113"`. Text must be what the \
+        screen shows, in the iPhone's language. Every \
         step is checked against the permissions before any runs, and the run stops at the \
         first failure. The reply ends with the text on screen.
 

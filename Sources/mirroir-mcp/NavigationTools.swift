@@ -19,7 +19,8 @@ extension MirroirMCP {
             description: """
                 Launch an app on the mirrored iPhone by name using Spotlight search. \
                 Opens Spotlight, types the app name, confirms by OCR that the name \
-                appeared, and presses Return to launch the top result; if the name \
+                appeared, and presses Return only when the top result is an app; with no \
+                app behind the name (not installed) it fails without pressing Return, and if the name \
                 never shows (a stale Spotlight query or lost keystrokes) it fails \
                 without pressing Return. The app name should match the display name shown \
                 on the iPhone home screen.

@@ -18,11 +18,48 @@ enum SpotlightDetector {
     /// Delay between poll attempts in milliseconds.
     static let retryDelayMs: UInt32 = 500
 
+    /// The heading above Spotlight's top result. A query with no installed app,
+    /// file or message behind it has none (measured on an XR, iOS 26: "Keynote",
+    /// not installed, lists a web suggestion and an App Store row under
+    /// "Suggestions").
+    static let topHitHeadings: [String] = ["Top Hit", "Meilleur résultat"]
+
+    /// What the search field adds after the query when Return opens an app
+    /// ("Notes — Ouvrir"); on any other top result it adds that result's title.
+    static let openWords: [String] = ["Open", "Ouvrir", "Abrir", "Öffnen"]
+
+    /// Whether Spotlight holds a query: its top-hit heading shows. The idle page
+    /// (Siri suggestions) holds none, and typing reaches it.
+    static func holdsQuery(elements: [TapPoint]) -> Bool {
+        elements.contains { el in
+            topHitHeadings.contains { el.text.lowercased().contains($0.lowercased()) }
+        }
+    }
+
+    /// Whether Return would open an app, not a web suggestion, an App Store page
+    /// or a message: Spotlight has a top result, and either the search field says
+    /// it opens it, or the result is a tile. Looks at the screen before Return
+    /// because nothing afterwards names the app in front.
+    static func returnOpensApp(elements: [TapPoint]) -> Bool {
+        guard holdsQuery(elements: elements) else { return false }
+        return elements.contains(where: fieldSaysOpen)
+            || SpotlightAppTile.topHit(in: elements) != nil
+    }
+
+    /// Whether `element` reads as the field's completion: the query, a dash, then
+    /// the word for open ("Q Horloge - Ouvrir").
+    private static func fieldSaysOpen(_ element: TapPoint) -> Bool {
+        let parts = element.text.split(whereSeparator: { "-–—".contains($0) })
+        guard parts.count >= 2, let last = parts.last else { return false }
+        let word = last.trimmingCharacters(in: .whitespaces).lowercased()
+        return openWords.contains { $0.lowercased() == word }
+    }
+
     /// Text patterns that indicate Spotlight search overlay is still visible.
     /// Covers English, French, Spanish, and German locales.
-    static let indicators: [String] = [
-        "Top Hit", "Meilleur résultat",
+    static let indicators: [String] = topHitHeadings + [
         "Search in App", "Rechercher dans l'app",
+        "Rechercher dans les apps",
         "Siri Suggestions", "Suggestions de Siri",
         "Siri-Vorschläge", "Sugerencias de Siri",
     ]

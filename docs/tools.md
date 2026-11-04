@@ -22,7 +22,7 @@ All 39 tools exposed by the MCP server. Mutating tools require [permission](perm
 | `type_text` | `text` | Type text — activates iPhone Mirroring and sends keystrokes. Characters with no key are pasted one run at a time and each paste is confirmed by OCR; one not seen (or unreadable, like emoji) returns an error ([limitations](limitations.md#clipboard-paste-is-confirmed-by-ocr)) |
 | `press_key` | `key`, `modifiers`? | Send a special key (return, escape, tab, delete, space, arrows) with optional modifiers (command, shift, option, control) |
 | `shake` | — | Trigger shake gesture (Ctrl+Cmd+Z) for undo/dev menus |
-| `launch_app` | `name` | Open app by name via Spotlight search; fails without pressing Return when the typed name never appears on screen |
+| `launch_app` | `name` | Open app by name via Spotlight search; presses Return only when the top result is an app, so a missing app fails instead of opening a web or App Store result; fails without pressing Return when the typed name never appears on screen |
 | `open_url` | `url` | Open URL in Safari |
 | `press_home` | — | Go to home screen |
 | `press_app_switcher` | — | Open app switcher |
@@ -31,7 +31,7 @@ All 39 tools exposed by the MCP server. Mutating tools require [permission](perm
 | `scroll_to` | `label`, `direction`?, `max_scrolls`? | Scroll until a text element becomes visible via OCR |
 | `reset_app` | `name` | Force-quit an app via the App Switcher |
 | `measure` | `action`, `until`, `max_seconds`?, `name`? | Time a screen transition after an action |
-| `run_steps` | `steps` | Run several proven steps in one call, in the [step grammar](#step-types) (`"tap: Search"`, `"type: calculator"`, `"wait_for: Get"`, `"home"`). Every step is checked against the permission policy before the first runs; the run stops at the first failure and the reply ends with the text on screen |
+| `run_steps` | `steps` | Run several proven steps in one call, in the [step grammar](#step-types) (`"tap: <text on screen>"`, `"tap: @324,113"` for a point, `"type: calculator"`, `"wait_for: Get"`, `"home"`). Every step is checked against the permission policy before the first runs; the run stops at the first failure and the reply ends with the text on screen |
 | `set_network` | `mode` | Toggle network settings (airplane, Wi-Fi, cellular) via Settings |
 | `get_orientation` | — | Report portrait/landscape and window dimensions |
 | `status` | — | Connection state, window geometry, and device readiness |

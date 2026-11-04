@@ -18,8 +18,11 @@ extension MirroirMCP {
             description: """
                 Run several steps on the mirrored iPhone in one call, once you have \
                 seen each of them work: one round trip instead of one per action. \
-                Each step uses the skill grammar: "launch: Weather", "tap: Search" \
-                (finds the text by OCR), "type: calculator", "press_key: return", \
+                Each step uses the skill grammar: "launch: Weather", "tap: <text on screen>" \
+                (found by OCR, so read it from describe_screen first: it is in the iPhone's \
+                language), "tap: @324,113" \
+                (a point from describe_screen, for controls with no readable text), \
+                "type: calculator", "press_key: return", \
                 "wait_for: Get", "assert_visible: Results", "swipe: up", \
                 "scroll_to: Privacy", "home". Every step must be allowed by the \
                 permission policy, or nothing runs. The run stops at the first \
@@ -33,7 +36,7 @@ extension MirroirMCP {
                         "type": .string("array"),
                         "items": .object(["type": .string("string")]),
                         "description": .string(
-                            "Steps in order, e.g. [\"tap: Search\", \"type: calculator\", "
+                            "Steps in order, e.g. [\"tap: @324,113\", \"type: calculator\", "
                             + "\"press_key: return\", \"wait_for: Get\"]"),
                     ]),
                 ]),
@@ -47,7 +50,7 @@ extension MirroirMCP {
                 }
                 let raw = values.compactMap { $0.asString() }
                 guard raw.count == values.count else {
-                    return .error("Every step must be a string such as \"tap: Search\".")
+                    return .error("Every step must be a string such as \"type: calculator\".")
                 }
                 switch InlineStepRunner.prepare(raw, policy: policy) {
                 case .failure(let refusal):

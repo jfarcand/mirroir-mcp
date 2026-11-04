@@ -97,4 +97,50 @@ final class SpotlightDetectorTests: XCTestCase {
 
         XCTAssertTrue(SpotlightDetector.isSpotlightVisible(elements: elements))
     }
+
+    // MARK: - What Return opens
+
+    private func point(_ text: String, _ x: Double, _ y: Double) -> TapPoint {
+        TapPoint(text: text, tapX: x, tapY: y, confidence: 0.9)
+    }
+
+    private var icon: String { CoreMLElementDetector.iconLabel }
+
+    func testAFieldSayingOpenMeansReturnOpensAnApp() {
+        let screen = [point("Meilleur résultat", 86, 107), point("Q Horloge - Ouvrir", 133, 874)]
+        XCTAssertTrue(SpotlightDetector.returnOpensApp(elements: screen))
+        let english = [point("Top Hit", 86, 107), point("Clock — Open", 133, 874)]
+        XCTAssertTrue(SpotlightDetector.returnOpensApp(elements: english))
+    }
+
+    func testATileUnderTheHeadingCountsWhenTheFieldIsUnread() {
+        let screen = [point("Meilleur résultat", 86, 107), point(icon, 81, 188), point("Météo", 79, 219)]
+        XCTAssertTrue(SpotlightDetector.returnOpensApp(elements: screen),
+                      "an English name on a French iPhone still has an app as its top hit")
+    }
+
+    /// iOS 27 phone, 2026-11-04: "M/t/o" typed, and the top result was a Mail message.
+    func testAMessageAsTopResultIsNotAnApp() {
+        let screen = [
+            point("Meilleur résultat", 82, 118), point("Clinique dentair...", 195, 172),
+            point("Clinique dentaire St-Sauveur", 220, 193), point("CS", 77, 202), point(icon, 203, 206),
+            point("Bonjour M. Jean Francois Arcand,", 238, 213),
+            point("Nous désirons vous rappeler votr...", 241, 232),
+            point("Q M/t/o - Clinique dentaire St-Sauve", 189, 829),
+        ]
+        XCTAssertFalse(SpotlightDetector.returnOpensApp(elements: screen))
+    }
+
+    func testNoTopHitMeansNoApp() {
+        let screen = [point("Suggestions", 72, 108), point(icon, 42, 153), point("Keynote", 101, 154),
+                      point("Keynote", 107, 872)]
+        XCTAssertFalse(SpotlightDetector.returnOpensApp(elements: screen))
+        XCTAssertFalse(SpotlightDetector.holdsQuery(elements: screen))
+    }
+
+    func testTheIdlePageHoldsNoQuery() {
+        let screen = [point("Suggestions de Siri", 97, 109), point(icon, 171, 189), point("Notes", 170, 218)]
+        XCTAssertFalse(SpotlightDetector.holdsQuery(elements: screen))
+        XCTAssertTrue(SpotlightDetector.isSpotlightVisible(elements: screen))
+    }
 }

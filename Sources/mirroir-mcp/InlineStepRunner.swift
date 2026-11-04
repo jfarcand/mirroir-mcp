@@ -9,7 +9,7 @@ import HelperLib
 
 /// Runs skill steps that an agent has already proven, in one call, so a
 /// sequence like "tap Search, type calculator, wait for Get" costs one round
-/// trip instead of three. The steps use the skill grammar (`tap: Search`,
+/// trip instead of three. The steps use the skill grammar (`tap: Rechercher`,
 /// `type: calculator`, `wait_for: Get`, `home`), parsed by `SkillParser`.
 enum InlineStepRunner {
 
@@ -45,7 +45,7 @@ enum InlineStepRunner {
         var message: String {
             switch self {
             case .empty:
-                return "No steps given. Pass steps such as [\"tap: Search\", \"type: calculator\"]."
+                return "No steps given. Pass steps such as [\"tap: @324,113\", \"type: calculator\"]."
             case .unparsable(let index, let raw, let reason):
                 return "Step \(index + 1) \"\(raw)\" is not a step: \(reason). Nothing was run."
             case .notInline(let index, let step):

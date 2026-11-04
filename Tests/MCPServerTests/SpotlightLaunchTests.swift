@@ -34,8 +34,8 @@ final class SpotlightLaunchTests: XCTestCase {
     }
 
     private func launch(
-        screens: [ScreenDescriber.DescribeResult]
-    ) -> (error: String?, bridge: StubBridge, poster: RecordingWindowPoster) {
+        name: String = "Horloge", screens: [ScreenDescriber.DescribeResult]
+    ) -> (error: String?, bridge: StubBridge, poster: RecordingWindowPoster, keys: RecordingKeyPoster) {
         let bridge = StubBridge()
         bridge.frontmost = false
         bridge.windowInfo = WindowInfo(
@@ -44,10 +44,76 @@ final class SpotlightLaunchTests: XCTestCase {
         let describer = StubDescriber()
         describer.describeResults = screens
         let poster = RecordingWindowPoster()
+        let keys = RecordingKeyPoster()
         let input = InputSimulation(bridge: bridge, keyboardLayout: .usQWERTY,
-                                    pasteVerifier: describer, keyPoster: RecordingKeyPoster(),
+                                    pasteVerifier: describer, keyPoster: keys,
                                     windowPoster: poster)
-        return (input.launchApp(name: "Horloge"), bridge, poster)
+        return (input.launchApp(name: name), bridge, poster, keys)
+    }
+
+    /// Idle Spotlight on an XR (12:28): a suggested tile, no query held.
+    private var idleSpotlight: ScreenDescriber.DescribeResult {
+        screen([
+            el("Suggestions de Siri", 97, 109), el("Plus de détails", 350, 107),
+            el(CoreMLElementDetector.iconLabel, 171, 189), el("Notes", 170, 218),
+            el("Q Rechercher", 107, 872),
+        ])
+    }
+
+    /// "Notes" typed, with Notes installed (12:28): a top hit, and the field says it opens.
+    private var typedInstalled: ScreenDescriber.DescribeResult {
+        screen([
+            el("Meilleur résultat", 86, 107),
+            el(CoreMLElementDetector.iconLabel, 81, 177), el("Notes", 79, 219),
+            el("Suggestions", 72, 284), el("Notes", 92, 328), el(CoreMLElementDetector.iconLabel, 42, 331),
+            el("Notes - Ouvrir", 137, 873),
+        ])
+    }
+
+    /// "Keynote" typed, with Keynote not installed (12:28): no top hit, a web
+    /// suggestion, and an App Store row with its download cloud.
+    private var typedNotInstalled: ScreenDescriber.DescribeResult {
+        screen([
+            el("Suggestions", 72, 108), el(CoreMLElementDetector.iconLabel, 42, 153), el("Keynote", 101, 154),
+            el("App Store", 63, 342), el("Keynote: Design Present...", 207, 386),
+            el(CoreMLElementDetector.iconLabel, 60, 411), el("Productivity", 143, 409),
+            el("Keynote", 107, 872),
+        ])
+    }
+
+    private static let returnKey = UInt16(36)
+
+    func testAnAppTopHitIsLaunchedWithReturn() {
+        let run = launch(name: "Notes", screens: [clock, idleSpotlight, typedInstalled])
+        XCTAssertNil(run.error)
+        XCTAssertEqual(run.keys.keycodes, [Self.returnKey])
+    }
+
+    func testAnIdleSuggestionTileIsTypedOverNotTapped() {
+        let run = launch(name: "Notes", screens: [clock, idleSpotlight, typedInstalled])
+        XCTAssertTrue(run.poster.buttons.isEmpty, "the idle page takes typing; its tiles are not needed")
+    }
+
+    func testAnAppThatIsNotInstalledFailsWithoutReturn() {
+        let run = launch(name: "Keynote", screens: [clock, idleSpotlight, typedNotInstalled])
+        XCTAssertEqual(run.error, "Spotlight lists no app as its top result for 'Keynote', so Return "
+            + "was not pressed: pressing it would open a web suggestion or an App Store page. The app "
+            + "may not be installed, or its name on this iPhone may differ.")
+        XCTAssertTrue(run.keys.keycodes.isEmpty)
+        XCTAssertEqual(run.bridge.menuActionCalls.map(\.item), ["Spotlight", "Spotlight"],
+                       "opened, then closed again so the query is not left on screen")
+    }
+
+    /// 14:39 on an XR: a refused launch left Spotlight open, and the next name was
+    /// typed after it ("KeynoteNotes").
+    func testAQuerySpotlightStillHoldsIsSelectedBeforeTyping() {
+        let held = screen([
+            el("Suggestions", 72, 108), el("Rechercher dans les apps", 119, 555), el("Keynote", 107, 872),
+        ])
+        let run = launch(name: "Notes", screens: [held, held, typedInstalled])
+        XCTAssertNil(run.error)
+        XCTAssertTrue(run.bridge.menuActionCalls.isEmpty, "pressing the menu item would close Spotlight")
+        XCTAssertEqual(run.keys.keycodes, [UInt16(0), Self.returnKey], "Cmd+A, then Return")
     }
 
     func testSpotlightAlreadyOpenIsNotToggledShut() {
