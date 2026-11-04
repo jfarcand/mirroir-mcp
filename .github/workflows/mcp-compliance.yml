@@ -40,9 +40,12 @@ on:
       - '.github/workflows/mcp-compliance.yml'
   workflow_dispatch:
 
+# Cancel superseded runs on the same branch / PR — never on main or a tag,
+# where each commit keeps its own complete run.
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  # On main every commit keeps its own run: a third push must not replace a queued second one.
+  group: ${{ github.workflow }}-${{ github.ref }}${{ github.ref == 'refs/heads/main' && format('-{0}', github.sha) || '' }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' && !startsWith(github.ref, 'refs/tags/') }}
 
 permissions:
   contents: read

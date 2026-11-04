@@ -3,7 +3,8 @@
 # ABOUTME: gates, clippy (deny warnings), tests; stamps .git/validation-passed on success.
 #
 # Tiers, run in order; the first failure aborts:
-#   Tier 0  cargo fmt --all -- --check
+#   Tier 0  cargo fmt --all -- --check, and check-fixture-modes.sh (a sample
+#           fixture with a shebang must be mode 100755 in the git index)
 #   Tier 1  .registre/limitation-gates.sh (deferral prose, markers, ledger,
 #           500-line cap, inline clippy allows — see registre.toml at repo root)
 #   Tier 2  cargo clippy --all-targets --all-features -- -D warnings
@@ -28,6 +29,9 @@ cd "$RUNNER_DIR"
 
 echo "==> Tier 0: cargo fmt --all -- --check"
 cargo fmt --all -- --check
+
+echo "==> Tier 0: sample fixture modes (scripts/ci/check-fixture-modes.sh)"
+bash "$SCRIPT_DIR/check-fixture-modes.sh"
 
 echo "==> Tier 1: limitation-register gates (.registre/limitation-gates.sh)"
 REPO_ROOT="$(cd "$RUNNER_DIR/.." && pwd)"

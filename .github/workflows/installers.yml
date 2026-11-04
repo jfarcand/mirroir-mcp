@@ -13,17 +13,11 @@ on:
     # The old 'feature/**' glob could not match the branch names actually used
     # here (feat/..., fix/...), so non-main pushes were effectively unbuilt.
     tags: ['v*']
-    paths:
-      - 'Package.swift'
-      - 'Sources/**'
-      - 'Tests/**'
-      - 'Resources/**'
-      - 'mirroir.sh'
-      - 'npm/**'
-      - 'scripts/package-fake-app.sh'
-      - '.github/actions/setup-embacle/**'
-      - '.github/actions/setup-fake-mirroring/**'
-      - '.github/workflows/installers.yml'
+    # No `paths` here: one paths filter applies to every ref the trigger
+    # covers, and main and the release tags always run every installer. A
+    # feature-branch push runs them only when an installer input changed —
+    # the `changes` job below names those inputs; Sources/ and Tests/ on a
+    # branch are build.yml's to cover. workflow_dispatch forces a full run.
   pull_request:
     branches: [main]
     paths:
@@ -40,14 +34,44 @@ on:
   workflow_dispatch:
 
 # Cancel superseded runs on the same branch / PR — three macos-15 jobs run here,
-# so a superseded run is expensive to leave in flight.
+# so a superseded run is expensive to leave in flight. Never on main or a tag:
+# each of those commits keeps its own complete run.
 concurrency:
-  group: installers-${{ github.head_ref || github.ref }}
-  cancel-in-progress: true
+  # On main every commit keeps its own run: a third push must not replace a queued second one.
+  group: installers-${{ github.head_ref || github.ref }}${{ github.ref == 'refs/heads/main' && format('-{0}', github.sha) || '' }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' && !startsWith(github.ref, 'refs/tags/') }}
 
 jobs:
+  # What the three installers exercise beyond the Swift sources: mirroir.sh
+  # and the agents/ profiles it copies, the npm wrapper, the manifest every
+  # install builds from, and the embacle/FakeMirroring setup they share. The
+  # Homebrew formula is written inline below, so this file covers it.
+  changes:
+    name: Installer inputs changed
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      run: ${{ steps.gate.outputs.run }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          filter: blob:none
+      - id: gate
+        env:
+          PUSH_BEFORE: ${{ github.event.before }}
+        run: >-
+          bash scripts/ci/changed-paths.sh
+          'mirroir.sh' 'agents/*' 'npm/*' 'Package.swift' 'Package.resolved'
+          'scripts/package-fake-app.sh' 'scripts/ci/changed-paths.sh'
+          '.github/actions/setup-embacle/*' '.github/actions/setup-fake-mirroring/*'
+          '.github/workflows/installers.yml'
+
   source-install:
     name: Source install (mirroir.sh)
+    needs: changes
+    if: needs.changes.outputs.run == 'true'
     runs-on: macos-15
     permissions:
       contents: read
@@ -109,6 +133,8 @@ jobs:
 
   homebrew-install:
     name: Homebrew install (local formula)
+    needs: changes
+    if: needs.changes.outputs.run == 'true'
     runs-on: macos-15
     permissions:
       contents: read
@@ -215,6 +241,8 @@ jobs:
 
   npx-install:
     name: NPX install (npm package)
+    needs: changes
+    if: needs.changes.outputs.run == 'true'
     runs-on: macos-15
     permissions:
       contents: read

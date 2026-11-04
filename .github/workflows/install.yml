@@ -11,23 +11,19 @@ on:
     # concurrency groups, so the push run is a pure duplicate of the PR run.
     branches-ignore: ['dependabot/**']
     tags: ['v*']
-    paths:
-      - 'Sources/**'
-      - 'Package.swift'
-      - '.github/actions/setup-embacle/**'
-      - '.github/workflows/install.yml'
-      # Not a build input. Path filters ARE evaluated for tag pushes, against
-      # the tagged commit's own diff, so `paths` now gates the v* release lane
-      # that has fired on all 8 releases. release.yml tags its "chore: bump
-      # version" commit, which always writes server.json — listing it pins the
-      # release lane to a file the bump owns rather than leaving it to depend
-      # on Version.swift continuing to live under Sources/.
-      - 'server.json'
+    # No `paths` here. Path filters ARE evaluated for tag pushes, against the
+    # tagged commit's own diff, so a filter would gate the v* release lane;
+    # and one filter applies to main and every branch alike. Main and the
+    # release tags always run this lane; a feature-branch push runs it only
+    # when a build input changed — the `changes` job below names them, and a
+    # Sources/ change on a branch is build.yml's release build to cover.
+    # workflow_dispatch forces a full run on any branch.
   pull_request:
     branches: [main]
-    # Same list as `push` — the Actions parser has no YAML anchors. Without it,
-    # dependabot bumps for /website and /runner burn a full macOS release build
-    # on code this workflow never compiles.
+    # The build inputs, scoped here by the trigger since a pull request is
+    # never gated by the `changes` job. Without it, dependabot bumps for
+    # /website and /runner burn a full macOS release build on code this
+    # workflow never compiles.
     paths:
       - 'Sources/**'
       - 'Package.swift'
@@ -42,13 +38,39 @@ on:
       - 'server.json'
   workflow_dispatch:
 
-# Cancel superseded runs on the same branch / PR to save runner-minutes.
+# Cancel superseded runs on the same branch / PR to save runner-minutes —
+# never on main or a tag, where each commit keeps its own complete run.
 concurrency:
-  group: install-${{ github.head_ref || github.ref }}
-  cancel-in-progress: true
+  # On main every commit keeps its own run: a third push must not replace a queued second one.
+  group: install-${{ github.head_ref || github.ref }}${{ github.ref == 'refs/heads/main' && format('-{0}', github.sha) || '' }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' && !startsWith(github.ref, 'refs/tags/') }}
 
 jobs:
+  # The build inputs this lane exists for on a branch: the package manifest
+  # and resolution, and the embacle setup the release build links against.
+  changes:
+    name: Install inputs changed
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      run: ${{ steps.gate.outputs.run }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          filter: blob:none
+      - id: gate
+        env:
+          PUSH_BEFORE: ${{ github.event.before }}
+        run: >-
+          bash scripts/ci/changed-paths.sh
+          'Package.swift' 'Package.resolved' 'scripts/ci/changed-paths.sh'
+          '.github/actions/setup-embacle/*' '.github/workflows/install.yml'
+
   install-test:
+    needs: changes
+    if: needs.changes.outputs.run == 'true'
     runs-on: macos-15
     permissions:
       contents: read

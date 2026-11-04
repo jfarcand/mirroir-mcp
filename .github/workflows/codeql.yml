@@ -13,21 +13,13 @@ on:
     # is excluded because its PR already runs the pull_request lane below.
     branches-ignore: ['dependabot/**']
     tags-ignore: ['**']
-    # Paths filters are workflow-scoped, not per-job: any match starts both
-    # language lanes, so a JS-only change still pays for the Swift analysis.
-    paths:
-      - '**.swift'
-      - 'Package.swift'
-      - 'Package.resolved'
-      - '**.ts'
-      - '**.tsx'
-      - '**.js'
-      - '**.mjs'
-      - '**.cjs'
-      - '**/package.json'
-      - '**/package-lock.json'
-      - '.github/workflows/codeql.yml'
-      - '.github/actions/setup-embacle/**'
+    # No `paths` here: one paths filter applies to main as well, and every
+    # main push is analyzed. A feature-branch push runs the analysis only when
+    # its own setup changed — the `changes` job below — so source changes on
+    # a branch are analyzed once they land on main (and by the weekly
+    # schedule), not on every branch push. The gate is workflow-wide, like a
+    # paths filter: any match starts all three lanes. workflow_dispatch forces
+    # a full run on any branch.
   pull_request:
     branches: [main]
     paths:
@@ -47,14 +39,38 @@ on:
   schedule:
     - cron: '0 6 * * 1'
 
-# Cancel superseded runs on the same branch / PR to save runner-minutes.
+# Cancel superseded runs on the same branch / PR to save runner-minutes —
+# never on main, where each commit keeps its own complete analysis.
 concurrency:
-  group: codeql-${{ github.head_ref || github.ref }}
-  cancel-in-progress: true
+  # On main every commit keeps its own run: a third push must not replace a queued second one.
+  group: codeql-${{ github.head_ref || github.ref }}${{ github.ref == 'refs/heads/main' && format('-{0}', github.sha) || '' }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' && !startsWith(github.ref, 'refs/tags/') }}
 
 jobs:
+  changes:
+    name: CodeQL setup changed
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      run: ${{ steps.gate.outputs.run }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          filter: blob:none
+      - id: gate
+        env:
+          PUSH_BEFORE: ${{ github.event.before }}
+        run: >-
+          bash scripts/ci/changed-paths.sh
+          'Package.swift' 'Package.resolved' 'scripts/ci/changed-paths.sh'
+          '.github/actions/setup-embacle/*' '.github/workflows/codeql.yml'
+
   analyze-swift:
     name: Analyze Swift
+    needs: changes
+    if: needs.changes.outputs.run == 'true'
     runs-on: macos-15
     permissions:
       security-events: write
@@ -78,6 +94,8 @@ jobs:
 
   analyze-js:
     name: Analyze JavaScript/TypeScript
+    needs: changes
+    if: needs.changes.outputs.run == 'true'
     runs-on: ubuntu-latest
     permissions:
       security-events: write
@@ -95,6 +113,8 @@ jobs:
 
   analyze-actions:
     name: Analyze Actions
+    needs: changes
+    if: needs.changes.outputs.run == 'true'
     runs-on: ubuntu-latest
     permissions:
       security-events: write

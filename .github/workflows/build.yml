@@ -51,9 +51,11 @@ on:
 
 # Cancel superseded runs to save the scarce macOS runner slots. Keyed on
 # `head_ref || ref` so a branch push and the pull request for it share one group.
+# Never on main or a tag: each of those commits keeps its own complete run.
 concurrency:
-  group: ${{ github.workflow }}-${{ github.head_ref || github.ref }}
-  cancel-in-progress: true
+  # On main every commit keeps its own run: a third push must not replace a queued second one.
+  group: ${{ github.workflow }}-${{ github.head_ref || github.ref }}${{ github.ref == 'refs/heads/main' && format('-{0}', github.sha) || '' }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' && !startsWith(github.ref, 'refs/tags/') }}
 
 jobs:
   build:
@@ -111,56 +113,11 @@ jobs:
           echo "=== AX/Input Monitoring TCC (read-only check) ==="
           ls -l /Library/Application\ Support/com.apple.TCC/TCC.db 2>/dev/null || echo "no system TCC.db readable"
 
-      - name: Integration tests (FakeMirroring)
-        env:
-          MIRROIR_BUNDLE_ID: com.jfarcand.FakeMirroring
-          MIRROIR_PROCESS_NAME: FakeMirroring
-        run: swift test --filter IntegrationTests
-
-      - name: Post-test runner diagnostics (on failure)
-        if: failure()
-        run: |
-          echo "=== ps for FakeMirroring after tests ==="
-          ps -ef | grep -i FakeMirroring | grep -v grep || echo "FakeMirroring not running"
-          echo ""
-          echo "=== CGWindowList via osascript ==="
-          osascript -e 'tell application "System Events" to get every process whose visible is true' 2>&1 | head -10 || true
-          echo ""
-          echo "=== FakeMirroring NSLog output (last 10 min, full) ==="
-          log show --last 10m --predicate 'process == "FakeMirroring"' --info --debug 2>&1 | grep -E "fakemirror-tap|FakeMirroring\]" | tail -200 || true
-          echo ""
-          echo "=== WindowServer log (last 5 min) ==="
-          log show --last 5m --predicate 'subsystem == "com.apple.WindowServer"' --info 2>&1 | tail -100 || true
-          echo ""
-          echo "=== HIToolbox / event tap log (last 5 min) ==="
-          log show --last 5m --predicate 'subsystem == "com.apple.HIToolbox" OR subsystem == "com.apple.coreservices"' --info 2>&1 | tail -50 || true
-
-      - name: Test runner (FakeMirroring)
-        env:
-          MIRROIR_BUNDLE_ID: com.jfarcand.FakeMirroring
-          MIRROIR_PROCESS_NAME: FakeMirroring
-        run: |
-          set -euo pipefail
-          .build/release/mirroir-mcp test --junit test-results.xml --verbose Tests/Fixtures/skills/fake-mirroring-check.yaml 2>&1 | tee test-runner.log
-          # Every capture must come from ScreenCaptureKit: a fallback to the
-          # screencapture CLI is a degraded capture path, even when steps pass.
-          grep -qE "capture: sck=[1-9][0-9]* fallback=0$" test-runner.log \
-            || { echo "capture fell back to the screencapture CLI:"; grep "capture:" test-runner.log; exit 1; }
-
-      - name: Compile skill (FakeMirroring)
-        env:
-          MIRROIR_BUNDLE_ID: com.jfarcand.FakeMirroring
-          MIRROIR_PROCESS_NAME: FakeMirroring
-        run: |
-          .build/release/mirroir-mcp compile Tests/Fixtures/skills/fake-mirroring-compiled.yaml
-
-      - name: Test compiled skill (FakeMirroring)
-        env:
-          MIRROIR_BUNDLE_ID: com.jfarcand.FakeMirroring
-          MIRROIR_PROCESS_NAME: FakeMirroring
-        run: |
-          .build/release/mirroir-mcp test --verbose Tests/Fixtures/skills/fake-mirroring-compiled.yaml
-
+      # The mirroir-run lanes come first, ahead of the ~25-minute integration
+      # suite: each takes minutes, so a broken lane fails the job early
+      # instead of after the suite. Every lane launches its own pack, so none
+      # depends on what ran before it.
+      #
       # Both toolchains in one job: the Swift server built above, and the Rust
       # runner that hands it an ios block. This is the only lane where a change
       # on either side of that boundary meets the other — the report format,
@@ -271,6 +228,10 @@ jobs:
           cp samples/game-scene/skills/*.md "$MIRROIR_SKILLS/"
           cp "${{ github.workspace }}/../mirroir-skills/drift-defaults.yaml" "$MIRROIR_SKILLS/"
           python3 -I samples/game-scene/fixtures/stub_vision.py 11434 move &
+          # The integration tests run after this lane: free 11434 for them
+          # however the step ends, so nothing they start meets the stub.
+          stub_pid=$!
+          trap 'kill "$stub_pid" 2>/dev/null || true' EXIT
           python3 -I -c "import socket, time
           for _ in range(60):
               try:
@@ -639,6 +600,71 @@ jobs:
           EOF
           mv "$BLOCKS" "$CONTRACT_DIR/$consumer-ios-blocks"
           done
+
+      # The integration suite starts from a FakeMirroring no lane has driven,
+      # as setup-fake-mirroring leaves it; the lanes above leave their own
+      # packs open. Quit it and launch it the way the action does.
+      - name: Relaunch FakeMirroring for the integration tests
+        run: |
+          set -euo pipefail
+          osascript -e 'quit app id "com.jfarcand.FakeMirroring"' 2>/dev/null || true
+          for _ in $(seq 1 20); do
+            pgrep -x FakeMirroring >/dev/null || break
+            sleep 0.5
+          done
+          pkill -9 -x FakeMirroring 2>/dev/null || true
+          open .build/release/FakeMirroring.app
+          sleep 3
+
+      - name: Integration tests (FakeMirroring)
+        env:
+          MIRROIR_BUNDLE_ID: com.jfarcand.FakeMirroring
+          MIRROIR_PROCESS_NAME: FakeMirroring
+        run: swift test --filter IntegrationTests
+
+      - name: Post-test runner diagnostics (on failure)
+        if: failure()
+        run: |
+          echo "=== ps for FakeMirroring after tests ==="
+          ps -ef | grep -i FakeMirroring | grep -v grep || echo "FakeMirroring not running"
+          echo ""
+          echo "=== CGWindowList via osascript ==="
+          osascript -e 'tell application "System Events" to get every process whose visible is true' 2>&1 | head -10 || true
+          echo ""
+          echo "=== FakeMirroring NSLog output (last 10 min, full) ==="
+          log show --last 10m --predicate 'process == "FakeMirroring"' --info --debug 2>&1 | grep -E "fakemirror-tap|FakeMirroring\]" | tail -200 || true
+          echo ""
+          echo "=== WindowServer log (last 5 min) ==="
+          log show --last 5m --predicate 'subsystem == "com.apple.WindowServer"' --info 2>&1 | tail -100 || true
+          echo ""
+          echo "=== HIToolbox / event tap log (last 5 min) ==="
+          log show --last 5m --predicate 'subsystem == "com.apple.HIToolbox" OR subsystem == "com.apple.coreservices"' --info 2>&1 | tail -50 || true
+
+      - name: Test runner (FakeMirroring)
+        env:
+          MIRROIR_BUNDLE_ID: com.jfarcand.FakeMirroring
+          MIRROIR_PROCESS_NAME: FakeMirroring
+        run: |
+          set -euo pipefail
+          .build/release/mirroir-mcp test --junit test-results.xml --verbose Tests/Fixtures/skills/fake-mirroring-check.yaml 2>&1 | tee test-runner.log
+          # Every capture must come from ScreenCaptureKit: a fallback to the
+          # screencapture CLI is a degraded capture path, even when steps pass.
+          grep -qE "capture: sck=[1-9][0-9]* fallback=0$" test-runner.log \
+            || { echo "capture fell back to the screencapture CLI:"; grep "capture:" test-runner.log; exit 1; }
+
+      - name: Compile skill (FakeMirroring)
+        env:
+          MIRROIR_BUNDLE_ID: com.jfarcand.FakeMirroring
+          MIRROIR_PROCESS_NAME: FakeMirroring
+        run: |
+          .build/release/mirroir-mcp compile Tests/Fixtures/skills/fake-mirroring-compiled.yaml
+
+      - name: Test compiled skill (FakeMirroring)
+        env:
+          MIRROIR_BUNDLE_ID: com.jfarcand.FakeMirroring
+          MIRROIR_PROCESS_NAME: FakeMirroring
+        run: |
+          .build/release/mirroir-mcp test --verbose Tests/Fixtures/skills/fake-mirroring-compiled.yaml
 
       - name: Upload emitted Clock contract
         if: always()
