@@ -13,10 +13,12 @@ import Foundation
 enum MirroringWindowResolver {
 
     /// Button titles that dismiss a Continuity interruption overlay and free the
-    /// session: the camera dialog's "OK" and the pause overlay's resume action
-    /// (localized variants). Compared lower-cased.
+    /// session: the camera dialog's "OK", the pause overlay's resume action and
+    /// the timed-out screen's Connect (localized variants; fr "Connecter",
+    /// fr_CA "Connexion"). Compared lower-cased.
     static let resumeControlTitles: Set<String> = [
-        "ok", "resume", "try again", "reprendre", "continuer", "réessayer", "reessayer",
+        "ok", "resume", "try again", "connect",
+        "reprendre", "continuer", "réessayer", "reessayer", "connecter", "connexion",
     ]
 
     /// Subroles of the window's own traffic-light controls. iPhone Mirroring
@@ -68,9 +70,24 @@ enum MirroringWindowResolver {
     /// reaches the caller. Revealing the toolbar adds the window controls and
     /// the Home / App Switcher buttons to the same subtree; those are window
     /// chrome over a live session and never read as paused.
-    static func state(of window: MirroringAXWindow) -> WindowState {
+    ///
+    /// Buttons with no label and no labeled text anywhere are ambiguous: a
+    /// live macOS 27 window exposes such buttons over the video. The frame
+    /// decides them: `frameIsBlank` is asked only then, and a frame showing
+    /// content reads as connected.
+    static func state(of window: MirroringAXWindow, frameIsBlank: () -> Bool) -> WindowState {
+        // An unreadable AX tree cannot show an interruption, so it cannot
+        // prove the session live: it reads as blocked, never as connected.
+        guard window.isWindow else { return .paused }
         guard let hosting = window.hostingView else { return .noWindow }
-        return hosting.children.contains(where: isInterruption) ? .paused : .connected
+        // A sheet attached to the window (a Mac password or Touch ID prompt)
+        // takes every click until it is answered.
+        if !window.sheets.isEmpty { return .paused }
+        switch hosting.children.map(overlayContent).max() ?? .none {
+        case .none: return .connected
+        case .labeled: return .paused
+        case .unlabeledControls: return frameIsBlank() ? .paused : .connected
+        }
     }
 
     /// Whether a button with `label` resumes or dismisses an interruption.
@@ -109,21 +126,38 @@ enum MirroringWindowResolver {
         }
     }
 
-    /// Whether `node` or a descendant is a button or labeled text: the
-    /// content of an interruption overlay. Toolbar chrome is skipped whole.
-    private static func isInterruption(_ node: AXNodeSnapshot) -> Bool {
-        if isToolbarControl(node) { return false }
-        if node.role == kAXButtonRole as String { return true }
-        if node.role == kAXStaticTextRole as String,
-           let label = node.label, !label.trimmingCharacters(in: .whitespaces).isEmpty {
-            return true
+    // MARK: - Overlay content
+
+    /// What an overlay subtree carries, ordered by how surely it means an
+    /// interruption.
+    enum OverlayContent: Int, Comparable {
+        /// Nothing that speaks: the live surface or its structural children.
+        case none
+        /// Buttons, none labeled, and no labeled text.
+        case unlabeledControls
+        /// A labeled button or labeled text: an interstitial talking.
+        case labeled
+
+        static func < (lhs: Self, rhs: Self) -> Bool { lhs.rawValue < rhs.rawValue }
+    }
+
+    /// The strongest overlay content in `node` and its descendants. Toolbar
+    /// chrome is skipped whole.
+    static func overlayContent(_ node: AXNodeSnapshot) -> OverlayContent {
+        if isToolbarControl(node) { return .none }
+        let hasLabel = !(node.label?.trimmingCharacters(in: .whitespaces).isEmpty ?? true)
+        var own = OverlayContent.none
+        if node.role == kAXButtonRole as String {
+            own = hasLabel ? .labeled : .unlabeledControls
+        } else if node.role == kAXStaticTextRole as String, hasLabel {
+            own = .labeled
         }
-        return node.children.contains(where: isInterruption)
+        return ([own] + node.children.map(overlayContent)).max() ?? own
     }
 
     /// Whether `node` is a window control or a toolbar button: chrome that
     /// shows over a live session when the toolbar is revealed.
-    private static func isToolbarControl(_ node: AXNodeSnapshot) -> Bool {
+    static func isToolbarControl(_ node: AXNodeSnapshot) -> Bool {
         guard node.role == kAXButtonRole as String else { return false }
         if let subrole = node.subrole, windowControlSubroles.contains(subrole) { return true }
         if let identifier = node.identifier, toolbarControlIdentifiers.contains(identifier) {

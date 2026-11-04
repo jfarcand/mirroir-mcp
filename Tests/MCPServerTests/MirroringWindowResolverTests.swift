@@ -18,6 +18,15 @@ final class MirroringWindowResolverTests: XCTestCase {
         MirroringAXWindow(title: title, frame: frame, hostingView: hosting)
     }
 
+    /// State with a frame check that fails the test when asked: only an
+    /// overlay of unlabeled controls may consult the frame.
+    private func state(_ window: MirroringAXWindow) -> WindowState {
+        MirroringWindowResolver.state(of: window) {
+            XCTFail("the frame was consulted for an unambiguous window")
+            return true
+        }
+    }
+
     // MARK: - windowInfo
 
     func testUntitledListMatchesBySizeWithinTolerance() {
@@ -69,12 +78,12 @@ final class MirroringWindowResolverTests: XCTestCase {
     // MARK: - state
 
     func testNoHostingViewIsNoWindow() {
-        XCTAssertEqual(MirroringWindowResolver.state(of: axWindow(frame: nil)), .noWindow)
+        XCTAssertEqual(state(axWindow(frame: nil)), .noWindow)
     }
 
     func testEmptyHostingViewIsConnected() {
         let window = axWindow(frame: nil, hosting: AXNodeSnapshot(role: "AXGroup"))
-        XCTAssertEqual(MirroringWindowResolver.state(of: window), .connected)
+        XCTAssertEqual(state(window), .connected)
     }
 
     func testChildrenWithoutButtonAreConnected() {
@@ -82,7 +91,7 @@ final class MirroringWindowResolverTests: XCTestCase {
             AXNodeSnapshot(role: "AXGroup", children: [AXNodeSnapshot(role: "AXStaticText")]),
         ])
         XCTAssertEqual(
-            MirroringWindowResolver.state(of: axWindow(frame: nil, hosting: hosting)),
+            state(axWindow(frame: nil, hosting: hosting)),
             .connected)
     }
 
@@ -95,7 +104,7 @@ final class MirroringWindowResolverTests: XCTestCase {
             ]),
         ])
         XCTAssertEqual(
-            MirroringWindowResolver.state(of: axWindow(frame: nil, hosting: hosting)),
+            state(axWindow(frame: nil, hosting: hosting)),
             .paused)
     }
 
@@ -105,7 +114,7 @@ final class MirroringWindowResolverTests: XCTestCase {
             AXNodeSnapshot(role: "AXGroup", children: [AXNodeSnapshot(role: "AXStaticText", label: " ")]),
         ])
         XCTAssertEqual(
-            MirroringWindowResolver.state(of: axWindow(frame: nil, hosting: hosting)),
+            state(axWindow(frame: nil, hosting: hosting)),
             .connected)
     }
 
@@ -116,7 +125,7 @@ final class MirroringWindowResolverTests: XCTestCase {
             ]),
         ])
         XCTAssertEqual(
-            MirroringWindowResolver.state(of: axWindow(frame: nil, hosting: hosting)),
+            state(axWindow(frame: nil, hosting: hosting)),
             .paused)
     }
 
@@ -136,7 +145,7 @@ final class MirroringWindowResolverTests: XCTestCase {
             ]),
         ])
         XCTAssertEqual(
-            MirroringWindowResolver.state(of: axWindow(frame: nil, hosting: hosting)),
+            state(axWindow(frame: nil, hosting: hosting)),
             .connected)
     }
 
@@ -152,7 +161,7 @@ final class MirroringWindowResolverTests: XCTestCase {
             ]),
         ])
         XCTAssertEqual(
-            MirroringWindowResolver.state(of: axWindow(frame: nil, hosting: hosting)),
+            state(axWindow(frame: nil, hosting: hosting)),
             .paused)
     }
 
@@ -162,7 +171,7 @@ final class MirroringWindowResolverTests: XCTestCase {
             AXNodeSnapshot(role: "AXButton", label: "Home Screen"),
         ])
         XCTAssertEqual(
-            MirroringWindowResolver.state(of: axWindow(frame: nil, hosting: hosting)),
+            state(axWindow(frame: nil, hosting: hosting)),
             .paused)
     }
 
@@ -185,5 +194,75 @@ final class MirroringWindowResolverTests: XCTestCase {
         XCTAssertFalse(MirroringWindowResolver.isResumeControl(label: "Close"))
         XCTAssertFalse(MirroringWindowResolver.isResumeControl(label: "Quit"))
         XCTAssertFalse(MirroringWindowResolver.isResumeControl(label: "Disconnect"))
+    }
+
+    // MARK: - Credential prompts
+
+    private let liveSurface = AXNodeSnapshot(role: "AXGroup")
+
+    func testAnAttachedSheetReadsAsPaused() {
+        let touchID = AXNodeSnapshot(role: "AXSheet", children: [
+            AXNodeSnapshot(role: "AXButton", label: "Use Password…"),
+            AXNodeSnapshot(role: "AXButton", label: "Cancel"),
+        ])
+        let window = MirroringAXWindow(title: "iPhone Mirroring", frame: nil,
+                                       hostingView: liveSurface, sheets: [touchID])
+        XCTAssertEqual(state(window), .paused)
+    }
+
+    func testASecureFieldInASheetIsACredentialPrompt() {
+        let sheet = AXNodeSnapshot(role: "AXSheet", children: [
+            AXNodeSnapshot(role: "AXGroup", children: [
+                AXNodeSnapshot(role: "AXTextField", subrole: "AXSecureTextField"),
+            ]),
+        ])
+        let window = MirroringAXWindow(title: nil, frame: nil, hostingView: liveSurface,
+                                       sheets: [sheet])
+        XCTAssertTrue(SessionBlockClassifier.hasCredentialPrompt(window))
+    }
+
+    func testATextFieldInTheOverlayIsACredentialPrompt() {
+        let overlay = AXNodeSnapshot(role: "AXGroup", children: [
+            AXNodeSnapshot(role: "AXStaticText", label: "Sign in to continue"),
+            AXNodeSnapshot(role: "AXTextField"),
+            AXNodeSnapshot(role: "AXButton", label: "Continue"),
+        ])
+        let window = MirroringAXWindow(title: nil, frame: nil, hostingView: overlay)
+        XCTAssertTrue(SessionBlockClassifier.hasCredentialPrompt(window))
+    }
+
+    func testThePlainResumeOverlayIsNotACredentialPrompt() {
+        let overlay = AXNodeSnapshot(role: "AXGroup", children: [
+            AXNodeSnapshot(role: "AXStaticText", label: "iPhone Mirroring Paused"),
+            AXNodeSnapshot(role: "AXButton", label: "Resume"),
+        ])
+        let window = MirroringAXWindow(title: nil, frame: nil, hostingView: overlay)
+        XCTAssertFalse(SessionBlockClassifier.hasCredentialPrompt(window))
+        XCTAssertEqual(state(window), .paused)
+    }
+
+    // MARK: - Unlabeled controls (macOS 27)
+
+    private let unlabeledButtons = AXNodeSnapshot(role: "AXGroup", children: [
+        AXNodeSnapshot(role: "AXButton"), AXNodeSnapshot(role: "AXButton"),
+        AXNodeSnapshot(role: "AXButton", label: "  "),
+    ])
+
+    func testUnlabeledButtonsOverContentAreConnected() {
+        let window = axWindow(frame: nil, hosting: unlabeledButtons)
+        XCTAssertEqual(MirroringWindowResolver.state(of: window) { false }, .connected)
+    }
+
+    func testUnlabeledButtonsOverABlankFrameArePaused() {
+        let window = axWindow(frame: nil, hosting: unlabeledButtons)
+        XCTAssertEqual(MirroringWindowResolver.state(of: window) { true }, .paused)
+    }
+
+    func testUnlabeledButtonsBesideLabeledTextArePausedWithoutTheFrame() {
+        let hosting = AXNodeSnapshot(role: "AXGroup", children: [
+            AXNodeSnapshot(role: "AXButton"),
+            AXNodeSnapshot(role: "AXStaticText", label: "iPhone in Use"),
+        ])
+        XCTAssertEqual(state(axWindow(frame: nil, hosting: hosting)), .paused)
     }
 }

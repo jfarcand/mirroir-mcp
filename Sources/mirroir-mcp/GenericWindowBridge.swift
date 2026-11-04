@@ -72,9 +72,12 @@ final class GenericWindowBridge: WindowBridging, Sendable {
         getWindowInfo()?.orientation
     }
 
+    /// Activate the app and un-minimize and raise its main window, so the
+    /// window is front even when it was minimized or behind another app's.
     func activate() {
         guard let app = findProcess() else { return }
         app.activate()
+        WindowListHelper.raiseMainWindow(pid: app.processIdentifier)
     }
 
     /// Try AXMainWindow then CGWindowList for a known PID.

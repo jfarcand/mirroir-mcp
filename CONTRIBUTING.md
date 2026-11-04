@@ -412,7 +412,6 @@ All timing and numeric constants can be overridden via environment variables. Th
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `MIRROIR_BUNDLE_ID` | `com.apple.ScreenContinuity` | Target app bundle ID for process discovery |
-| `MIRROIR_PROCESS_NAME` | `iPhone Mirroring` | Target app display name for messages |
 
 ### Keyboard Layout
 

@@ -28,6 +28,8 @@ extension EnvConfig {
             ("App Switching", [
                 ("statusBarTapY", "\(statusBarTapY)"),
                 ("spaceSwitchSettleUs", "\(spaceSwitchSettleUs)"),
+                ("activationConfirmTimeoutUs", "\(activationConfirmTimeoutUs)"),
+                ("overlayClearTimeoutUs", "\(overlayClearTimeoutUs)"),
                 ("spotlightAppearanceUs", "\(spotlightAppearanceUs)"),
                 ("searchResultsPopulateUs", "\(searchResultsPopulateUs)"),
                 ("launchVerifySettleUs", "\(launchVerifySettleUs)"),
@@ -39,6 +41,8 @@ extension EnvConfig {
                 ("processPollUs", "\(processPollUs)"),
                 ("earlyFailureDetectUs", "\(earlyFailureDetectUs)"),
                 ("resumeFromPausedUs", "\(resumeFromPausedUs)"),
+                ("launchConnectTimeoutUs", "\(launchConnectTimeoutUs)"),
+                ("launchConnectPollUs", "\(launchConnectPollUs)"),
                 ("postHeartbeatSettleUs", "\(postHeartbeatSettleUs)"),
             ]),
             ("Keyboard", [
@@ -173,7 +177,7 @@ extension EnvConfig {
             ]),
             ("App Identity", [
                 ("mirroringBundleID", mirroringBundleID),
-                ("mirroringProcessName", mirroringProcessName),
+                ("notificationCenterBundleID", notificationCenterBundleID),
             ]),
         ]
 

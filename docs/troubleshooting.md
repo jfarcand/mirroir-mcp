@@ -60,11 +60,15 @@ The script uses `fswatch` to monitor `Sources/` for `.swift` file changes, rebui
 
 ## Common Issues
 
-**Typing goes to the wrong app instead of iPhone** — The MCP server activates iPhone Mirroring via AppleScript before every input call. If keystrokes still land in the wrong app, check that your terminal has Accessibility permissions in System Settings. Note that focus stealing is expected — see [limitations](limitations.md#focus-stealing).
+**Typed text never appears on the iPhone** — Keystrokes are addressed to the iPhone Mirroring process, so they cannot land in another app. When `type_text` reports success but nothing shows up, the phone side has stopped accepting typed keys (taps and Cmd shortcuts often still work). Quit iPhone Mirroring and open it again; the next input call reconnects. If the text appears but differs from what was sent, iOS autocorrect rewrote it: `type_text` says so in its result.
+
+**iPhone Mirroring is not running** — The first input call starts it in the background (the app you are using stays in front) and waits up to 20 seconds for the session to connect, pressing Resume or Connect when the session shows them. A session that needs you (the iPhone in use, a Mac prompt) is reported instead of waited on.
 
 **Taps don't register** — Run `mirroir doctor` to check prerequisites. Verify that iPhone Mirroring is connected (not showing "Connect to your iPhone" screen) and that Accessibility permissions are granted in System Settings > Privacy & Security > Accessibility.
 
-**"Mirroring paused" screenshots** — The MCP server, and the `test`, `compile` and `record` commands, auto-resume paused sessions. If it persists, click the iPhone Mirroring window manually once.
+**"Mirroring paused" screenshots** — Input tools, and the `test`, `compile` and `record` commands, press the window's own Resume, OK or Try Again control once; `screenshot` and `describe_screen` never press anything, so they show the interruption as it is. When the session stays blocked, the refusal quotes what the window says and names the next move: lock the iPhone ("iPhone in Use", timed out), turn on the Mac's Wi-Fi or Bluetooth, wait while it connects, or approve or cancel a Mac Touch ID or password prompt. A password is never typed for you. `status` and `mirroir doctor` report the same guidance.
+
+**Taps refused with "off every display"** — The iPhone Mirroring window was moved past the edge of every screen, so a click there would reach nothing. Drag it back onto a display.
 
 **iOS autocorrect mangling typed text** — iOS applies autocorrect to typed text. Disable autocorrect in iPhone Settings > General > Keyboard, or type words followed by spaces to confirm them before autocorrect triggers.
 

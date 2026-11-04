@@ -97,7 +97,13 @@ final class MirroringBridge: Sendable {
     func getState() -> MirroringState {
         guard let pid = processID else { return .notRunning }
         guard let window = probe.mainWindow(pid: pid) else { return .noWindow }
-        return MirroringWindowResolver.state(of: window)
+        return MirroringWindowResolver.state(of: window) {
+            let windowID = MirroringWindowResolver.windowInfo(
+                pid: pid, axWindow: window, windowList: probe.windowList())?.windowID ?? 0
+            let blank = probe.frameIsBlank(windowID: windowID)
+            DebugLog.log("state", "unlabeled controls only; frame blank=\(blank)")
+            return blank
+        }
     }
 
     /// Press the resume control of the paused overlay.
@@ -108,16 +114,41 @@ final class MirroringBridge: Sendable {
     /// that terminates the app, so it is never pressed. The lookup and the press
     /// go through `probe`, the same reads `getState` classifies.
     func pressResume() -> Bool {
-        guard let pid = processID else { return false }
+        guard let pid = processID, !showsCredentialPrompt(pid: pid) else { return false }
         return probe.pressResumeControl(pid: pid)
     }
 
     /// Screen-center of the overlay's *dismiss* button (e.g. the camera dialog's
     /// "OK"), located by title so we don't click a stray titlebar/toolbar control.
+    /// Nil while a credential prompt shows: its "OK" would submit the prompt.
     /// See `MenuActionCapable.pausedDismissButtonPoint`.
     func pausedDismissButtonPoint() -> CGPoint? {
-        guard let pid = processID else { return nil }
+        guard let pid = processID, !showsCredentialPrompt(pid: pid) else { return nil }
         return probe.dismissControlPoint(pid: pid)
+    }
+
+    /// Launch iPhone Mirroring without making it active: the user's front app
+    /// keeps the focus while the session connects.
+    func launchInBackground() -> Bool {
+        let accepted = probe.launchInBackground(bundleID: bundleIdentifier)
+        DebugLog.log("launch", "background launch of \(bundleIdentifier): \(accepted ? "requested" : "refused")")
+        return accepted
+    }
+
+    /// What the paused window says and the move that frees it; nil while the
+    /// session is connected or has no window to read.
+    func sessionBlock() -> SessionBlock? {
+        guard getState() == .paused, let pid = processID,
+              let window = probe.mainWindow(pid: pid) else { return nil }
+        return SessionBlockClassifier.block(of: window)
+    }
+
+    /// Whether a password or Touch ID prompt shows over the mirroring window.
+    private func showsCredentialPrompt(pid: pid_t) -> Bool {
+        guard let window = probe.mainWindow(pid: pid) else { return false }
+        let showing = SessionBlockClassifier.hasCredentialPrompt(window)
+        if showing { DebugLog.log("resume", "credential prompt showing — nothing is pressed") }
+        return showing
     }
 
     /// Trigger a menu bar action (e.g., View > Home Screen).
@@ -213,10 +244,15 @@ final class MirroringBridge: Sendable {
     }
 
     /// Activate (bring to front) the iPhone Mirroring app and raise its window.
-    /// Uses both NSRunningApplication.activate() and AXUIElement AXRaise to
-    /// ensure the window becomes the key window that receives keyboard input.
+    /// Uses both NSRunningApplication.activate() and AXUIElement AXRaise (after
+    /// un-minimizing) so the window becomes the key window that receives
+    /// keyboard input.
     func activate() {
+        guard let pid = processID else { return }
         findProcess()?.activate()
+        if !probe.raiseMainWindow(pid: pid) {
+            DebugLog.log("focus", "AXRaise of the mirroring window was not accepted")
+        }
     }
 
     // MARK: - Private

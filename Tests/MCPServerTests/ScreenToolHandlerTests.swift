@@ -102,6 +102,34 @@ final class ScreenToolHandlerTests: XCTestCase {
 
     // MARK: - describe_screen
 
+    /// A screenshot is read-only: a paused session is captured as it is, never resumed.
+    func testScreenshotOfAPausedSessionPressesNothing() {
+        bridge.processRunning = true
+        bridge.state = .paused
+        bridge.connectOnResume = true
+        capture.captureResult = "iVBORw0KGgo="
+        let response = callTool("screenshot")
+        XCTAssertFalse(isError(response))
+        XCTAssertEqual(bridge.pressResumeCount, 0)
+        XCTAssertEqual(bridge.getState(), .paused)
+    }
+
+    func testDescribeScreenOfAPausedSessionPressesNothingAndSaysSo() {
+        bridge.processRunning = true
+        bridge.state = .paused
+        bridge.connectOnResume = true
+        describer.describeResult = ScreenDescriber.DescribeResult(
+            elements: [TapPoint(text: "Resume", tapX: 200, tapY: 450, confidence: 0.9)],
+            screenshotBase64: "iVBORw0KGgo=")
+        let response = callTool("describe_screen")
+        XCTAssertFalse(isError(response))
+        XCTAssertEqual(bridge.pressResumeCount, 0)
+        XCTAssertEqual(bridge.getState(), .paused)
+        let text = extractText(response) ?? ""
+        XCTAssertTrue(text.contains("is paused"), text)
+        XCTAssertTrue(text.contains("Nothing was pressed"), text)
+    }
+
     func testDescribeScreenAppNotRunning() {
         bridge.processRunning = false
         let response = callTool("describe_screen")

@@ -23,12 +23,14 @@ final class VerifiedTextEntryTests: XCTestCase {
         var pending: (run: String, reads: Int)?
         var screenReadable = true
         var otherLines: [String] = []
+        /// What the iPhone does to keystrokes as they land, as autocorrect does.
+        var autocorrect: (String) -> String = { $0 }
 
         func entry(timeoutUs: UInt32 = 1_000, pollUs: UInt32 = 250) -> VerifiedTextEntry {
             VerifiedTextEntry(
                 typeKeys: { run in
                     self.log.append("keys:\(run)")
-                    self.field += run
+                    self.field += self.autocorrect(run)
                     return nil
                 },
                 paste: { run in
@@ -69,12 +71,51 @@ final class VerifiedTextEntryTests: XCTestCase {
 
     // MARK: - Entry
 
-    func testAllKeyedTextNeverTouchesTheClipboardOrTheScreen() {
+    func testAllKeyedTextNeverTouchesTheClipboardAndIsReadBackOnce() {
         let screen = ScriptedField()
         let result = screen.entry().enter(segments([("hello world", .keyEvent)]))
         XCTAssertTrue(result.success, result.error ?? "")
-        XCTAssertEqual(screen.log, ["keys:hello world"])
+        XCTAssertNil(result.notice)
+        XCTAssertEqual(screen.log, ["keys:hello world", "read"])
         XCTAssertEqual(screen.field, "hello world")
+    }
+
+    // MARK: - Keyed read-back
+
+    /// Measured in Notes on an XR: "Thu teh adress is 12 Main st." landed as
+    /// "They the adress is 12 Main st." five times out of five.
+    func testAutocorrectedKeyedTextSucceedsWithANotice() {
+        let screen = ScriptedField()
+        screen.autocorrect = {
+            $0.replacingOccurrences(of: "Thu", with: "They").replacingOccurrences(of: "teh", with: "the")
+        }
+        let result = screen.entry().enter(segments([("Thu teh adress is 12 Main st.", .keyEvent)]))
+        XCTAssertTrue(result.success, "every keystroke was sent")
+        let notice = result.notice ?? ""
+        XCTAssertTrue(notice.contains("Thu teh adress is 12 Main st."), notice)
+        XCTAssertTrue(notice.contains("autocorrect"), notice)
+    }
+
+    func testAnUnreadableScreenGivesNoNotice() {
+        let screen = ScriptedField()
+        screen.screenReadable = false
+        let result = screen.entry().enter(segments([("a long line that wraps", .keyEvent)]))
+        XCTAssertNil(result.notice, "an unreadable screen is no evidence of a mismatch")
+    }
+
+    func testKeyedTextTheFieldWrappedOverTwoLinesIsShown() {
+        let wrapped = ScriptedField()
+        wrapped.otherLines = ["a long line"]
+        wrapped.autocorrect = { _ in "that wraps" }
+        let shown = wrapped.entry().enter(segments([("a long line that wraps", .keyEvent)]))
+        XCTAssertNil(shown.notice, "lines are read in order, so a wrapped line still matches")
+    }
+
+    func testEntryWithAPasteIsNotReadBackAsKeyedText() {
+        let screen = ScriptedField()
+        let result = screen.entry().enter(segments([("caf", .keyEvent), ("é", .paste)]))
+        XCTAssertTrue(result.success, result.error ?? "")
+        XCTAssertNil(result.notice)
     }
 
     func testPasteThatArrivesIsConfirmedAndTypingContinues() {

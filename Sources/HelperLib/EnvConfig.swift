@@ -103,6 +103,14 @@ public enum EnvConfig {
         readUInt32("spaceSwitchSettleUs", default: TimingConstants.spaceSwitchSettleUs)
     }
 
+    public static var activationConfirmTimeoutUs: UInt32 {
+        readUInt32("activationConfirmTimeoutUs", default: TimingConstants.activationConfirmTimeoutUs)
+    }
+
+    public static var overlayClearTimeoutUs: UInt32 {
+        readUInt32("overlayClearTimeoutUs", default: TimingConstants.overlayClearTimeoutUs)
+    }
+
     public static var spotlightAppearanceUs: UInt32 {
         readUInt32("spotlightAppearanceUs", default: TimingConstants.spotlightAppearanceUs)
     }
@@ -139,6 +147,14 @@ public enum EnvConfig {
 
     public static var resumeFromPausedUs: UInt32 {
         readUInt32("resumeFromPausedUs", default: TimingConstants.resumeFromPausedUs)
+    }
+
+    public static var launchConnectTimeoutUs: UInt32 {
+        readUInt32("launchConnectTimeoutUs", default: TimingConstants.launchConnectTimeoutUs)
+    }
+
+    public static var launchConnectPollUs: UInt32 {
+        readUInt32("launchConnectPollUs", default: TimingConstants.launchConnectPollUs)
     }
 
     public static var postHeartbeatSettleUs: UInt32 {

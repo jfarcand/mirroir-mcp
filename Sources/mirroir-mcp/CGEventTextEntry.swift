@@ -9,15 +9,15 @@ import CoreGraphics
 import Foundation
 
 /// Live `KeyEventPosting`: forwards to `CGEventInput`, which posts to the HID
-/// event tap where iPhone Mirroring reads keyboard events.
+/// event tap where iPhone Mirroring reads keyboard events, or to one process.
 struct CGEventKeyPoster: KeyEventPosting {
 
-    func postKey(keycode: UInt16, flags: CGEventFlags) -> Bool {
-        CGEventInput.postKey(keycode: keycode, flags: flags)
+    func postKey(keycode: UInt16, flags: CGEventFlags, targetPID: pid_t?) -> Bool {
+        CGEventInput.postKey(keycode: keycode, flags: flags, targetPID: targetPID)
     }
 
-    func postKeySequence(_ sequence: CGKeySequence) -> Bool {
-        CGEventInput.postKeySequence(sequence)
+    func postKeySequence(_ sequence: CGKeySequence, targetPID: pid_t?) -> Bool {
+        CGEventInput.postKeySequence(sequence, targetPID: targetPID)
     }
 }
 

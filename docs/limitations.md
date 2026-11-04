@@ -2,26 +2,30 @@
 
 ## Focus Stealing
 
-Every input tool (`tap`, `type_text`, `press_key`, `swipe`, `drag`, `long_press`, `double_tap`, `shake`, and `press_back` — which OCR-taps the back chevron) must make iPhone Mirroring the frontmost app before sending input events. This means the tool will steal keyboard focus from whatever app you are currently using.
+On iPhone Mirroring, taps and keystrokes no longer take the front: the app you are using keeps keyboard focus and the cursor does not move. Swipes and other gestures still bring iPhone Mirroring to the front.
 
-### Why
+| Input | Front app | How it reaches the iPhone |
+|-------|-----------|---------------------------|
+| `tap`, `double_tap`, `long_press`, `press_back` (an OCR tap on the back chevron) | Kept | A window event addressed to the iPhone Mirroring window. It lands even when other windows cover the mirror. |
+| `type_text`, `press_key`, `shake`, the typing inside `launch_app` and `open_url` | Kept | One event makes the mirror the key window of its own app, without activating it; the keys are then addressed to the iPhone Mirroring process. |
+| `swipe`, `drag`, `scroll_to`, `hold_keys`, `touch`, `pinch`, `rotate` | Taken | HID events, which macOS routes to the frontmost app. iPhone Mirroring is activated first and keeps the front afterwards. |
 
-CGEvent input is routed by macOS to the frontmost application. There is no API to direct input events to a background window.
+Measured on macOS 26.5 with iTerm in front and the front app sampled every 0.2s: Clock tab taps, taps with a Finder window over the whole mirror, typing, a select-all/copy/delete/paste round trip, back-to-back Spotlight launches and a launch that first had to start iPhone Mirroring all left iTerm in front throughout.
 
-### What This Means in Practice
+### Why Gestures Still Take the Front
 
-If you are typing in a terminal or editor and an MCP tool fires, iPhone Mirroring will become frontmost and your terminal loses focus. After the tool completes, iPhone Mirroring retains focus — the server intentionally does not switch back to avoid per-call Space jitter.
+On macOS 26.5, a drag sent as window events loses its intermediate points (iOS sees a press and a release, so a drag reads as a tap), and scroll events routed to a window are ignored. Swipes, drags and multi-step gestures therefore stay on HID input, which needs iPhone Mirroring in front. Generic macOS window targets use HID input for everything.
 
-Read-only tools (`screenshot`, `describe_screen`, `start_recording`, `stop_recording`, `status`, `get_orientation`, `check_health`, `list_skills`, `get_skill`, `list_targets`, `calibrate_component`) use the Accessibility API and do **not** steal focus.
+Read-only tools (`screenshot`, `describe_screen`, `start_recording`, `stop_recording`, `status`, `get_orientation`, `check_health`, `list_skills`, `get_skill`, `list_targets`, `calibrate_component`) do **not** steal focus.
 
-### Mitigations
+### Mitigations for Gestures
 
 | Strategy | How It Helps |
 |----------|-------------|
 | **Separate macOS Space** | Put iPhone Mirroring in its own Space. The activation triggers a Space switch, so your cursor position and text selection in the other Space are preserved. |
-| **Skill runner** | Chain multiple steps in a single skill (SKILL.md or YAML). Focus is acquired once at the start rather than stolen between each individual tool call. |
-| **Batch your MCP work** | Run a sequence of phone interactions together, then return to your other work. Interleaving phone commands with terminal typing will cause repeated focus switches. |
-| **`cursor_mode: preserving`** | Coordinate tools (`tap`, `swipe`, `drag`, `long_press`, `double_tap`) accept an optional `cursor_mode` argument. `preserving` restores the cursor to its original position after the operation. The default is `direct` for iPhone Mirroring and `preserving` for generic windows. This preserves cursor position, not application focus. |
+| **Skill runner** | Chain multiple steps in a single skill (SKILL.md or YAML). Focus is taken once, at the first gesture, rather than between individual tool calls. |
+| **Batch your MCP work** | Run a sequence of phone interactions together, then return to your other work. |
+| **`cursor_mode: preserving`** | Coordinate tools (`tap`, `swipe`, `drag`, `long_press`, `double_tap`) accept an optional `cursor_mode` argument. `preserving` restores the cursor to its original position after a HID gesture. The default is `direct` for iPhone Mirroring and `preserving` for generic windows. This preserves cursor position, not application focus. |
 
 ## Cross-Space Interaction
 

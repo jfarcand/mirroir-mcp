@@ -2,7 +2,7 @@
 // Licensed under the Apache License, Version 2.0
 //
 // ABOUTME: Enters segmented text — keystrokes for keyed runs, one clipboard paste per unmappable run.
-// ABOUTME: Each paste is confirmed on screen by OCR before the next clipboard write, or entry stops with an error.
+// ABOUTME: Each paste is confirmed on screen by OCR before the next write; keyed text is read back for autocorrect.
 
 import Foundation
 import HelperLib
@@ -56,8 +56,43 @@ struct VerifiedTextEntry {
                 entered += segment.text
             }
         }
-        return TypeResult(success: true, error: nil)
+        let keyedOnly = segments.allSatisfy { $0.method == .keyEvent }
+        return TypeResult(success: true, error: nil,
+                          notice: keyedOnly ? keyedReadBack(entered) : nil)
     }
+
+    /// Read typed text back from the screen. iOS autocorrect rewrites keystrokes
+    /// at each word boundary ("teh" becomes "the" in Notes), so the field can
+    /// hold other text than was typed. The text counts as shown when its
+    /// readable characters appear in the screen's lines read in order, which
+    /// keeps a line the field wrapped whole. Nil when it is shown, when it has
+    /// nothing OCR could read, or when the screen cannot be read at all;
+    /// otherwise a notice saying what was not seen. It is a notice, not a
+    /// failure: every keystroke was posted, and a password field shows dots.
+    private func keyedReadBack(_ typed: String) -> String? {
+        let needle = PasteNeedle.readable(typed)
+        guard !needle.isEmpty else { return nil }
+        var screenRead = false
+        for _ in 0 ..< Self.readBackReads {
+            sleep(verifyPollUs)
+            guard let lines = readScreen() else { continue }
+            screenRead = true
+            if PasteNeedle.readable(lines.joined()).contains(needle) { return nil }
+        }
+        guard screenRead else { return nil }
+        return "Every keystroke was sent, but \"\(typed)\" is not what the screen shows. " +
+            "The iPhone may have autocorrected it (for example \"teh\" to \"the\", or " +
+            "English words rewritten by a French keyboard); read the field before relying " +
+            "on its text. A password field hides what it holds, so this notice is " +
+            "expected there."
+    }
+
+    /// Screen reads the keyed read-back makes, each after one `verifyPollUs` gap.
+    /// Autocorrect rewrites a word as its boundary is typed, so nothing arrives
+    /// late but the mirrored frame: the second read covers a frame the first
+    /// came too early for. Each read is a full OCR pass, so a mismatch costs
+    /// two of them rather than a poll over the whole paste timeout.
+    static let readBackReads = 2
 
     /// Paste one run and wait until it is on screen. Nil when seen, the reason otherwise.
     private func pasteAndVerify(_ run: String, after entered: String) -> String? {

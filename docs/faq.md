@@ -17,13 +17,13 @@ See [Security](security.md) for the full threat model and recommendations.
 
 ## Why does my cursor jump when the AI is working?
 
-Every input tool (`tap`, `type_text`, `swipe`, etc.) must make iPhone Mirroring the frontmost app before sending input. macOS routes CGEvent input to the frontmost application — there is no API to direct input to a background window.
+On iPhone Mirroring it only jumps for gestures. Taps and typing (`tap`, `double_tap`, `long_press`, `type_text`, `press_key`, `launch_app`) are sent straight to the iPhone Mirroring window: your front app keeps focus and the cursor stays where it is. Swipes, drags, `scroll_to`, `hold_keys`, `touch`, `pinch` and `rotate` still use HID input, which macOS routes to the frontmost app, so they bring iPhone Mirroring to the front.
 
-**Mitigations:**
+**Mitigations for gestures:**
 
 - **Separate macOS Space** — Put iPhone Mirroring in its own Space. Your cursor position and text selection in the other Space are preserved.
 - **Batch interactions** — Run a sequence of phone commands together rather than interleaving with terminal work.
-- **Skills** — Chain multiple steps in a skill (SKILL.md or YAML). Focus is acquired once rather than per-tool-call.
+- **Skills** — Chain multiple steps in a skill (SKILL.md or YAML). Focus is taken once rather than per tool call.
 
 Read-only tools (`screenshot`, `describe_screen`, `start_recording`, `stop_recording`, `status`, `get_orientation`, `check_health`, `list_skills`, `get_skill`, `list_targets`, `calibrate_component`) do **not** steal focus.
 

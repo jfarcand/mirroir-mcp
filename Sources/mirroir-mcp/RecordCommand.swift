@@ -155,7 +155,7 @@ enum RecordCommand {
         let bridge = MirroringBridge()
 
         // A paused session is freed first, the way every MCP input tool does.
-        if let refusal = InputSimulation(bridge: bridge).ensureConnected(tag: "record") {
+        if let refusal = IPhoneMirroringTarget.input(bridge: bridge).ensureConnected(tag: "record") {
             fputs("Error: \(refusal)\n", stderr)
             fputs("Start iPhone Mirroring and connect your device before recording.\n", stderr)
             return nil
@@ -223,7 +223,9 @@ enum RecordCommand {
     ) -> Bool {
         let executor = StepExecutor(
             bridge: bridge,
-            input: InputSimulation(bridge: bridge, pasteVerifier: describer),
+            input: FocusObservingInput(
+                wrapping: IPhoneMirroringTarget.input(bridge: bridge, pasteVerifier: describer),
+                bridge: bridge),
             describer: describer, capture: capture,
             config: .default)
         let opening: [SkillStep] = [.resetApp(appName: appName), .launch(appName: appName)]

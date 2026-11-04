@@ -79,8 +79,10 @@ enum ConsoleReporter {
     /// Print a final summary across all skills, ending the counts with how the
     /// run's screens were captured (`captures.summaryLine`), so a ScreenCaptureKit
     /// path silently degrading to the `screencapture` CLI shows up as
-    /// `fallback=N` rather than only as slow steps.
-    static func reportSummary(results: [SkillResult], captures: CaptureStatsSnapshot) {
+    /// `fallback=N` rather than only as slow steps, and with how often driving the
+    /// target took the Mac's focus (`focus.summaryLine`).
+    static func reportSummary(results: [SkillResult], captures: CaptureStatsSnapshot,
+                              focus: FocusStatsSnapshot) {
         let totalSkills = results.count
         let passedSkills = results.filter(\.passed).count
         let failedSkills = totalSkills - passedSkills
@@ -101,6 +103,7 @@ enum ConsoleReporter {
             + "NOT EVALUATED: \(notEvaluatedSteps), SKIPPED: \(skippedSteps), "
             + "INCONCLUSIVE: \(inconclusiveSteps)\n", stderr)
         fputs("  \(captures.summaryLine)\n", stderr)
+        fputs("  \(focus.summaryLine)\n", stderr)
 
         if failedSkills > 0 {
             fputs("\nFailed skills:\n", stderr)

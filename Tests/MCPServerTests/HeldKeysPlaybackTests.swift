@@ -371,7 +371,9 @@ final class HeldKeysPlaybackTests: XCTestCase {
         let (input, bridge) = makeConnectedInput(poster: poster)
         bridge.frontmost = false
         let error = input.holdKeys(try request(["command", "w"]))
-        XCTAssertTrue(error?.contains("not the frontmost app") ?? false, error ?? "nil")
+        // The keyboard preamble's activation cannot confirm the front, so it
+        // refuses before any key or button event is posted.
+        XCTAssertTrue(error?.contains("No input was sent") ?? false, error ?? "nil")
         XCTAssertTrue(poster.calls.isEmpty)
     }
 

@@ -14,6 +14,10 @@ import HelperLib
 struct TypeResult {
     let success: Bool
     let error: String?
+    /// What the caller should know about a successful entry: the text typed is
+    /// not what the screen shows (the iPhone autocorrected it, or the field
+    /// hides its text). Nil when nothing needs saying.
+    var notice: String? = nil
 }
 
 /// Controls how the mouse cursor is managed during coordinate-based operations.
@@ -60,6 +64,10 @@ final class InputSimulation: Sendable {
     let keyPoster: any KeyEventPosting
     /// The pasteboard type_text pastes unmappable runs through.
     let pasteboard: any PasteboardAccessing
+    /// Posts taps and keystrokes straight to the target's window without
+    /// making it the front app. Nil sends all input through the HID path,
+    /// which brings the target to the front first.
+    let windowPoster: (any WindowEventPosting)?
     /// The target's PID right now, or nil when the target is not running.
     ///
     /// Resolved on every read rather than captured at init: the target can
@@ -84,8 +92,10 @@ final class InputSimulation: Sendable {
          heldInputPoster: any HeldInputPosting = CGEventHeldInputPoster(),
          pasteVerifier: (any ScreenDescribing)? = nil,
          keyPoster: any KeyEventPosting = CGEventKeyPoster(),
-         pasteboard: any PasteboardAccessing = GeneralPasteboard()) {
+         pasteboard: any PasteboardAccessing = GeneralPasteboard(),
+         windowPoster: (any WindowEventPosting)? = nil) {
         self.bridge = bridge
+        self.windowPoster = windowPoster
         // Every read behind a paste check or a Spotlight launch is one the
         // window kept its size across: launching from a landscape app rotates
         // the mirror while Spotlight opens.
@@ -111,15 +121,34 @@ final class InputSimulation: Sendable {
         case .connected:
             return nil
         case .paused:
+            if let block = (bridge as? MenuActionCapable)?.sessionBlock() {
+                DebugLog.log(tag, "ERROR: target paused (\(block.move.rawValue)): \(block.said)")
+                return block.refusal(targetName: bridge.targetName)
+            }
             DebugLog.log(tag, "ERROR: target paused")
-            return "Target '\(bridge.targetName)' is paused. Unlock iPhone or click Resume in the mirroring window."
+            return "Target '\(bridge.targetName)' is paused. Clear the interruption in its window "
+                + "on the Mac, then retry. No input was sent."
         case .noWindow:
             DebugLog.log(tag, "ERROR: no window")
-            return "Target '\(bridge.targetName)' window not found. Is the app running?"
+            return "Target '\(bridge.targetName)' is running but Accessibility reads no window for it: "
+                + "the window is closed, or Accessibility permission was revoked (run "
+                + "`mirroir-mcp doctor`). No input was sent."
         case .notRunning:
             DebugLog.log(tag, "ERROR: not running")
             return "Target '\(bridge.targetName)' is not running. Launch iPhone Mirroring first."
         }
+    }
+
+    /// Report a delivered pointing action honestly when the session stopped
+    /// right after it: the action can itself raise an interruption (a camera
+    /// dialog, a Continuity prompt). Returns nil when the target is still
+    /// connected, else the message to return in place of plain success.
+    func checkLivenessAfter(tag: String, action: String) -> String? {
+        let state = bridge.getState()
+        guard state != .connected else { return nil }
+        DebugLog.log(tag, "delivered, then target state=\(state)")
+        return "\(action) was delivered, then '\(bridge.targetName)' stopped accepting "
+            + "input (\(state)). Describe the screen before the next action."
     }
 
     /// Free a session suspended by a target interruption (on iPhone Mirroring: the
@@ -131,10 +160,7 @@ final class InputSimulation: Sendable {
     /// Returns true if the session is connected (or was never paused).
     func freePausedSession(tag: String) -> Bool {
         guard bridge.getState() == .paused else { return true }
-        let pid = cursorFreePID
-        let click: (CGPoint) -> Void = { point in
-            _ = CGEventInput.click(at: point, targetPID: pid)
-        }
+        let click = escapeClick()
         for attempt in 0 ..< EnvConfig.pausedDismissClickAttempts {
             DebugLog.log(tag, "session paused — running escape plugins " +
                 "(attempt \(attempt + 1)/\(EnvConfig.pausedDismissClickAttempts))")
@@ -158,14 +184,18 @@ final class InputSimulation: Sendable {
     }
 
     /// Ensure the target is connected, first freeing it from any interruption
-    /// (via the registered session-escape plugins) if needed. Returns nil when
+    /// (via the registered session-escape plugins) if needed, after launching a
+    /// target that is not running (`launchIfNotRunning`). Returns nil when
     /// connected (possibly after freeing), or the state error when it still
     /// cannot accept input.
     func ensureConnected(tag: String) -> String? {
+        launchIfNotRunning(tag: tag)
         // An escape plugin frees the session with a real click, which would
         // lift a held touch, so a held touch leaves the paused state alone.
         if !touchSession.isHeld, bridge.getState() == .paused {
             _ = freePausedSession(tag: tag)
+            // A Connect press leaves the window reading "Connecting to".
+            waitForConnection(tag: tag)
         }
         return checkMirroringConnected(tag: tag)
     }
@@ -182,25 +212,38 @@ final class InputSimulation: Sendable {
     /// stage-manager move). Stale `info.position` then sends CGEvent clicks to
     /// the old location, missing the actual window. The post-activate re-query
     /// ensures every pointing operation uses the window's *current* coordinates.
-    func preparePointingInput(tag: String, x: Double, y: Double) -> (info: WindowInfo?, focusChanged: Bool, error: String?) {
+    ///
+    /// `byWindow` marks an operation that can be posted to the window itself
+    /// (tap, double tap, long press). When the target has a window poster,
+    /// such an operation returns it in `windowPoster` and skips activation
+    /// and the point-ownership guard: the event is addressed to the window,
+    /// so it cannot land in whatever covers that point, and the user keeps
+    /// the front app.
+    func preparePointingInput(
+        tag: String, x: Double, y: Double, byWindow: Bool = false
+    ) -> (info: WindowInfo?, focusChanged: Bool, error: String?, windowPoster: (any WindowEventPosting)?) {
         if let refusal = touchSession.heldRefusal(tool: tag) {
             DebugLog.log(tag, "REJECTED: touch held")
-            return (nil, false, refusal)
+            return (nil, false, refusal, nil)
         }
         if let stateError = ensureConnected(tag: tag) {
-            return (nil, false, stateError)
+            return (nil, false, stateError, nil)
         }
 
         guard var info = bridge.getWindowInfo() else {
             DebugLog.log(tag, "ERROR: window not found")
-            return (nil, false, "Target '\(bridge.targetName)' window not found")
+            return (nil, false, "Target '\(bridge.targetName)' window not found", nil)
         }
 
         if let boundsError = validateBounds(x: x, y: y, info: info, tag: tag) {
-            return (nil, false, boundsError)
+            return (nil, false, boundsError, nil)
         }
 
         logWindowState(tag, info)
+        if byWindow, let poster = windowDelivery(for: info) {
+            DebugLog.log(tag, "posting to window \(info.windowID); front app untouched")
+            return (info, false, nil, poster)
+        }
         // Make the mirror the key window before the click. A cold click on a
         // window that is not already frontmost is swallowed by macOS
         // click-to-focus — it raises the window instead of reaching the content,
@@ -208,7 +251,14 @@ final class InputSimulation: Sendable {
         // already active (consecutive taps pay no activation cost) and activates
         // otherwise, which is the only way the click lands. Skipping activation
         // when merely "unobstructed" was tried and reverted — it dropped the tap.
-        let changed = ensureTargetFrontmost()
+        let changed: Bool
+        switch ensureTargetFrontmost() {
+        case .alreadyFront: changed = false
+        case .activated: changed = true
+        case .failed(let reason):
+            DebugLog.log(tag, "REJECTED: \(reason)")
+            return (nil, false, reason, nil)
+        }
         if changed {
             usleep(EnvConfig.spaceSwitchSettleUs)
             if let freshInfo = bridge.getWindowInfo() {
@@ -220,14 +270,23 @@ final class InputSimulation: Sendable {
                 info = freshInfo
             }
         }
-        return (info, changed, nil)
+        if let covered = checkPointCoverage(tag: tag, info: info, x: x, y: y) {
+            return (nil, changed, covered, nil)
+        }
+        return (info, changed, nil, nil)
     }
 
-    /// Common preamble for keyboard operations (type, press_key, shake).
-    /// Validates that the target is connected and ensures it's frontmost.
+    /// Common preamble for keyboard operations (type, press_key, shake, hold_keys).
+    /// Validates that the target is connected and brings it to the front.
+    /// Keystrokes go to whichever Mac app has focus, so a target that cannot be
+    /// confirmed front refuses here rather than typing into the user's app.
     func prepareKeyboardInput(tag: String) -> String? {
         if let stateError = ensureConnected(tag: tag) {
             return stateError
+        }
+        if case .failed(let reason) = ensureTargetFrontmost() {
+            DebugLog.log(tag, "REJECTED: \(reason)")
+            return reason
         }
         return nil
     }
@@ -270,8 +329,14 @@ final class InputSimulation: Sendable {
     /// Tap at a position relative to the target window.
     /// Returns nil on success, or an error message on failure.
     func tap(x: Double, y: Double, cursorMode override: CursorMode? = nil) -> String? {
-        let prep = preparePointingInput(tag: "tap", x: x, y: y)
+        let prep = preparePointingInput(tag: "tap", x: x, y: y, byWindow: true)
         guard let info = prep.info else { return prep.error ?? "Unknown error" }
+        if let poster = prep.windowPoster {
+            let posted = poster.click(at: CGPoint(x: x, y: y), holdUs: CGEventInput.clickHoldUs, in: info)
+            DebugLog.log("tap", "relative=(\(x),\(y)) window record=\(posted ? "OK" : "FAILED")")
+            guard posted else { return "Window click failed" }
+            return checkLivenessAfter(tag: "tap", action: "The tap")
+        }
 
         let saved = saveCursor(mode: override)
         defer { restoreCursor(saved) }
@@ -282,7 +347,8 @@ final class InputSimulation: Sendable {
 
         let result = CGEventInput.click(at: CGPoint(x: screenX, y: screenY), targetPID: cursorFreePID)
         DebugLog.log("tap", "CGEvent=\(result ? "OK" : "FAILED")")
-        return result ? nil : "CGEvent click failed"
+        guard result else { return "CGEvent click failed" }
+        return checkLivenessAfter(tag: "tap", action: "The tap")
     }
 
     /// Swipe from one point to another relative to the target window.
@@ -328,15 +394,23 @@ final class InputSimulation: Sendable {
             targetPID: cursorFreePID
         )
         DebugLog.log("swipe", "CGEvent=\(result ? "OK" : "FAILED")")
-        return result ? nil : "CGEvent swipe failed"
+        guard result else { return "CGEvent swipe failed" }
+        return checkLivenessAfter(tag: "swipe", action: "The swipe")
     }
 
     /// Long press at a position relative to the target window.
     /// Returns nil on success, or an error message on failure.
     func longPress(x: Double, y: Double, durationMs: Int = 500,
                    cursorMode override: CursorMode? = nil) -> String? {
-        let prep = preparePointingInput(tag: "longPress", x: x, y: y)
+        let prep = preparePointingInput(tag: "longPress", x: x, y: y, byWindow: true)
         guard let info = prep.info else { return prep.error ?? "Unknown error" }
+        if let poster = prep.windowPoster {
+            let holdUs = UInt32(CGEventInput.safeDurationMs(durationMs)) * 1000
+            let posted = poster.click(at: CGPoint(x: x, y: y), holdUs: holdUs, in: info)
+            DebugLog.log("longPress", "relative=(\(x),\(y)) duration=\(durationMs)ms window record=\(posted ? "OK" : "FAILED")")
+            guard posted else { return "Window long press failed" }
+            return checkLivenessAfter(tag: "longPress", action: "The long press")
+        }
 
         let saved = saveCursor(mode: override)
         defer { restoreCursor(saved) }
@@ -347,14 +421,21 @@ final class InputSimulation: Sendable {
 
         let result = CGEventInput.longPress(at: CGPoint(x: screenX, y: screenY), durationMs: durationMs, targetPID: cursorFreePID)
         DebugLog.log("longPress", "CGEvent=\(result ? "OK" : "FAILED")")
-        return result ? nil : "CGEvent long press failed"
+        guard result else { return "CGEvent long press failed" }
+        return checkLivenessAfter(tag: "longPress", action: "The long press")
     }
 
     /// Double-tap at a position relative to the target window.
     /// Returns nil on success, or an error message on failure.
     func doubleTap(x: Double, y: Double, cursorMode override: CursorMode? = nil) -> String? {
-        let prep = preparePointingInput(tag: "doubleTap", x: x, y: y)
+        let prep = preparePointingInput(tag: "doubleTap", x: x, y: y, byWindow: true)
         guard let info = prep.info else { return prep.error ?? "Unknown error" }
+        if let poster = prep.windowPoster {
+            let posted = poster.doubleClick(at: CGPoint(x: x, y: y), gapUs: CGEventInput.clickHoldUs, in: info)
+            DebugLog.log("doubleTap", "relative=(\(x),\(y)) window record=\(posted ? "OK" : "FAILED")")
+            guard posted else { return "Window double tap failed" }
+            return checkLivenessAfter(tag: "doubleTap", action: "The double tap")
+        }
 
         let saved = saveCursor(mode: override)
         defer { restoreCursor(saved) }
@@ -365,7 +446,8 @@ final class InputSimulation: Sendable {
 
         let result = CGEventInput.doubleTap(at: CGPoint(x: screenX, y: screenY), targetPID: cursorFreePID)
         DebugLog.log("doubleTap", "CGEvent=\(result ? "OK" : "FAILED")")
-        return result ? nil : "CGEvent double tap failed"
+        guard result else { return "CGEvent double tap failed" }
+        return checkLivenessAfter(tag: "doubleTap", action: "The double tap")
     }
 
     /// Drag from one point to another relative to the target window.
@@ -398,81 +480,7 @@ final class InputSimulation: Sendable {
             targetPID: cursorFreePID
         )
         DebugLog.log("drag", "CGEvent=\(result ? "OK" : "FAILED")")
-        return result ? nil : "CGEvent drag failed"
+        guard result else { return "CGEvent drag failed" }
+        return checkLivenessAfter(tag: "drag", action: "The drag")
     }
-
-    /// Ensure the target window is the frontmost app so it receives input.
-    /// Always activates, since focus can move between the check and the input;
-    /// the check only decides whether to sleep for Space-switch settling.
-    ///
-    /// Activation state comes from the freshly resolved target itself, not from
-    /// `NSWorkspace.frontmostApplication`, which is frozen in a server that
-    /// never runs its main run loop (see `RunningAppLocator`).
-    ///
-    /// When the target is already the active app, this returns without touching
-    /// focus at all: the System Events `set frontmost` call disturbs event
-    /// routing for a beat even when it is a no-op, and a click posted inside
-    /// that window is silently dropped (measured against FakeMirroring — the
-    /// same tap delivers with no AppleScript, or with AppleScript plus the
-    /// settle sleep, but never with AppleScript and no settle).
-    ///
-    /// Uses AppleScript `set frontmost to true` via System Events for
-    /// cross-Space activation (NSRunningApplication.activate() cannot trigger
-    /// a macOS Space switch, deprecated in macOS 14).
-    ///
-    /// - Returns: `true` if the window was not already frontmost (focus changed).
-    @discardableResult
-    func ensureTargetFrontmost() -> Bool {
-        let target = bridge.findProcess()
-        let alreadyFront = target?.isActive ?? false
-
-        if alreadyFront {
-            DebugLog.log("focus", "target already active — skipping activation")
-            return false
-        }
-        if DebugLog.enabled {
-            let front = RunningAppLocator.frontmostWindowOwner()?.bundleIdentifier ?? "nil"
-            DebugLog.log("focus", "switching from \(front)")
-        }
-
-        // Resolve the process name for the current target's running application.
-        // For iPhone Mirroring this is the configured process name; for generic
-        // targets it's the app's localized name from NSRunningApplication.
-        let processName: String
-        if bridge is MirroringBridge {
-            processName = EnvConfig.mirroringProcessName
-        } else if let app = target, let name = app.localizedName {
-            processName = name
-        } else {
-            // Fallback: use NSRunningApplication.activate() directly
-            bridge.activate()
-            usleep(EnvConfig.spaceSwitchSettleUs)
-            return true
-        }
-
-        let script = NSAppleScript(source: """
-            tell application "System Events"
-                tell process "\(processName)"
-                    set frontmost to true
-                end tell
-            end tell
-            """)
-        var errorInfo: NSDictionary?
-        script?.executeAndReturnError(&errorInfo)
-
-        if let err = errorInfo {
-            DebugLog.log("focus", "AppleScript error: \(err)")
-        }
-
-        // The settle sleep is not just for Space switches: a click posted
-        // before the activation transition finishes is silently dropped.
-        usleep(EnvConfig.spaceSwitchSettleUs)
-
-        if DebugLog.enabled {
-            let after = RunningAppLocator.frontmostWindowOwner()?.bundleIdentifier ?? "nil"
-            DebugLog.log("focus", "after activation frontApp=\(after)")
-        }
-        return true
-    }
-
 }

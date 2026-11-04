@@ -9,8 +9,8 @@ import Foundation
 import HelperLib
 
 /// Navigation-to-root primitive shared by BFS recovery sites.
-/// Each Spotlight relaunch costs ~3 seconds and visibly steals focus on the
-/// Mac. When the iPhone is still inside the target app, tapping the back
+/// Each Spotlight relaunch costs ~3 seconds and visibly resets the app on the
+/// iPhone. When the iPhone is still inside the target app, tapping the back
 /// chevron a few times is faster and less disruptive — and the existing
 /// `Backtracking` protocol already knows how to find the chevron via OCR.
 enum AppRootNavigator {

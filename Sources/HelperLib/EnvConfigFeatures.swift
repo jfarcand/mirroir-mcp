@@ -414,9 +414,12 @@ extension EnvConfig {
                    default: "com.apple.ScreenContinuity")
     }
 
-    public static var mirroringProcessName: String {
-        readString("mirroringProcessName", envVar: "MIRROIR_PROCESS_NAME",
-                   default: "iPhone Mirroring")
+    /// Bundle ID of the process that draws notification banners. Its
+    /// display-sized overlay window over the target means a banner is up, so a
+    /// click waits for it to clear instead of landing on the banner.
+    public static var notificationCenterBundleID: String {
+        readString("notificationCenterBundleID", envVar: "MIRROIR_NOTIFICATION_CENTER_BUNDLE_ID",
+                   default: "com.apple.notificationcenterui")
     }
 
     /// Post mouse events directly to the target PID via `postToPid` instead

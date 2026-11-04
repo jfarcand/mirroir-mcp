@@ -79,6 +79,23 @@ enum WindowListHelper {
         windowEntries(onScreenOnly: true).first { $0.layer == 0 }?.ownerPID
     }
 
+    /// Layer of the menu bar. Windows below it and above layer 0 are floating
+    /// panels; the menu bar, the Dock and system overlays sit at or above it.
+    static let mainMenuLayer = Int(CGWindowLevelForKey(.mainMenuWindow))
+
+    /// Whether `pid` has a window in front of every other process's
+    /// normal-layer window, reading `entries` front to back: it owns the
+    /// frontmost layer-0 window, or one of its windows floats above all of
+    /// them (a floating-level panel). System overlays above the floating
+    /// levels (the menu bar, the Dock) do not count either way.
+    static func isInFront(pid: pid_t, entries: [WindowListEntry]) -> Bool {
+        for entry in entries {
+            if entry.ownerPID == pid && (0..<mainMenuLayer).contains(entry.layer) { return true }
+            if entry.layer == 0 { return false }
+        }
+        return false
+    }
+
     /// Whether two geometries are the same within `geometryMatchTolerance`.
     static func matches(_ a: CGFloat, _ b: CGFloat) -> Bool {
         abs(a - b) < geometryMatchTolerance
@@ -120,6 +137,22 @@ enum WindowListHelper {
 }
 
 extension WindowListHelper {
+
+    /// Un-minimize and raise the AX main window of `pid`. Returns whether the
+    /// raise was accepted. Activating an app does neither for a minimized
+    /// window, and does not reorder a window that sits behind another app's.
+    @discardableResult
+    static func raiseMainWindow(pid: pid_t) -> Bool {
+        let app = AXUIElementCreateApplication(pid)
+        var windowValue: CFTypeRef?
+        guard AXUIElementCopyAttributeValue(
+                app, kAXMainWindowAttribute as CFString, &windowValue) == .success,
+              let value = windowValue, CFGetTypeID(value) == AXUIElementGetTypeID()
+        else { return false }
+        let window = unsafeDowncast(value, to: AXUIElement.self)
+        AXUIElementSetAttributeValue(window, kAXMinimizedAttribute as CFString, kCFBooleanFalse)
+        return AXUIElementPerformAction(window, kAXRaiseAction as CFString) == .success
+    }
 
     /// Extract position and size from an AXUIElement window reference.
     static func geometryFromAXElement(_ window: AXUIElement) -> (position: CGPoint, size: CGSize)? {

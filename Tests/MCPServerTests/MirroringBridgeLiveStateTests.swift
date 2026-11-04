@@ -52,6 +52,41 @@ private final class ScriptedMirroringProbe: MirroringSystemProbing, @unchecked S
     func dismissControlPoint(pid requested: pid_t) -> CGPoint? {
         lock.withLock { requested == pid ? resumePoint : nil }
     }
+
+    private var raises: [pid_t] = []
+    var raisedPIDs: [pid_t] { lock.withLock { raises } }
+
+    func raiseMainWindow(pid requested: pid_t) -> Bool {
+        lock.withLock {
+            raises.append(requested)
+            return requested == pid && axWindow != nil
+        }
+    }
+
+    /// Whether the scripted frame is blank, and the window IDs it was asked for.
+    private var blankFrame = true
+    private var frameChecks: [CGWindowID] = []
+
+    func set(blankFrame: Bool) { lock.withLock { self.blankFrame = blankFrame } }
+    var checkedFrames: [CGWindowID] { lock.withLock { frameChecks } }
+
+    func frameIsBlank(windowID: CGWindowID) -> Bool {
+        lock.withLock {
+            frameChecks.append(windowID)
+            return blankFrame
+        }
+    }
+
+    /// Bundle IDs a background launch was requested for.
+    private var launches: [String] = []
+    var launchedBundleIDs: [String] { lock.withLock { launches } }
+
+    func launchInBackground(bundleID: String) -> Bool {
+        lock.withLock {
+            launches.append(bundleID)
+            return true
+        }
+    }
 }
 
 final class MirroringBridgeLiveStateTests: XCTestCase {
@@ -91,6 +126,27 @@ final class MirroringBridgeLiveStateTests: XCTestCase {
         probe.set(
             pid: pid, axWindow: liveWindow(axFrame ?? frame),
             entries: windowList(pid: pid, mirroring: frame))
+    }
+
+    // MARK: - Activation
+
+    func testABackgroundLaunchAsksLaunchServicesForTheBridgedBundle() {
+        XCTAssertTrue(bridge.launchInBackground())
+        XCTAssertEqual(probe.launchedBundleIDs, ["com.example.mirroring"])
+    }
+
+    func testActivateRaisesTheLiveProcessWindow() {
+        show(pid: 100, frame: Self.portrait)
+        bridge.activate()
+        show(pid: 200, frame: Self.portrait)
+        bridge.activate()
+        XCTAssertEqual(probe.raisedPIDs, [100, 200])
+    }
+
+    func testActivateWithoutAProcessRaisesNothing() {
+        probe.set(pid: nil, axWindow: nil, entries: [])
+        bridge.activate()
+        XCTAssertTrue(probe.raisedPIDs.isEmpty)
     }
 
     // MARK: - Geometry across calls
@@ -201,9 +257,93 @@ final class MirroringBridgeLiveStateTests: XCTestCase {
         XCTAssertEqual(probe.resumePresses, [300], "no press without a running process")
     }
 
+    /// A Mac password sheet carries an "OK" button, a resume title: pressing or
+    /// clicking it would submit the prompt, so neither happens.
+    func testAPasswordSheetIsNeverPressedOrClicked() {
+        let sheet = AXNodeSnapshot(role: "AXSheet", children: [
+            AXNodeSnapshot(role: "AXStaticText", label: "Enter your password to allow this."),
+            AXNodeSnapshot(role: "AXTextField", subrole: "AXSecureTextField"),
+            AXNodeSnapshot(role: "AXButton", label: "OK"),
+            AXNodeSnapshot(role: "AXButton", label: "Cancel"),
+        ])
+        probe.set(pid: 300, axWindow: MirroringAXWindow(
+            title: Self.title, frame: Self.portrait,
+            hostingView: AXNodeSnapshot(role: "AXGroup"), sheets: [sheet]),
+                  entries: windowList(pid: 300, mirroring: Self.portrait))
+        probe.set(resumePoint: CGPoint(x: 1498, y: 569))
+
+        XCTAssertEqual(bridge.getState(), .paused)
+        XCTAssertEqual(bridge.sessionBlock()?.move, .approveOnMac)
+        XCTAssertNil(bridge.pausedDismissButtonPoint())
+        XCTAssertFalse(bridge.pressResume())
+        XCTAssertTrue(probe.resumePresses.isEmpty)
+    }
+
     func testNoWindowWhenAXExposesNoMainWindow() {
         probe.set(pid: 100, axWindow: nil, entries: [])
         XCTAssertEqual(bridge.getState(), .noWindow)
         XCTAssertNil(bridge.getWindowInfo())
+    }
+
+    // MARK: - Unlabeled controls (macOS 27) and blocked-session guidance
+
+    /// A live macOS 27 window: three unlabeled buttons over the video.
+    private func unlabeledButtonsWindow() -> MirroringAXWindow {
+        MirroringAXWindow(
+            title: Self.title, frame: Self.portrait,
+            hostingView: AXNodeSnapshot(role: "AXGroup", children: [
+                AXNodeSnapshot(role: "AXButton"), AXNodeSnapshot(role: "AXButton"),
+                AXNodeSnapshot(role: "AXButton"),
+            ]))
+    }
+
+    func testUnlabeledButtonsOverAFrameWithContentReadAsConnected() {
+        probe.set(pid: 300, axWindow: unlabeledButtonsWindow(),
+                  entries: windowList(pid: 300, mirroring: Self.portrait))
+        probe.set(blankFrame: false)
+
+        XCTAssertEqual(bridge.getState(), .connected)
+        XCTAssertEqual(probe.checkedFrames, [11])
+    }
+
+    func testUnlabeledButtonsOverABlankFrameReadAsPaused() {
+        probe.set(pid: 300, axWindow: unlabeledButtonsWindow(),
+                  entries: windowList(pid: 300, mirroring: Self.portrait))
+        probe.set(blankFrame: true)
+
+        XCTAssertEqual(bridge.getState(), .paused)
+        XCTAssertEqual(probe.checkedFrames, [11])
+    }
+
+    func testALabeledInterstitialNeverConsultsTheFrame() {
+        probe.set(pid: 300, axWindow: MirroringAXWindow(
+            title: Self.title, frame: Self.portrait,
+            hostingView: AXNodeSnapshot(role: "AXGroup", children: [
+                AXNodeSnapshot(role: "AXStaticText", label: "iPhone in Use"),
+                AXNodeSnapshot(role: "AXButton", label: "Try Again"),
+            ])), entries: windowList(pid: 300, mirroring: Self.portrait))
+
+        XCTAssertEqual(bridge.getState(), .paused)
+        XCTAssertTrue(probe.checkedFrames.isEmpty)
+    }
+
+    func testTheBlockQuotesTheWindowAndNamesTheMove() {
+        probe.set(pid: 300, axWindow: MirroringAXWindow(
+            title: Self.title, frame: Self.portrait,
+            hostingView: AXNodeSnapshot(role: "AXGroup", children: [
+                AXNodeSnapshot(role: "AXStaticText", label: "iPhone in Use"),
+                AXNodeSnapshot(role: "AXStaticText", label: "Lock your iPhone to connect."),
+                AXNodeSnapshot(role: "AXButton", label: "Try Again"),
+            ])), entries: windowList(pid: 300, mirroring: Self.portrait))
+
+        let block = bridge.sessionBlock()
+        XCTAssertEqual(block?.move, .lockIPhone)
+        XCTAssertEqual(block?.quoted, ["iPhone in Use", "Lock your iPhone to connect.", "[Try Again]"])
+    }
+
+    func testAConnectedSessionHasNoBlock() {
+        probe.set(pid: 300, axWindow: liveWindow(Self.portrait),
+                  entries: windowList(pid: 300, mirroring: Self.portrait))
+        XCTAssertNil(bridge.sessionBlock())
     }
 }

@@ -118,7 +118,7 @@ private final class SimulatedPhone: KeyEventPosting, @unchecked Sendable {
         pasteboard = RecordingPasteboard(contents: clipboard)
     }
 
-    func postKey(keycode: UInt16, flags: CGEventFlags) -> Bool {
+    func postKey(keycode: UInt16, flags: CGEventFlags, targetPID: pid_t?) -> Bool {
         guard flags.contains(.maskCommand), keycode == CGKeyMap.lookup("v")?.keycode else {
             return true
         }
@@ -128,7 +128,7 @@ private final class SimulatedPhone: KeyEventPosting, @unchecked Sendable {
         return true
     }
 
-    func postKeySequence(_ sequence: CGKeySequence) -> Bool {
+    func postKeySequence(_ sequence: CGKeySequence, targetPID: pid_t?) -> Bool {
         guard let char = keyedCharacters.first(where: { layout.keySequence(for: $0) == sequence }) else {
             return false
         }

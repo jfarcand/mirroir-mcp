@@ -39,44 +39,6 @@ public enum AppleScriptKeyMap {
         KeyName.sortedNames
     }
 
-    /// Build an AppleScript that activates iPhone Mirroring and sends a key press.
-    /// - Parameters:
-    ///   - keyCode: macOS virtual key code (from `keyCode(for:)`)
-    ///   - modifiers: Optional modifier names ("command", "shift", "option", "control")
-    /// - Returns: AppleScript source string ready for NSAppleScript execution
-    public static func buildKeyPressScript(keyCode: UInt16, modifiers: [String] = [], processName: String = EnvConfig.mirroringProcessName) -> String {
-        let modifierClause: String
-        if modifiers.isEmpty {
-            modifierClause = ""
-        } else {
-            let modifierList = modifiers.compactMap { modifierMapping[$0] }.joined(separator: ", ")
-            modifierClause = " using {\(modifierList)}"
-        }
-
-        return """
-            tell application "System Events"
-                set prevApp to name of first process whose frontmost is true
-                tell process "\(processName)"
-                    set frontmost to true
-                end tell
-                delay 0.1
-                key code \(keyCode)\(modifierClause)
-                delay 0.05
-                tell process prevApp
-                    set frontmost to true
-                end tell
-            end tell
-            """
-    }
-
-    /// AppleScript modifier name mapping.
-    private static let modifierMapping: [String: String] = [
-        "command": "command down",
-        "shift": "shift down",
-        "option": "option down",
-        "control": "control down",
-    ]
-
     /// Escape a string for safe embedding in an AppleScript `keystroke "..."` command.
     /// Handles backslashes (doubled) and double quotes (backslash-escaped).
     public static func escapeForAppleScript(_ text: String) -> String {

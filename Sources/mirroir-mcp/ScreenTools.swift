@@ -75,13 +75,8 @@ extension MirroirMCP {
                     return .error("Target '\(ctx.name)' is not running")
                 }
 
-                let state = bridge.getState()
-                if state == .paused {
-                    if let menuBridge = bridge as? (any MenuActionCapable) {
-                        _ = menuBridge.pressResume()
-                        usleep(EnvConfig.resumeFromPausedUs)
-                    }
-                }
+                // Read-only: a paused session is captured as it is (the overlay
+                // shows), never resumed — the user may have paused it on purpose.
 
                 // A settle window of 0 is an explicit opt-out: the caller wants
                 // the first available frame and accepts that it may be stale.
@@ -171,13 +166,8 @@ extension MirroirMCP {
                 guard bridge.findProcess() != nil else {
                     return .error("Target '\(ctx.name)' is not running")
                 }
-                let state = bridge.getState()
-                if state == .paused {
-                    if let menuBridge = bridge as? (any MenuActionCapable) {
-                        _ = menuBridge.pressResume()
-                        usleep(EnvConfig.resumeFromPausedUs)
-                    }
-                }
+                // Read-only: a paused session is described as it is, never resumed.
+                let paused = bridge.getState() == .paused
 
                 let scrollEnabled = args["scroll"]?.asBool() ?? false
                 let omitScreenshot = args["omit_screenshot"]?.asBool() ?? EnvConfig.describeScreenOmitScreenshot
@@ -250,6 +240,11 @@ extension MirroirMCP {
                     for hint in result.hints {
                         lines.append("- \(hint)")
                     }
+                }
+                if paused {
+                    lines.append("")
+                    lines.append("Note: '\(ctx.name)' is paused, so this frame shows the "
+                        + "interruption, not the app. Nothing was pressed to resume it.")
                 }
                 lines.append("")
                 lines.append("_meta: ocr_time_ms=\(result.ocrTimeMs) recognition_level=\(EnvConfig.ocrRecognitionLevel) element_count=\(result.elements.count)"

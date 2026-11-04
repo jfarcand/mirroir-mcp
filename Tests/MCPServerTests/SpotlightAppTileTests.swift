@@ -35,6 +35,14 @@ final class SpotlightAppTileTests: XCTestCase {
         XCTAssertEqual(tile?.tapY, 219)
     }
 
+    /// A tap on the label does nothing on iOS 26; the icon above it opens the app.
+    func testTheTapGoesIntoTheIconAboveTheLabel() throws {
+        let tile = try XCTUnwrap(SpotlightAppTile.label(for: "Horloge", in: heldQuery))
+        let point = SpotlightAppTile.tapPoint(for: tile)
+        XCTAssertEqual(point.x, 80)
+        XCTAssertEqual(point.y, 219 - SpotlightAppTile.iconTapLift)
+    }
+
     func testATopHitWithAnUndetectedIconIsATileBesideItsShortcuts() {
         // 2026-11-01 13:35: the clock-face icon read as "11 12"; the shortcut
         // "Régler le" has its icon above it, and "Horloge" shares its baseline.

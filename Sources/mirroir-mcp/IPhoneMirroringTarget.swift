@@ -61,6 +61,17 @@ enum IPhoneMirroringTarget {
         .menuActions, .spotlight, .home, .appSwitcher,
     ]
 
+    /// The input path every entry point that drives the mirror builds (the MCP
+    /// target, `test`, `compile` and `record`): taps and keys go to the
+    /// mirror's window by SkyLight record, so the app in front keeps the focus.
+    static func input(
+        bridge: MirroringBridge, pasteVerifier: (any ScreenDescribing)? = nil
+    ) -> InputSimulation {
+        InputSimulation(bridge: bridge, cursorMode: profile.cursorMode,
+                        pasteVerifier: pasteVerifier,
+                        windowPoster: SkyLightWindowPoster.live)
+    }
+
     /// Build a fully-wired TargetContext for iPhone Mirroring.
     static func build(config: TargetConfig?, name: String = "iphone") -> TargetContext {
         let bridge = MirroringBridge(targetName: name, bundleID: config?.bundleID)
@@ -75,8 +86,9 @@ enum IPhoneMirroringTarget {
             bundleID: config?.bundleID,
             profile: profile,
             bridge: bridge,
-            input: InputSimulation(bridge: bridge, cursorMode: profile.cursorMode,
-                                   pasteVerifier: describers.ocr),
+            input: FocusObservingInput(
+                wrapping: input(bridge: bridge, pasteVerifier: describers.ocr),
+                bridge: bridge),
             capture: capture,
             describer: describers.describer,
             ocrDescriber: describers.ocr,

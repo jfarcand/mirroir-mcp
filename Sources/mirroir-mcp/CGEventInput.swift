@@ -24,7 +24,7 @@ import Foundation
 enum CGEventInput {
 
     /// Milliseconds to pause between mouse-down and mouse-up for a click.
-    private static let clickHoldUs: UInt32 = 50_000
+    static let clickHoldUs: UInt32 = 50_000
 
     /// Microseconds to settle after warping cursor before posting scroll events.
     /// Only used by swipe, which needs the cursor pre-positioned for scroll routing.
@@ -314,7 +314,9 @@ enum CGEventInput {
     /// rather than reading flags from key events. This method sends
     /// flagsChanged press/release events for each required modifier around
     /// the actual keystroke, matching how a physical keyboard works.
-    static func postKey(keycode: UInt16, flags: CGEventFlags = CGEventFlags()) -> Bool {
+    /// `targetPID` posts every event to that process instead of the HID tap.
+    static func postKey(keycode: UInt16, flags: CGEventFlags = CGEventFlags(),
+                        targetPID: pid_t? = nil) -> Bool {
         guard let down = CGEvent(keyboardEventSource: nil, virtualKey: keycode, keyDown: true),
               let up = CGEvent(keyboardEventSource: nil, virtualKey: keycode, keyDown: false) else {
             return false
@@ -324,26 +326,26 @@ enum CGEventInput {
 
         // Press modifier keys explicitly so iPhone Mirroring sees the state change
         if hasModifiers {
-            pressModifiers(flags)
+            pressModifiers(flags, targetPID: targetPID)
         }
 
         down.flags = flags
         up.flags = flags
-        down.post(tap: .cghidEventTap)
+        post(down, targetPID: targetPID)
         usleep(keystrokeDelayUs)
-        up.post(tap: .cghidEventTap)
+        post(up, targetPID: targetPID)
 
         // Release modifiers after the keystroke
         if hasModifiers {
             usleep(keystrokeDelayUs)
-            releaseModifiers(flags)
+            releaseModifiers(flags, targetPID: targetPID)
         }
 
         return true
     }
 
     /// Post flagsChanged events to press the specified modifier keys.
-    private static func pressModifiers(_ flags: CGEventFlags) {
+    private static func pressModifiers(_ flags: CGEventFlags, targetPID: pid_t?) {
         var accumulated = CGEventFlags()
         for (flag, keycode) in modifierKeys {
             if flags.contains(flag) {
@@ -353,14 +355,14 @@ enum CGEventInput {
                 }
                 event.type = .flagsChanged
                 event.flags = accumulated
-                event.post(tap: .cghidEventTap)
+                post(event, targetPID: targetPID)
                 usleep(keystrokeDelayUs)
             }
         }
     }
 
     /// Post flagsChanged events to release the specified modifier keys (reverse order).
-    private static func releaseModifiers(_ flags: CGEventFlags) {
+    private static func releaseModifiers(_ flags: CGEventFlags, targetPID: pid_t?) {
         var remaining = flags.intersection(allModifierFlags)
         for (flag, keycode) in modifierKeys.reversed() {
             if remaining.contains(flag) {
@@ -370,7 +372,7 @@ enum CGEventInput {
                 }
                 event.type = .flagsChanged
                 event.flags = remaining
-                event.post(tap: .cghidEventTap)
+                post(event, targetPID: targetPID)
                 usleep(keystrokeDelayUs)
             }
         }
@@ -378,9 +380,9 @@ enum CGEventInput {
 
     /// Post a dead-key sequence (2+ key events with a longer delay between them).
     /// Used for accented characters like é (Option+e, then e).
-    static func postKeySequence(_ sequence: CGKeySequence) -> Bool {
+    static func postKeySequence(_ sequence: CGKeySequence, targetPID: pid_t? = nil) -> Bool {
         for (index, step) in sequence.steps.enumerated() {
-            guard postKey(keycode: step.keycode, flags: step.flags) else {
+            guard postKey(keycode: step.keycode, flags: step.flags, targetPID: targetPID) else {
                 return false
             }
             // Use longer delay after the dead-key trigger (first step),
@@ -393,10 +395,10 @@ enum CGEventInput {
     }
 
     /// Trigger a shake gesture by posting Ctrl+Cmd+Z via CGEvent.
-    static func shake() -> Bool {
+    static func shake(targetPID: pid_t? = nil) -> Bool {
         let flags: CGEventFlags = [.maskControl, .maskCommand]
         // Z key = kVK_ANSI_Z = 0x06
-        return postKey(keycode: 0x06, flags: flags)
+        return postKey(keycode: 0x06, flags: flags, targetPID: targetPID)
     }
 
     // MARK: - Private

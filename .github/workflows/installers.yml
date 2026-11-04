@@ -77,7 +77,6 @@ jobs:
       contents: read
     env:
       MIRROIR_BUNDLE_ID: com.jfarcand.FakeMirroring
-      MIRROIR_PROCESS_NAME: FakeMirroring
     steps:
       - uses: actions/checkout@v7
 
@@ -140,7 +139,6 @@ jobs:
       contents: read
     env:
       MIRROIR_BUNDLE_ID: com.jfarcand.FakeMirroring
-      MIRROIR_PROCESS_NAME: FakeMirroring
     steps:
       - uses: actions/checkout@v7
 
@@ -248,7 +246,6 @@ jobs:
       contents: read
     env:
       MIRROIR_BUNDLE_ID: com.jfarcand.FakeMirroring
-      MIRROIR_PROCESS_NAME: FakeMirroring
     steps:
       - uses: actions/checkout@v7
 

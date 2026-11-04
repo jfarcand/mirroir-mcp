@@ -272,7 +272,7 @@ final class StepExecutor {
                               message: result.error ?? "Type failed",
                               durationSeconds: elapsed(startTime))
         }
-        return StepResult(step: step, status: .passed, message: nil,
+        return StepResult(step: step, status: .passed, message: result.notice,
                           durationSeconds: elapsed(startTime))
     }
 

@@ -178,11 +178,13 @@ enum DoctorCommand {
                 fixHint: nil
             )
         case .paused:
+            let block = bridge.sessionBlock()
             return DoctorCheck(
                 name: "Mirroring connected",
                 status: .failed,
-                detail: "paused",
-                fixHint: "iPhone Mirroring is paused. Unlock your iPhone and click Resume in the mirroring window."
+                detail: block.map { "paused: \($0.said)" } ?? "paused",
+                fixHint: block?.move.advice
+                    ?? "Clear the interruption in the iPhone Mirroring window on the Mac, then retry."
             )
         case .notRunning:
             return DoctorCheck(

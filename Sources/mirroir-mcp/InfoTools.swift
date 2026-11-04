@@ -85,7 +85,10 @@ extension MirroirMCP {
                     } ?? "unknown"
                     checks.append("[ok] '\(ctx.name)' connected (window: \(size))")
                 case .paused:
-                    checks.append("[WARN] '\(ctx.name)' is paused — click the window to resume")
+                    let block = (bridge as? MenuActionCapable)?.sessionBlock()
+                    checks.append("[WARN] '\(ctx.name)' is paused: "
+                        + (block.map { "the window says \($0.said). \($0.move.advice)" }
+                            ?? "clear the interruption in its window, then retry."))
                     allOk = false
                 case .noWindow:
                     checks.append("[FAIL] '\(ctx.name)' running but no window found")
@@ -155,7 +158,10 @@ extension MirroirMCP {
                     let orientDesc = info?.orientation.rawValue ?? "unknown"
                     mirroringStatus = "Connected — mirroring active (window: \(sizeDesc), \(posDesc), \(orientDesc))"
                 case .paused:
-                    mirroringStatus = "Paused — connection paused, can resume"
+                    let block = (bridge as? MenuActionCapable)?.sessionBlock()
+                    mirroringStatus = "Paused — "
+                        + (block.map { "the window says \($0.said). \($0.move.advice)" }
+                            ?? "clear the interruption in its window, then retry.")
                 case .notRunning:
                     mirroringStatus = "Not running — '\(ctx.name)' is not open"
                 case .noWindow:

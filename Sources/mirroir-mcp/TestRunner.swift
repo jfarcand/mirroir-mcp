@@ -123,7 +123,7 @@ enum TestRunner {
         let capture = ScreenCapture(bridge: bridge)
         let describer = ScreenDescriber(
             bridge: bridge, capture: capture, textRecognizer: MirroirMCP.buildTextRecognizer())
-        let input = InputSimulation(bridge: bridge, pasteVerifier: describer)
+        let input = IPhoneMirroringTarget.input(bridge: bridge, pasteVerifier: describer)
 
         // Pre-flight check: verify mirroring is connected (unless dry run),
         // freeing a paused session first the way every MCP input tool does.
@@ -132,6 +132,9 @@ enum TestRunner {
             fputs("Start iPhone Mirroring and connect your device before running tests.\n", stderr)
             return 1
         }
+
+        // Every step's input is judged for focus steals; the summary prints the totals.
+        let observedInput = FocusObservingInput(wrapping: input, bridge: bridge)
 
         let executorConfig = StepExecutorConfig(
             waitForTimeoutSeconds: config.timeoutSeconds,
@@ -144,7 +147,7 @@ enum TestRunner {
         // Live and compiled-passthrough executors share it.
         let registry = MirroirMCP.buildTargetRegistry()
         let executor = StepExecutor(
-            bridge: bridge, input: input,
+            bridge: bridge, input: observedInput,
             describer: describer, capture: capture,
             config: executorConfig,
             registry: registry,
@@ -181,7 +184,7 @@ enum TestRunner {
             let result: ConsoleReporter.SkillResult
             if let compiled = compiledMap[skill.filePath] {
                 let compiledExecutor = CompiledStepExecutor(
-                    bridge: bridge, input: input,
+                    bridge: bridge, input: observedInput,
                     describer: describer, capture: capture,
                     config: executorConfig,
                     registry: registry
@@ -220,7 +223,8 @@ enum TestRunner {
 
         // Print summary
         ConsoleReporter.reportSummary(
-            results: allResults, captures: CaptureStats.shared.snapshot())
+            results: allResults, captures: CaptureStats.shared.snapshot(),
+            focus: FocusStats.shared.snapshot())
 
         // Write JUnit XML if requested
         if let junitPath = config.junitPath {

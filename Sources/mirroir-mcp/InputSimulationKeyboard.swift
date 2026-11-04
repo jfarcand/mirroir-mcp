@@ -15,14 +15,14 @@ extension InputSimulation {
     /// Trigger a shake gesture on the mirrored iPhone.
     /// Sends Ctrl+Cmd+Z via CGEvent which triggers shake-to-undo in iOS apps.
     func shake() -> TypeResult {
-        if let keyboardError = prepareKeyboardInput(tag: "shake") {
+        let prep = prepareWindowKeyboardInput(tag: "shake")
+        if let keyboardError = prep.error {
             return TypeResult(success: false, error: keyboardError)
         }
 
         DebugLog.log("shake", "sending shake gesture via CGEvent")
-        ensureTargetFrontmost()
 
-        let result = CGEventInput.shake()
+        let result = CGEventInput.shake(targetPID: prep.targetPID)
         DebugLog.log("shake", "CGEvent=\(result ? "OK" : "FAILED")")
         if result {
             return TypeResult(success: true, error: nil)
@@ -42,12 +42,22 @@ extension InputSimulation {
         // Step 1: Open Spotlight via menu action (requires MenuActionCapable). The
         // screen before it is kept to tell when Spotlight has opened.
         let beforeOpen = pasteVerifier?.describe(settleTimeoutUs: 0)?.elements ?? []
-        guard let menuBridge = bridge as? (any MenuActionCapable),
-              menuBridge.triggerMenuAction(menu: "View", item: "Spotlight") else {
+        let openFailure = "Failed to open Spotlight. Is target '\(bridge.targetName)' running?"
+        guard let menuBridge = bridge as? (any MenuActionCapable) else {
             DebugLog.log("launchApp", "ERROR: failed to open Spotlight")
-            return "Failed to open Spotlight. Is target '\(bridge.targetName)' running?"
+            return openFailure
         }
-        usleep(EnvConfig.spotlightAppearanceUs)
+        // The menu item toggles Spotlight: pressed while Spotlight is open, it
+        // closes it, and the name would then be typed into the app behind.
+        if SpotlightDetector.isSpotlightVisible(elements: beforeOpen) {
+            DebugLog.log("launchApp", "Spotlight already open; menu item not pressed")
+        } else {
+            guard menuBridge.triggerMenuAction(menu: "View", item: "Spotlight") else {
+                DebugLog.log("launchApp", "ERROR: failed to open Spotlight")
+                return openFailure
+            }
+            usleep(EnvConfig.spotlightAppearanceUs)
+        }
 
         // Step 2: Type the app name, and confirm Spotlight shows it before Return.
         // Spotlight can reopen holding the previous query in a state that swallows
@@ -128,7 +138,8 @@ extension InputSimulation {
     /// polling for up to `pasteVerifyTimeoutUs`. Nil on success, else why it failed.
     private func openTile(_ tile: TapPoint, name: String, spotlight: [TapPoint]) -> String? {
         DebugLog.log("launchApp", "tapping the '\(name)' tile Spotlight already shows")
-        if let tapError = tap(x: tile.tapX, y: tile.tapY) {
+        let point = SpotlightAppTile.tapPoint(for: tile)
+        if let tapError = tap(x: point.x, y: point.y) {
             return "Failed to tap the '\(name)' tile in Spotlight: \(tapError)"
         }
         let poll = max(1, EnvConfig.pasteVerifyPollUs)
@@ -210,19 +221,19 @@ extension InputSimulation {
     /// re-pastes the stale value. A paste that is not seen — or cannot be read
     /// back, like emoji — fails the call instead of passing silently.
     func typeText(_ text: String) -> TypeResult {
-        if let keyboardError = prepareKeyboardInput(tag: "typeText") {
+        let prep = prepareWindowKeyboardInput(tag: "typeText")
+        if let keyboardError = prep.error {
             return TypeResult(success: false, error: keyboardError)
         }
 
         DebugLog.log("typeText", "typing \(text.count) char(s)")
-        ensureTargetFrontmost()
 
         let segments = buildTypeSegments(text)
         let saved = pasteboard.string()
         let pastes = segments.contains { $0.method == .paste }
 
         let entry = VerifiedTextEntry(
-            typeKeys: { [self] run in typeViaCGEvent(run) },
+            typeKeys: { [self] run in typeViaCGEvent(run, targetPID: prep.targetPID) },
             paste: { [self] run in pasteRun(run) },
             readScreen: { [self] in screenLines() },
             sleep: { usleep($0) },
@@ -304,7 +315,7 @@ extension InputSimulation {
     }
 
     /// Type text by posting CGEvent keyboard events for each character.
-    private func typeViaCGEvent(_ text: String) -> TypeResult? {
+    private func typeViaCGEvent(_ text: String, targetPID: pid_t?) -> TypeResult? {
         for char in text {
             guard let sequence = keyboardLayout.keySequence(for: char) else {
                 return TypeResult(
@@ -312,7 +323,7 @@ extension InputSimulation {
                     error: "No key mapping for character '\(char)'"
                 )
             }
-            guard keyPoster.postKeySequence(sequence) else {
+            guard keyPoster.postKeySequence(sequence, targetPID: targetPID) else {
                 return TypeResult(
                     success: false,
                     error: "CGEvent key post failed for '\(char)'"
@@ -327,13 +338,13 @@ extension InputSimulation {
     /// via CGEvent keyboard events. Also handles single printable characters with modifiers
     /// (e.g., Cmd+L for Safari address bar).
     func pressKey(keyName: String, modifiers: [String] = []) -> TypeResult {
-        if let keyboardError = prepareKeyboardInput(tag: "pressKey") {
+        let prep = prepareWindowKeyboardInput(tag: "pressKey")
+        if let keyboardError = prep.error {
             return TypeResult(success: false, error: keyboardError)
         }
 
         let modStr = modifiers.isEmpty ? "" : " modifiers=\(modifiers.joined(separator: "+"))"
         DebugLog.log("pressKey", "key=\(keyName)\(modStr)")
-        ensureTargetFrontmost()
 
         // Resolve the virtual keycode: try special key names first, then single characters
         let keycode: UInt16
@@ -359,7 +370,7 @@ extension InputSimulation {
             flags.insert(flag)
         }
 
-        let result = keyPoster.postKey(keycode: keycode, flags: flags)
+        let result = keyPoster.postKey(keycode: keycode, flags: flags, targetPID: prep.targetPID)
         DebugLog.log("pressKey", "CGEvent=\(result ? "OK" : "FAILED")")
         if result {
             return TypeResult(success: true, error: nil)

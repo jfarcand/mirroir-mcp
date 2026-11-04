@@ -34,4 +34,3 @@
 
 # --- App Identity (for testing with FakeMirroring) ---
 # export MIRROIR_BUNDLE_ID=com.apple.ScreenContinuity
-# export MIRROIR_PROCESS_NAME="iPhone Mirroring"

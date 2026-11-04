@@ -37,7 +37,6 @@ The MCP server discovers the mirroring app by bundle ID and process name. Two en
 
 ```
 MIRROIR_BUNDLE_ID=com.jfarcand.FakeMirroring
-MIRROIR_PROCESS_NAME=FakeMirroring
 ```
 
 When unset, they default to `com.apple.ScreenContinuity` and `iPhone Mirroring` — the real app. This is the same `EnvConfig` system used for all runtime configuration (timing constants, keyboard parameters, etc.), so there is no test-only code path in production.
@@ -245,7 +244,6 @@ open .build/release/FakeMirroring.app
 
 # 2. Run integration tests
 MIRROIR_BUNDLE_ID=com.jfarcand.FakeMirroring \
-MIRROIR_PROCESS_NAME=FakeMirroring \
 swift test --filter IntegrationTests
 ```
 

@@ -249,8 +249,9 @@ extension MirroirMCP {
         server.registerTool(MCPToolDefinition(
             name: "type_text",
             description: """
-                Type text on the mirrored iPhone. Automatically activates the \
-                iPhone Mirroring window if needed (one-time Space switch). \
+                Type text on the mirrored iPhone. On iPhone Mirroring the keys go \
+                to its window without bringing it to the front; other targets are \
+                activated first. \
                 A text field must be active on the iPhone. \
                 Sends keystrokes through the CGEvent keyboard interface \
                 with automatic keyboard layout translation for non-US layouts. \
@@ -261,7 +262,10 @@ extension MirroirMCP {
                 what was not confirmed. Emoji and pictographic symbols cannot \
                 be read back by OCR, so text containing them always returns an \
                 error even when the paste landed — check the screen. Non-Latin \
-                scripts are confirmed only when ocrLanguages includes them.
+                scripts are confirmed only when ocrLanguages includes them. \
+                Typed text is read back from the screen: when iOS autocorrect \
+                rewrote it, the call still succeeds and the result says the \
+                screen does not show what was typed.
                 """,
             inputSchema: [
                 "type": .string("object"),
@@ -286,7 +290,8 @@ extension MirroirMCP {
                 guard result.success else {
                     return .error(result.error ?? "Failed to type text")
                 }
-                return .text("Typed \(text.count) characters")
+                let typed = "Typed \(text.count) characters"
+                return .text(result.notice.map { "\(typed)\n\n\($0)" } ?? typed)
             }
         ))
 
@@ -295,7 +300,8 @@ extension MirroirMCP {
             name: "press_key",
             description: """
                 Send a key press to the mirrored iPhone with optional modifiers. \
-                Automatically activates the iPhone Mirroring window if needed (one-time Space switch). \
+                On iPhone Mirroring the key goes to its window without bringing it to the front; \
+                other targets are activated first. \
                 Supported keys: return, escape, tab, delete, space, up, down, left, right, \
                 or any single character (a-z, 0-9, etc.) for shortcuts. \
                 Optional modifiers: command, shift, option, control. \

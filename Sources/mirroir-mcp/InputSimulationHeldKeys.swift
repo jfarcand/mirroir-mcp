@@ -37,7 +37,6 @@ extension InputSimulation {
                                 y: info.position.y + CGFloat(drag.toY)))
         } else {
             if let keyboardError = prepareKeyboardInput(tag: tool) { return keyboardError }
-            ensureTargetFrontmost()
         }
         // Keyboard events reach whichever Mac app has focus: activation can
         // fail silently (another Space, no System Events permission), and a

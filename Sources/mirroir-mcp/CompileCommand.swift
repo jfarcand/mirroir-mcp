@@ -80,7 +80,7 @@ enum CompileCommand {
         let bridge = MirroringBridge()
 
         // A paused session is freed first, the way every MCP input tool does.
-        if let refusal = InputSimulation(bridge: bridge).ensureConnected(tag: "compile") {
+        if let refusal = IPhoneMirroringTarget.input(bridge: bridge).ensureConnected(tag: "compile") {
             fputs("Error: \(refusal)\n", stderr)
             fputs("Start iPhone Mirroring and connect your device before compiling.\n", stderr)
             return 1
@@ -94,7 +94,9 @@ enum CompileCommand {
         let capture = ScreenCapture(bridge: bridge)
         let realDescriber = ScreenDescriber(
             bridge: bridge, capture: capture, textRecognizer: MirroirMCP.buildTextRecognizer())
-        let input = InputSimulation(bridge: bridge, pasteVerifier: realDescriber)
+        let input = FocusObservingInput(
+            wrapping: IPhoneMirroringTarget.input(bridge: bridge, pasteVerifier: realDescriber),
+            bridge: bridge)
         let recordingDescriber = RecordingDescriber(wrapping: realDescriber)
 
         let executorConfig = StepExecutorConfig(

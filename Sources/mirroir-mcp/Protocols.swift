@@ -25,12 +25,17 @@ protocol WindowBridging: Sendable {
 }
 
 extension WindowBridging {
-    /// Default: the target's process owns the frontmost normal-layer window,
-    /// asked of the window server on every call rather than NSWorkspace's
-    /// snapshot, which freezes in the server (see `RunningAppLocator`).
+    /// Default: the target's process has a window in front of every normal
+    /// window (it owns the frontmost one, or floats above them), asked of the
+    /// window server on every call rather than NSWorkspace's snapshot, which
+    /// freezes in the server (see `RunningAppLocator`). An unbundled target
+    /// with no running-application record is identified by its window's owner
+    /// PID.
     func isFrontmost() -> Bool {
-        guard let pid = findProcess()?.processIdentifier else { return false }
-        return WindowListHelper.frontmostWindowOwnerPID() == pid
+        guard let pid = findProcess()?.processIdentifier ?? getWindowInfo()?.pid
+        else { return false }
+        return WindowListHelper.isInFront(
+            pid: pid, entries: WindowListHelper.windowEntries(onScreenOnly: true))
     }
 }
 
@@ -44,11 +49,21 @@ protocol MenuActionCapable: WindowBridging {
     /// mouse click here frees the session even when CGEvent input to the iPhone is
     /// rejected and AX-press is inert. Returns nil when not paused / no button found.
     func pausedDismissButtonPoint() -> CGPoint?
+    /// What blocks the session while it is paused: the interstitial's words
+    /// and the move that frees it. Nil while the session accepts input.
+    func sessionBlock() -> SessionBlock?
+    /// Launch the target app without making it active. Returns whether the
+    /// launch request was accepted.
+    func launchInBackground() -> Bool
 }
 
 extension MenuActionCapable {
     /// Default: no overlay button (non-mirroring bridges have no paused overlay).
     func pausedDismissButtonPoint() -> CGPoint? { nil }
+    /// Default: nothing to quote (non-mirroring bridges have no interstitial).
+    func sessionBlock() -> SessionBlock? { nil }
+    /// Default: nothing to launch (non-mirroring bridges are started by the user).
+    func launchInBackground() -> Bool { false }
 }
 
 /// Backward-compatible alias for code that references the old protocol name.
@@ -74,6 +89,15 @@ protocol MirroringSystemProbing: Sendable {
     /// Screen centre of a resume or dismiss control anywhere in the main
     /// window of `pid`, or nil when no interruption overlay shows one.
     func dismissControlPoint(pid: pid_t) -> CGPoint?
+    /// Un-minimize and raise the main window of `pid`. Returns whether the raise
+    /// was accepted.
+    func raiseMainWindow(pid: pid_t) -> Bool
+    /// Whether window `windowID` shows a blank frame right now. True when it
+    /// cannot be captured: an unreadable frame is no evidence of a live session.
+    func frameIsBlank(windowID: CGWindowID) -> Bool
+    /// Launch the app with `bundleID` without activating it. Returns whether
+    /// Launch Services accepted the request.
+    func launchInBackground(bundleID: String) -> Bool
 }
 
 /// A pluggable strategy for clearing a target interruption that blocks input —
@@ -162,14 +186,29 @@ protocol HeldInputPosting: PointerEngaging {
     func pause(microseconds: UInt32)
 }
 
-/// Posts the key events of type_text and press_key to the HID event tap.
+/// Posts the key events of type_text and press_key, to the HID event tap or,
+/// when `targetPID` is set, to that one process.
 protocol KeyEventPosting: Sendable {
     /// Post one key press (down then up) carrying `flags`. Returns false when
     /// the event could not be created.
-    func postKey(keycode: UInt16, flags: CGEventFlags) -> Bool
+    func postKey(keycode: UInt16, flags: CGEventFlags, targetPID: pid_t?) -> Bool
     /// Post every key press that types one character (a dead key and its
     /// base, for accents). Returns false when one could not be created.
-    func postKeySequence(_ sequence: CGKeySequence) -> Bool
+    func postKeySequence(_ sequence: CGKeySequence, targetPID: pid_t?) -> Bool
+}
+
+/// Posts clicks and keystroke focus to one window without making its app
+/// active, so the user keeps the Mac's front app and cursor. Points are
+/// window-local.
+protocol WindowEventPosting: Sendable {
+    /// Press (`down`) or lift the primary button at `point` in `window`, as
+    /// click `clickCount` of a multi-click. Returns false when it was not posted.
+    func postButton(down: Bool, at point: CGPoint, clickCount: Int, in window: WindowInfo) -> Bool
+    /// Make `window` its app's key window, so key events posted to its
+    /// process reach it. Returns false when it was not posted.
+    func focusKeys(in window: WindowInfo) -> Bool
+    /// Wait between button events.
+    func pause(microseconds: UInt32)
 }
 
 /// The Mac's general pasteboard: type_text carries unmappable runs through it,

@@ -63,8 +63,10 @@ enum MacOSAppTarget {
             bundleID: config?.bundleID,
             profile: profile,
             bridge: bridge,
-            input: InputSimulation(bridge: bridge, cursorMode: profile.cursorMode,
-                                   pasteVerifier: describers.ocr),
+            input: FocusObservingInput(
+                wrapping: InputSimulation(bridge: bridge, cursorMode: profile.cursorMode,
+                                          pasteVerifier: describers.ocr),
+                bridge: bridge),
             capture: capture,
             describer: describers.describer,
             ocrDescriber: describers.ocr,

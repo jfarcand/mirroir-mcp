@@ -70,7 +70,11 @@ final class StubBridge: MenuActionCapable, @unchecked Sendable {
     /// Successive `pressResume()` results; when empty, `pressResumeResult` answers.
     var pressResumeResults: [Bool] = []
 
+    /// Number of `pressResume()` calls.
+    var pressResumeCount = 0
+
     func pressResume() -> Bool {
+        pressResumeCount += 1
         if connectOnResume { state = .connected }
         if !pressResumeResults.isEmpty { return pressResumeResults.removeFirst() }
         return pressResumeResult
@@ -78,6 +82,25 @@ final class StubBridge: MenuActionCapable, @unchecked Sendable {
 
     func pausedDismissButtonPoint() -> CGPoint? {
         pausedButtonPoint
+    }
+
+    /// What `sessionBlock()` reports while paused (nil = nothing to quote).
+    var block: SessionBlock?
+
+    func sessionBlock() -> SessionBlock? {
+        getState() == .paused ? block : nil
+    }
+
+    /// State a background launch leaves the target in; nil refuses the launch.
+    var launchedState: WindowState?
+    /// Number of `launchInBackground()` calls.
+    var launchCount = 0
+
+    func launchInBackground() -> Bool {
+        launchCount += 1
+        guard let launchedState else { return false }
+        state = launchedState
+        return true
     }
 }
 

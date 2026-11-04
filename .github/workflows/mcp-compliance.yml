@@ -111,5 +111,4 @@ jobs:
       - name: Integration tests (FakeMirroring)
         env:
           MIRROIR_BUNDLE_ID: com.jfarcand.FakeMirroring
-          MIRROIR_PROCESS_NAME: FakeMirroring
         run: swift test --filter IntegrationTests

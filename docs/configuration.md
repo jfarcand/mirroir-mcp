@@ -15,7 +15,7 @@ All settings live in `settings.json` — project-local (`.mirroir-mcp/settings.j
 
 Every setting has a corresponding environment variable (e.g. `MIRROIR_SCREEN_DESCRIBER_MODE`, `MIRROIR_KEYSTROKE_DELAY_US`). Resolution order: project-local `settings.json` → global `settings.json` → environment variable → built-in default.
 
-Env-var names are derived from the camelCase key by inserting `_` before every uppercase letter and screaming-snake-casing the result. This means adjacent capitals in an acronym are each split: `openAITimeoutSeconds` → `MIRROIR_OPEN_A_I_TIMEOUT_SECONDS` and `defaultAIMaxTokens` → `MIRROIR_DEFAULT_A_I_MAX_TOKENS`. A handful of keys override this with a fixed env var (e.g. `keyboardLayout` → `IPHONE_KEYBOARD_LAYOUT`, `mirroringBundleID` → `MIRROIR_BUNDLE_ID`, `mirroringProcessName` → `MIRROIR_PROCESS_NAME`).
+Env-var names are derived from the camelCase key by inserting `_` before every uppercase letter and screaming-snake-casing the result. This means adjacent capitals in an acronym are each split: `openAITimeoutSeconds` → `MIRROIR_OPEN_A_I_TIMEOUT_SECONDS` and `defaultAIMaxTokens` → `MIRROIR_DEFAULT_A_I_MAX_TOKENS`. A handful of keys override this with a fixed env var (e.g. `keyboardLayout` → `IPHONE_KEYBOARD_LAYOUT`, `mirroringBundleID` → `MIRROIR_BUNDLE_ID`).
 
 ## Screen Intelligence
 
@@ -91,7 +91,6 @@ Env-var names are derived from the camelCase key by inserting `_` before every u
 | Setting | Default | Env Var | Description |
 |---------|---------|---------|-------------|
 | `mirroringBundleID` | `"com.apple.ScreenContinuity"` | `MIRROIR_BUNDLE_ID` | Bundle ID of the window to target. Override to point at a stand-in app (e.g. FakeMirroring) for local/CI runs |
-| `mirroringProcessName` | `"iPhone Mirroring"` | `MIRROIR_PROCESS_NAME` | Process name of the target window, used alongside the bundle ID for window lookup |
 | `cursorFreeInput` | `false` | `MIRROIR_CURSOR_FREE` | Post mouse events directly to the target PID via `postToPid` instead of global HID posting. Works for regular macOS apps (e.g. FakeMirroring) for local integration tests without cursor interference, but NOT for iPhone Mirroring — per-process injection does not register taps there |
 
 ## AI Provider Timeouts

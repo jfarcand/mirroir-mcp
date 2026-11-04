@@ -28,12 +28,15 @@ struct LiveMirroringProbe: MirroringSystemProbing {
         let frame = WindowListHelper.geometryFromAXElement(window).map {
             CGRect(origin: $0.position, size: $0.size)
         }
-        let hosting = Self.children(of: window).first.map {
-            Self.snapshot($0, depth: 0)
-        }
+        let kids = Self.children(of: window)
+        let hosting = kids.first.map { Self.snapshot($0, depth: 0) }
+        let sheets = kids
+            .filter { Self.stringAttribute($0, kAXRoleAttribute) == kAXSheetRole as String }
+            .map { Self.snapshot($0, depth: 0) }
         return MirroringAXWindow(
             title: Self.stringAttribute(window, kAXTitleAttribute),
-            frame: frame, hostingView: hosting)
+            frame: frame, hostingView: hosting, sheets: sheets,
+            isWindow: Self.stringAttribute(window, kAXRoleAttribute) == kAXWindowRole as String)
     }
 
     func windowList() -> [WindowListEntry] {
@@ -53,6 +56,33 @@ struct LiveMirroringProbe: MirroringSystemProbing {
             return AXUIElementPerformAction(kid, kAXPressAction as CFString) == .success
         }
         return false
+    }
+
+    func raiseMainWindow(pid: pid_t) -> Bool {
+        WindowListHelper.raiseMainWindow(pid: pid)
+    }
+
+    /// `open -g -b`: Launch Services starts the app hidden behind the front
+    /// app, which keeps the focus.
+    func launchInBackground(bundleID: String) -> Bool {
+        let open = Process()
+        open.executableURL = URL(fileURLWithPath: "/usr/bin/open")
+        open.arguments = ["-g", "-b", bundleID]
+        do {
+            try open.run()
+        } catch {
+            DebugLog.log("launch", "open -g -b \(bundleID) failed to start: \(error)")
+            return false
+        }
+        open.waitUntilExit()
+        return open.terminationStatus == 0
+    }
+
+    func frameIsBlank(windowID: CGWindowID) -> Bool {
+        guard windowID != 0,
+              case .captured(let data) = ScreenCaptureKitShot.capture(windowID: windowID)
+        else { return true }
+        return BlankFrameDetector.isBlank(pngData: data)
     }
 
     func dismissControlPoint(pid: pid_t) -> CGPoint? {

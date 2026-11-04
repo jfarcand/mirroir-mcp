@@ -6,9 +6,8 @@ description: >
   macos-15 runner conditions that swallow synthetic taps (a foreground Setup
   Assistant, and a display too short for the window), then launch it. Leaves
   FakeMirroring running and settled, ready for `swift test --filter
-  IntegrationTests`. The calling job supplies MIRROIR_BUNDLE_ID and
-  MIRROIR_PROCESS_NAME for those tests, at job or step level; no step in this
-  action reads either.
+  IntegrationTests`. The calling job supplies MIRROIR_BUNDLE_ID for those
+  tests, at job or step level; no step in this action reads it.
 
 runs:
   using: composite

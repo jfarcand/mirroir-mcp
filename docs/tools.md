@@ -65,16 +65,16 @@ A frame that is a uniform fill (rotation, launch, scene change) with no text or 
 
 ## Typing Workflow
 
-`type_text` and `press_key` route keyboard input through the CGEvent keyboard interface. If iPhone Mirroring isn't already frontmost, the MCP server activates it once (which may trigger a macOS Space switch) and stays there. Subsequent keyboard tool calls reuse the active window without switching again.
+`type_text` and `press_key` send CGEvent key events addressed to the iPhone Mirroring process, after one window event makes the mirror the key window of its own app. iPhone Mirroring is not activated: the app you are using keeps focus (see [limitations](limitations.md#focus-stealing)).
 
 - Characters are mapped to macOS virtual keycodes with automatic keyboard layout translation — non-US layouts (French AZERTY, German QWERTZ, etc.) are supported via UCKeyTranslate
-- iOS autocorrect applies — type carefully or disable it on the iPhone
+- iOS autocorrect applies, and it rewrites words as they are typed (in Notes, "Thu teh adress" lands as "They the adress"; a French keyboard turns English words into French ones). After typing, `type_text` reads the text back from the screen; when the screen does not show what was typed, the call still succeeds and its result carries a notice saying so. A password field hides its text, so the notice is expected there.
 
 ## Key Press Workflow
 
 `press_key` sends special keys that `type_text` can't handle — Return to submit forms, Tab to switch fields, Delete to erase, and arrow keys to move through lists or text.
 
-**Important:** Keyboard shortcuts with modifiers (Cmd+N, Cmd+Z, etc.) do **not** work with iOS apps through iPhone Mirroring. iOS apps do not receive modifier-key combinations through the mirroring compositor. The only modifier combination that works is `shake` (Ctrl+Cmd+Z), which is a Mac-level action that iPhone Mirroring translates to a device shake.
+**Important:** Modifier shortcuts reach iOS, but only the ones iOS itself implements do anything. In a focused text field Cmd+A, Cmd+C and Cmd+V work (a select-all, copy, delete, paste round trip restores the text), and Safari implements Cmd+L. Mac conventions such as Cmd+[ for back are not implemented by iOS apps and do nothing. `shake` (Ctrl+Cmd+Z) is translated by iPhone Mirroring into a device shake.
 
 For navigating within apps, combine `spotlight` + `type_text` + `press_key`. For example: `spotlight` → `type_text "Messages"` → `press_key return` to launch Messages.
 

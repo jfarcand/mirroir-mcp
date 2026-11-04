@@ -43,4 +43,20 @@ struct MirroringAXWindow: Sendable, Equatable {
     /// The window's first child (the SwiftUI hosting view) and its subtree, or
     /// nil when the window has no children.
     let hostingView: AXNodeSnapshot?
+    /// Sheets attached to the window (a Mac password or Touch ID prompt), each
+    /// with its subtree. Empty when none is attached.
+    let sheets: [AXNodeSnapshot]
+    /// Whether Accessibility answered with a window. False when the app's AX
+    /// tree is degraded and its main-window attribute returns another element
+    /// (seen: the application element itself), so nothing in it can be read.
+    let isWindow: Bool
+
+    init(title: String?, frame: CGRect?, hostingView: AXNodeSnapshot?,
+         sheets: [AXNodeSnapshot] = [], isWindow: Bool = true) {
+        self.title = title
+        self.frame = frame
+        self.hostingView = hostingView
+        self.sheets = sheets
+        self.isWindow = isWindow
+    }
 }
