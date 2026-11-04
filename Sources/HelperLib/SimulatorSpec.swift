@@ -101,6 +101,9 @@ public enum SimulatorElement: Sendable, Equatable {
     /// A gray rectangle placeholder for media (feed image / avatar). Width and
     /// height are in points relative to the rendered scene's coordinate system.
     case placeholder(width: Int, height: Int)
+    /// A square board of equal tappable cells, each cell leading to the
+    /// screen its transition names (see `SimulatorGrid`).
+    case grid(SimulatorGrid)
 
     /// Display text for OCR + tap matching.
     public var displayText: String {
@@ -108,7 +111,7 @@ public enum SimulatorElement: Sendable, Equatable {
         case .row(let t, _), .button(let t, _), .text(let t),
              .tab(let t, _), .textField(let t, _), .slider(let t, _, _):
             return t
-        case .placeholder: return ""
+        case .placeholder, .grid: return ""
         }
     }
 
@@ -117,7 +120,7 @@ public enum SimulatorElement: Sendable, Equatable {
         switch self {
         case .row(_, let to), .button(_, let to): return to
         case .tab(_, let to): return to
-        case .text, .textField, .slider, .placeholder: return nil
+        case .text, .textField, .slider, .placeholder, .grid: return nil
         }
     }
 }

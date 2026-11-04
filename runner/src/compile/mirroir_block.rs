@@ -3,6 +3,7 @@
 
 use std::fmt::Write as _;
 use std::ops::Range;
+use std::path::Path;
 
 use crate::error::Result;
 use crate::ios_error::IosError;
@@ -25,12 +26,23 @@ const DEFAULT_MAX_SCROLLS: u32 = 10;
 /// `scene: { skill: "s", max_frames: 6, max_tokens: 150000, max_seconds: 60 }`,
 /// and the opening `target: { kind: ios, app: "…" }`.
 ///
+/// `scenario_dir` is the directory of the scenario file: a scene `decider:`
+/// whose program is a relative path is resolved against it.
+///
 /// # Errors
 ///
 /// [`IosError::NotExpressible`] for a step that uses a web-only option
 /// (`last:`, `into:`, `contains:`, a per-step timeout on `tap:` / asserts), a
 /// runner-side step, or a value the line format cannot carry intact.
-pub fn ios_block_yaml(name: &str, steps: &[SkillStep], block: Range<usize>) -> Result<String> {
+///
+/// [`crate::scene_error::SceneError::DeciderPathNotUtf8`] for a decider
+/// program that resolves to a path that is not UTF-8.
+pub fn ios_block_yaml(
+    name: &str,
+    steps: &[SkillStep],
+    block: Range<usize>,
+    scenario_dir: &Path,
+) -> Result<String> {
     let mut out = format!(
         "version: 1\nname: {}\nsteps:\n",
         scalar(usize::MAX, "name", name)?
@@ -39,13 +51,13 @@ pub fn ios_block_yaml(name: &str, steps: &[SkillStep], block: Range<usize>) -> R
         let Some(step) = steps.get(index) else {
             continue;
         };
-        writeln!(out, "  - {}", step_line(index, step)?)?;
+        writeln!(out, "  - {}", step_line(index, step, scenario_dir)?)?;
     }
     Ok(out)
 }
 
 /// One step, as mirroir-mcp's parser reads it.
-fn step_line(index: usize, step: &SkillStep) -> Result<String> {
+fn step_line(index: usize, step: &SkillStep, scenario_dir: &Path) -> Result<String> {
     let kind = step_kind(step);
     let refuse = |reason: &str| -> Result<String> {
         Err(IosError::NotExpressible {
@@ -138,7 +150,7 @@ fn step_line(index: usize, step: &SkillStep) -> Result<String> {
             )
         }
         SkillStep::Measure(args) => measure_line(index, args)?,
-        SkillStep::Scene(args) => scene_line(index, args)?,
+        SkillStep::Scene(args) => scene_line(index, args, scenario_dir)?,
         SkillStep::Condition(_)
         | SkillStep::Spawn(_)
         | SkillStep::WaitPort(_)
@@ -186,16 +198,45 @@ fn measure_line(index: usize, args: &MeasureArgs) -> Result<String> {
 
 /// `scene: { skill: "…", max_frames: N, max_tokens: N, max_seconds: N }` —
 /// the budget flattened into the step's own map, which mirroir-mcp splits on
-/// top-level commas without descending into a nested `{ … }`.
-fn scene_line(index: usize, args: &SceneArgs) -> Result<String> {
+/// top-level commas without descending into a nested `{ … }`. A decider
+/// follows as `decider: "…"`, its program resolved against `scenario_dir`.
+fn scene_line(index: usize, args: &SceneArgs, scenario_dir: &Path) -> Result<String> {
     let budget = &args.budget;
-    Ok(format!(
-        "scene: {{ skill: {}, max_frames: {}, max_tokens: {}, max_seconds: {} }}",
+    let mut line = format!(
+        "scene: {{ skill: {}, max_frames: {}, max_tokens: {}, max_seconds: {}",
         comma_free(index, "scene", &args.skill)?,
         budget.frames,
         budget.tokens,
         budget.seconds
-    ))
+    );
+    if let Some(decider) = &args.decider {
+        let command = decider.resolved_against(scenario_dir)?;
+        write!(
+            line,
+            ", decider: {}",
+            double_quoted(index, "scene", &command)?
+        )?;
+    }
+    line.push_str(" }");
+    Ok(line)
+}
+
+/// `value` inside double quotes, verbatim. mirroir-mcp's map splitter keeps a
+/// double-quoted value whole, commas included, and its quote stripper
+/// unescapes nothing, so a value holding `"`, `\` or a line break is refused
+/// rather than written as a line that reads back as something else.
+fn double_quoted(index: usize, kind: &'static str, value: &str) -> Result<String> {
+    if value.contains(['"', '\\', '\n', '\r']) {
+        return Err(IosError::NotExpressible {
+            index,
+            kind,
+            reason: format!(
+                "`{value}` holds a double quote, a backslash or a line break, which mirroir-mcp's quoted value cannot carry"
+            ),
+        }
+        .into());
+    }
+    Ok(format!("\"{value}\""))
 }
 
 /// Quote `value` as one scalar mirroir-mcp's parser reads back unchanged.
@@ -237,6 +278,7 @@ fn comma_free(index: usize, kind: &'static str, value: &str) -> Result<String> {
 
 #[cfg(test)]
 mod tests {
+    use std::path::Path;
     use std::result::Result as StdResult;
 
     use serde_norway::Deserializer;
@@ -249,13 +291,20 @@ mod tests {
 
     type TestResult = StdResult<(), String>;
 
+    const SCENARIO_DIR: &str = "/work/scenarios";
+
     fn block(steps_yaml: &str) -> StdResult<Result<String, RunnerError>, String> {
         let yaml = format!("version: 1\nname: flow\nsteps:\n{steps_yaml}");
         let scenario: Scenario =
             singleton_map_recursive::deserialize(Deserializer::from_str(&yaml))
                 .map_err(|e| format!("parse: {e}"))?;
         let len = scenario.steps.len();
-        Ok(ios_block_yaml(&scenario.name, &scenario.steps, 0..len))
+        Ok(ios_block_yaml(
+            &scenario.name,
+            &scenario.steps,
+            0..len,
+            Path::new(SCENARIO_DIR),
+        ))
     }
 
     /// Every step lands on one line, in the shape `SkillParser` reads.
@@ -335,6 +384,49 @@ mod tests {
         refused(
             "  - scene: { skill: \"a, b\", budget: { max_frames: 1, max_tokens: 1, max_seconds: 1 } }\n",
         )?;
+        Ok(())
+    }
+
+    /// A decider rides the scene line double-quoted, its relative program
+    /// resolved against the scenario's directory and its arguments verbatim.
+    #[test]
+    fn a_scene_decider_is_resolved_and_double_quoted() -> TestResult {
+        let budget = "budget: { max_frames: 1, max_tokens: 2, max_seconds: 3 }";
+        for (decider, rendered) in [
+            (
+                "./tools/sf.sh --depth 12",
+                "/work/scenarios/tools/sf.sh --depth 12",
+            ),
+            ("/opt/sf --multipv 1,2", "/opt/sf --multipv 1,2"),
+            ("pick it's", "pick it's"),
+        ] {
+            let yaml = block(&format!(
+                "  - scene: {{ skill: board, {budget}, decider: \"{decider}\" }}\n"
+            ))?
+            .map_err(|e| e.to_string())?;
+            let expected = format!(
+                "  - scene: {{ skill: \"board\", max_frames: 1, max_tokens: 2, max_seconds: 3, decider: \"{rendered}\" }}\n"
+            );
+            if !yaml.ends_with(&expected) {
+                return Err(format!("{decider}: rendered\n{yaml}"));
+            }
+        }
+        Ok(())
+    }
+
+    /// mirroir-mcp unescapes nothing inside a quoted value, so a `"` or `\`
+    /// in the decider is refused, never written.
+    #[test]
+    fn a_decider_the_quoted_value_cannot_carry_is_refused() -> TestResult {
+        let budget = "budget: { max_frames: 1, max_tokens: 1, max_seconds: 1 }";
+        for decider in [r#"'pick \"x\"'"#, r"'pick a\b'", r"'pick\'"] {
+            let reason = refused(&format!(
+                "  - scene: {{ skill: s, {budget}, decider: {decider} }}\n"
+            ))?;
+            if !reason.contains("backslash") {
+                return Err(format!("{decider}: wrong reason {reason}"));
+            }
+        }
         Ok(())
     }
 }

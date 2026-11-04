@@ -190,8 +190,8 @@ final class StepExecutor {
                                      skillName: skillName, startTime: startTime)
         case .switchTarget(let selector):
             result = executeSwitchTarget(selector: selector, startTime: startTime)
-        case .scene(let skill, let budget):
-            result = executeScene(skill: skill, budget: budget, stepIndex: stepIndex,
+        case .scene(let skill, let budget, let decider):
+            result = executeScene(skill: skill, budget: budget, decider: decider, stepIndex: stepIndex,
                                   skillName: skillName, startTime: startTime)
         case .skipped(let stepType, let reason):
             let duration = CFAbsoluteTimeGetCurrent() - startTime

@@ -37,7 +37,7 @@ final class SceneRunTests: XCTestCase {
             framesToPredicate: verdict == .pass ? 3 : nil,
             promptTokens: 72000, completionTokens: 150, totalTokens: 72150, seconds: 12.5,
             model: "scene-stub", responseModel: "scene-stub", rejectedReplies: 0,
-            evidenceDir: "/tmp/mirroir-scene/scene-2")
+            waits: 0, deciderCalls: 0, evidenceDir: "/tmp/mirroir-scene/scene-2")
     }
 
     private func result(skill: String, report scene: SceneReport, status: StepResult.StepStatus)
@@ -99,7 +99,8 @@ final class SceneRunTests: XCTestCase {
     private let header = SceneHeader(
         name: "reach", budget: SceneBudget(maxFrames: 10, maxTokens: 400000, maxSeconds: 180),
         controls: [SceneControl(name: "move", gesture: .tap(x: 0.2, y: 0.5))],
-        objective: "Reach GOAL.", success: .visible("GOAL"), fail: nil)
+        objective: "Reach GOAL.", success: [.visible("GOAL")], fail: [],
+        imageWidth: nil, needsDecider: false)
 
     func testAPlayableSceneIsNotRefused() {
         let refusals = SceneStepGate.refusals(
@@ -126,6 +127,36 @@ final class SceneRunTests: XCTestCase {
         XCTAssertTrue(refusals.last?.reason.contains("measure") ?? false)
     }
 
+    func testAMovePickerMustMatchTheSkill() {
+        let board = SceneHeader(
+            name: "board", budget: budget, controls: header.controls, objective: "Read.",
+            success: [.visible("GOAL")], fail: [], imageWidth: nil, needsDecider: true)
+        let steps: [SkillStep] = [
+            .scene(skill: "board", budget: budget),
+            .scene(skill: "board", budget: budget, decider: "/opt/picker"),
+            .scene(skill: "reach", budget: budget, decider: "/opt/picker"),
+            .scene(skill: "board", budget: budget, decider: "/no/such/picker"),
+        ]
+        let refusals = SceneStepGate.refusals(
+            skills: [skill(steps)], visionAvailable: true, envDecider: nil,
+            load: { $0 == "board" ? .success(board) : .success(self.header) },
+            runnable: { $0.program == "/opt/picker" })
+        XCTAssertEqual(refusals.map(\.stepNumber), [1, 3, 4])
+        XCTAssertTrue(refusals[0].reason.contains("needs a move picker"), refusals[0].reason)
+        XCTAssertTrue(refusals[1].reason.contains("chooses its own actions"), refusals[1].reason)
+        XCTAssertTrue(refusals[2].reason.contains("not a runnable program"), refusals[2].reason)
+    }
+
+    func testTheEnvironmentNamesTheMovePickerWhenTheStepDoesNot() {
+        let board = SceneHeader(
+            name: "board", budget: budget, controls: header.controls, objective: "Read.",
+            success: [.visible("GOAL")], fail: [], imageWidth: nil, needsDecider: true)
+        let refusals = SceneStepGate.refusals(
+            skills: [skill([.scene(skill: "board", budget: budget)])], visionAvailable: true,
+            envDecider: "/opt/picker", load: { _ in .success(board) }, runnable: { _ in true })
+        XCTAssertEqual(refusals, [])
+    }
+
     func testASceneSkillIsFoundByNameAndAnOrdinarySkillIsNotOne() throws {
         _ = try write("reach.md", """
             ---
@@ -149,7 +180,7 @@ final class SceneRunTests: XCTestCase {
             """)
         _ = try write("plain.yaml", "name: plain\napp: X\ndescription: d\nsteps:\n  - home\n")
         let loaded = try SceneSkills.load(name: "reach", dirs: [tmpDir]).get()
-        XCTAssertEqual(loaded.success, .visible("GOAL"))
+        XCTAssertEqual(loaded.success, [.visible("GOAL")])
         guard case .failure(.notAGame) = SceneSkills.load(name: "plain", dirs: [tmpDir]) else {
             return XCTFail("an ordinary skill played as a scene")
         }

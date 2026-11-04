@@ -1,0 +1,7 @@
+version: 1
+name: "board-wrong"
+steps:
+  - target: { kind: ios, app: "Grid Frames" }
+  - reset_app: "Grid Frames"
+  - launch: "Grid Frames"
+  - scene: { skill: grid-frames-reach, budget: { max_frames: 3, max_tokens: 200000, max_seconds: 60 }, decider: "../fixtures/stub_decider.py wrong" }

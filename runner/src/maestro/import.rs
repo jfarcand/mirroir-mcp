@@ -220,7 +220,8 @@ impl Importer<'_> {
             .iter()
             .map(|value| self.parse_step(value))
             .collect::<Result<Vec<_>, _>>()?;
-        if let Err(err) = ios_block_yaml(command, &parsed, 0..parsed.len()) {
+        let flow_dir = self.source.parent().unwrap_or_else(|| Path::new(""));
+        if let Err(err) = ios_block_yaml(command, &parsed, 0..parsed.len(), flow_dir) {
             let reason = match err {
                 RunnerError::Ios(IosError::NotExpressible { reason, .. }) => reason,
                 other => other.to_string(),

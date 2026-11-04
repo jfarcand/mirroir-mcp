@@ -264,7 +264,7 @@ Steps are intents — the AI maps each to the appropriate MCP tool calls:
 | `reset_app: "AppName"` | calls `reset_app` — force-quit via App Switcher |
 | `set_network: "mode"` | calls `set_network` — toggle airplane/wifi/cellular |
 | `measure: { action, until, max }` | calls `measure` — time screen transitions |
-| `scene: { skill, max_frames, max_tokens, max_seconds }` | plays a `kind: game` skill under a hard budget — see [Scenes](skills-marketplace.md#scenes) |
+| `scene: { skill, max_frames, max_tokens, max_seconds, decider }` | plays a `kind: game` skill under a hard budget; `decider` names the move picker a `decider: required` skill needs — see [Scenes](skills-marketplace.md#scenes) |
 | `target: { kind: ios }` / `target: { kind: macos, name: "…" }` | calls `switch_target` — switch to the iPhone or to a configured desktop window |
 | `remember: "instruction"` | AI reads dynamic data from screen and holds it for later steps |
 | `condition:` | Branch based on screen state — see below |

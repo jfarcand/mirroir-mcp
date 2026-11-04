@@ -9,12 +9,14 @@ import HelperLib
 
 extension StepExecutor {
 
-    /// Play the scene skill `skill` under `budget` and report what it did.
+    /// Play the scene skill `skill` under `budget`, with the move picker
+    /// `decider` (or `MIRROIR_SCENE_DECIDER`) when the skill needs one, and
+    /// report what it did.
     func executeScene(
-        skill: String, budget: SceneBudget, stepIndex: Int, skillName: String,
+        skill: String, budget: SceneBudget, decider: String?, stepIndex: Int, skillName: String,
         startTime: CFAbsoluteTime
     ) -> StepResult {
-        let step = SkillStep.scene(skill: skill, budget: budget)
+        let step = SkillStep.scene(skill: skill, budget: budget, decider: decider)
         guard let vision else {
             return StepResult(step: step, status: .failed,
                               message: "no vision model is configured to play the scene",
@@ -28,12 +30,16 @@ extension StepExecutor {
             return StepResult(step: step, status: .failed, message: error.localizedDescription,
                               durationSeconds: elapsed(startTime))
         }
+        let picker = header.needsDecider
+            ? (decider ?? EnvConfig.sceneDecider).flatMap { CommandSceneDecider(command: $0) }
+            : nil
         let loop = SceneLoop(dependencies: SceneLoop.Dependencies(
             bridge: bridge, describer: ocrDescriber, input: input, vision: vision,
             now: { CFAbsoluteTimeGetCurrent() }, sleep: { usleep($0) },
             settleMs: config.settlingDelayMs,
             imageWidth: EnvConfig.visionImageWidth,
-            callTimeoutSeconds: EnvConfig.embacleTimeoutSeconds))
+            callTimeoutSeconds: EnvConfig.embacleTimeoutSeconds,
+            decider: picker))
         let evidence = SceneEvidenceWriter(
             baseDir: config.screenshotDir, skillName: skillName, stepIndex: stepIndex)
         let report = loop.run(header: header, budget: budget, evidence: evidence)

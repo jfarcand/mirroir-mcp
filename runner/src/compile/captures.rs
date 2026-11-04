@@ -106,6 +106,12 @@ pub struct SceneCapture {
     pub response_model: Option<String>,
     /// Replies that named no allowed control; each still cost a frame.
     pub rejected_replies: u32,
+    /// Frames whose action was `none`: the scene waited a frame and touched
+    /// nothing.
+    pub waits: u32,
+    /// Times the scenario's move picker (`decider:`) was asked for an action;
+    /// `0` for a scene run without one.
+    pub decider_calls: u32,
     /// Where the scene's per-frame screenshots and replies were written.
     pub evidence_dir: PathBuf,
 }
@@ -144,6 +150,9 @@ pub enum SceneReason {
     PerceptionFailed,
     /// The touch the model chose could not be posted to the device.
     InputFailed,
+    /// The move picker exited non-zero, printed no valid action, named a
+    /// control the skill does not declare, or timed out with time still left.
+    DeciderFailed,
 }
 
 impl SceneReason {
@@ -159,6 +168,7 @@ impl SceneReason {
             Self::UsageMissing => "usage_missing",
             Self::PerceptionFailed => "perception_failed",
             Self::InputFailed => "input_failed",
+            Self::DeciderFailed => "decider_failed",
         }
     }
 }
@@ -177,7 +187,7 @@ mod tests {
 
     type TestResult = StdResult<(), serde_json::Error>;
 
-    const SCENE: &str = r#"{"completion_tokens":150,"evidence_dir":"\/w\/scene-2","frames":3,"frames_to_predicate":null,"model":"m","prompt_tokens":72000,"reason":"max_frames","rejected_replies":0,"response_model":null,"seconds":12.5,"skill":"s","total_tokens":72150,"verdict":"inconclusive"}"#;
+    const SCENE: &str = r#"{"completion_tokens":150,"decider_calls":0,"evidence_dir":"\/w\/scene-2","frames":3,"frames_to_predicate":null,"model":"m","prompt_tokens":72000,"reason":"max_frames","rejected_replies":0,"response_model":null,"seconds":12.5,"skill":"s","total_tokens":72150,"verdict":"inconclusive","waits":0}"#;
 
     #[test]
     fn a_scene_report_decodes_with_null_optionals() -> TestResult {
@@ -201,6 +211,36 @@ mod tests {
         assert!(serde_json::from_str::<SceneCapture>(&reason).is_err());
         let input = SCENE.replace("max_frames", "input_failed");
         assert!(serde_json::from_str::<SceneCapture>(&input).is_ok());
+    }
+
+    /// `waits` and `decider_calls` are always written, so a report without
+    /// them comes from a writer this runner does not speak to.
+    #[test]
+    fn waits_and_decider_calls_are_read_and_required() -> TestResult {
+        let scene: SceneCapture = serde_json::from_str(
+            &SCENE
+                .replace("\"waits\":0", "\"waits\":2")
+                .replace("\"decider_calls\":0", "\"decider_calls\":3"),
+        )?;
+        assert_eq!((scene.waits, scene.decider_calls), (2, 3));
+        let missing = SCENE.replace(",\"waits\":0", "");
+        assert!(serde_json::from_str::<SceneCapture>(&missing).is_err());
+        let missing = SCENE.replace("\"decider_calls\":0,", "");
+        assert!(serde_json::from_str::<SceneCapture>(&missing).is_err());
+        Ok(())
+    }
+
+    #[test]
+    fn a_decider_failure_reads_back_as_its_reason() -> TestResult {
+        let scene: SceneCapture = serde_json::from_str(
+            &SCENE
+                .replace("max_frames", "decider_failed")
+                .replace("\"inconclusive\"", "\"fail\""),
+        )?;
+        assert_eq!(scene.reason, SceneReason::DeciderFailed);
+        assert_eq!(scene.reason.to_string(), "decider_failed");
+        assert_eq!(scene.verdict, SceneVerdict::Fail);
+        Ok(())
     }
 
     #[test]

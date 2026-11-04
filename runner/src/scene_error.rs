@@ -1,5 +1,7 @@
-// ABOUTME: Structured errors for a `scene:` step's verdict — failed, inconclusive, or never reported.
+// ABOUTME: Structured errors for a `scene:` step — its verdict (failed, inconclusive, unreported) and its decider.
 // ABOUTME: Converts into RunnerError via #[from]; an inconclusive scene is the one error that exits 66.
+
+use std::path::PathBuf;
 
 use thiserror::Error;
 
@@ -66,5 +68,20 @@ pub enum SceneError {
         index: usize,
         /// The kind:game skill the step names.
         skill: String,
+    },
+
+    /// A `decider:` that is empty or only whitespace names no program.
+    #[error("a scene `decider:` is blank; name the move picker's program, or drop the key")]
+    BlankDecider,
+
+    /// A relative decider program, joined onto the scenario's directory, is
+    /// not UTF-8 and cannot be written into mirroir-mcp's block text.
+    #[error(
+        "the scene decider resolves to `{}`, which is not UTF-8 and cannot be written into the ios block",
+        path.display()
+    )]
+    DeciderPathNotUtf8 {
+        /// The joined program path.
+        path: PathBuf,
     },
 }

@@ -76,10 +76,14 @@ enum SceneStepGate {
 
     /// The scene steps of `skills` that cannot play: an unresolvable or invalid
     /// scene skill, a step budget wider than the skill's, a scene timed inside a
-    /// `measure`, or no vision model to play with.
+    /// `measure`, no vision model to play with, or a move picker that does not
+    /// match the skill (missing, unrunnable, or given to a skill that needs none).
+    /// `envDecider` is `MIRROIR_SCENE_DECIDER`, used when a step names none.
     static func refusals(
         skills: [SkillDefinition], visionAvailable: Bool,
-        load: (String) -> Result<SceneHeader, SceneSkillError> = { SceneSkills.load(name: $0) }
+        envDecider: String? = EnvConfig.sceneDecider,
+        load: (String) -> Result<SceneHeader, SceneSkillError> = { SceneSkills.load(name: $0) },
+        runnable: (CommandSceneDecider) -> Bool = { $0.isRunnable() }
     ) -> [Refusal] {
         var refusals: [Refusal] = []
         for skill in skills {
@@ -91,7 +95,7 @@ enum SceneStepGate {
                         reason: "a scene cannot be timed by measure; its report carries its own time"))
                     continue
                 }
-                guard case .scene(let name, let budget) = step else { continue }
+                guard case .scene(let name, let budget, let stepDecider) = step else { continue }
                 if !visionAvailable {
                     refusals.append(Refusal(
                         skillName: skill.name, stepNumber: number,
@@ -110,10 +114,35 @@ enum SceneStepGate {
                             reason: "the step budget's \(wider.joined(separator: ", ")) exceed "
                                 + "the skill's; a step may only narrow it"))
                     }
+                    if let reason = deciderProblem(
+                        header: header, command: stepDecider ?? envDecider, runnable: runnable) {
+                        refusals.append(Refusal(skillName: skill.name, stepNumber: number, reason: reason))
+                    }
                 }
             }
         }
         return refusals
+    }
+
+    /// Why the move picker `command` does not fit `header`, or nil when it does.
+    static func deciderProblem(
+        header: SceneHeader, command: String?, runnable: (CommandSceneDecider) -> Bool
+    ) -> String? {
+        switch (header.needsDecider, command) {
+        case (false, nil):
+            return nil
+        case (false, .some):
+            return "the skill chooses its own actions (no `decider: required`); "
+                + "drop the step's decider and \(EnvConfig.sceneDeciderVariable)"
+        case (true, nil):
+            return "the skill needs a move picker: name one with the step's `decider:` "
+                + "or \(EnvConfig.sceneDeciderVariable)"
+        case (true, .some(let command)):
+            guard let decider = CommandSceneDecider(command: command), runnable(decider) else {
+                return "the move picker '\(command)' is not a runnable program"
+            }
+            return nil
+        }
     }
 
     /// Refuse the run when any scene step cannot play. Returns the exit code to

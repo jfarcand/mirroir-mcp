@@ -322,6 +322,120 @@ jobs:
             echo "budget-typo: a max_touches budget key validated"; exit 1
           fi
 
+      # The scene: step's board mechanics, deterministically: FakeMirroring's
+      # Grid Frames pack is a 3x3 board (a1 then c3 reaches GOAL, a1 then any
+      # other cell shows DEFAITE). The skill declares `decider: required`, so
+      # the stub vision model (samples/board-scene/fixtures/stub_vision.py
+      # --reading, test-only) only reads the frame, and the stub move picker
+      # each scenario names (fixtures/stub_decider.py MODE) chooses the cells.
+      # Each case asserts its exit code and scene report: the goal reached
+      # passes (0), a wrong move fails (1), waiting every frame spends the
+      # budget (66), a failing picker stops with decider_failed (1), and a
+      # step that names no picker is refused before any touch (1).
+      - name: mirroir-run → board scene (FakeMirroring)
+        timeout-minutes: 20
+        working-directory: runner
+        env:
+          MIRROIR_BUNDLE_ID: com.jfarcand.FakeMirroring
+          MIRROIR_PROCESS_NAME: FakeMirroring
+          MIRROIR_MCP_BIN: ${{ github.workspace }}/.build/release/mirroir-mcp
+          MIRROIR_SCENE_AGENT: ollama:scene-stub
+          RUST_LOG: info,mirroir_run::target::ios=debug
+        run: |
+          set -euo pipefail
+          # The no-decider case must find no picker in the environment either.
+          unset MIRROIR_SCENE_DECIDER
+          export MIRROIR_SKILLS="$RUNNER_TEMP/board-skills"
+          mkdir -p "$MIRROIR_SKILLS"
+          cp samples/board-scene/skills/*.md "$MIRROIR_SKILLS/"
+          cp "${{ github.workspace }}/../mirroir-skills/drift-defaults.yaml" "$MIRROIR_SKILLS/"
+          # The decider runs with no shell, so the script itself must be executable.
+          [ -x samples/board-scene/fixtures/stub_decider.py ] \
+            || { echo "stub_decider.py is not executable (git mode 100755)"; exit 1; }
+          # The scene lane's stub (which names a control) still holds 11434:
+          # stop it and wait for the port to free before starting the reader.
+          pkill -f "fixtures/stub_vision.py" || true
+          python3 -I -c "import socket, time
+          for _ in range(60):
+              try:
+                  socket.create_connection(('127.0.0.1', 11434), 1).close()
+                  time.sleep(0.5)
+              except OSError:
+                  break
+          else:
+              raise SystemExit('port 11434 never freed')"
+          python3 -I samples/board-scene/fixtures/stub_vision.py 11434 --reading &
+          stub_pid=$!
+          trap 'kill "$stub_pid" 2>/dev/null || true' EXIT
+          python3 -I -c "import socket, time
+          for _ in range(60):
+              try:
+                  socket.create_connection(('127.0.0.1', 11434), 1).close(); break
+              except OSError:
+                  time.sleep(0.5)
+          else:
+              raise SystemExit('stub vision never listened')"
+
+          run_case() {
+            local scenario=$1 expected=$2
+            rm -rf target/mirroir-ios
+            set +e
+            ./target/debug/mirroir-run --run-scenario "samples/board-scene/scenarios/$scenario.yaml" \
+              > "board-$scenario.log" 2>&1
+            local code=$?
+            set -e
+            cat "board-$scenario.log"
+            if [ "$code" -ne "$expected" ]; then
+              echo "$scenario exited $code, expected $expected"; exit 1
+            fi
+          }
+          # The scene's captures in the report mirroir-mcp wrote for the block.
+          scene_field() {
+            python3 -I - "$1" <<'EOF'
+          import base64, glob, json, sys
+          report = json.load(open(sorted(glob.glob("target/mirroir-ios/**/ios-report.json", recursive=True))[-1]))
+          body = report["suites"][0]["specs"][0]["tests"][0]["results"][0]["attachments"][0]["body"]
+          scene = next(iter(json.loads(base64.b64decode(body))["scenes"].values()))
+          print(scene[sys.argv[1]])
+          EOF
+          }
+          expect_field() {
+            local scenario=$1 field=$2 expected=$3 actual
+            actual=$(scene_field "$field")
+            if [ "$actual" != "$expected" ]; then
+              echo "$scenario: $field is $actual, expected $expected"; exit 1
+            fi
+          }
+
+          run_case reach 0
+          expect_field reach verdict pass
+          expect_field reach frames_to_predicate 1
+          expect_field reach decider_calls 1
+          expect_field reach waits 0
+
+          run_case wrong 1
+          expect_field wrong verdict fail
+          expect_field wrong reason fail
+          expect_field wrong decider_calls 1
+
+          run_case wait 66
+          expect_field wait reason max_frames
+          expect_field wait frames 3
+          expect_field wait waits 3
+          expect_field wait decider_calls 3
+
+          run_case broken 1
+          expect_field broken verdict fail
+          expect_field broken reason decider_failed
+
+          run_case no-decider 1
+          if ! grep -qF "Refusing to run: 1 scene step(s) cannot play." board-no-decider.log; then
+            echo "no-decider: no scene refusal"; exit 1
+          fi
+          if ! grep -qF "decider" board-no-decider.log; then
+            echo "no-decider: the refusal does not name the missing decider"; exit 1
+          fi
+
       # The recorder's emit, off-device: a checked-in recording renders a
       # .mirroir/ scenario that mirroir-run's own validator accepts, and a
       # recording whose tap carries no label is refused with nothing written.

@@ -159,10 +159,12 @@ extension SkillParser {
     }
 
     /// Parse a scene step value, its budget written flat beside the skill.
-    /// Format: `{ skill: "name", max_frames: 6, max_tokens: 150000, max_seconds: 60 }`.
-    /// Every field is required and positive; any other key is refused.
+    /// Format: `{ skill: "name", max_frames: 6, max_tokens: 150000, max_seconds: 60,
+    /// decider: "/path/to/picker --flag" }`. Every budget field is required and
+    /// positive; `decider` is optional; any other key is refused.
     static func parseScene(_ value: String) -> SkillStep {
         var skill: String?
+        var decider: String?
         var budgetEntries: [String] = []
         for entry in inlineMapEntries(value) {
             guard let val = entry.value else {
@@ -170,6 +172,12 @@ extension SkillParser {
             }
             if entry.key == "skill" {
                 skill = stripQuotes(val)
+            } else if entry.key == "decider" {
+                let command = stripQuotes(val).trimmingCharacters(in: .whitespaces)
+                guard !command.isEmpty else {
+                    return .invalid(stepType: "scene", reason: "decider names no command")
+                }
+                decider = command
             } else {
                 budgetEntries.append("\(entry.key): \(val)")
             }
@@ -179,7 +187,7 @@ extension SkillParser {
         }
         do {
             let budget = try SceneHeaderParser.parseBudget(budgetEntries.joined(separator: ", "))
-            return .scene(skill: skill, budget: budget)
+            return .scene(skill: skill, budget: budget, decider: decider)
         } catch {
             return .invalid(stepType: "scene", reason: error.localizedDescription)
         }

@@ -126,10 +126,16 @@ public enum SimulatorSpecParser {
     ///   - `textfield: "placeholder" #fieldID`   — keyboard input
     ///   - `slider: "label" #fieldID = 0.5`      — drag slider, value 0.0-1.0
     ///   - `placeholder: 370x175`                — gray media block
+    ///   - `grid: 3x3`                           — a board of COLSxROWS cells (one per screen)
+    ///   - `cell: a1 → screen_id`                — a board cell's transition
     ///
-    /// Arrow may be `→` or `->`.
+    /// Arrow may be `→` or `->`. A grid size outside 1...26 columns or
+    /// 1...99 rows drops the grid; a cell line the grid does not have (or
+    /// with no grid, or no destination) is dropped. Cell lines may sit
+    /// anywhere in the screen section.
     private static func parseElements(_ body: String) -> [SimulatorElement] {
         var elements: [SimulatorElement] = []
+        var cellLines: [String] = []
         for rawLine in body.components(separatedBy: .newlines) {
             let line = rawLine.trimmingCharacters(in: .whitespaces)
             guard line.lowercased().hasPrefix("- element") else { continue }
@@ -170,10 +176,37 @@ public enum SimulatorSpecParser {
                 if let parsed = parsePlaceholder(valueRaw) {
                     elements.append(parsed)
                 }
+            case "grid":
+                let hasGrid = elements.contains { if case .grid = $0 { return true } else { return false } }
+                if !hasGrid, let grid = SimulatorGrid(size: valueRaw) {
+                    elements.append(.grid(grid))
+                }
+            case "cell":
+                cellLines.append(valueRaw)
             default: continue
             }
         }
-        return elements
+        return applyCells(cellLines, to: elements)
+    }
+
+    /// Fold `cell: <name> → <screen>` lines into the screen's grid element.
+    /// A line naming no destination, or a cell the grid does not have, is dropped.
+    private static func applyCells(
+        _ lines: [String], to elements: [SimulatorElement]
+    ) -> [SimulatorElement] {
+        guard let index = elements.firstIndex(where: {
+            if case .grid = $0 { return true } else { return false }
+        }), case .grid(var grid) = elements[index] else { return elements }
+        for line in lines {
+            let (name, leadsTo) = splitTextAndDestination(line)
+            guard let leadsTo, let updated = grid.adding(cell: name, leadsTo: leadsTo) else {
+                continue
+            }
+            grid = updated
+        }
+        var result = elements
+        result[index] = .grid(grid)
+        return result
     }
 
     /// Parse `"placeholder" #fieldID` → `.textField(...)`.

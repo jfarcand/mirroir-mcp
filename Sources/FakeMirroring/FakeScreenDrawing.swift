@@ -144,6 +144,31 @@ extension FakeScreenView {
         (pctText as NSString).draw(at: NSPoint(x: rect.maxX + 8, y: rect.minY + 5), withAttributes: labelAttrs)
     }
 
+    /// Draw a board as a checkerboard of equal cells, each carrying its name
+    /// (`a1` bottom-left) as a small label in its top-left corner.
+    func drawBoard(_ grid: SimulatorGrid, in board: CGRect) {
+        let light = NSColor(red: 0.85, green: 0.80, blue: 0.68, alpha: 1.0)
+        let dark = NSColor(red: 0.45, green: 0.58, blue: 0.36, alpha: 1.0)
+        let labelAttrs: [NSAttributedString.Key: Any] = [
+            .font: NSFont.systemFont(ofSize: 12, weight: .medium),
+            .foregroundColor: NSColor(white: 0.15, alpha: 1.0),
+        ]
+        for column in 0..<grid.columns {
+            for row in 1...grid.rows {
+                let name = SimulatorGrid.name(column: column, row: row)
+                guard let cell = grid.rect(of: name, in: board) else { continue }
+                ((column + row) % 2 == 0 ? light : dark).setFill()
+                cell.fill()
+                (name as NSString).draw(
+                    at: NSPoint(x: cell.minX + 4, y: cell.minY + 2), withAttributes: labelAttrs)
+            }
+        }
+        NSColor(white: 0.1, alpha: 1.0).setStroke()
+        let outline = NSBezierPath(rect: board)
+        outline.lineWidth = 2
+        outline.stroke()
+    }
+
     func drawTypedTextOverlays(_ content: ScenarioData) {
         guard !content.textFieldRects.isEmpty else { return }
         let font = NSFont.systemFont(ofSize: 16, weight: .regular)

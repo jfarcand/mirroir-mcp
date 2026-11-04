@@ -14,6 +14,8 @@ enum SceneHeaderError: LocalizedError, Equatable {
     case predicate(field: String, reason: String)
     case noObjective
     case controls(String)
+    case imageWidth(String)
+    case decider(String)
 
     var errorDescription: String? {
         switch self {
@@ -29,6 +31,10 @@ enum SceneHeaderError: LocalizedError, Equatable {
             return "no ## Objective for the model to play toward"
         case .controls(let reason):
             return "controls: \(reason)"
+        case .imageWidth(let reason):
+            return "image_width: \(reason)"
+        case .decider(let reason):
+            return "decider: \(reason)"
         }
     }
 }
@@ -38,6 +44,12 @@ enum SceneHeaderParser {
 
     /// The budget fields, as written in YAML.
     static let budgetFields = ["max_frames", "max_tokens", "max_seconds"]
+    /// The narrowest and widest frame a skill may ask the model to read.
+    static let imageWidthRange = 200...2000
+    /// Most columns a grid may have: one letter a...z each.
+    static let maxGridColumns = 26
+    /// Most rows a grid may have.
+    static let maxGridRows = 99
 
     /// The scene skill in `content`, or why it cannot be played.
     static func parse(content: String, name: String) -> Result<SceneHeader, SceneHeaderError> {
@@ -56,7 +68,11 @@ enum SceneHeaderParser {
             }
             let success = try parsePredicate(successRaw, field: "success")
             let fail = try SkillMdParser.extractStringValue(from: frontMatter, key: "fail")
-                .map { try parsePredicate($0, field: "fail") }
+                .map { try parsePredicate($0, field: "fail") } ?? []
+            let imageWidth = try parseImageWidth(
+                SkillMdParser.extractStringValue(from: frontMatter, key: "image_width"))
+            let needsDecider = try parseDecider(
+                SkillMdParser.extractStringValue(from: frontMatter, key: "decider"))
             guard let objective = section("Objective", in: body), !objective.isEmpty else {
                 throw SceneHeaderError.noObjective
             }
@@ -64,7 +80,7 @@ enum SceneHeaderParser {
             let controls = try parseControls(section("Controls", in: body), declared: declared)
             return .success(SceneHeader(
                 name: name, budget: budget, controls: controls, objective: objective,
-                success: success, fail: fail))
+                success: success, fail: fail, imageWidth: imageWidth, needsDecider: needsDecider))
         } catch let error as SceneHeaderError {
             return .failure(error)
         } catch {
@@ -96,20 +112,61 @@ enum SceneHeaderParser {
         return SceneBudget(maxFrames: frames, maxTokens: tokens, maxSeconds: seconds)
     }
 
-    /// A predicate map holding exactly one `visible: "<text>"`.
-    static func parsePredicate(_ raw: String, field: String) throws -> ScenePredicate {
+    /// A predicate map holding one `visible:` naming a text or a list of texts:
+    /// `{ visible: "GOAL" }` or `{ visible: ["Vaincu", "Quitter"] }`. A list is met
+    /// when any of its texts is visible.
+    static func parsePredicate(_ raw: String, field: String) throws -> [ScenePredicate] {
         let entries = SkillParser.inlineMapEntries(raw)
-        guard entries.count == 1, let entry = entries.first, let value = entry.value else {
-            throw SceneHeaderError.predicate(field: field, reason: "must be one { visible: \"<text>\" }")
+        let shape = "must be one { visible: \"<text>\" } or { visible: [\"<text>\", ...] }"
+        guard let first = entries.first, let firstValue = first.value else {
+            throw SceneHeaderError.predicate(field: field, reason: shape)
         }
-        guard entry.key == "visible" else {
-            throw SceneHeaderError.predicate(field: field, reason: "unknown predicate '\(entry.key)'")
+        guard first.key == "visible" else {
+            throw SceneHeaderError.predicate(field: field, reason: "unknown predicate '\(first.key)'")
         }
-        let text = SkillParser.stripQuotes(value)
-        guard !text.isEmpty else {
+        let texts: [String]
+        if firstValue.hasPrefix("[") {
+            // A list is split at its commas, so rejoin the entries the map split
+            // inside the brackets and require it to close with nothing after it.
+            let list = ([firstValue] + entries.dropFirst().map { entry in
+                entry.value.map { "\(entry.key):\($0)" } ?? entry.key
+            }).joined(separator: ",").trimmingCharacters(in: .whitespaces)
+            guard list.hasSuffix("]") else {
+                throw SceneHeaderError.predicate(field: field, reason: "visible list is not closed")
+            }
+            texts = TargetSelector.splitTopLevel(String(list.dropFirst().dropLast()))
+                .map { SkillParser.stripQuotes($0.trimmingCharacters(in: .whitespaces)) }
+                .filter { !$0.isEmpty }
+            guard !texts.isEmpty else {
+                throw SceneHeaderError.predicate(field: field, reason: "visible list is empty")
+            }
+        } else {
+            guard entries.count == 1 else { throw SceneHeaderError.predicate(field: field, reason: shape) }
+            texts = [SkillParser.stripQuotes(firstValue)]
+        }
+        guard texts.allSatisfy({ !$0.isEmpty }) else {
             throw SceneHeaderError.predicate(field: field, reason: "visible names no text")
         }
-        return .visible(text)
+        return texts.map { .visible($0) }
+    }
+
+    /// An optional `image_width`: a whole number of pixels in `imageWidthRange`.
+    static func parseImageWidth(_ raw: String?) throws -> Int? {
+        guard let raw else { return nil }
+        guard let width = Int(raw), imageWidthRange.contains(width) else {
+            throw SceneHeaderError.imageWidth(
+                "\(raw) is not a width in \(imageWidthRange.lowerBound)...\(imageWidthRange.upperBound)")
+        }
+        return width
+    }
+
+    /// An optional `decider`, whose only value is `required`.
+    static func parseDecider(_ raw: String?) throws -> Bool {
+        guard let raw else { return false }
+        guard raw == "required" else {
+            throw SceneHeaderError.decider("'\(raw)' is not 'required'")
+        }
+        return true
     }
 
     /// The calibrated `## Controls` lines, one per declared control and none other.
@@ -135,7 +192,8 @@ enum SceneHeaderParser {
         return controls
     }
 
-    /// `- name: tap at X,Y` | `drag from X,Y radius R` | `hold at X,Y for MS`.
+    /// `- name: tap at X,Y` | `drag from X,Y radius R` | `hold at X,Y for MS` |
+    /// `grid CxR from X,Y to X,Y`.
     static func parseControlLine(_ line: String) throws -> SceneControl {
         let body = line.dropFirst().trimmingCharacters(in: .whitespaces)
         guard let colon = body.firstIndex(of: ":") else {
@@ -146,6 +204,9 @@ enum SceneHeaderParser {
             .split(separator: " ").map(String.init)
         guard !name.isEmpty, !name.contains("+") else {
             throw SceneHeaderError.controls("'\(name)' is not one control")
+        }
+        guard name != SceneControl.waitName else {
+            throw SceneHeaderError.controls("'\(name)' is reserved for waiting a frame")
         }
         let gesture: SceneGesture
         switch (words.first, words.count) {
@@ -163,9 +224,12 @@ enum SceneHeaderParser {
                 throw SceneHeaderError.controls("'\(name)' must hold for a positive number of ms")
             }
             gesture = .hold(x: point.x, y: point.y, ms: ms)
+        case ("grid", 6) where words[2] == "from" && words[4] == "to":
+            gesture = try parseGrid(size: words[1], from: words[3], to: words[5], name: name)
         default:
             throw SceneHeaderError.controls(
-                "'\(line)' is not 'tap at X,Y', 'drag from X,Y radius R' or 'hold at X,Y for MS'")
+                "'\(line)' is not 'tap at X,Y', 'drag from X,Y radius R', 'hold at X,Y for MS' "
+                    + "or 'grid CxR from X,Y to X,Y'")
         }
         return SceneControl(name: name, gesture: gesture)
     }
@@ -184,6 +248,23 @@ enum SceneHeaderParser {
         }
         guard collecting || !lines.isEmpty else { return nil }
         return lines.joined(separator: "\n").trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    /// A `CxR` board between its top-left `from` and bottom-right `to` corners.
+    private static func parseGrid(size: String, from: String, to: String, name: String) throws -> SceneGesture {
+        let dims = size.lowercased().split(separator: "x").map { Int($0) }
+        guard dims.count == 2, let cols = dims[0], let rows = dims[1],
+              (1...maxGridColumns).contains(cols), (1...maxGridRows).contains(rows) else {
+            throw SceneHeaderError.controls(
+                "'\(name)' grid size '\(size)' is not CxR with 1...\(maxGridColumns) columns "
+                    + "and 1...\(maxGridRows) rows")
+        }
+        let topLeft = try fractionPoint(from, name: name)
+        let bottomRight = try fractionPoint(to, name: name)
+        guard bottomRight.x > topLeft.x, bottomRight.y > topLeft.y else {
+            throw SceneHeaderError.controls("'\(name)' grid must run from its top-left to its bottom-right corner")
+        }
+        return .grid(cols: cols, rows: rows, x0: topLeft.x, y0: topLeft.y, x1: bottomRight.x, y1: bottomRight.y)
     }
 
     private static func fractionPoint(_ raw: String, name: String) throws -> (x: Double, y: Double) {

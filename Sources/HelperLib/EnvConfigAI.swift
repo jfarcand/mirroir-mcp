@@ -147,4 +147,22 @@ extension EnvConfig {
     public static var sceneAgent: String {
         readString("sceneAgent", envVar: "MIRROIR_SCENE_AGENT", default: "claude-sonnet-5-5")
     }
+
+    /// The env var naming a scene's move picker when the scene step names none.
+    public static let sceneDeciderVariable = "MIRROIR_SCENE_DECIDER"
+
+    /// The move picker a `decider: required` scene runs when its step names none:
+    /// the command in `MIRROIR_SCENE_DECIDER`, or nil. Read from the environment
+    /// only, never from settings or a skill, so only the person running the test
+    /// chooses which program it starts.
+    public static var sceneDecider: String? {
+        let value = ProcessInfo.processInfo.environment[sceneDeciderVariable]?
+            .trimmingCharacters(in: .whitespaces) ?? ""
+        return value.isEmpty ? nil : value
+    }
+
+    /// Milliseconds between the taps of one multi-cell scene action (a board move).
+    public static var sceneCellTapGapMs: UInt32 {
+        UInt32(max(0, readInt("sceneCellTapGapMs", default: TimingConstants.sceneCellTapGapMs)))
+    }
 }

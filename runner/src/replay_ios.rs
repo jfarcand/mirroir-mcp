@@ -103,7 +103,14 @@ pub async fn run_ios_block(
         }
         ScreenReference::Compare { .. } | ScreenReference::Untracked => None,
     };
-    let yaml = ios_block_yaml(&run.scenario.name, &run.scenario.steps, run.block.clone())?;
+    let scenario_path = absolute(run.scenario_path)?;
+    let scenario_dir = scenario_path.parent().unwrap_or_else(|| Path::new("/"));
+    let yaml = ios_block_yaml(
+        &run.scenario.name,
+        &run.scenario.steps,
+        run.block.clone(),
+        scenario_dir,
+    )?;
     let runner = MirroirMcpRunner::from_env()?
         .with_recording(recording)
         .with_skills(run.skills)?;

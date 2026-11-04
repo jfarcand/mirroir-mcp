@@ -486,6 +486,9 @@ public enum TimingConstants {
     /// Default drag duration in milliseconds.
     public static let defaultDragDurationMs: Int = 1000
 
+    /// Pause between the taps of one multi-cell scene action, in milliseconds.
+    public static let sceneCellTapGapMs: Int = 300
+
     /// Default long press duration in milliseconds.
     public static let defaultLongPressDurationMs: Int = 500
 

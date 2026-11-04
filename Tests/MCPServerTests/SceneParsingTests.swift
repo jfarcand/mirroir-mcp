@@ -39,8 +39,8 @@ final class SceneParsingTests: XCTestCase {
     func testAWellFormedSceneSkillParses() throws {
         let header = try SceneHeaderParser.parse(content: Self.scene, name: "reach").get()
         XCTAssertEqual(header.budget, SceneBudget(maxFrames: 10, maxTokens: 400000, maxSeconds: 180))
-        XCTAssertEqual(header.success, .visible("GOAL"))
-        XCTAssertEqual(header.fail, .visible("DÉFAITE, encore"), "a comma inside quotes stays in the value")
+        XCTAssertEqual(header.success, [.visible("GOAL")])
+        XCTAssertEqual(header.fail, [.visible("DÉFAITE, encore")], "a comma inside quotes stays in the value")
         XCTAssertEqual(header.objective, "Reach the screen that says GOAL.")
         XCTAssertEqual(header.controls, [
             SceneControl(name: "move", gesture: .drag(x: 0.18, y: 0.80, radius: 0.08)),
@@ -110,7 +110,7 @@ final class SceneParsingTests: XCTestCase {
         let step = SkillParser.parseStep(
             key: "scene",
             rawValue: #"{ skill: "scene-frames-reach", max_frames: 6, max_tokens: 150000, max_seconds: 60 }"#)
-        guard case .scene(let skill, let budget) = step else { return XCTFail("\(step)") }
+        guard case .scene(let skill, let budget, _) = step else { return XCTFail("\(step)") }
         XCTAssertEqual(skill, "scene-frames-reach")
         XCTAssertEqual(budget, SceneBudget(maxFrames: 6, maxTokens: 150000, maxSeconds: 60))
         XCTAssertEqual(step.typeKey, "scene")
@@ -151,7 +151,7 @@ final class SceneParsingTests: XCTestCase {
     func testAReplyNamingATapControlIsOneAction() {
         let action = ScenePrompt.parseAction(
             #"{"control": "fire", "rationale": "an enemy ahead"}"#, controls: controls)
-        XCTAssertEqual(action?.control.name, "fire")
+        XCTAssertEqual(action?.control?.name, "fire")
         XCTAssertNil(action?.direction)
     }
 

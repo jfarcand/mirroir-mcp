@@ -21,6 +21,29 @@ private struct ScriptedVision: VisionCompleting {
     }
 }
 
+/// Stands in for the scenario's move picker: always the same board move.
+private struct FixedMove: SceneDeciding {
+    let command = "fixed-move"
+    let cells: [String]
+
+    func decide(input: Data, timeoutSeconds: Int) -> SceneDecisionOutcome {
+        let quoted = cells.map { "\"\($0)\"" }.joined(separator: ", ")
+        return .answered(#"{"control": "board", "cells": [\#(quoted)]}"#)
+    }
+}
+
+/// Stands in for the vision model on a board scene: it only reads the board.
+private struct ReadingOnly: VisionCompleting {
+    let model = "scene-stub"
+
+    func complete(systemPrompt: String, image: ChatCompletionImage, timeoutSeconds: Int) -> ChatCompletionReply? {
+        ChatCompletionReply(
+            text: #"{"reading": "empty", "rationale": "scripted"}"#,
+            usage: ChatCompletionUsage(promptTokens: 400, completionTokens: 50, totalTokens: 450),
+            responseModel: model)
+    }
+}
+
 final class SceneLoopIntegrationTests: XCTestCase {
 
     private var bridge: MirroringBridge!
@@ -82,6 +105,41 @@ final class SceneLoopIntegrationTests: XCTestCase {
             contentsOfFile: (report.evidenceDir as NSString).appendingPathComponent("frames.jsonl"),
             encoding: .utf8)
         XCTAssertEqual(log.split(separator: "\n").count, 3, "one evidence line per frame")
+    }
+
+    /// The board sample's skill, played with a fixed move on Grid Frames.
+    private func playBoard(cells: [String]) throws -> SceneReport {
+        IntegrationTestHelper.resetScenario(bridge: bridge, to: "Grid Frames")
+        usleep(800_000)
+        let path = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+            .appendingPathComponent("runner/samples/board-scene/skills/grid-frames-reach.md").path
+        let content = try String(contentsOfFile: path, encoding: .utf8)
+        let board = try SceneHeaderParser.parse(content: content, name: "grid-frames-reach").get()
+        let capture = ScreenCapture(bridge: bridge)
+        let describer = ScreenDescriber(bridge: bridge, capture: capture)
+        let loop = SceneLoop(dependencies: .init(
+            bridge: bridge, describer: describer,
+            input: InputSimulation(bridge: bridge, pasteVerifier: describer),
+            vision: ReadingOnly(),
+            now: { CFAbsoluteTimeGetCurrent() }, sleep: { usleep($0) },
+            settleMs: 500, imageWidth: 400, callTimeoutSeconds: 30,
+            decider: FixedMove(cells: cells)))
+        return loop.run(
+            header: board, budget: SceneBudget(maxFrames: 3, maxTokens: 400000, maxSeconds: 120),
+            evidence: nil)
+    }
+
+    func testABoardMoveTapsItsCellsInOrderToTheGoal() throws {
+        let report = try playBoard(cells: ["a1", "c3"])
+        XCTAssertEqual(report.verdict, .pass, "reason \(report.reason.rawValue)")
+        XCTAssertEqual(report.framesToPredicate, 1, "a1 then c3 is one move")
+        XCTAssertEqual(report.deciderCalls, 1)
+    }
+
+    func testAWrongSecondCellLoses() throws {
+        let report = try playBoard(cells: ["a1", "b2"])
+        XCTAssertEqual(report.reason, .fail, "a1 then b2 shows DEFAITE")
     }
 
     func testFiringOnTheFirstFrameMeetsTheFailPredicate() throws {

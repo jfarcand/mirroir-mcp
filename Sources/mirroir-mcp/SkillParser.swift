@@ -55,9 +55,10 @@ enum SkillStep {
     case longPress(label: String, durationMs: Int?)
     case drag(fromLabel: String, toLabel: String)
     case switchTarget(TargetSelector)
-    /// Play the kind:game skill `skill` (a skill name) under `budget`. Never
+    /// Play the kind:game skill `skill` (a skill name) under `budget`, with the
+    /// scenario's move-picker command `decider` when the skill needs one. Never
     /// compiled: a scene is a model loop, not a replayable action.
-    case scene(skill: String, budget: SceneBudget)
+    case scene(skill: String, budget: SceneBudget, decider: String? = nil)
     case skipped(stepType: String, reason: String)
     /// A step the parser could not turn into an action: an unknown verb or a
     /// malformed value. A skill holding one is refused before it runs.
@@ -121,7 +122,7 @@ enum SkillStep {
         case .longPress(let label, _): return label
         case .drag(let fromLabel, _): return fromLabel
         case .switchTarget(let selector): return selector.labelValue
-        case .scene(let skill, _): return skill
+        case .scene(let skill, _, _): return skill
         case .skipped, .invalid: return nil
         }
     }
@@ -150,7 +151,7 @@ enum SkillStep {
         case .longPress(let label, _): return "long_press: \"\(label)\""
         case .drag(let from, let to): return "drag: \"\(from)\" -> \"\(to)\""
         case .switchTarget(let selector): return "target: \(selector.displayName)"
-        case .scene(let skill, _): return "scene: \"\(skill)\""
+        case .scene(let skill, _, _): return "scene: \"\(skill)\""
         case .skipped(let type, _): return "\(type) (skipped)"
         case .invalid(let type, _): return "\(type) (invalid)"
         }

@@ -103,6 +103,20 @@ extension FakeScreenView {
             }
         }
 
+        // Board tap: the cell under the point leads where its transition says;
+        // a cell with none, like any tap on the board, is consumed and stays put.
+        if let board = data.board, board.rect.contains(contentPoint) {
+            let cell = board.grid.cell(at: contentPoint, in: board.rect)
+            let dest = cell.flatMap(board.grid.destination(of:))
+            NSLog("[fakemirror-tap] board cell=%@ destination=%@",
+                  cell ?? "<none>", dest ?? "<nil>")
+            if let dest {
+                pack.navigate(to: dest)
+                needsDisplay = true
+            }
+            return true
+        }
+
         // Row tap → navigate via SimulatorElement.leadsTo
         for (label, origin) in data.rows {
             let rowRect = CGRect(x: origin.x - 20, y: origin.y - rowHeight / 2,

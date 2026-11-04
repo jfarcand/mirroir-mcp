@@ -175,6 +175,8 @@ fn observe(index: usize, capture: &SceneCapture, drift: &mut DriftSession) -> Re
         frames = capture.frames,
         total_tokens = capture.total_tokens,
         seconds = capture.seconds,
+        waits = capture.waits,
+        decider_calls = capture.decider_calls,
         evidence = %capture.evidence_dir.display(),
         "scene passed"
     );

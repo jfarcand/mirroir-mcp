@@ -26,6 +26,12 @@ enum SceneRenderer {
     private static let buttonWidth: CGFloat = 160
     private static let buttonHeight: CGFloat = 36
     private static let buttonGap: CGFloat = 20
+    /// The board a `grid` element fills: a 300pt square centred in the 410pt
+    /// view, its top 200pt below the view's top, so it clears the header and
+    /// stays above the y~600 band CI displays clip. A scene skill calibrates
+    /// its grid control on this square as window fractions; moving it moves
+    /// every such calibration (runner/samples/board-scene/skills/).
+    static let boardRect = CGRect(x: 55, y: 200, width: 300, height: 300)
 
     /// Build the ScenarioData for a screen (no active obstacle).
     /// `tabBarStyle` comes from the owning pack's spec — it is app-level,
@@ -41,6 +47,7 @@ enum SceneRenderer {
         var placeholders: [CGRect] = []
         var textFieldRects: [CGRect] = []
         var sliderTrack: (label: String, rect: CGRect)?
+        var board: (grid: SimulatorGrid, rect: CGRect)?
 
         var rowY = firstRowY
         var textY = textStartY
@@ -88,6 +95,8 @@ enum SceneRenderer {
                     width: CGFloat(w), height: CGFloat(h))
                 placeholders.append(rect)
                 placeholderY += CGFloat(h) + 10
+            case .grid(let grid):
+                board = (grid, boardRect)
             }
         }
 
@@ -103,7 +112,8 @@ enum SceneRenderer {
             hasBackChevron: screen.backTo != nil,
             cards: [],
             sliderTrack: sliderTrack,
-            textFieldRects: textFieldRects
+            textFieldRects: textFieldRects,
+            board: board
         )
     }
 

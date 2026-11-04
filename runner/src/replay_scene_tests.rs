@@ -56,6 +56,8 @@ fn capture(skill: &str, verdict: SceneVerdict, reason: SceneReason, tokens: u64)
         model: "model-a".to_owned(),
         response_model: Some("model-a-2026".to_owned()),
         rejected_replies: 0,
+        waits: 0,
+        decider_calls: 0,
         evidence_dir: PathBuf::from("/w/scene"),
     }
 }
@@ -200,6 +202,36 @@ fn a_failed_scene_outranks_an_inconclusive_one() -> TestResult {
         }
         other => Err(format!("expected Failed, got {other:?}")),
     }
+}
+
+/// A move picker that broke fails the scene: its verdict is a fail, never an
+/// inconclusive, on the failure path and on a block that otherwise passed.
+#[test]
+fn a_decider_failure_is_a_failed_scene() -> TestResult {
+    let broken = SceneCapture {
+        decider_calls: 1,
+        ..capture("other", SceneVerdict::Fail, SceneReason::DeciderFailed, 500)
+    };
+    for ran in [
+        failed(vec![("2", pass("reach")), ("3", broken.clone())]),
+        Ok(passed(vec![("2", pass("reach")), ("3", broken)])),
+    ] {
+        match verify(ran)? {
+            Err(
+                error @ RunnerError::Scene(SceneError::Failed {
+                    index: 4,
+                    reason: SceneReason::DeciderFailed,
+                    ..
+                }),
+            ) => {
+                assert!(!error.is_inconclusive());
+                assert_eq!(error.exit_code(), 1);
+                assert!(error.to_string().contains("decider_failed"));
+            }
+            other => return Err(format!("expected a failed scene, got {other:?}")),
+        }
+    }
+    Ok(())
 }
 
 /// A step before the scene failed, so no scene ran: the report's own failure

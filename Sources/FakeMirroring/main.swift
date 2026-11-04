@@ -124,6 +124,7 @@ final class FakeScreenView: NSView {
         drawPlainTexts(content.plainTexts)
         drawButtons(content.buttons)
         if let slider = content.sliderTrack { drawSlider(slider) }
+        if let board = content.board { drawBoard(board.grid, in: board.rect) }
         drawTypedTextOverlays(content)
 
         ctx.restoreGState()

@@ -55,6 +55,7 @@ fn a_passing_scene_passes_and_feeds_drift() -> Result<(), String> {
     assert_eq!(scene.verdict, SceneVerdict::Pass);
     assert_eq!(scene.frames_to_predicate, Some(3));
     assert_eq!(scene.total_tokens, 72_150);
+    assert_eq!((scene.waits, scene.decider_calls), (0, 0));
     let observed = drift.into_observed().metrics;
     assert_eq!(
         observed.get("scene.2.scene-frames-reach@scene-stub.tokens"),

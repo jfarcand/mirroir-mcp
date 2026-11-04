@@ -446,12 +446,64 @@ and positive, and an unknown key is a parse error.
 | Scene verdict | Run |
 |---|---|
 | `pass` — the success predicate showed | passes; its total tokens and frames-to-predicate feed `scene_tokens_pct_increase` / `scene_frames_pct_increase`, compared only against green runs of the same model |
-| `fail` — the fail predicate showed, or a frame could not be read, priced or acted on | FAIL, exit 1 (`SceneError::Failed`) |
+| `fail` — the fail predicate showed, a frame could not be read, priced or acted on, or the move picker failed (`decider_failed`) | FAIL, exit 1 (`SceneError::Failed`) |
 | `inconclusive` — the budget ran out first | FAIL, exit **66** (`SceneError::Inconclusive`) unless another failure exits 1 |
 
 A block that passes with no report for one of its scenes fails
 (`SceneError::NotReported`). A scene is never compiled: a block holding one
 neither records nor compares a `<scenario>.compiled.json` screen reference.
+
+### `decider` — the move picker
+
+A skill that declares `decider: required` (a board game, say) has the model
+only *read* each frame into the text its Objective defines, such as a FEN; an
+external program picks the move. That program is named by the scenario's
+`decider:` key, never by a skill, so the same skill runs against any engine:
+
+```yaml
+- scene: { skill: board-reach, budget: { max_frames: 4, max_tokens: 80000, max_seconds: 120 }, decider: "./tools/sf.sh --depth 12" }
+```
+
+- The value is a command line: a program, then its arguments, split on
+  whitespace with no shell. A blank value is a parse error
+  (`SceneError::BlankDecider`).
+- A program written as a relative path (holding a `/`, not starting with one)
+  is resolved against the **scenario file's directory**, `.` components
+  dropped; an absolute path, and a bare name looked up on `PATH`, are kept.
+  The arguments cross as written.
+- The block line carries it double-quoted: `scene: { skill: "board-reach",
+  max_frames: 4, max_tokens: 80000, max_seconds: 120, decider:
+  "/abs/scenarios/tools/sf.sh --depth 12" }`. mirroir-mcp unescapes nothing in
+  a quoted value, so a decider holding `"`, `\` or a line break is refused
+  (`IosError::NotExpressible`).
+- Without the key, mirroir-mcp falls back to `MIRROIR_SCENE_DECIDER`. A
+  `decider: required` skill with neither, and a decider on a skill that does
+  not require one, are refused before the block's first step.
+
+Each frame the picker gets one JSON object on stdin (`run_id`, `frame`,
+`reading`, `ocr`, `controls`) and prints one action: a `tap`/`hold` control, a
+`drag` control with a `direction`, a `grid` control with 1 to 4 `cells`
+(`"e2"`: column letter from the left, row number from the bottom), or
+`"control": "none"` to wait a frame without touching. The skill side — the
+`- board: grid 8x8 from x,y to x,y` control line, cell naming, and the action
+shapes — is documented in
+[`docs/skills-marketplace.md#scenes`](../../docs/skills-marketplace.md#scenes).
+
+### The scene report
+
+Each scene's entry in the block's captures carries its verdict and reason,
+frames, tokens, seconds, model, rejected replies, evidence directory, and two
+counters that are always present:
+
+| Key | Meaning |
+|---|---|
+| `waits` | frames whose action was `none` |
+| `decider_calls` | times the move picker was asked for an action; `0` with no decider |
+
+The reason `decider_failed` — the picker exited non-zero, printed no valid
+action, named a control the skill does not declare, or timed out with time
+still left — has verdict `fail`: exit 1 (`SceneError::Failed`), never the
+inconclusive 66. A picker timeout at the scene's deadline is `max_seconds`.
 
 ---
 

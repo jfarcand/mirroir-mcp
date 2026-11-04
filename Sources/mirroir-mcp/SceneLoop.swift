@@ -1,7 +1,7 @@
 // Copyright 2026 jfarcand@apache.org
 // Licensed under the Apache License, Version 2.0
 //
-// ABOUTME: Plays one scene: read a frame, judge its OCR predicates, ask the model for one control, make that one touch.
+// ABOUTME: Plays one scene: read a frame, judge its OCR predicates, get one action (model or move picker), act once.
 // ABOUTME: A session accumulator that stops at its predicates or its frame/token/time budget, never past it.
 
 import CoreGraphics
@@ -31,8 +31,12 @@ final class SceneLoop: @unchecked Sendable {
         let settleMs: UInt32
         /// Width the frame is resized to before it is sent.
         let imageWidth: Int
-        /// The longest a single model call may take.
+        /// The longest a single model or move-picker call may take.
         let callTimeoutSeconds: Int
+        /// The scenario's move picker; nil when the scene has none.
+        var decider: (any SceneDeciding)? = nil
+        /// Milliseconds between the taps of one multi-cell action.
+        var cellTapGapMs: UInt32 = EnvConfig.sceneCellTapGapMs
     }
 
     private let deps: Dependencies
@@ -48,6 +52,10 @@ final class SceneLoop: @unchecked Sendable {
     private var completionTokens = 0
     private var lastFrameTokens = 0
     private var rejectedReplies = 0
+    private var waits = 0
+    private var deciderCalls = 0
+    /// Identifies this run to the move picker, which may keep state across frames.
+    private var runID = ""
     private var responseModel: String?
     private var stopReason: SceneStopReason?
 
@@ -76,6 +84,9 @@ final class SceneLoop: @unchecked Sendable {
         completionTokens = 0
         lastFrameTokens = 0
         rejectedReplies = 0
+        waits = 0
+        deciderCalls = 0
+        runID = UUID().uuidString
         responseModel = nil
         stopReason = nil
     }
@@ -108,6 +119,8 @@ final class SceneLoop: @unchecked Sendable {
             model: deps.vision.model,
             responseModel: responseModel,
             rejectedReplies: rejectedReplies,
+            waits: waits,
+            deciderCalls: deciderCalls,
             evidenceDir: evidence?.directory ?? "")
     }
 
@@ -122,17 +135,13 @@ final class SceneLoop: @unchecked Sendable {
             return .maxTokens
         }
 
-        guard let screen = deps.describer.describe(settleTimeoutUs: 0),
-              screen.ocrFailure == nil,
-              let png = Data(base64Encoded: screen.screenshotBase64) else {
-            return .perceptionFailed
-        }
-        if let fail = header.fail, fail.isMet(by: screen.elements) { return .fail }
-        if header.success.isMet(by: screen.elements) { return .success }
+        guard let (screen, png) = readFrame() else { return .perceptionFailed }
+        if SceneHeader.anyMet(header.fail, by: screen.elements) { return .fail }
+        if SceneHeader.anyMet(header.success, by: screen.elements) { return .success }
 
         let windowSize = deps.bridge.getWindowInfo()?.size ?? .zero
         let image = ImageResizer.resize(
-            pngData: png, targetWidth: deps.imageWidth, windowSize: windowSize)?.base64
+            pngData: png, targetWidth: header.imageWidth ?? deps.imageWidth, windowSize: windowSize)?.base64
             ?? screen.screenshotBase64
         let remaining = Double(budget.maxSeconds) - elapsed
         let timeout = max(1, min(deps.callTimeoutSeconds, Int(remaining.rounded(.up))))
@@ -143,7 +152,8 @@ final class SceneLoop: @unchecked Sendable {
             if deps.now() - startTime >= Double(budget.maxSeconds) { return .maxSeconds }
             frames += 1
             rejectedReplies += 1
-            evidence?.record(frame: frames, png: png, screen: screen, reply: nil, action: nil, touch: nil)
+            evidence?.record(frame: frames, png: png, screen: screen, reply: nil, action: nil,
+                             touch: nil, decision: nil)
             return nil
         }
         guard let usage = reply.usage else { return .usageMissing }
@@ -153,21 +163,114 @@ final class SceneLoop: @unchecked Sendable {
         lastFrameTokens = usage.promptTokens + usage.completionTokens
         responseModel = reply.responseModel ?? responseModel
 
-        guard let action = ScenePrompt.parseAction(reply.text, controls: header.controls) else {
-            rejectedReplies += 1
-            evidence?.record(frame: frames, png: png, screen: screen, reply: reply, action: nil, touch: nil)
+        let record = { (action: SceneAction?, touch: String?, decision: String?) in
+            self.evidence?.record(frame: self.frames, png: png, screen: screen, reply: reply,
+                                  action: action, touch: touch, decision: decision)
+        }
+        let action: SceneAction
+        var decision: String?
+        if header.needsDecider {
+            guard let reading = ScenePrompt.parseReading(reply.text) else {
+                rejectedReplies += 1
+                record(nil, nil, nil)
+                return nil
+            }
+            switch decide(reading: reading, screen: screen, header: header) {
+            case .action(let decided, let answer):
+                action = decided
+                decision = answer
+            case .stop(let reason, let why):
+                record(nil, nil, why)
+                return reason
+            }
+        } else {
+            guard let parsed = ScenePrompt.parseAction(reply.text, controls: header.controls) else {
+                rejectedReplies += 1
+                record(nil, nil, nil)
+                return nil
+            }
+            action = parsed
+        }
+        guard let touch = Self.touch(for: action, in: windowSize) else {
+            waits += 1
+            record(action, SceneControl.waitName, decision)
+            deps.sleep(deps.settleMs * 1000)
             return nil
         }
-        let touch = Self.touch(for: action, in: windowSize)
         if let error = perform(touch) {
-            evidence?.record(frame: frames, png: png, screen: screen, reply: reply, action: action,
-                             touch: "\(touch.summary) failed: \(error)")
+            record(action, "\(touch.summary) failed: \(error)", decision)
             return .inputFailed
         }
-        evidence?.record(frame: frames, png: png, screen: screen, reply: reply, action: action,
-                         touch: touch.summary)
+        record(action, touch.summary, decision)
         deps.sleep(deps.settleMs * 1000)
         return nil
+    }
+
+    /// The frame's OCR and PNG, read again once after a settle when the first
+    /// read fails: one dropped capture in a long game is not a broken scene.
+    private func readFrame() -> (ScreenDescriber.DescribeResult, Data)? {
+        for attempt in 0..<2 {
+            if attempt > 0 { deps.sleep(deps.settleMs * 1000) }
+            if let screen = deps.describer.describe(settleTimeoutUs: 0), screen.ocrFailure == nil,
+               let png = Data(base64Encoded: screen.screenshotBase64) {
+                return (screen, png)
+            }
+        }
+        return nil
+    }
+
+    /// What the move picker made of one frame.
+    private enum Decision {
+        /// An allowed action, and the picker's raw answer for the evidence.
+        case action(SceneAction, answer: String)
+        /// The scene stops, and why, for the evidence.
+        case stop(SceneStopReason, why: String)
+    }
+
+    /// Ask the move picker for this frame's action, within the time left.
+    private func decide(reading: String, screen: ScreenDescriber.DescribeResult, header: SceneHeader) -> Decision {
+        guard let decider = deps.decider else {
+            return .stop(.deciderFailed, why: "the skill needs a move picker and none is configured")
+        }
+        let input: [String: Any] = [
+            "run_id": runID,
+            "frame": frames,
+            "reading": reading,
+            "ocr": screen.elements.map(\.text),
+            "controls": header.controls.map(Self.describe),
+        ]
+        guard let data = try? JSONSerialization.data(withJSONObject: input, options: [.sortedKeys]) else {
+            return .stop(.deciderFailed, why: "the move picker's input cannot be encoded")
+        }
+        let remaining = Double(budget.maxSeconds) - (deps.now() - startTime)
+        guard remaining > 0 else { return .stop(.maxSeconds, why: "no time left for the move picker") }
+        let timeout = max(1, min(deps.callTimeoutSeconds, Int(remaining.rounded(.up))))
+        deciderCalls += 1
+        switch decider.decide(input: data, timeoutSeconds: timeout) {
+        case .answered(let answer):
+            guard let action = ScenePrompt.parseAction(
+                answer, controls: header.controls, rationaleRequired: false) else {
+                return .stop(.deciderFailed, why: "not an allowed action: \(answer.prefix(200))")
+            }
+            return .action(action, answer: answer)
+        case .failed(let why):
+            return .stop(.deciderFailed, why: why)
+        case .timedOut:
+            if deps.now() - startTime >= Double(budget.maxSeconds) {
+                return .stop(.maxSeconds, why: "the move picker ran to the deadline")
+            }
+            return .stop(.deciderFailed, why: "the move picker ran past \(timeout)s")
+        }
+    }
+
+    /// A control as the move picker is told it: name, kind, and a grid's size.
+    private static func describe(_ control: SceneControl) -> [String: Any] {
+        var entry: [String: Any] = ["name": control.name, "kind": control.kind]
+        if case .grid(let cols, let rows, _, _, _, _) = control.gesture {
+            entry["cols"] = cols
+            entry["rows"] = rows
+        }
+        return entry
     }
 
     /// One touch in window points.
@@ -175,6 +278,14 @@ final class SceneLoop: @unchecked Sendable {
         case tap(x: Double, y: Double)
         case drag(fromX: Double, fromY: Double, toX: Double, toY: Double)
         case hold(x: Double, y: Double, ms: Int)
+        /// Taps in order, one per grid cell.
+        case taps([Point])
+
+        /// A point in window points.
+        struct Point: Equatable {
+            let x: Double
+            let y: Double
+        }
 
         var summary: String {
             switch self {
@@ -182,17 +293,20 @@ final class SceneLoop: @unchecked Sendable {
             case .drag(let fx, let fy, let tx, let ty):
                 return "drag \(Int(fx)),\(Int(fy)) -> \(Int(tx)),\(Int(ty))"
             case .hold(let x, let y, let ms): return "hold \(Int(x)),\(Int(y)) \(ms)ms"
+            case .taps(let points):
+                return "taps " + points.map { "\(Int($0.x)),\(Int($0.y))" }.joined(separator: " -> ")
             }
         }
     }
 
-    /// The touch `action` makes in a window of `size`. Fractions scale per frame,
-    /// so the controls follow the window's orientation; a drag radius is a
-    /// fraction of the window's shorter side.
-    static func touch(for action: SceneAction, in size: CGSize) -> Touch {
+    /// The touch `action` makes in a window of `size`, nil for a wait. Fractions
+    /// scale per frame, so the controls follow the window's orientation; a drag
+    /// radius is a fraction of the window's shorter side.
+    static func touch(for action: SceneAction, in size: CGSize) -> Touch? {
+        guard let control = action.control else { return nil }
         let width = Double(size.width)
         let height = Double(size.height)
-        switch action.control.gesture {
+        switch control.gesture {
         case .tap(let x, let y):
             return .tap(x: x * width, y: y * height)
         case .hold(let x, let y, let ms):
@@ -202,6 +316,10 @@ final class SceneLoop: @unchecked Sendable {
             let reach = radius * min(width, height)
             return .drag(fromX: x * width, fromY: y * height,
                          toX: x * width + vector.dx * reach, toY: y * height + vector.dy * reach)
+        case .grid:
+            let points = action.cells.compactMap { control.gesture.cellCenter($0) }
+                .map { Touch.Point(x: $0.x * width, y: $0.y * height) }
+            return .taps(points)
         }
     }
 
@@ -214,6 +332,12 @@ final class SceneLoop: @unchecked Sendable {
         case .drag(let fromX, let fromY, let toX, let toY):
             return deps.input.drag(fromX: fromX, fromY: fromY, toX: toX, toY: toY,
                                    durationMs: EnvConfig.defaultDragDurationMs)
+        case .taps(let points):
+            for (index, point) in points.enumerated() {
+                if index > 0 { deps.sleep(deps.cellTapGapMs * 1000) }
+                if let error = deps.input.tap(x: point.x, y: point.y) { return error }
+            }
+            return nil
         }
     }
 }

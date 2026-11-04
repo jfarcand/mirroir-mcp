@@ -12,7 +12,7 @@
                 {
                   "attachments" : [
                     {
-                      "body" : "eyJjcm9zc19zdXJmYWNlIjp7ImlvcyI6Ik1PVkUgRklSRVxuIn0sIm1ldHJpY3MiOnt9LCJzY2VuZXMiOnsiMiI6eyJjb21wbGV0aW9uX3Rva2VucyI6MTUwLCJldmlkZW5jZV9kaXIiOiJcL3RtcFwvbWlycm9pci1zY2VuZVwvc2NlbmUtMiIsImZyYW1lcyI6MywiZnJhbWVzX3RvX3ByZWRpY2F0ZSI6bnVsbCwibW9kZWwiOiJzY2VuZS1zdHViIiwicHJvbXB0X3Rva2VucyI6NzIwMDAsInJlYXNvbiI6Im1heF9mcmFtZXMiLCJyZWplY3RlZF9yZXBsaWVzIjowLCJyZXNwb25zZV9tb2RlbCI6InNjZW5lLXN0dWIiLCJzZWNvbmRzIjoxMi41LCJza2lsbCI6InNjZW5lLWZyYW1lcy1pbXBvc3NpYmxlIiwidG90YWxfdG9rZW5zIjo3MjE1MCwidmVyZGljdCI6ImluY29uY2x1c2l2ZSJ9fX0=",
+                      "body" : "eyJjcm9zc19zdXJmYWNlIjp7ImlvcyI6Ik1PVkUgRklSRVxuIn0sIm1ldHJpY3MiOnt9LCJzY2VuZXMiOnsiMiI6eyJjb21wbGV0aW9uX3Rva2VucyI6MTUwLCJkZWNpZGVyX2NhbGxzIjowLCJldmlkZW5jZV9kaXIiOiJcL3RtcFwvbWlycm9pci1zY2VuZVwvc2NlbmUtMiIsImZyYW1lcyI6MywiZnJhbWVzX3RvX3ByZWRpY2F0ZSI6bnVsbCwibW9kZWwiOiJzY2VuZS1zdHViIiwicHJvbXB0X3Rva2VucyI6NzIwMDAsInJlYXNvbiI6Im1heF9mcmFtZXMiLCJyZWplY3RlZF9yZXBsaWVzIjowLCJyZXNwb25zZV9tb2RlbCI6InNjZW5lLXN0dWIiLCJzZWNvbmRzIjoxMi41LCJza2lsbCI6InNjZW5lLWZyYW1lcy1pbXBvc3NpYmxlIiwidG90YWxfdG9rZW5zIjo3MjE1MCwidmVyZGljdCI6ImluY29uY2x1c2l2ZSIsIndhaXRzIjowfX19",
                       "contentType" : "application\/json",
                       "name" : "mirroir-captures"
                     }

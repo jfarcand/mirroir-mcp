@@ -45,4 +45,6 @@ struct ScenarioData {
     var sliderTrack: (label: String, rect: CGRect)? = nil
     /// Text field rects that accept keyboard input on tap.
     var textFieldRects: [CGRect] = []
+    /// A board of tappable cells and the view rect it fills (top-down points).
+    var board: (grid: SimulatorGrid, rect: CGRect)? = nil
 }

@@ -168,9 +168,8 @@ A game's playfield has almost no text and one touch at a time, so it is not a
 list of steps: it is a `kind: game` skill that a `scene:` step plays. Each frame
 is read once by local OCR, which judges the skill's `success` and `fail`
 predicates; the vision model (the `sceneAgent` setting, the built-in Anthropic
-agent by default, which needs `ANTHROPIC_API_KEY`) only names one calibrated
-control per frame, and exactly that one touch is made. The step stops at its
-first limit:
+agent by default, which needs `ANTHROPIC_API_KEY`) only names one action per
+frame, and exactly that action is made. The step stops at its first limit:
 
 ```yaml
 - scene: { skill: "brawl-stars-probe", max_frames: 12, max_tokens: 288000, max_seconds: 240 }
@@ -179,16 +178,17 @@ first limit:
 | Verdict | When | Step |
 |---|---|---|
 | pass | the `success` text shows | PASS |
-| fail | the `fail` text shows, a frame cannot be read, the model reports no token usage, or a touch cannot be posted | FAIL |
+| fail | a `fail` text shows, a frame cannot be read, the model reports no token usage, a touch cannot be posted, or the move picker fails (`decider_failed`) | FAIL |
 | inconclusive | the budget runs out first | INCONCLUSIVE — a failure, never a pass |
 
 The step's budget may only narrow the skill's own `budget:`. Every scene step
 is checked before any step runs (`SceneStepGate`): an unknown or invalid scene
-skill, a wider budget, a scene inside `measure`, or no configured vision model
-refuses the whole run. A scene is never compiled, and `mirroir-mcp test` given
-a `kind: game` skill directly refuses it. Each frame's PNG and a `frames.jsonl`
-line (OCR, reply, control, touch, tokens) are written under the run's
-screenshot directory.
+skill, a wider budget, a scene inside `measure`, no configured vision model, or
+a move picker that does not fit the skill refuses the whole run. A scene is
+never compiled, and `mirroir-mcp test` given a `kind: game` skill directly
+refuses it. Each frame's PNG and a `frames.jsonl` line (OCR, reply, action,
+move-picker answer, touch, tokens) are written under the run's screenshot
+directory.
 
 The scene skill declares its predicates and calibrated controls, in window
 fractions so they follow the window's orientation:
@@ -213,6 +213,55 @@ What the model plays toward.
 - move: drag from 0.18,0.80 radius 0.08
 - fire: tap at 0.85,0.72
 ```
+
+`success` and `fail` each take one text or a list, met when any text shows:
+`fail: { visible: ["Vous avez perdu", "Jouer contre des bots"] }`. An optional
+`image_width: 800` (200 to 2000) sends the model a larger frame, for a board
+whose squares must be read.
+
+#### Actions
+
+| Reply | Touch |
+|---|---|
+| `{"control": "fire", "rationale": "..."}` | a tap or hold control |
+| `{"control": "move", "direction": "up-left", "rationale": "..."}` | a drag control, in one of 8 directions |
+| `{"control": "board", "cells": ["e2", "e4"], "rationale": "..."}` | a grid control: 1 to 4 cells, tapped in order |
+| `{"control": "none", "rationale": "..."}` | nothing: wait one frame, counted as a `wait` |
+
+A board is one grid control, its top-left and bottom-right corners calibrated:
+
+```markdown
+- board: grid 8x8 from 0.019,0.350 to 0.981,0.795
+```
+
+A cell is named by its position on screen: column `a` is the leftmost, row `1`
+the bottom (`a1` bottom-left). The cells of one action are tapped with a pause
+between them (the `sceneCellTapGapMs` setting, 300 ms). When the game shows the board turned around
+(playing Black), the move picker translates.
+
+#### Move picker
+
+A model reading a board is good; a model choosing a chess move is weak. A skill
+that declares `decider: required` splits the two: the model only reads each
+frame into the text its Objective defines (a FEN, for chess), and a program you
+name chooses the action. The program comes from your scenario, never from the
+skill, so a downloaded skill cannot make mirroir run anything:
+
+```yaml
+- scene: { skill: "chess-vs-computer", max_frames: 100, max_tokens: 400000, max_seconds: 1200, decider: "/path/to/picker --depth 12" }
+```
+
+or `MIRROIR_SCENE_DECIDER="/path/to/picker --depth 12"` when the step names
+none. The command is split on spaces and run without a shell, once per frame:
+
+- stdin: `{"run_id": "<same for the whole scene>", "frame": 1, "reading": "<the model's reading>", "ocr": ["...", ...], "controls": [{"name": "board", "kind": "grid", "cols": 8, "rows": 8}]}`
+- stdout: one action from the table above (`rationale` optional); `{"control": "none"}` waits for a fresh read.
+
+A program that exits non-zero, answers no allowed action, or runs past its time
+(at most the time the budget has left) fails the scene with `decider_failed`.
+The gate refuses a `decider: required` skill with no move picker, a move picker
+given to a skill that chooses its own actions, and a program that cannot be
+found. The report counts `waits` and `decider_calls`.
 
 ### Conditions
 

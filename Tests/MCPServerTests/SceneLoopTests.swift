@@ -45,7 +45,8 @@ final class SceneLoopTests: XCTestCase {
             SceneControl(name: "move", gesture: .drag(x: 0.5, y: 0.5, radius: 0.1)),
             SceneControl(name: "fire", gesture: .tap(x: 0.25, y: 0.5)),
         ],
-        objective: "Reach GOAL.", success: .visible("GOAL"), fail: .visible("DEFAITE"))
+        objective: "Reach GOAL.", success: [.visible("GOAL")], fail: [.visible("DEFAITE")],
+        imageWidth: nil, needsDecider: false)
 
     private func frame(_ texts: String...) -> ScreenDescriber.DescribeResult {
         ScreenDescriber.DescribeResult(

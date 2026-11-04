@@ -161,6 +161,7 @@ extension EnvConfig {
                 ("visionMaxTokens", "\(visionMaxTokens)"),
                 ("agent", agent.isEmpty ? "(none)" : agent),
                 ("sceneAgent", sceneAgent),
+                ("sceneCellTapGapMs", "\(sceneCellTapGapMs)"),
                 ("agentTransport", agentTransport),
             ]),
             ("Compiled Safety", [

@@ -57,8 +57,13 @@ fn emitted(relative: &str) -> PathBuf {
 /// Render the whole scenario as its iOS block — every emitted step belongs to
 /// it — and check one rendered line per step.
 fn render_whole_block(scenario: &Scenario) -> StdResult<String, String> {
-    let yaml = ios_block_yaml(&scenario.name, &scenario.steps, 0..scenario.steps.len())
-        .map_err(|e| format!("{}: {e}", scenario.name))?;
+    let yaml = ios_block_yaml(
+        &scenario.name,
+        &scenario.steps,
+        0..scenario.steps.len(),
+        &Path::new(env!("CARGO_MANIFEST_DIR")).join(EMITTED_DIR),
+    )
+    .map_err(|e| format!("{}: {e}", scenario.name))?;
     let rendered = yaml.lines().filter(|l| l.starts_with("  - ")).count();
     if rendered != scenario.steps.len() {
         return Err(format!(

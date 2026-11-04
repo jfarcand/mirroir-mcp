@@ -1,7 +1,7 @@
 // Copyright 2026 jfarcand@apache.org
 // Licensed under the Apache License, Version 2.0
 //
-// ABOUTME: Writes a scene's evidence: each frame's PNG and one JSON line per frame (OCR, reply, action, touch, tokens).
+// ABOUTME: Writes a scene's evidence: each frame's PNG and one JSON line per frame (OCR, reply, action, picker, touch, tokens).
 // ABOUTME: What a reviewer reads to judge a run the predicates alone cannot explain.
 
 import Foundation
@@ -27,10 +27,11 @@ final class SceneEvidenceWriter: @unchecked Sendable {
         }
     }
 
-    /// Record one frame: what was read, what the model answered, what was touched.
+    /// Record one frame: what was read, what the model answered, what the move
+    /// picker answered (or why it failed), what was touched.
     func record(
         frame: Int, png: Data, screen: ScreenDescriber.DescribeResult,
-        reply: ChatCompletionReply?, action: SceneAction?, touch: String?
+        reply: ChatCompletionReply?, action: SceneAction?, touch: String?, decision: String?
     ) {
         lock.lock()
         defer { lock.unlock() }
@@ -41,8 +42,10 @@ final class SceneEvidenceWriter: @unchecked Sendable {
             "png": name,
             "ocr": screen.elements.map(\.text),
             "reply": reply?.text ?? NSNull(),
-            "control": action?.control.name ?? NSNull(),
+            "control": action?.controlName ?? NSNull(),
             "direction": action?.direction?.rawValue ?? NSNull(),
+            "cells": action.map { $0.cells as Any } ?? NSNull(),
+            "decision": decision ?? NSNull(),
             "rationale": action?.rationale ?? NSNull(),
             "touch": touch ?? NSNull(),
         ]

@@ -36,6 +36,31 @@ enum SceneGesture: Equatable, Sendable {
     case drag(x: Double, y: Double, radius: Double)
     /// A press held at a point for `ms` milliseconds.
     case hold(x: Double, y: Double, ms: Int)
+    /// A board of `cols` x `rows` equal cells between its top-left corner
+    /// (`x0`, `y0`) and bottom-right corner (`x1`, `y1`). An action names cells
+    /// by screen position: column letter from the left, row number from the bottom.
+    case grid(cols: Int, rows: Int, x0: Double, y0: Double, x1: Double, y1: Double)
+
+    /// The window-fraction center of `cell` ("a1" = bottom-left) on a grid
+    /// gesture, or nil when this is not a grid or the cell is not on it.
+    func cellCenter(_ cell: String) -> (x: Double, y: Double)? {
+        guard case .grid(let cols, let rows, let x0, let y0, let x1, let y1) = self,
+              let (col, row) = SceneGesture.cellIndex(cell, cols: cols, rows: rows) else { return nil }
+        let x = x0 + (Double(col) + 0.5) * (x1 - x0) / Double(cols)
+        let y = y1 - (Double(row) - 0.5) * (y1 - y0) / Double(rows)
+        return (x, y)
+    }
+
+    /// The 0-based column and 1-based row of `cell` on a `cols` x `rows` grid, or
+    /// nil when it is not one letter a... followed by a row number in range.
+    static func cellIndex(_ cell: String, cols: Int, rows: Int) -> (col: Int, row: Int)? {
+        guard let letter = cell.first, let ascii = letter.asciiValue,
+              (UInt8(ascii: "a")...UInt8(ascii: "z")).contains(ascii),
+              let row = Int(cell.dropFirst()), String(row) == String(cell.dropFirst()) else { return nil }
+        let col = Int(ascii - UInt8(ascii: "a"))
+        guard col < cols, (1...rows).contains(row) else { return nil }
+        return (col, row)
+    }
 }
 
 /// A drag direction the model may pick for a drag control.
@@ -64,8 +89,21 @@ enum SceneDirection: String, CaseIterable, Sendable {
 
 /// A named control of the scene skill, calibrated on the device in `## Controls`.
 struct SceneControl: Equatable, Sendable {
+    /// The name an action uses for "no touch this frame"; never a declared control.
+    static let waitName = "none"
+
     let name: String
     let gesture: SceneGesture
+
+    /// The kind a move picker is told: tap, drag, hold or grid.
+    var kind: String {
+        switch gesture {
+        case .tap: return "tap"
+        case .drag: return "drag"
+        case .hold: return "hold"
+        case .grid: return "grid"
+        }
+    }
 }
 
 /// A condition read from a frame's OCR, never from the model.
@@ -92,8 +130,20 @@ struct SceneHeader: Equatable, Sendable {
     let controls: [SceneControl]
     /// The `## Objective` text the model plays toward.
     let objective: String
-    let success: ScenePredicate
-    let fail: ScenePredicate?
+    /// Met when any of these is met.
+    let success: [ScenePredicate]
+    /// Read before `success`; met when any of these is met. Empty when the skill declares none.
+    let fail: [ScenePredicate]
+    /// Width the frame is resized to before it is sent; nil keeps the configured default.
+    let imageWidth: Int?
+    /// The skill declares `decider: required`: the model reads the frame and an
+    /// external move picker named by the scenario chooses the action.
+    let needsDecider: Bool
+
+    /// Whether any of `predicates` is met by one frame's OCR.
+    static func anyMet(_ predicates: [ScenePredicate], by elements: [TapPoint]) -> Bool {
+        predicates.contains { $0.isMet(by: elements) }
+    }
 }
 
 /// Whether a scene met its goal, failed it, or ran out of budget first.
@@ -117,11 +167,14 @@ enum SceneStopReason: String, Sendable {
     case perceptionFailed = "perception_failed"
     /// The chosen control's touch could not be posted.
     case inputFailed = "input_failed"
+    /// The move picker exited non-zero, timed out with time left, or answered
+    /// no allowed action.
+    case deciderFailed = "decider_failed"
 
     var verdict: SceneVerdict {
         switch self {
         case .success: return .pass
-        case .fail, .usageMissing, .perceptionFailed, .inputFailed: return .fail
+        case .fail, .usageMissing, .perceptionFailed, .inputFailed, .deciderFailed: return .fail
         case .maxFrames, .maxTokens, .maxSeconds: return .inconclusive
         }
     }
@@ -147,6 +200,10 @@ struct SceneReport: Encodable, Equatable, Sendable {
     let responseModel: String?
     /// Replies that named no allowed control: no touch, but budget spent.
     let rejectedReplies: Int
+    /// Frames whose action was `none`: no touch, but budget spent.
+    let waits: Int
+    /// Calls made to the external move picker; 0 when the scene has none.
+    let deciderCalls: Int
     /// Where the frames and per-frame log were written.
     let evidenceDir: String
 
@@ -158,6 +215,8 @@ struct SceneReport: Encodable, Equatable, Sendable {
         case totalTokens = "total_tokens"
         case responseModel = "response_model"
         case rejectedReplies = "rejected_replies"
+        case waits
+        case deciderCalls = "decider_calls"
         case evidenceDir = "evidence_dir"
     }
 
@@ -176,6 +235,8 @@ struct SceneReport: Encodable, Equatable, Sendable {
         try container.encode(model, forKey: .model)
         try container.encode(responseModel, forKey: .responseModel)
         try container.encode(rejectedReplies, forKey: .rejectedReplies)
+        try container.encode(waits, forKey: .waits)
+        try container.encode(deciderCalls, forKey: .deciderCalls)
         try container.encode(evidenceDir, forKey: .evidenceDir)
     }
 

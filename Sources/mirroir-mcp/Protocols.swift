@@ -393,6 +393,28 @@ protocol VisionCompleting: Sendable {
     ) -> ChatCompletionReply?
 }
 
+// MARK: - Scene Move Picker
+
+/// What a scene's external move picker answered for one frame.
+enum SceneDecisionOutcome: Equatable, Sendable {
+    /// It exited 0; its stdout, to be read as one action.
+    case answered(String)
+    /// It could not start or exited non-zero; why, for the evidence.
+    case failed(String)
+    /// It ran past its time and was stopped.
+    case timedOut
+}
+
+/// The external move picker a scenario names for a `decider: required` scene.
+/// The system boundary is a user-supplied program; tests stand it in.
+protocol SceneDeciding: Sendable {
+    /// The command as the scenario wrote it, for the evidence.
+    var command: String { get }
+
+    /// Send `input` (one JSON object) and wait at most `timeoutSeconds` for its answer.
+    func decide(input: Data, timeoutSeconds: Int) -> SceneDecisionOutcome
+}
+
 // MARK: - Conformances
 
 extension MirroringBridge: MenuActionCapable {}
