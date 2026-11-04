@@ -278,6 +278,12 @@ extension EnvConfig {
         readBool("describeScreenOmitScreenshot", envVar: "MIRROIR_OMIT_SCREENSHOT", default: false)
     }
 
+    /// When true, status, check_health and doctor ask the npm registry, at most
+    /// once a day, whether a newer mirroir-mcp is published, and say so.
+    public static var updateCheck: Bool {
+        readBool("updateCheck", default: true)
+    }
+
     // MARK: - YOLO Element Detection
 
     /// OCR backend selection: "auto", "vision", "yolo", or "both".

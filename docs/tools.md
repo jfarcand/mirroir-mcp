@@ -1,16 +1,16 @@
 # Tools Reference
 
-All 38 tools exposed by the MCP server. Mutating tools require [permission](permissions.md) to appear in `tools/list`.
+All 39 tools exposed by the MCP server. Mutating tools require [permission](permissions.md) to appear in `tools/list`.
 
 ## Tool List
 
 | Tool | Parameters | Description |
 |------|-----------|-------------|
 | `screenshot` | — | Capture the iPhone screen as base64 PNG |
-| `describe_screen` | `scroll`?, `omit_screenshot`?, `settle_ms`? | Analyze the screen and return UI elements with tap coordinates plus a grid-overlaid screenshot. Uses local OCR or AI vision depending on `screenDescriberMode`. `scroll: true` does a full-page scroll to capture all elements. `omit_screenshot: true` returns text only (no image). `settle_ms` sets how long to wait for the screen to stop changing first. |
+| `describe_screen` | `scroll`?, `omit_screenshot`?, `query`?, `text_only`?, `settle_ms`? | Analyze the screen and return UI elements with tap coordinates plus a grid-overlaid screenshot. Uses local OCR or AI vision depending on `screenDescriberMode`. `scroll: true` does a full-page scroll to capture all elements. `omit_screenshot: true` returns text only (no image). `query` lists only elements whose text contains it (case- and accent-insensitive; icons omitted), and `text_only: true` drops the coordinates, so reading one value costs a line or two. `settle_ms` sets how long to wait for the screen to stop changing first. |
 | `start_recording` | `output_path`? | Start video recording of the mirrored screen |
 | `stop_recording` | — | Stop recording and return the .mov file path |
-| `tap` | `x`, `y`, `cursor_mode`? | Tap at coordinates (relative to mirroring window) |
+| `tap` | `text`? or `x`, `y`; `cursor_mode`? | Tap visible text found by OCR (`text`; a miss lists the text on screen), or tap at coordinates relative to the mirroring window |
 | `double_tap` | `x`, `y`, `cursor_mode`? | Two rapid taps for zoom/text selection |
 | `long_press` | `x`, `y`, `duration_ms`?, `cursor_mode`? | Hold tap for context menus (default 500ms) |
 | `swipe` | `from_x`, `from_y`, `to_x`, `to_y`, `duration_ms`?, `cursor_mode`? | Swipe between two points (default 300ms) |
@@ -31,6 +31,7 @@ All 38 tools exposed by the MCP server. Mutating tools require [permission](perm
 | `scroll_to` | `label`, `direction`?, `max_scrolls`? | Scroll until a text element becomes visible via OCR |
 | `reset_app` | `name` | Force-quit an app via the App Switcher |
 | `measure` | `action`, `until`, `max_seconds`?, `name`? | Time a screen transition after an action |
+| `run_steps` | `steps` | Run several proven steps in one call, in the [step grammar](#step-types) (`"tap: Search"`, `"type: calculator"`, `"wait_for: Get"`, `"home"`). Every step is checked against the permission policy before the first runs; the run stops at the first failure and the reply ends with the text on screen |
 | `set_network` | `mode` | Toggle network settings (airplane, Wi-Fi, cellular) via Settings |
 | `get_orientation` | — | Report portrait/landscape and window dimensions |
 | `status` | — | Connection state, window geometry, and device readiness |
@@ -40,6 +41,7 @@ All 38 tools exposed by the MCP server. Mutating tools require [permission](perm
 | `generate_skill` | `action`, `app_name`?, `goal`?, `goals`?, `arrived_via`?, `action_type`?, `max_depth`?, `max_screens`?, `max_time`?, `strategy`?, `fresh`?, `seed`?, `skip_calibration`?, `explorer`?, `emit`?, `output_dir`? | Generate a SKILL.md by exploring an app. Session-based: start → capture → finish. `action: "explore"` runs autonomous exploration — `explorer: "bfs"` (default) or `"dfs"`. `fresh: false` resumes a persisted navigation graph; `seed` makes exploration ordering deterministic. `emit: true` (on `finish` / `explore`) also writes a runnable iOS leg into the consumer repo's `.mirroir/apps/<app>/` — see [Web and iOS in one scenario](web-and-ios.md); `output_dir` names the repo root when the server is not running from it. `save_compiled` and `mirroir record` write the same tree. |
 | `list_targets` | — | List all configured automation targets with status and window size |
 | `switch_target` | `target` | Switch active target for subsequent tool calls |
+| `classify_screen` | `target`? | Group the current screen's OCR elements into UI components with an AI model: each component, its definition, and the elements it covers. Read-only |
 | `calibrate_component` | `component_path`, `target`?, `scroll`? | Test a component definition (.md) against the current screen and return a diagnostic report |
 | `record_step` | `step_index`, `type`, `label`?, `tap_x`?, `tap_y`?, `match_strategy`?, `elapsed_ms`?, `scroll_count`?, `scroll_direction`? | Record a compiled step during AI-driven skill execution; a tap with coordinates and no label also records the screen it led to, which replay must reach, and is refused when that screen is the one before the tap |
 | `save_compiled` | `skill_name`, `emit`?, `output_dir`? | Save accumulated compiled steps as .compiled.json next to the source skill (the speed cache `mirroir test` replays). `emit: true` also writes the walk into the consumer repo's `.mirroir/apps/<app>/` as a runnable iOS scenario — its app is the one the skill's opening `launch:` names; no `.compiled.json` is written into `.mirroir/`. See [Compiled Skills](compiled-skills.md#emitting-the-walk-into-mirroir). |

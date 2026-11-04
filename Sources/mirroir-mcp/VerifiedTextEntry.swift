@@ -70,16 +70,24 @@ struct VerifiedTextEntry {
     /// otherwise a notice saying what was not seen. It is a notice, not a
     /// failure: every keystroke was posted, and a password field shows dots.
     private func keyedReadBack(_ typed: String) -> String? {
-        let needle = PasteNeedle.readable(typed)
+        let needle = PasteNeedle.readable(typed, foldingCase: false)
         guard !needle.isEmpty else { return nil }
         var screenRead = false
+        var recased = false
         for _ in 0 ..< Self.readBackReads {
             sleep(verifyPollUs)
             guard let lines = readScreen() else { continue }
             screenRead = true
-            if PasteNeedle.readable(lines.joined()).contains(needle) { return nil }
+            let shown = PasteNeedle.readable(lines.joined(), foldingCase: false)
+            if shown.contains(needle) { return nil }
+            recased = recased || shown.lowercased().contains(needle.lowercased())
         }
         guard screenRead else { return nil }
+        if recased {
+            return "Every keystroke was sent, but the iPhone changed the capitalization of "
+                + "\"\(typed)\" (it capitalizes the start of a sentence, for example). Read the "
+                + "field if the exact case matters."
+        }
         return "Every keystroke was sent, but \"\(typed)\" is not what the screen shows. " +
             "The iPhone may have autocorrected it (for example \"teh\" to \"the\", or " +
             "English words rewritten by a French keyboard); read the field before relying " +
@@ -174,11 +182,13 @@ enum PasteNeedle {
         }
     }
 
-    /// Lowercased text without the characters OCR cannot be trusted to report:
-    /// whitespace (recognition inserts and drops spaces), control characters,
-    /// and emoji or pictographic symbols (no recognizable glyph).
-    static func readable(_ text: String) -> String {
-        String(text.lowercased().filter(isReadable))
+    /// Text without the characters OCR cannot be trusted to report: whitespace
+    /// (recognition inserts and drops spaces), control characters, and emoji or
+    /// pictographic symbols (no recognizable glyph). Lowercased unless
+    /// `foldingCase` is false, which keeps the case for the keyed read-back:
+    /// iOS capitalizes what it is typed, and only the case tells.
+    static func readable(_ text: String, foldingCase: Bool = true) -> String {
+        String((foldingCase ? text.lowercased() : text).filter(isReadable))
     }
 
     private static func isReadable(_ character: Character) -> Bool {

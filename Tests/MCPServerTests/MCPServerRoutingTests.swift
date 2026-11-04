@@ -130,6 +130,7 @@ final class MCPServerRoutingTests: XCTestCase {
         }
         XCTAssertEqual(tool["name"], .string("test_tool"))
         XCTAssertEqual(tool["description"], .string("A test tool"))
+        XCTAssertEqual(tool["annotations"], .object(PermissionPolicy.annotations(for: "test_tool")))
     }
 
     func testToolsListRespectsPermissionPolicy() {

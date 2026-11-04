@@ -6,6 +6,7 @@
 
 import ApplicationServices
 import Foundation
+import HelperLib
 
 /// A blocked session: what the window says and what frees it.
 struct SessionBlock: Sendable, Equatable {
@@ -27,6 +28,7 @@ struct SessionBlock: Sendable, Equatable {
     func refusal(targetName: String) -> String {
         "'\(targetName)' is not accepting input. The window says: \(said). "
             + "\(move.advice) No input was sent."
+            + (move.needsUser ? " " + AgentInstruction.waitForUser : "")
     }
 }
 

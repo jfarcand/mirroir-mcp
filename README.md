@@ -24,7 +24,7 @@
   ✓ done, and the run can be saved as a skill that replays with no AI in the loop
 ```
 
-**Drive a real, stock iPhone from any AI agent — no Developer Mode, no Xcode, no WebDriverAgent, no jailbreak.** mirroir-mcp works through macOS iPhone Mirroring, so it reaches any app on your phone, App Store apps you could never build included. Any MCP client, [38 tools](docs/tools.md), and experimental support for macOS app windows.
+**Drive a real, stock iPhone from any AI agent — no Developer Mode, no Xcode, no WebDriverAgent, no jailbreak.** mirroir-mcp works through macOS iPhone Mirroring, so it reaches any app on your phone, App Store apps you could never build included. Any MCP client, [39 tools](docs/tools.md), and experimental support for macOS app windows.
 
 Give your AI eyes, hands, and a real iPhone: it sees the screen, taps what it needs, and figures the rest out.
 
@@ -60,7 +60,7 @@ Each tool has strengths the table doesn't capture. Maestro, mobile-mcp and Appiu
 The fastest path: paste this into your coding agent (Claude Code, Codex, Cursor, …) and let it do the setup.
 
 ```text
-Install mirroir-mcp (https://github.com/jfarcand/mirroir-mcp) with `npx -y mirroir-mcp install`, add it as an MCP server to this client following the README's per-client setup, then run `mirroir doctor` and walk me through anything it flags (iPhone Mirroring, Screen Recording, Accessibility).
+Set up mirroir-mcp so you can drive my iPhone: follow https://github.com/jfarcand/mirroir-mcp/blob/main/docs/onboarding.md step by step, and finish by reading back what my iPhone screen shows.
 ```
 
 Or install it yourself:
@@ -91,7 +91,9 @@ or as a [Claude Code plugin](https://docs.claude.com/en/docs/claude-code/plugins
 
 or as an MCP Bundle for Claude Desktop and other MCPB hosts: download `mirroir-mcp.mcpb` from the [latest release](https://github.com/jfarcand/mirroir-mcp/releases/latest) (v0.43.0 and later) and double-click it. The bundle carries the native Apple Silicon binary, so it needs no Node.js. To build one from a release build: `mcpb/build-mcpb.sh .build/release/mirroir-mcp mirroir-mcp.mcpb`.
 
-The first time you take a screenshot, macOS will prompt for **Screen Recording** and **Accessibility** permissions. Grant both.
+The first time you take a screenshot, macOS will prompt for **Screen Recording** and **Accessibility** permissions. Grant both. `mirroir doctor` names the app that needs each grant and links the System Settings pane to open.
+
+Every MCP client receives a short operating manual in the server instructions. For the full version as a skill (Claude Code and Codex), run `npx -y mirroir-mcp skill --install`; `npx -y mirroir-mcp install` does it when it configures either client.
 
 <details>
 <summary>Per-client setup</summary>
@@ -197,7 +199,7 @@ Use the full path to the binary in your `.mcp.json`: `<repo>/.build/release/mirr
 
 Every interaction follows the same loop: **observe, reason, act**. `describe_screen` gives the AI every text element with tap coordinates (eyes). The LLM decides what to do next (brain). `tap`, `type_text`, `swipe` execute the action (hands) — then it loops back to observe. No scripts, no coordinates, just intent.
 
-Beyond the basics, the server exposes higher-level navigation and lifecycle tools: `press_back` navigates back by OCR-tapping the "<" chevron (with a canonical-position fallback), `press_home`/`press_app_switcher`/`spotlight` drive system gestures, `scroll_to` scrolls until a target text becomes visible, `reset_app` force-quits an app via the App Switcher, `set_network` toggles connectivity through Settings, and `measure` times how long an action takes to surface a target element. Multi-target setups use `list_targets`/`switch_target` to move between window automation endpoints. Skill authoring is served by `record_step` and `save_compiled` (compiled replay) and `calibrate_component` (test a component definition against the live screen). See the [Tools Reference](docs/tools.md) for all 38 tools.
+Beyond the basics, the server exposes higher-level navigation and lifecycle tools: `press_back` navigates back by OCR-tapping the "<" chevron (with a canonical-position fallback), `press_home`/`press_app_switcher`/`spotlight` drive system gestures, `scroll_to` scrolls until a target text becomes visible, `reset_app` force-quits an app via the App Switcher, `set_network` toggles connectivity through Settings, and `measure` times how long an action takes to surface a target element. Multi-target setups use `list_targets`/`switch_target` to move between window automation endpoints. Skill authoring is served by `record_step` and `save_compiled` (compiled replay) and `calibrate_component` (test a component definition against the live screen). See the [Tools Reference](docs/tools.md) for all 39 tools.
 
 ## Describe Your App
 
@@ -739,12 +741,14 @@ A character the layout types with a dead key (`ê` is `^` then `e` on Canadian-C
 
 ## Updating
 
+`mirroir-mcp update` reads how this copy was installed and upgrades it (`--dry-run` prints the command first). `status`, `check_health` and `mirroir doctor` say when a newer release is out; they ask the npm registry at most once a day, and `updateCheck: false` turns that off. By hand:
+
 ```bash
 # curl installer
 /bin/bash -c "$(curl -fsSL https://mirroir.dev/get-mirroir.sh)"
 
-# npx
-npx -y mirroir-mcp install
+# npx: npx keeps the copy it cached, so point your MCP config at mirroir-mcp@latest
+npx -y mirroir-mcp@latest install
 
 # Homebrew
 brew upgrade mirroir-mcp
@@ -785,7 +789,8 @@ See [Configuration Reference](docs/configuration.md) for all 40+ settings coveri
 
 | | |
 |---|---|
-| [Tools Reference](docs/tools.md) | All 38 tools, parameters, and input workflows |
+| [Onboarding](docs/onboarding.md) | Setup written for the agent: prerequisites, install, doctor, and a read-only proof |
+| [Tools Reference](docs/tools.md) | All 39 tools, parameters, and input workflows |
 | [Configuration](docs/configuration.md) | All settings: screen intelligence, input timing, exploration, AI providers |
 | [FAQ](docs/faq.md) | Security, focus stealing, keyboard layouts, embacle/vision mode |
 | [Security](docs/security.md) | Threat model, kill switch, and recommendations |

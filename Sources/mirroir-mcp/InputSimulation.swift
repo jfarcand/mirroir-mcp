@@ -126,13 +126,13 @@ final class InputSimulation: Sendable {
                 return block.refusal(targetName: bridge.targetName)
             }
             DebugLog.log(tag, "ERROR: target paused")
-            return "Target '\(bridge.targetName)' is paused. Clear the interruption in its window "
-                + "on the Mac, then retry. No input was sent."
+            return "Target '\(bridge.targetName)' is paused. The user must clear the interruption in "
+                + "its window on the Mac. No input was sent. " + AgentInstruction.waitForUser
         case .noWindow:
             DebugLog.log(tag, "ERROR: no window")
             return "Target '\(bridge.targetName)' is running but Accessibility reads no window for it: "
                 + "the window is closed, or Accessibility permission was revoked (run "
-                + "`mirroir-mcp doctor`). No input was sent."
+                + "`mirroir-mcp doctor`). No input was sent. " + AgentInstruction.waitForUser
         case .notRunning:
             DebugLog.log(tag, "ERROR: not running")
             return "Target '\(bridge.targetName)' is not running. Launch iPhone Mirroring first."

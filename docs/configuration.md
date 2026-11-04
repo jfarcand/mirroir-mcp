@@ -91,6 +91,7 @@ Env-var names are derived from the camelCase key by inserting `_` before every u
 | Setting | Default | Env Var | Description |
 |---------|---------|---------|-------------|
 | `mirroringBundleID` | `"com.apple.ScreenContinuity"` | `MIRROIR_BUNDLE_ID` | Bundle ID of the window to target. Override to point at a stand-in app (e.g. FakeMirroring) for local/CI runs |
+| `updateCheck` | `true` | `MIRROIR_UPDATE_CHECK` | Ask the npm registry, at most once a day (two-second timeout, answer cached in `~/.mirroir-mcp/update-check.json`), whether a newer mirroir-mcp is published; `status`, `check_health` and `mirroir doctor` then say so. Nothing else is sent. `false` turns it off |
 | `cursorFreeInput` | `false` | `MIRROIR_CURSOR_FREE` | Post mouse events directly to the target PID via `postToPid` instead of global HID posting. Works for regular macOS apps (e.g. FakeMirroring) for local integration tests without cursor interference, but NOT for iPhone Mirroring — per-process injection does not register taps there |
 
 ## AI Provider Timeouts

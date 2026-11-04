@@ -25,7 +25,7 @@ const agentFlow = `● you: "open Weather and tell me if it rains tomorrow"
 │
 ● tap(71, 149) → describe_screen → forecast is up
 ✓ done, and the run can be saved as a skill that replays with no AI in the loop`;
-const setupPrompt = "Install mirroir-mcp (https://github.com/jfarcand/mirroir-mcp) with `npx -y mirroir-mcp install`, add it as an MCP server to this client following the README's per-client setup, then run `mirroir doctor` and walk me through anything it flags (iPhone Mirroring, Screen Recording, Accessibility).";
+const setupPrompt = "Set up mirroir-mcp so you can drive my iPhone: follow https://github.com/jfarcand/mirroir-mcp/blob/main/docs/onboarding.md step by step, and finish by reading back what my iPhone screen shows.";
 const actionSnippet = `- uses: jfarcand/mirroir-mcp/actions/setup-mirroir-run@main
   with:
     version: latest
@@ -857,7 +857,7 @@ if (!skillsAvailable) {
   <!-- What it does -->
   <section>
     <h2>What Does mirroir-mcp Do?</h2>
-    <p>38 tools exposed as an MCP server.</p>
+    <p>39 tools exposed as an MCP server.</p>
 
     <div class="tool-grid">
       <div class="tool-category cat-touch">

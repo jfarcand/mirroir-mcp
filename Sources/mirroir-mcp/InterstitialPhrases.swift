@@ -22,6 +22,16 @@ enum SessionBlockMove: String, Sendable, CaseIterable {
     case clearOnMac
     case reopenMirroring
 
+    /// Whether only the user can make this move. The agent has no tool for the
+    /// Mac's own windows, settings or prompts, nor for the iPhone's side button;
+    /// it can only wait out a connection that is still forming.
+    var needsUser: Bool {
+        switch self {
+        case .waitForCameraOrMicrophone, .waitWhileConnecting: return false
+        default: return true
+        }
+    }
+
     /// The next move, worded for the agent to relay to the user.
     var advice: String {
         switch self {

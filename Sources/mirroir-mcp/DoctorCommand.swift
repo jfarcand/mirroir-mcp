@@ -29,6 +29,8 @@ struct DoctorCheck {
     let status: CheckStatus
     let detail: String
     let fixHint: String?
+    /// A link that opens the place to fix it (a System Settings pane), when there is one.
+    var fixURL: String? = nil
 }
 
 /// Runs diagnostic checks on the iPhone Mirroring setup and reports results
@@ -48,12 +50,20 @@ enum DoctorCommand {
 
         let useColor = config.noColor ? false : isatty(STDERR_FILENO) != 0
 
+        let hostApp = HostApp.current
         var checks = [DoctorCheck]()
         checks.append(checkMacOSVersion())
         checks.append(checkMirroringRunning())
-        checks.append(checkMirroringConnected())
-        checks.append(checkScreenRecording())
-        checks.append(checkAccessibility())
+        let connected = checkMirroringConnected()
+        checks.append(connected)
+        let screenRecording = checkScreenRecording(hostApp: hostApp)
+        checks.append(screenRecording)
+        // Reading the screen proves the grant is in effect, which needs a live mirror.
+        if connected.status == .passed, screenRecording.status == .passed {
+            checks.append(DoctorCaptureCheck.run(hostApp: hostApp))
+        }
+        checks.append(checkAccessibility(hostApp: hostApp))
+        checks.append(updateCheck(notice: UpdateCheck.liveNotice()))
         checks.append(EmbacleVersionCheck.run())
         checks.append(contentsOf: PromptOverrideCheck.run())
         checks.append(contentsOf: checkConfiguredTargets())
@@ -203,7 +213,7 @@ enum DoctorCommand {
         }
     }
 
-    static func checkScreenRecording() -> DoctorCheck {
+    static func checkScreenRecording(hostApp: String?) -> DoctorCheck {
         if #available(macOS 15.0, *) {
             let permitted = CGPreflightScreenCaptureAccess()
             if permitted {
@@ -218,7 +228,8 @@ enum DoctorCommand {
                 name: "Screen capture",
                 status: .failed,
                 detail: "not permitted",
-                fixHint: "Open System Settings > Privacy & Security > Screen Recording and enable the terminal app you're using."
+                fixHint: PermissionGuidance.hint(.screenRecording, hostApp: hostApp),
+                fixURL: PermissionGuidance.Pane.screenRecording.url
             )
         }
 
@@ -230,7 +241,18 @@ enum DoctorCommand {
         )
     }
 
-    static func checkAccessibility() -> DoctorCheck {
+    /// Whether a newer release is published; a warning, never a failure.
+    static func updateCheck(notice: String?) -> DoctorCheck {
+        guard let notice else {
+            let detail = EnvConfig.updateCheck
+                ? "\(MirroirVersion.current) (no newer release found)" : "\(MirroirVersion.current) (check off)"
+            return DoctorCheck(name: "mirroir-mcp version", status: .passed, detail: detail, fixHint: nil)
+        }
+        return DoctorCheck(name: "mirroir-mcp version", status: .warned, detail: notice,
+                           fixHint: "Run `mirroir-mcp update`.")
+    }
+
+    static func checkAccessibility(hostApp: String?) -> DoctorCheck {
         let trusted = AXIsProcessTrusted()
         if trusted {
             return DoctorCheck(
@@ -245,7 +267,8 @@ enum DoctorCommand {
             name: "Accessibility",
             status: .failed,
             detail: "not granted",
-            fixHint: "Open System Settings > Privacy & Security > Accessibility and enable the terminal app you're using."
+            fixHint: PermissionGuidance.hint(.accessibility, hostApp: hostApp),
+            fixURL: PermissionGuidance.Pane.accessibility.url
         )
     }
 
@@ -338,6 +361,9 @@ enum DoctorCommand {
             ]
             if let hint = check.fixHint {
                 entry["fix_hint"] = hint
+            }
+            if let url = check.fixURL {
+                entry["fix_url"] = url
             }
             results.append(entry)
         }

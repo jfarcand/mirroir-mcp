@@ -106,4 +106,17 @@ final class CaptureStatsTests: XCTestCase {
         XCTAssertEqual(stats.snapshot(),
                        CaptureStatsSnapshot(sck: 0, fallbackReasons: [.noWindowID: 1]))
     }
+
+    /// A region capture holds whatever covers the target. The test bridge's
+    /// window has no owner PID, so the window server never reports it in front:
+    /// the fallback returns nothing rather than another window's pixels.
+    func testARegionIsNeverCapturedWhileTheTargetIsNotInFront() {
+        let bridge = ActivationRecordingBridge(windowID: 0)
+        let capture = ScreenCapture(
+            bridge: bridge, windowImages: FixedProvider(reply: .image(Data([0x89]))), stats: CaptureStats())
+
+        XCTAssertFalse(bridge.isFrontmost())
+        XCTAssertNil(capture.captureWithInfo())
+        XCTAssertEqual(bridge.activationCount, 1, "the fallback still tries to bring it forward")
+    }
 }

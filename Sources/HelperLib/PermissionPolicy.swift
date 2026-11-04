@@ -133,7 +133,46 @@ public struct PermissionPolicy: Sendable {
         "record_step",
         "save_compiled",
         "generate_skill",
+        "run_steps",
     ]
+
+    /// Mutating tools that only move around the iPhone's UI or mirroir's own
+    /// session: they open, close or reveal screens, but never change data in an
+    /// app or on the device. Every other mutating tool can: a tap or a typed
+    /// line may delete, send or buy, depending on what is on screen.
+    public static let nonDestructiveTools: Set<String> = [
+        "launch_app",
+        "press_home",
+        "press_app_switcher",
+        "spotlight",
+        "scroll_to",
+        "switch_target",
+        "record_step",
+    ]
+
+    /// Mutating tools that leave the same state however often they are called
+    /// with the same arguments.
+    public static let idempotentTools: Set<String> = [
+        "launch_app",
+        "press_home",
+        "set_network",
+        "switch_target",
+    ]
+
+    /// The MCP tool annotations for `name`, so a host can run observation
+    /// without asking and ask before anything that changes the iPhone. A tool
+    /// in neither set is annotated as destructive: an unknown tool is assumed
+    /// to change something.
+    public static func annotations(for name: String) -> [String: JSONValue] {
+        if readonlyTools.contains(name) {
+            return ["readOnlyHint": .bool(true)]
+        }
+        return [
+            "readOnlyHint": .bool(false),
+            "destructiveHint": .bool(!nonDestructiveTools.contains(name)),
+            "idempotentHint": .bool(idempotentTools.contains(name)),
+        ]
+    }
 
     public init(skipPermissions: Bool, config: PermissionConfig?) {
         self.skipPermissions = skipPermissions
@@ -164,7 +203,8 @@ public struct PermissionPolicy: Sendable {
            denyList.contains(where: { $0.lowercased() == name }) {
             return .denied(reason:
                 "Tool '\(toolName)' is blocked by deny list in permissions config. " +
-                "Remove it from the deny list in \(Self.configPath) to allow it.")
+                "Remove it from the deny list in \(Self.configPath) to allow it. "
+                + AgentInstruction.userDecides)
         }
 
         if let allowList = config?.allow {
@@ -176,12 +216,14 @@ public struct PermissionPolicy: Sendable {
             }
             return .denied(reason:
                 "Tool '\(toolName)' is not in the allow list. " +
-                "Add it to the allow list in \(Self.configPath) or use --dangerously-skip-permissions.")
+                "Add it to the allow list in \(Self.configPath) or use --dangerously-skip-permissions. "
+                + AgentInstruction.userDecides)
         }
 
         return .denied(reason:
             "Tool '\(toolName)' requires explicit permission. " +
-            "Use --dangerously-skip-permissions or configure \(Self.configPath).")
+            "Use --dangerously-skip-permissions or configure \(Self.configPath). "
+            + AgentInstruction.userDecides)
     }
 
     /// Check a tool against global rules AND the per-app overrides (if any).
@@ -199,7 +241,8 @@ public struct PermissionPolicy: Sendable {
            denyList.contains(where: { $0.lowercased() == name }) {
             return .denied(reason:
                 "Tool '\(toolName)' is denied for app '\(appName)' by permissions.json perApp rules. "
-                + "Remove it from perApp.\(appName).deny to allow it during this app's exploration.")
+                + "Remove it from perApp.\(appName).deny to allow it during this app's exploration. "
+                + AgentInstruction.userDecides)
         }
 
         if case .denied = baseline,
@@ -231,7 +274,8 @@ public struct PermissionPolicy: Sendable {
            blockedApps.contains(where: { $0.lowercased() == name }) {
             return .denied(reason:
                 "App '\(appName)' is blocked by permissions config. " +
-                "Remove it from blockedApps in \(Self.configPath) to allow launching it.")
+                "Remove it from blockedApps in \(Self.configPath) to allow launching it. "
+                + AgentInstruction.userDecides)
         }
 
         return .allowed

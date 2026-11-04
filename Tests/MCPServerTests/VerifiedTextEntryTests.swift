@@ -96,6 +96,24 @@ final class VerifiedTextEntryTests: XCTestCase {
         XCTAssertTrue(notice.contains("autocorrect"), notice)
     }
 
+    /// Measured in Notes on an XR (A/B run, 2026-11-04): "mirroir test" landed as
+    /// "Mirroir test", and the agents spent 15-20 calls on it without being told.
+    func testACapitalizedEntryIsReportedAsACaseChange() {
+        let screen = ScriptedField()
+        screen.autocorrect = { $0.prefix(1).uppercased() + $0.dropFirst() }
+        let result = screen.entry().enter(segments([("mirroir test", .keyEvent)]))
+        XCTAssertTrue(result.success)
+        let notice = result.notice ?? ""
+        XCTAssertTrue(notice.contains("changed the capitalization of \"mirroir test\""), notice)
+        XCTAssertFalse(notice.contains("autocorrect"), "a case change is not a rewrite: \(notice)")
+    }
+
+    func testTextShownWithItsOwnCaseGetsNoNotice() {
+        let screen = ScriptedField()
+        let result = screen.entry().enter(segments([("Bonjour le Monde", .keyEvent)]))
+        XCTAssertNil(result.notice)
+    }
+
     func testAnUnreadableScreenGivesNoNotice() {
         let screen = ScriptedField()
         screen.screenReadable = false

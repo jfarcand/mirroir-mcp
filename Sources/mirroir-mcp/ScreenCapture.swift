@@ -72,6 +72,13 @@ final class ScreenCapture: Sendable {
             DebugLog.log("ScreenCapture",
                 "Window-ID capture failed for \(info.windowID), falling back to region capture")
         }
+        // A region holds whatever is on top of it. Taps and keys no longer bring
+        // the target forward, so a window the user is working in can cover it;
+        // reading that window as the target's screen would be a lie.
+        guard bridge.isFrontmost() else {
+            DebugLog.log("ScreenCapture", "region capture refused: '\(bridge.targetName)' is not in front")
+            return nil
+        }
         guard let data = captureByRegion(info, to: tempPath) else { return nil }
         return CaptureResult(data: data, info: info)
     }

@@ -45,10 +45,12 @@ extension MirroirMCP {
         server.registerTool(MCPToolDefinition(
             name: "tap",
             description: """
-                Tap at a specific position on the mirrored iPhone screen. \
-                Coordinates are relative to the iPhone Mirroring window \
-                (0,0 is top-left of the mirrored content). \
-                Use screenshot first to identify element positions.
+                Tap on the mirrored iPhone screen, either on visible text or at a \
+                position. With `text`, the text is found by OCR and tapped; when \
+                it is not on screen, the reply lists the text that is. With `x` \
+                and `y`, the point is relative to the iPhone Mirroring window \
+                (0,0 is the top-left of the mirrored content); take coordinates \
+                from describe_screen, which reports each element's tap point.
                 """,
             inputSchema: [
                 "type": .string("object"),
@@ -63,17 +65,27 @@ extension MirroirMCP {
                         "description": .string(
                             "Y coordinate relative to the mirroring window (0 = top edge)"),
                     ]),
+                    "text": .object([
+                        "type": .string("string"),
+                        "description": .string(
+                            "Visible text to tap, matched by OCR (exact, then case- and "
+                            + "accent-insensitive, then substring). Use instead of x and y."),
+                    ]),
                     "cursor_mode": cursorModeSchema,
                 ]),
-                "required": .array([.string("x"), .string("y")]),
             ],
             handler: { args in
                 let (ctx, err) = registry.resolveForTool(args)
                 guard let ctx else { return err! }
                 let input = ctx.input
 
+                if let text = args["text"]?.asString() {
+                    let executor = InlineStepRunner.executor(for: ctx, registry: registry)
+                    let report = InlineStepRunner.run([.tap(label: text)], executor: executor)
+                    return report.failed ? .error(report.text) : .text(report.text)
+                }
                 guard let x = args["x"]?.asNumber(), let y = args["y"]?.asNumber() else {
-                    return .error("Missing required parameters: x, y (numbers)")
+                    return .error("Missing parameters: give text (string), or x and y (numbers)")
                 }
 
                 let cursorMode: CursorMode?

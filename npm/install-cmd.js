@@ -102,6 +102,7 @@ function configureClaudeCode() {
       }
     }
     console.log("Claude Code configured.");
+    installSkill();
     return;
   }
 
@@ -134,6 +135,20 @@ function configureClaudeCode() {
 
   fs.writeFileSync(configPath, JSON.stringify(config, null, 2) + "\n");
   console.log(`Claude Code configured: ${configPath}`);
+  installSkill();
+}
+
+// --- Agent Skill ---
+
+// Writes the operating manual (how to drive the iPhone with the mirroir tools)
+// where Claude Code and Codex load skills: `mirroir-mcp skill --install`.
+function installSkill() {
+  const nativeBin = path.join(BIN_DIR, "mirroir-mcp-native");
+  try {
+    execSync(`"${nativeBin}" skill --install`, { stdio: "inherit" });
+  } catch (skillErr) {
+    console.log("  Could not install the mirroir skill. Run: npx -y mirroir-mcp skill --install");
+  }
 }
 
 function configureCursor() {
@@ -209,6 +224,7 @@ function configureCodex() {
       { stdio: "inherit" }
     );
     console.log("Codex configured.");
+    installSkill();
     return;
   } catch (noCli) {
     // codex CLI not in PATH — fall back to TOML append
@@ -237,6 +253,7 @@ function configureCodex() {
   fs.mkdirSync(codexDir, { recursive: true });
   fs.appendFileSync(configPath, tomlBlock);
   console.log("Codex configured via ~/.codex/config.toml");
+  installSkill();
 }
 
 // --- Main ---

@@ -5,6 +5,7 @@
 // ABOUTME: Runs the English and fr_CA fixture corpus, and pins the refusal text and phrase normalization.
 
 import XCTest
+import HelperLib
 @testable import mirroir_mcp
 
 final class SessionBlockTests: XCTestCase {
@@ -58,7 +59,7 @@ final class SessionBlockTests: XCTestCase {
                       refusal)
         XCTAssertTrue(refusal.contains("[Try Again]"), refusal)
         XCTAssertTrue(refusal.contains("lock the iPhone"), refusal)
-        XCTAssertTrue(refusal.hasSuffix("No input was sent."), refusal)
+        XCTAssertTrue(refusal.hasSuffix("No input was sent. " + AgentInstruction.waitForUser), refusal)
     }
 
     func testAWindowWithNoWordsSaysSo() {

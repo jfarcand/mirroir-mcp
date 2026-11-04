@@ -54,7 +54,20 @@ rm -rf "$HOME/.iphone-mirroir-mcp"
 
 echo "Legacy artifacts removed."
 
-# --- Step 3: Remove config directory ---
+# --- Step 3: Remove the agent skill (mirroir-mcp skill --install) ---
+
+echo ""
+echo "--- Agent skill ---"
+
+for skill_dir in "$HOME/.claude/skills/mirroir" "${CODEX_HOME:-$HOME/.codex}/skills/mirroir"; do
+    # Only the manual mirroir wrote: its heading identifies it.
+    if grep -q "^# Driving an iPhone with mirroir" "$skill_dir/SKILL.md" 2>/dev/null; then
+        rm -rf "$skill_dir"
+        echo "Removed $skill_dir"
+    fi
+done
+
+# --- Step 4: Remove config directory ---
 
 echo ""
 echo "--- Config ---"

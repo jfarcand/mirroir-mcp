@@ -56,7 +56,7 @@ final class InputToolHandlerTests: XCTestCase {
         let response = callTool("tap", args: [:])
         XCTAssertTrue(isError(response))
         let text = extractText(response)
-        XCTAssertTrue(text?.contains("Missing required parameters") ?? false)
+        XCTAssertTrue(text?.contains("give text (string), or x and y") ?? false)
     }
 
     func testTapSuccess() {

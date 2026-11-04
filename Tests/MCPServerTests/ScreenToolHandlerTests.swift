@@ -164,6 +164,36 @@ final class ScreenToolHandlerTests: XCTestCase {
         XCTAssertTrue(text?.contains("(100, 200)") ?? false)
     }
 
+    func testDescribeScreenWithAQueryListsOnlyMatchingTextWithoutCoordinates() {
+        bridge.processRunning = true
+        describer.describeResult = ScreenDescriber.DescribeResult(
+            elements: [
+                TapPoint(text: "Montréal", tapX: 200, tapY: 120, confidence: 0.95),
+                TapPoint(text: "-2°", tapX: 200, tapY: 180, confidence: 0.95),
+                TapPoint(text: "H:3° L:-6°", tapX: 200, tapY: 240, confidence: 0.95),
+            ],
+            icons: [IconDetector.DetectedIcon(tapX: 30, tapY: 30, estimatedSize: 24)],
+            screenshotBase64: "iVBORw0KGgo="
+        )
+        let text = extractText(callTool("describe_screen", args: [
+            "query": .string("°"), "text_only": .bool(true), "omit_screenshot": .bool(true),
+        ])) ?? ""
+        XCTAssertTrue(text.contains("- \"-2°\"\n- \"H:3° L:-6°\""), text)
+        XCTAssertFalse(text.contains("Montréal"), text)
+        XCTAssertFalse(text.contains("Icon at"), "a query omits icons")
+        XCTAssertFalse(text.contains("(200,"), "text_only omits coordinates")
+    }
+
+    func testAQueryThatMatchesNothingSaysTheScreenIsNotEmpty() {
+        bridge.processRunning = true
+        describer.describeResult = ScreenDescriber.DescribeResult(
+            elements: [TapPoint(text: "Montreal", tapX: 200, tapY: 120, confidence: 0.95)],
+            screenshotBase64: "iVBORw0KGgo="
+        )
+        let text = extractText(callTool("describe_screen", args: ["query": .string("Toronto")])) ?? ""
+        XCTAssertTrue(text.contains("(no element matches \"Toronto\"; 1 element(s) on screen."), text)
+    }
+
     func testDescribeScreenMetaReportsVisionTokensWhenProviderSendsThem() {
         bridge.processRunning = true
         describer.describeResult = ScreenDescriber.DescribeResult(

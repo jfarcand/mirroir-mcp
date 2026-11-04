@@ -1,6 +1,6 @@
 # mirroir-mcp
 
-> Give your AI eyes, hands, and a real iPhone. An MCP server that lets any AI agent see the screen, tap what it needs, and figure the rest out — through macOS iPhone Mirroring. Also supports macOS windows. 38 tools, any MCP client (Claude Code, Cursor, Copilot, ChatGPT, Codex). Written in Swift. Apache 2.0 licensed.
+> Give your AI eyes, hands, and a real iPhone. An MCP server that lets any AI agent see the screen, tap what it needs, and figure the rest out — through macOS iPhone Mirroring. Also supports macOS windows. 39 tools, any MCP client (Claude Code, Cursor, Copilot, ChatGPT, Codex). Written in Swift. Apache 2.0 licensed.
 
 ## Overview
 
@@ -344,7 +344,8 @@ Multi-target configuration via `targets.json` for controlling multiple windows s
 ## Documentation Index
 
 - [README](README.md) — Installation, examples, quick start
-- [Tools Reference](docs/tools.md) — All 38 tools with parameters
+- [Onboarding](docs/onboarding.md) — Setup written for the agent: prerequisites, install, doctor, read-only proof
+- [Tools Reference](docs/tools.md) — All 39 tools with parameters
 - [Security](docs/security.md) — Threat model, kill switch, recommendations
 - [Permissions](docs/permissions.md) — Fail-closed permission model
 - [Component Detection](docs/components.md) — Component definitions, calibration, detection pipeline

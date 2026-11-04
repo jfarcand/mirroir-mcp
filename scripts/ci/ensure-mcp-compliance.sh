@@ -156,12 +156,19 @@ for name, tool in tools.items():
     assert 'inputSchema' in tool, f'{name}: missing inputSchema'
     schema = tool['inputSchema']
     assert isinstance(schema, dict), f'{name}: inputSchema must be object'
+    hints = tool.get('annotations', {})
+    assert isinstance(hints.get('readOnlyHint'), bool), f'{name}: missing annotations.readOnlyHint'
+    if not hints['readOnlyHint']:
+        assert isinstance(hints.get('destructiveHint'), bool), f'{name}: missing annotations.destructiveHint'
+
+assert tools['describe_screen']['annotations']['readOnlyHint'] is True, 'describe_screen must be read-only'
+assert tools['reset_app']['annotations']['destructiveHint'] is True, 'reset_app must be destructive'
 
 # Validate specific tool schemas
 tap = tools['tap']['inputSchema']
 assert 'x' in tap.get('properties', {}), 'tap missing x property'
 assert 'y' in tap.get('properties', {}), 'tap missing y property'
-assert set(tap.get('required', [])) == {'x', 'y'}, 'tap should require x and y'
+assert 'text' in tap.get('properties', {}), 'tap missing text property'
 
 swipe = tools['swipe']['inputSchema']
 for coord in ['from_x', 'from_y', 'to_x', 'to_y']:

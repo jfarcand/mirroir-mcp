@@ -22,7 +22,7 @@ struct PermissionClassificationTests {
     @Test("all tools are classified")
     func allToolsClassified() {
         let total = PermissionPolicy.readonlyTools.count + PermissionPolicy.mutatingTools.count
-        #expect(total == 38, "Expected 38 tools, got \(total)")
+        #expect(total == 39, "Expected 39 tools, got \(total)")
     }
 
     @Test("readonly tools contains expected tools")
@@ -44,9 +44,34 @@ struct PermissionClassificationTests {
             "open_url", "press_home", "press_app_switcher", "press_back",
             "spotlight", "scroll_to", "reset_app", "measure", "set_network",
             "switch_target", "record_step", "save_compiled",
-            "generate_skill",
+            "generate_skill", "run_steps",
         ]
         #expect(PermissionPolicy.mutatingTools == expected)
+    }
+
+    @Test("annotation sets only name mutating tools")
+    func annotationSetsAreMutating() {
+        #expect(PermissionPolicy.nonDestructiveTools.isSubset(of: PermissionPolicy.mutatingTools))
+        #expect(PermissionPolicy.idempotentTools.isSubset(of: PermissionPolicy.mutatingTools))
+    }
+
+    @Test("observation is annotated read-only")
+    func readonlyAnnotations() {
+        #expect(PermissionPolicy.annotations(for: "describe_screen") == ["readOnlyHint": .bool(true)])
+    }
+
+    @Test("a tap may destroy, going home may not")
+    func destructiveAnnotations() {
+        #expect(PermissionPolicy.annotations(for: "tap")["destructiveHint"] == .bool(true))
+        #expect(PermissionPolicy.annotations(for: "reset_app")["destructiveHint"] == .bool(true))
+        #expect(PermissionPolicy.annotations(for: "press_home") == [
+            "readOnlyHint": .bool(false), "destructiveHint": .bool(false), "idempotentHint": .bool(true),
+        ])
+    }
+
+    @Test("an unknown tool is annotated as destructive")
+    func unknownToolAnnotations() {
+        #expect(PermissionPolicy.annotations(for: "format_disk")["destructiveHint"] == .bool(true))
     }
 }
 

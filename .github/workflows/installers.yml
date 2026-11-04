@@ -130,6 +130,25 @@ jobs:
           print(f'screenshot tool: OK ({len(images)} image block(s))')
           "
 
+      - name: Update knows this is a source install
+        run: |
+          .build/release/mirroir-mcp update --dry-run 2>&1 | tee update.txt
+          grep -q "Installed from the source checkout" update.txt
+
+      - name: Doctor reads the screen end to end (installed binary + FakeMirroring)
+        run: |
+          .build/release/mirroir-mcp doctor --json 2>doctor.json || true
+          python3 -c "
+          import json
+          raw = open('doctor.json').read()
+          report, _ = json.JSONDecoder().raw_decode(raw[raw.index('{'):])
+          checks = {c['name']: c for c in report['checks']}
+          read = checks.get('Screen read')
+          assert read, f'doctor ran no screen read: {checks}'
+          assert read['status'] == 'passed', f'screen read: {read}'
+          print('doctor screen read:', read['detail'])
+          "
+
   homebrew-install:
     name: Homebrew install (local formula)
     needs: changes
@@ -199,6 +218,11 @@ jobs:
           which mirroir
           # Verify mirroir CLI works (symlink to mirroir-mcp)
           mirroir test --help 2>&1 | grep -q "mirroir-mcp test"
+
+      - name: Update knows this is a Homebrew install
+        run: |
+          mirroir-mcp update --dry-run 2>&1 | tee update.txt
+          grep -q "Would run: brew upgrade mirroir-mcp" update.txt
 
       - name: Verify embacle FFI linked
         run: nm "$(brew --prefix)/bin/mirroir-mcp" | grep -q embacle_init
@@ -281,8 +305,18 @@ jobs:
           import sys, json
           obj = json.loads(sys.stdin.readline())
           assert obj['result']['serverInfo']['name'] == 'mirroir-mcp'
+          assert 'describe_screen' in obj['result']['instructions'], 'initialize must carry the operating manual'
           print('MCP initialize (npx wrapper): OK')
           "
+
+      - name: Agent skill installs for Claude Code and Codex (clean HOME)
+        run: |
+          CLEAN_HOME=$(mktemp -d)
+          HOME="$CLEAN_HOME" node npm/bin/mirroir-mcp skill --install
+          for f in "$CLEAN_HOME/.claude/skills/mirroir/SKILL.md" "$CLEAN_HOME/.codex/skills/mirroir/SKILL.md"; do
+            head -2 "$f" | grep -qx 'name: mirroir' || { echo "missing or malformed: $f"; exit 1; }
+          done
+          echo "Agent skill installed: OK"
 
       - name: MCP tools/call screenshot (npx wrapper + FakeMirroring)
         run: |

@@ -8,9 +8,12 @@ import Foundation
 import HelperLib
 
 extension MirroirMCP {
+    /// `updateNotice` says when a newer release is published (nil when current):
+    /// `UpdateCheck.liveNotice` in the server, a fixed answer in tests.
     static func registerInfoTools(
         server: MCPServer,
-        registry: TargetRegistry
+        registry: TargetRegistry,
+        updateNotice: @escaping @Sendable () -> String?
     ) {
         // get_orientation — report device orientation
         server.registerTool(MCPToolDefinition(
@@ -107,9 +110,8 @@ extension MirroirMCP {
                 if screenshot != nil {
                     checks.append("[ok] Screen capture working (\(captureMs) ms)")
                 } else {
-                    checks.append(
-                        "[FAIL] Screen capture failed — " +
-                        "grant Screen Recording permission in System Settings")
+                    checks.append("[FAIL] Screen capture failed — "
+                        + PermissionGuidance.hint(.screenRecording, hostApp: HostApp.current))
                     allOk = false
                 }
 
@@ -122,6 +124,10 @@ extension MirroirMCP {
                 case .failed(let reason):
                     checks.append("[FAIL] Text recognition failed — \(reason)")
                     allOk = false
+                }
+
+                if let notice = updateNotice() {
+                    checks.append("[WARN] \(notice)")
                 }
 
                 let summary = allOk ? "All checks passed" : "Issues detected"
@@ -168,7 +174,7 @@ extension MirroirMCP {
                     mirroringStatus = "No window — app is running but no mirroring window found"
                 }
 
-                return .text(mirroringStatus)
+                return .text(updateNotice().map { "\(mirroringStatus)\n\n\($0)" } ?? mirroringStatus)
             }
         ))
     }

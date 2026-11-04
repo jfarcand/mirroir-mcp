@@ -243,9 +243,7 @@ final class MCPServer: Sendable {
             "capabilities": .object([
                 "tools": .object([:]),
             ]),
-            "instructions": .string(
-                "Drive a real iPhone via macOS iPhone Mirroring: see the screen "
-                + "(describe_screen), tap/swipe/type, and author replayable skills."),
+            "instructions": .string(OperatingManual.essentials),
         ]
         // Identity and capabilities are the same for every client, so the
         // response is shareable. `server/discover` exists only in the modern
@@ -286,6 +284,7 @@ final class MCPServer: Sendable {
                 "name": .string("mirroir-mcp"),
                 "version": .string(MirroirVersion.current),
             ]),
+            "instructions": .string(OperatingManual.essentials),
         ])
         return JSONRPCResponse(id: request.id, result: result, error: nil)
     }
@@ -299,6 +298,7 @@ final class MCPServer: Sendable {
                         "name": .string(tool.name),
                         "description": .string(tool.description),
                         "inputSchema": .object(tool.inputSchema),
+                        "annotations": .object(PermissionPolicy.annotations(for: tool.name)),
                     ])
                 }
         }
