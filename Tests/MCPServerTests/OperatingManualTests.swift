@@ -62,7 +62,32 @@ final class OperatingManualTests: XCTestCase {
         XCTAssertEqual(lines[2], "description: \"\(OperatingManual.skillDescription)\"")
         XCTAssertFalse(OperatingManual.skillDescription.contains("\""),
                        "a quote would end the YAML string early")
-        XCTAssertEqual(lines[3], "---")
+        XCTAssertEqual(lines[3], "homepage: \(OperatingManual.skillHomepage)")
+        XCTAssertEqual(lines[4], "metadata: \(OperatingManual.skillMetadata)")
+        XCTAssertEqual(lines[5], "---")
+    }
+
+    func testTheOpenClawMetadataDeclaresThePlatformBinaryAndInstalls() throws {
+        let data = Data(OperatingManual.skillMetadata.utf8)
+        let root = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
+        let openClaw = try XCTUnwrap(root["openclaw"] as? [String: Any])
+        XCTAssertEqual(openClaw["os"] as? [String], ["darwin"])
+        let requires = try XCTUnwrap(openClaw["requires"] as? [String: Any])
+        XCTAssertEqual(requires["bins"] as? [String], ["mirroir-mcp"])
+        let installs = try XCTUnwrap(openClaw["install"] as? [[String: Any]])
+        XCTAssertEqual(installs.compactMap { $0["kind"] as? String }, ["brew", "node"])
+        XCTAssertEqual(installs.compactMap { $0["formula"] as? String }, ["jfarcand/tap/mirroir-mcp"])
+        XCTAssertEqual(installs.compactMap { $0["package"] as? String }, ["mirroir-mcp"])
+        for install in installs {
+            XCTAssertEqual(install["bins"] as? [String], ["mirroir-mcp"], "an install must provide the gated binary")
+        }
+    }
+
+    func testTheManualRegistersTheServerWithEachHost() {
+        for command in ["claude mcp add", "codex mcp add", "openclaw mcp add mirroir --command mirroir-mcp"] {
+            XCTAssertTrue(OperatingManual.skillMarkdown.contains(command), command)
+        }
+        XCTAssertTrue(OperatingManual.skillMarkdown.contains("mirroir-mcp doctor"))
     }
 
     func testTheManualNamesOnlyRealToolsAndParameters() {
@@ -83,12 +108,16 @@ final class OperatingManualTests: XCTestCase {
         }
     }
 
-    func testInstallGoesToClaudeAndCodexSkillDirectories() {
+    func testInstallGoesToEachHostsSkillDirectory() {
         XCTAssertEqual(SkillCommand.installDirectories(environment: ["HOME": "/Users/a"]), [
             "/Users/a/.claude/skills/mirroir", "/Users/a/.codex/skills/mirroir",
+            "/Users/a/.openclaw/skills/mirroir",
         ])
         XCTAssertEqual(
-            SkillCommand.installDirectories(environment: ["HOME": "/Users/a", "CODEX_HOME": "/opt/codex"])
-                .last, "/opt/codex/skills/mirroir")
+            SkillCommand.installDirectories(environment: [
+                "HOME": "/Users/a", "CODEX_HOME": "/opt/codex", "OPENCLAW_STATE_DIR": "/opt/openclaw",
+            ]), [
+                "/Users/a/.claude/skills/mirroir", "/opt/codex/skills/mirroir", "/opt/openclaw/skills/mirroir",
+            ])
     }
 }

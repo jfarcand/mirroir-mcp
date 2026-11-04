@@ -9,7 +9,8 @@ import Foundation
 /// How an agent should drive the phone through mirroir. The essentials go to
 /// every MCP client in the `initialize` instructions; the full manual is
 /// printed by `mirroir-mcp skill`, in SKILL.md form, so agent hosts that load
-/// skills (Claude Code, Codex) can install it.
+/// skills (Claude Code, Codex, OpenClaw) can install it. The same file is what
+/// gets published to ClawHub.
 enum OperatingManual {
 
     /// The skill name the manual is installed under.
@@ -20,6 +21,19 @@ enum OperatingManual {
         "Drive a real iPhone through macOS iPhone Mirroring with the mirroir MCP tools: "
         + "read the screen, tap, type, swipe, open apps, and replay skills. Use whenever "
         + "a task needs the user's phone."
+
+    /// The project page, for the SKILL.md front matter.
+    static let skillHomepage = "https://mirroir.dev"
+
+    /// OpenClaw's runtime declarations, as the one-line JSON its front matter
+    /// accepts: which platform the skill runs on, the binary it needs, and how
+    /// to install that binary. Hosts that do not read them ignore the field.
+    static let skillMetadata = #"{"openclaw":{"emoji":"📱","os":["darwin"],"#
+        + #""requires":{"bins":["mirroir-mcp"]},"install":["#
+        + #"{"id":"brew","kind":"brew","formula":"jfarcand/tap/mirroir-mcp","#
+        + #""bins":["mirroir-mcp"],"label":"Install mirroir with Homebrew"},"#
+        + #"{"id":"node","kind":"node","package":"mirroir-mcp","#
+        + #""bins":["mirroir-mcp"],"label":"Install mirroir with npm"}]}}"#
 
     /// The working method in brief: what every client receives as server instructions.
     static let essentials = """
@@ -45,6 +59,8 @@ enum OperatingManual {
         ---
         name: \(skillName)
         description: "\(skillDescription)"
+        homepage: \(skillHomepage)
+        metadata: \(skillMetadata)
         ---
 
         # Driving an iPhone with mirroir
@@ -52,6 +68,20 @@ enum OperatingManual {
         mirroir drives the user's own iPhone through macOS iPhone Mirroring: you see the screen \
         as text with tap points, and you tap, type and swipe on the real device. The phone is \
         the user's, with their accounts and data on it, so every action is real.
+
+        ## Setup
+
+        Skip this when the mirroir tools are already available. mirroir needs macOS 15 or \
+        later with iPhone Mirroring connected to the iPhone. Register the server with your host:
+
+        - Claude Code: `claude mcp add --transport stdio mirroir -- npx -y mirroir-mcp`
+        - Codex: `codex mcp add mirroir -- npx -y mirroir-mcp`
+        - OpenClaw: `openclaw mcp add mirroir --command mirroir-mcp`
+
+        Then run `mirroir-mcp doctor`: every line that does not pass names its fix. Screen \
+        Recording and Accessibility are granted by the user, to the app that runs the server; \
+        tell them which pane and which app, and never change a permission yourself. The full \
+        guide is https://github.com/jfarcand/mirroir-mcp/blob/main/docs/onboarding.md.
 
         ## Working method
 

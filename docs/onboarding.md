@@ -19,7 +19,7 @@ Run these and read the results:
 sw_vers -productVersion        # macOS version
 uname -m                       # arm64 = Apple silicon
 pgrep -x "iPhone Mirroring"    # running or not
-command -v node npx claude codex
+command -v node npx claude codex openclaw
 ```
 
 Compare with the prerequisites:
@@ -46,6 +46,8 @@ Register mirroir with the client you are running in:
 claude mcp add --transport stdio mirroir -- npx -y mirroir-mcp
 # Codex
 codex mcp add mirroir -- npx -y mirroir-mcp
+# OpenClaw (needs the binary on the Gateway's PATH: brew install jfarcand/tap/mirroir-mcp)
+openclaw mcp add mirroir --command mirroir-mcp
 ```
 
 For Cursor, VS Code and Claude Desktop, use the configuration block for that client in the [README](../README.md#install).
@@ -56,7 +58,7 @@ Then install the operating manual, which teaches you (and later sessions) how to
 npx -y mirroir-mcp skill --install
 ```
 
-It writes `~/.claude/skills/mirroir/SKILL.md` and `~/.codex/skills/mirroir/SKILL.md`. Read it now with `npx -y mirroir-mcp skill`.
+It writes `~/.claude/skills/mirroir/SKILL.md`, `~/.codex/skills/mirroir/SKILL.md` and `~/.openclaw/skills/mirroir/SKILL.md`. Read it now with `npx -y mirroir-mcp skill`.
 
 ## Step 2: run doctor
 

@@ -57,7 +57,7 @@ Each tool has strengths the table doesn't capture. Maestro, mobile-mcp and Appiu
 
 ## Install
 
-The fastest path: paste this into your coding agent (Claude Code, Codex, Cursor, …) and let it do the setup.
+The fastest path: paste this into your coding agent (Claude Code, Codex, Cursor, OpenClaw, …) and let it do the setup.
 
 ```text
 Set up mirroir-mcp so you can drive my iPhone: follow https://github.com/jfarcand/mirroir-mcp/blob/main/docs/onboarding.md step by step, and finish by reading back what my iPhone screen shows.
@@ -89,11 +89,19 @@ or as a [Claude Code plugin](https://docs.claude.com/en/docs/claude-code/plugins
 /plugin install skills@mirroir   # optional: the community skill library
 ```
 
+or from [OpenClaw](https://docs.openclaw.ai), with the skill from [ClawHub](https://clawhub.ai/jfarcand/mirroir):
+
+```bash
+openclaw skills install @jfarcand/mirroir
+brew tap jfarcand/tap && brew install mirroir-mcp
+openclaw mcp add mirroir --command mirroir-mcp
+```
+
 or as an MCP Bundle for Claude Desktop and other MCPB hosts: download `mirroir-mcp.mcpb` from the [latest release](https://github.com/jfarcand/mirroir-mcp/releases/latest) (v0.43.0 and later) and double-click it. The bundle carries the native Apple Silicon binary, so it needs no Node.js. To build one from a release build: `mcpb/build-mcpb.sh .build/release/mirroir-mcp mirroir-mcp.mcpb`.
 
 The first time you take a screenshot, macOS will prompt for **Screen Recording** and **Accessibility** permissions. Grant both. `mirroir doctor` names the app that needs each grant and links the System Settings pane to open.
 
-Every MCP client receives a short operating manual in the server instructions. For the full version as a skill (Claude Code and Codex), run `npx -y mirroir-mcp skill --install`; `npx -y mirroir-mcp install` does it when it configures either client.
+Every MCP client receives a short operating manual in the server instructions. For the full version as a skill (Claude Code, Codex and OpenClaw), run `npx -y mirroir-mcp skill --install`; `npx -y mirroir-mcp install` does it when it configures either client.
 
 <details>
 <summary>Per-client setup</summary>
