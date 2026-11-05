@@ -59,9 +59,10 @@ Start recording, open Instagram, scroll the feed and open my profile, stop recor
 - **Drift fails loudly.** [`mirroir-run`](docs/mirroir-run.md) has a third verdict beside pass and fail: `DRIFT`, exit code **65**, when every assertion held but the output moved past its baseline. Your CI lane decides whether drift blocks a merge.
 - **It plays games, too.** A `scene:` step plays a turn-based or tap-driven game, frame by frame, under a hard budget. See [Games](docs/games.md).
 
-  <img src="website/public/chess-vs-maximum.gif" alt="A full chess game on a real iPhone, sped up, ending in checkmate against the Maximum bot on Chess.com" width="240" />
-
-  *A real game on a real iPhone, sped up 45×: the model reads the board, Stockfish picks the moves, mirroir plays them against Chess.com's strongest bot.*
+  <p align="center">
+    <img src="website/public/chess-vs-maximum.gif" alt="A full chess game on a real iPhone, sped up, ending in checkmate against the Maximum bot on Chess.com" width="240" />
+  </p>
+  <p align="center"><em>A real game on a real iPhone, sped up 45×: the model reads the board, Stockfish picks the moves, mirroir plays them against Chess.com's strongest bot.</em></p>
 
 - **One scenario, many surfaces.** A single `mirroir-run` scenario can drive the iPhone, a browser, HTTP endpoints and subprocesses, then compare what the page and the phone showed. See [Web and iOS in one scenario](docs/web-and-ios.md).
 
