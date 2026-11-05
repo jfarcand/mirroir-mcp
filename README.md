@@ -61,7 +61,7 @@ Start recording, open Instagram, scroll the feed and open my profile, stop recor
 
   <img src="website/public/chess-vs-maximum.gif" alt="A full chess game on a real iPhone, sped up, ending in checkmate against the Maximum bot on Chess.com" width="240" />
 
-  *A real game on a real iPhone, sped up 30×: the model reads the board, Stockfish picks the moves, mirroir plays them against Chess.com's strongest bot.*
+  *A real game on a real iPhone, sped up 45×: the model reads the board, Stockfish picks the moves, mirroir plays them against Chess.com's strongest bot.*
 
 - **One scenario, many surfaces.** A single `mirroir-run` scenario can drive the iPhone, a browser, HTTP endpoints and subprocesses, then compare what the page and the phone showed. See [Web and iOS in one scenario](docs/web-and-ios.md).
 
