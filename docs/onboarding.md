@@ -30,7 +30,7 @@ Compare with the prerequisites:
 | A Mac with Apple silicon, or an Intel Mac with a T2 chip | Apple's requirement for iPhone Mirroring |
 | iPhone on iOS 18 or later, signed in to the same Apple Account as the Mac | Apple's requirement for iPhone Mirroring |
 | Bluetooth and Wi-Fi on, iPhone near the Mac | Mirroring runs over Continuity |
-| iPhone Mirroring available in the user's region | Apple does not offer it everywhere, notably not in the European Union ([Apple's page](https://support.apple.com/en-us/105071)) |
+| iPhone Mirroring available in the user's region | Apple does not offer it everywhere, notably not in the European Union ([Apple's page](https://support.apple.com/en-us/120421)) |
 | Node.js (`npx`) | The quickest install path |
 
 If macOS is older than 15 or the Mac does not qualify, stop and tell the user in one sentence that this Mac cannot run iPhone Mirroring, so mirroir cannot drive an iPhone from it. Do not continue.
@@ -87,5 +87,5 @@ Read back to the user, in one or two sentences, which app is on their iPhone and
 
 ## If something does not fit
 
-- The user's Mac is fine but iPhone Mirroring will not connect: point them to [Apple's iPhone Mirroring page](https://support.apple.com/en-us/105071) and to [Troubleshooting](troubleshooting.md).
+- The user's Mac is fine but iPhone Mirroring will not connect: point them to [Apple's iPhone Mirroring page](https://support.apple.com/en-us/120421) and to [Troubleshooting](troubleshooting.md).
 - The client cannot run MCP servers: say so; mirroir needs an MCP client.

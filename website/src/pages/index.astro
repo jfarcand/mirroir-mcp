@@ -249,8 +249,9 @@ if (!skillsAvailable) {
 ---
 
 <Layout
-  title="mirroir-mcp — Let your agent use your real iPhone"
-  description="Drive a real, stock iPhone from any AI agent through macOS iPhone Mirroring — no Developer Mode, no Xcode, no WebDriverAgent. Explore an app once, then replay the flows in CI without an LLM."
+  title="mirroir-mcp: real iPhone automation for AI agents over MCP"
+  description="Let your AI agent use your real iPhone over MCP, with no Developer Mode, Xcode or WebDriverAgent. Automate any app, then replay the flow in CI without an LLM."
+  softwareVersion={version}
 >
   <!-- Star banner -->
   <a class="star-banner" href="https://github.com/jfarcand/mirroir-mcp" rel="noopener noreferrer">
@@ -262,13 +263,13 @@ if (!skillsAvailable) {
 
   <!-- Hero -->
   <header>
-    <img src={`${import.meta.env.BASE_URL}mirroir-wordmark.svg`} alt="mirroir-mcp" class="logo" width="80" height="100" />
+    <img src={`${import.meta.env.BASE_URL}mirroir-wordmark.svg`} alt="mirroir-mcp logo" class="logo" width="80" height="100" />
     <h1>mirroir-mcp</h1>
     <p class="tagline">
       Let your agent use your real iPhone, then replay what it did without an LLM.
     </p>
     <p class="subtitle">
-      Drive a real, stock iPhone from any AI agent &mdash; <strong>no Developer Mode, no Xcode, no WebDriverAgent, no jailbreak</strong>. mirroir works through macOS iPhone Mirroring, so it reaches any app on your phone, App Store apps you could never build included. Tell your AI to test a login flow or explore an app &mdash; it sees the screen, taps what it needs, and figures the rest out.
+      iPhone automation for AI agents: drive a real, stock iPhone from any MCP client &mdash; <strong>no Developer Mode, no Xcode, no WebDriverAgent, no jailbreak</strong>. mirroir works through macOS iPhone Mirroring, so it reaches any app on your phone, App Store apps you could never build included. Tell your AI to test a login flow or explore an app &mdash; it sees the screen, taps what it needs, and figures the rest out.
     </p>
     <pre class="snippet hero-flow"><code>{agentFlow}</code></pre>
   </header>
@@ -280,13 +281,13 @@ if (!skillsAvailable) {
       <div class="carousel-track">
         <div class="carousel-slide demo-slide">
           <h3>Login Flow</h3>
-          <video loop muted playsinline>
+          <video loop muted playsinline aria-label="An AI agent tests a login screen in Expo Go on a real iPhone">
             <source src={`${import.meta.env.BASE_URL}video1-expo-login.mp4`} type="video/mp4" />
           </video>
         </div>
         <div class="carousel-slide demo-slide">
           <h3>Cross-App Workflow</h3>
-          <video loop muted playsinline>
+          <video loop muted playsinline aria-label="An AI agent reads the commute time in Waze on a real iPhone, then posts it in Slack">
             <source src={`${import.meta.env.BASE_URL}video2-waze-slack.mp4`} type="video/mp4" />
           </video>
         </div>

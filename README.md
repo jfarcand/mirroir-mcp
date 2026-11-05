@@ -7,7 +7,7 @@
 [![npm version](https://img.shields.io/npm/v/mirroir-mcp)](https://www.npmjs.com/package/mirroir-mcp)
 [![Build](https://github.com/jfarcand/mirroir-mcp/actions/workflows/build.yml/badge.svg)](https://github.com/jfarcand/mirroir-mcp/actions/workflows/build.yml)
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue)](LICENSE)
-[![macOS 15+](https://img.shields.io/badge/macOS-15%2B-black?logo=apple)](https://support.apple.com/en-us/105071)
+[![macOS 15+](https://img.shields.io/badge/macOS-15%2B-black?logo=apple)](https://support.apple.com/en-us/120421)
 [![Discord](https://img.shields.io/discord/1481795325953048627?logo=discord&label=Discord)](https://discord.gg/jVDBbMjPMf)
 
 ### Let your agent use your real iPhone, then replay what it did without an LLM.
@@ -21,7 +21,7 @@ No Developer Mode, no Xcode, no WebDriverAgent, no jailbreak. mirroir-mcp works 
 
 ## Quick start
 
-You need macOS 15 or later and an iPhone connected through [iPhone Mirroring](https://support.apple.com/en-us/105071). Paste this into your coding agent (Claude Code, Codex, Cursor, OpenClaw, …):
+You need macOS 15 or later and an iPhone connected through [iPhone Mirroring](https://support.apple.com/en-us/120421). Paste this into your coding agent (Claude Code, Codex, Cursor, OpenClaw, …):
 
 ```text
 Set up mirroir-mcp so you can drive my iPhone: follow https://github.com/jfarcand/mirroir-mcp/blob/main/docs/onboarding.md step by step, and finish by reading back what my iPhone screen shows.

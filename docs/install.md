@@ -5,7 +5,7 @@ Every way to install mirroir-mcp, the per-client setup, and how to update or rem
 ## Requirements
 
 - macOS 15+
-- iPhone connected via [iPhone Mirroring](https://support.apple.com/en-us/105071)
+- iPhone connected via [iPhone Mirroring](https://support.apple.com/en-us/120421)
 
 ## Install
 

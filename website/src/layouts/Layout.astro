@@ -2,10 +2,30 @@
 interface Props {
   title: string;
   description: string;
+  softwareVersion: string;
 }
 
-const { title, description } = Astro.props;
+const { title, description, softwareVersion } = Astro.props;
 const base = import.meta.env.BASE_URL;
+const canonicalUrl = new URL(Astro.url.pathname, Astro.site).href;
+const imageUrl = new URL("og-image.png", Astro.site).href;
+const imageAlt = "mirroir-mcp: let your agent use your real iPhone";
+const keywords = "iPhone automation, MCP, MCP server, AI agent, real iPhone, iPhone Mirroring, no Developer Mode, mobile testing";
+const softwareApplication = {
+  "@context": "https://schema.org",
+  "@type": "SoftwareApplication",
+  name: "mirroir-mcp",
+  description,
+  url: canonicalUrl,
+  image: imageUrl,
+  applicationCategory: "DeveloperApplication",
+  operatingSystem: "macOS 15 or later",
+  softwareVersion,
+  downloadUrl: "https://www.npmjs.com/package/mirroir-mcp",
+  license: "https://www.apache.org/licenses/LICENSE-2.0",
+  sameAs: ["https://github.com/jfarcand/mirroir-mcp"],
+  offers: { "@type": "Offer", price: "0", priceCurrency: "USD" },
+};
 ---
 
 <!doctype html>
@@ -14,18 +34,28 @@ const base = import.meta.env.BASE_URL;
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="description" content={description} />
+    <meta name="keywords" content={keywords} />
     <meta name="generator" content={Astro.generator} />
+    <link rel="canonical" href={canonicalUrl} />
+    <link rel="sitemap" href={`${base}sitemap-index.xml`} />
+    <meta property="og:site_name" content="mirroir-mcp" />
     <meta property="og:title" content={title} />
     <meta property="og:description" content={description} />
-    <meta property="og:image" content="https://mirroir.dev/og-image.png" />
-    <meta property="og:url" content="https://mirroir.dev" />
+    <meta property="og:image" content={imageUrl} />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content={imageAlt} />
+    <meta property="og:url" content={canonicalUrl} />
     <meta property="og:type" content="website" />
+    <meta property="og:locale" content="en_US" />
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:title" content={title} />
     <meta name="twitter:description" content={description} />
-    <meta name="twitter:image" content="https://mirroir.dev/og-image.png" />
+    <meta name="twitter:image" content={imageUrl} />
+    <meta name="twitter:image:alt" content={imageAlt} />
     <link rel="icon" type="image/svg+xml" href={`${base}logo-robot.svg`} />
     <title>{title}</title>
+    <script is:inline type="application/ld+json" set:html={JSON.stringify(softwareApplication)} />
     <script defer src="https://static.cloudflareinsights.com/beacon.min.js" data-cf-beacon='{"token": "b6d2802f48e6447c9f8ddef519445431"}'></script>
   </head>
   <body>
