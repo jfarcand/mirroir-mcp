@@ -109,9 +109,11 @@ extension MirroirMCP {
                 Coordinates are relative to the iPhone Mirroring window. \
                 Content follows the finger: swipe up (scroll down), swipe down \
                 (scroll up), swipe left to reveal content on the right. \
-                Fast swipes (short duration_ms) end with flick momentum, so \
-                paging surfaces like video feeds snap to the next page; use a \
-                long duration_ms for a slow precise scroll without inertia.
+                Paging surfaces like video feeds snap to the next page only on a \
+                real flick, 2000 points per second or faster: for example 75% of \
+                the screen height in 150 ms. The default 300 ms over a third of the \
+                screen scrolls a list a bounded distance and does not page a feed. \
+                Use a long duration_ms for a slow scroll without inertia.
                 """,
             inputSchema: [
                 "type": .string("object"),

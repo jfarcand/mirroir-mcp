@@ -109,7 +109,8 @@ enum OperatingManual {
         - `press_back` taps the back chevron; `press_home` goes to the Home Screen; \
         `press_app_switcher` shows open apps; `reset_app` force-quits one.
         - Scrolling: content follows the finger. `swipe` from bottom to top shows what is \
-        below. Fast swipes fling; a long `duration_ms` scrolls precisely.
+        below. To page a video feed, flick: about 75% of the screen height with `duration_ms` 150. \
+        A long `duration_ms` scrolls slowly without inertia.
         - `long_press` opens context menus; `double_tap` zooms or selects; `drag` moves \
         icons and sliders.
         - `run_steps` runs a list of steps you have already seen work, such as \

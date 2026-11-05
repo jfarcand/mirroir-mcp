@@ -62,6 +62,17 @@ enum SwipeGestureProfile {
     /// Minimum number of drag frames regardless of duration.
     static let minimumDragSteps: Int = 5
 
+    /// Gesture speed (pixels/second, pre-amplification) at or above which a
+    /// flick carries real trackpad fields. A real trackpad flick measures about
+    /// 3300. iOS honors the momentum of such a flick in full, so slower swipes
+    /// leave these fields out: list scrolling keeps its bounded travel, which
+    /// calibration, `scroll_to` and the explorers rely on.
+    static let trackpadFlickVelocity: Double = 2000.0
+
+    /// Reported velocity per point of a drag frame, measured from real
+    /// trackpad flicks: the hardware's velocity leads its per-frame delta.
+    static let dragVelocityPerPoint: Double = 1.75
+
     /// The complete delta schedule for one swipe gesture.
     struct Plan: Equatable {
         /// Deltas posted while the finger is down (phase Began/Changed).
@@ -69,6 +80,28 @@ enum SwipeGestureProfile {
         /// Deltas posted after the finger lifts (momentum phase).
         /// Empty when the gesture is too slow to be a flick.
         let momentum: [SwipeWheelStep]
+        /// Whether the events identify themselves as a real trackpad flick,
+        /// which iOS paging surfaces need before they snap to the next page.
+        var isTrackpadFlick = false
+
+        /// The velocity a trackpad reports for each drag frame.
+        var dragVelocities: [TrackpadVelocity] {
+            drag.map {
+                TrackpadVelocity(axis1: Double($0.wheel1) * dragVelocityPerPoint,
+                                 axis2: Double($0.wheel2) * dragVelocityPerPoint)
+            }
+        }
+
+        /// The velocity a trackpad reports for each momentum frame: it carries
+        /// on from the last drag frame and decays frame by frame.
+        var momentumVelocities: [TrackpadVelocity] {
+            var current = dragVelocities.last ?? .zero
+            return momentum.map { _ in
+                current = TrackpadVelocity(axis1: current.axis1 * momentumDecayPerFrame,
+                                           axis2: current.axis2 * momentumDecayPerFrame)
+                return current
+            }
+        }
     }
 
     /// Compute the delta schedule for a swipe covering `deltaX`/`deltaY`
@@ -109,7 +142,8 @@ enum SwipeGestureProfile {
         while let last = momentum.last, last.wheel1 == 0, last.wheel2 == 0 {
             momentum.removeLast()
         }
-        return Plan(drag: drag, momentum: momentum)
+        return Plan(drag: drag, momentum: momentum,
+                    isTrackpadFlick: velocity >= trackpadFlickVelocity)
     }
 
     /// Convert an amplified pixel distance into a wheel delta, saturating at
