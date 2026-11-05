@@ -209,6 +209,11 @@ protocol WindowEventPosting: Sendable {
     func focusKeys(in window: WindowInfo) -> Bool
     /// Wait between button events.
     func pause(microseconds: UInt32)
+    /// Whether `stamp` can address an event to a window on this Mac.
+    var canStampEvents: Bool { get }
+    /// Address `event` to `window` at the window-local `point`, so posting it
+    /// to the window's process reaches that window with the pointer elsewhere.
+    func stamp(_ event: CGEvent, at point: CGPoint, in window: WindowInfo)
 }
 
 /// The Mac's general pasteboard: type_text carries unmappable runs through it,

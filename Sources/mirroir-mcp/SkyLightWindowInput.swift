@@ -88,6 +88,11 @@ final class SkyLightWindowPoster: WindowEventPosting, @unchecked Sendable {
     private static let processSerialNumberSize = 8
 
     private let processForPID: ProcessForPID
+    private typealias SetWindowLocation = @convention(c) (CGEvent, CGPoint) -> Int32
+    /// Absent on a macOS without it; swipes then keep the HID path.
+    private let setWindowLocation: SetWindowLocation?
+    /// The event fields that name the window an event belongs to.
+    private static let windowNumberFields = [51, 52, 91].compactMap { CGEventField(rawValue: $0) }
     private let postEventRecord: PostEventRecord
     private let lock = NSLock()
     /// The number of the last mouse-down posted, shared by its mouse-up.
@@ -101,6 +106,8 @@ final class SkyLightWindowPoster: WindowEventPosting, @unchecked Sendable {
             DebugLog.log("skylight", "event-record entry points unavailable; window input disabled")
             return nil
         }
+        setWindowLocation = dlsym(skyLight, "SLEventSetWindowLocation")
+            .map { unsafeBitCast($0, to: SetWindowLocation.self) }
         postEventRecord = unsafeBitCast(post, to: PostEventRecord.self)
         processForPID = unsafeBitCast(psn, to: ProcessForPID.self)
         eventNumber = Int16(truncatingIfNeeded: getpid()) & Record.eventNumberMask
@@ -140,6 +147,19 @@ final class SkyLightWindowPoster: WindowEventPosting, @unchecked Sendable {
 
     func pause(microseconds: UInt32) {
         usleep(microseconds)
+    }
+
+    var canStampEvents: Bool { setWindowLocation != nil }
+
+    /// Without the window fields, a posted event finds no window and is dropped.
+    /// Setting an event's location clears its window location, so that comes last.
+    func stamp(_ event: CGEvent, at point: CGPoint, in window: WindowInfo) {
+        event.location = CGPoint(x: window.position.x + point.x, y: window.position.y + point.y)
+        for field in Self.windowNumberFields {
+            event.setIntegerValueField(field, value: Int64(window.windowID))
+        }
+        _ = setWindowLocation?(event, point)
+        event.timestamp = mach_absolute_time()
     }
 
     // MARK: - Private

@@ -116,6 +116,18 @@ final class SpotlightLaunchTests: XCTestCase {
         XCTAssertEqual(run.keys.keycodes, [UInt16(0), Self.returnKey], "Cmd+A, then Return")
     }
 
+    /// 18:35 on an XR: Spotlight holding "Photos" has an "App Store" section
+    /// heading with a result's icon above it, which opens nothing when tapped.
+    func testASectionHeadingIsNotATile() {
+        let held = screen([
+            el("Meilleur résultat", 86, 107), el(CoreMLElementDetector.iconLabel, 81, 189), el("Photos", 79, 219),
+            el(CoreMLElementDetector.iconLabel, 69, 526), el("App Store", 63, 599),
+            el("Q Photos - Ouvrir", 129, 872),
+        ])
+        let run = launch(name: "App Store", screens: [held, held, typedInstalled])
+        XCTAssertTrue(run.poster.buttons.isEmpty, "typed instead of tapping the heading")
+    }
+
     func testSpotlightAlreadyOpenIsNotToggledShut() {
         let run = launch(screens: [heldSpotlight, heldSpotlight, clock])
         XCTAssertNil(run.error)

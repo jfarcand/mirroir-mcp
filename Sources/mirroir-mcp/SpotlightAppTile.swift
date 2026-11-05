@@ -76,15 +76,21 @@ enum SpotlightAppTile {
     /// the top-hit heading, within `topHitReach`. Nil when the top result is not a
     /// tile (a message or a web row has its image beside its text).
     static func topHit(in elements: [TapPoint]) -> TapPoint? {
+        iconLabels(in: elements)
+            .filter { isInTopHitRow($0, in: elements) }
+            .min { $0.tapY < $1.tapY }
+    }
+
+    /// Whether `label` sits in the top-hit row, within `topHitReach` below its
+    /// heading. A section heading further down ("App Store", "Notes") can have a
+    /// result's icon above it and read as a tile, but it opens nothing.
+    static func isInTopHitRow(_ label: TapPoint, in elements: [TapPoint]) -> Bool {
         guard let heading = elements.first(where: { element in
             SpotlightDetector.topHitHeadings.contains {
                 element.text.lowercased().contains($0.lowercased())
             }
-        }) else { return nil }
-        let reach = heading.tapY ... (heading.tapY + topHitReach)
-        return iconLabels(in: elements)
-            .filter { reach.contains($0.tapY) }
-            .min { $0.tapY < $1.tapY }
+        }) else { return false }
+        return (heading.tapY ... (heading.tapY + topHitReach)).contains(label.tapY)
     }
 
     /// Whether two labels share a baseline: tiles of one row.

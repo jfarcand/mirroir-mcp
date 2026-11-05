@@ -33,6 +33,8 @@ extension InputSimulation {
             DebugLog.log(tool, "REJECTED: no multitouch trackpad")
             return Self.noTrackpadMessage(tool: tool)
         }
+        let handback = beginFrontHandback()
+        defer { handback.finish(targetPID: targetPID) }
         let prep = preparePointingInput(tag: tool, x: request.x, y: request.y)
         guard let info = prep.info else { return prep.error ?? "Unknown error" }
 

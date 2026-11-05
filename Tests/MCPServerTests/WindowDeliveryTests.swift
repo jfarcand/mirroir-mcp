@@ -69,19 +69,44 @@ final class WindowDeliveryTests: XCTestCase {
         XCTAssertTrue(poster.buttons.isEmpty, "no window ID, nothing to address")
     }
 
-    /// Drag records lose their intermediate points on macOS 26, and swipes
-    /// are scroll-wheel events: both stay on the HID path, which needs the
-    /// front. A swipe or drag here is refused, and the window poster is
-    /// never used.
-    func testSwipesAndDragsNeverUseTheWindowPoster() {
+    /// Drag events and records lose their intermediate points on macOS 26: a
+    /// drag stays on the HID path, which needs the front. Refused here, and the
+    /// window poster is never used.
+    func testADragNeverUsesTheWindowPoster() {
         let poster = RecordingWindowPoster()
         let input = makeInput(poster: poster)
-        XCTAssertNotNil(input.swipe(fromX: 200, fromY: 600, toX: 200, toY: 200,
-                                    durationMs: 300, cursorMode: nil))
         XCTAssertNotNil(input.drag(fromX: 200, fromY: 600, toX: 200, toY: 200,
                                    durationMs: 300, cursorMode: nil))
         XCTAssertTrue(poster.buttons.isEmpty)
         XCTAssertTrue(poster.keyFocusWindows.isEmpty)
+    }
+
+    /// A swipe is scroll events: addressed to the window, they scroll it with
+    /// the mirror covered and another app in front (measured on an XR, macOS 26.5).
+    /// The window's PID here is one no process has, so the events go nowhere.
+    func testASwipeGoesToTheWindowWithoutActivatingTheTarget() {
+        let poster = RecordingWindowPoster()
+        let bridge = StubBridge()
+        bridge.processRunning = false
+        bridge.frontmost = false
+        bridge.windowInfo = WindowInfo(windowID: windowID, position: CGPoint(x: 100, y: 50),
+                                       size: CGSize(width: 410, height: 898), pid: 99_999)
+        let input = InputSimulation(bridge: bridge, keyboardLayout: .usQWERTY,
+                                    keyPoster: RecordingKeyPoster(), windowPoster: poster)
+        XCTAssertNil(input.swipe(fromX: 200, fromY: 600, toX: 200, toY: 200,
+                                 durationMs: 100, cursorMode: nil))
+        XCTAssertEqual(poster.keyFocusWindows, [windowID], "one focus record for the gesture")
+        XCTAssertFalse(poster.stampedPoints.isEmpty)
+        XCTAssertEqual(Set(poster.stampedPoints.map(\.x)), [200])
+        XCTAssertEqual(Set(poster.stampedPoints.map(\.y)), [400], "every event at the midpoint")
+    }
+
+    func testWithoutEventStampingASwipeNeedsTheFront() {
+        let poster = RecordingWindowPoster()
+        poster.canStampEvents = false
+        XCTAssertNotNil(makeInput(poster: poster).swipe(fromX: 200, fromY: 600, toX: 200, toY: 200,
+                                                        durationMs: 100, cursorMode: nil))
+        XCTAssertTrue(poster.stampedPoints.isEmpty)
     }
 
     // MARK: - Keys

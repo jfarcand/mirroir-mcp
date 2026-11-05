@@ -68,6 +68,8 @@ final class InputSimulation: Sendable {
     /// making it the front app. Nil sends all input through the HID path,
     /// which brings the target to the front first.
     let windowPoster: (any WindowEventPosting)?
+    /// The Mac's front app and pointer, which a swipe or drag borrows and returns.
+    let macFront: MacFront
     /// The target's PID right now, or nil when the target is not running.
     ///
     /// Resolved on every read rather than captured at init: the target can
@@ -93,9 +95,11 @@ final class InputSimulation: Sendable {
          pasteVerifier: (any ScreenDescribing)? = nil,
          keyPoster: any KeyEventPosting = CGEventKeyPoster(),
          pasteboard: any PasteboardAccessing = GeneralPasteboard(),
-         windowPoster: (any WindowEventPosting)? = nil) {
+         windowPoster: (any WindowEventPosting)? = nil,
+         macFront: MacFront = .live) {
         self.bridge = bridge
         self.windowPoster = windowPoster
+        self.macFront = macFront
         // Every read behind a paste check or a Spotlight launch is one the
         // window kept its size across: launching from a landscape app rotates
         // the mirror while Spotlight opens.
@@ -351,53 +355,6 @@ final class InputSimulation: Sendable {
         return checkLivenessAfter(tag: "tap", action: "The tap")
     }
 
-    /// Swipe from one point to another relative to the target window.
-    /// Returns nil on success, or an error message on failure.
-    func swipe(fromX: Double, fromY: Double, toX: Double, toY: Double,
-               durationMs: Int = 300, cursorMode override: CursorMode? = nil) -> String?
-    {
-        let prep = preparePointingInput(tag: "swipe", x: fromX, y: fromY)
-        guard var info = prep.info else { return prep.error ?? "Unknown error" }
-
-        if let boundsError = validateBounds(x: toX, y: toY, info: info, tag: "swipe") {
-            return boundsError
-        }
-
-        // After a focus switch, the window is frontmost but not the "key window"
-        // for scroll input. Re-query window info AFTER activation to get fresh
-        // coordinates, then warp the cursor into the content area. The cursor
-        // warp + MayBegin priming in CGEventInput.swipe() engages the scroll
-        // subsystem. No click needed — a click risks hitting the title bar or
-        // triggering an unwanted iOS action.
-        if prep.focusChanged {
-            usleep(EnvConfig.spaceSwitchSettleUs)
-            if let freshInfo = bridge.getWindowInfo() {
-                info = freshInfo
-                DebugLog.log("swipe", "re-queried window after focus change: (\(Int(info.position.x)),\(Int(info.position.y)))")
-            }
-        }
-
-        let saved = saveCursor(mode: override)
-        defer { restoreCursor(saved) }
-
-        let startX = Double(info.position.x) + fromX
-        let startY = Double(info.position.y) + fromY
-        let endX = Double(info.position.x) + toX
-        let endY = Double(info.position.y) + toY
-
-        DebugLog.log("swipe", "from=(\(fromX),\(fromY))->(\(toX),\(toY)) screen=(\(Int(startX)),\(Int(startY)))->(\(Int(endX)),\(Int(endY))) duration=\(durationMs)ms")
-
-        let result = CGEventInput.swipe(
-            from: CGPoint(x: startX, y: startY),
-            to: CGPoint(x: endX, y: endY),
-            durationMs: durationMs,
-            targetPID: cursorFreePID
-        )
-        DebugLog.log("swipe", "CGEvent=\(result ? "OK" : "FAILED")")
-        guard result else { return "CGEvent swipe failed" }
-        return checkLivenessAfter(tag: "swipe", action: "The swipe")
-    }
-
     /// Long press at a position relative to the target window.
     /// Returns nil on success, or an error message on failure.
     func longPress(x: Double, y: Double, durationMs: Int = 500,
@@ -456,6 +413,8 @@ final class InputSimulation: Sendable {
     /// Returns nil on success, or an error message on failure.
     func drag(fromX: Double, fromY: Double, toX: Double, toY: Double,
               durationMs: Int = 1000, cursorMode override: CursorMode? = nil) -> String? {
+        let handback = beginFrontHandback()
+        defer { handback.finish(targetPID: targetPID) }
         let prep = preparePointingInput(tag: "drag", x: fromX, y: fromY)
         guard let info = prep.info else { return prep.error ?? "Unknown error" }
 

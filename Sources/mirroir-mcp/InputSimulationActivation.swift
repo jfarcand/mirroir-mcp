@@ -62,7 +62,7 @@ extension InputSimulation {
     }
 
     /// Ask System Events to make the process with `pid` frontmost.
-    private static func requestFrontmost(pid: pid_t) {
+    static func requestFrontmost(pid: pid_t) {
         let script = NSAppleScript(source: """
             tell application "System Events"
                 set frontmost of (first process whose unix id is \(pid)) to true

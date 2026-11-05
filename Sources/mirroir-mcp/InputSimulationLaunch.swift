@@ -90,8 +90,8 @@ extension InputSimulation {
         // An app tile a held query already shows is tapped instead: typing into a
         // held query can be ignored. The idle page holds no query and takes typing,
         // which is more reliable than its suggestion tiles.
-        if SpotlightDetector.holdsQuery(elements: opened.elements),
-           let tile = SpotlightAppTile.label(for: name, in: opened.elements) {
+        if let tile = SpotlightAppTile.label(for: name, in: opened.elements),
+           SpotlightAppTile.isInTopHitRow(tile, in: opened.elements) {
             return openTile(tile, name: name, spotlight: opened.elements)
         }
         let before = opened.elements.map(\.text)

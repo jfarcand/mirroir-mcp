@@ -121,10 +121,17 @@ enum CGEventInput {
 
     /// Swipe (scroll wheel) from one screen-absolute point to another.
     /// Uses scroll wheel events since iPhone Mirroring interprets scroll
-    /// wheel as swipe gestures (page scrolling, list scrolling).
+    /// wheel as swipe gestures (page scrolling, list scrolling). With `stamp`
+    /// and a `targetPID`, every event is addressed to the window, so neither the
+    /// pointer nor the front app is involved.
     static func swipe(from start: CGPoint, to end: CGPoint, durationMs: Int,
-                      targetPID: pid_t? = nil) -> Bool {
+                      targetPID: pid_t? = nil,
+                      stamp: ((CGEvent) -> Void)? = nil) -> Bool {
         let durationMs = safeDurationMs(durationMs)
+        let send = { (event: CGEvent) in
+            stamp?(event)
+            post(event, targetPID: targetPID)
+        }
         let deltaX = end.x - start.x
         let deltaY = end.y - start.y
 
@@ -139,7 +146,7 @@ enum CGEventInput {
         // may not register with the window's event tracking. The mouseMoved
         // event forces macOS to associate the cursor with this window.
         if let move = makeMouseEvent(.mouseMoved, at: midpoint) {
-            post(move, targetPID: targetPID)
+            send(move)
             usleep(50_000) // 50ms for window to register cursor presence
         }
 
@@ -158,7 +165,7 @@ enum CGEventInput {
         if let prime = makeScrollEvent(SwipeWheelStep(wheel1: 0, wheel2: 0), at: midpoint) {
             prime.setIntegerValueField(scrollPhaseField, value: phaseMayBegin)
             prime.setIntegerValueField(momentumPhaseField, value: 0)
-            post(prime, targetPID: targetPID)
+            send(prime)
             usleep(warpSettleUs)
         }
 
@@ -195,7 +202,7 @@ enum CGEventInput {
             let phase = index == 0 ? phaseBegan : phaseChanged
             scroll.setIntegerValueField(scrollPhaseField, value: phase)
             scroll.setIntegerValueField(momentumPhaseField, value: phaseNone)
-            post(scroll, targetPID: targetPID)
+            send(scroll)
             usleep(stepDelay)
         }
 
@@ -206,7 +213,7 @@ enum CGEventInput {
         if let lift = makeScrollEvent(SwipeWheelStep(wheel1: 0, wheel2: 0), at: midpoint) {
             lift.setIntegerValueField(scrollPhaseField, value: phaseEnded)
             lift.setIntegerValueField(momentumPhaseField, value: phaseNone)
-            post(lift, targetPID: targetPID)
+            send(lift)
             usleep(momentumFrameUs)
         }
 
@@ -220,7 +227,7 @@ enum CGEventInput {
             scroll.setIntegerValueField(scrollPhaseField, value: phaseNone)
             let momentumPhase = index == 0 ? momentumBegin : momentumContinue
             scroll.setIntegerValueField(momentumPhaseField, value: momentumPhase)
-            post(scroll, targetPID: targetPID)
+            send(scroll)
             usleep(momentumFrameUs)
         }
 
@@ -232,7 +239,7 @@ enum CGEventInput {
            let close = makeScrollEvent(SwipeWheelStep(wheel1: 0, wheel2: 0), at: midpoint) {
             close.setIntegerValueField(scrollPhaseField, value: phaseNone)
             close.setIntegerValueField(momentumPhaseField, value: momentumEnd)
-            post(close, targetPID: targetPID)
+            send(close)
             usleep(stepDelay)
         }
 

@@ -2,21 +2,23 @@
 
 ## Focus Stealing
 
-On iPhone Mirroring, taps and keystrokes no longer take the front: the app you are using keeps keyboard focus and the cursor does not move. Swipes and other gestures still bring iPhone Mirroring to the front.
+On iPhone Mirroring, taps, keystrokes and swipes no longer take the front: the app you are using keeps keyboard focus and the cursor does not move. Drags and two-finger gestures still bring iPhone Mirroring forward for their duration, then return the front and the pointer.
 
 | Input | Front app | How it reaches the iPhone |
 |-------|-----------|---------------------------|
 | `tap`, `double_tap`, `long_press`, `press_back` (an OCR tap on the back chevron) | Kept | A window event addressed to the iPhone Mirroring window. It lands even when other windows cover the mirror. |
 | `type_text`, `press_key`, `shake`, the typing inside `launch_app` and `open_url` | Kept | One event makes the mirror the key window of its own app, without activating it; the keys are then addressed to the iPhone Mirroring process. |
-| `swipe`, `drag`, `scroll_to`, `hold_keys`, `touch`, `pinch`, `rotate` | Taken | HID events, which macOS routes to the frontmost app. iPhone Mirroring is activated first and keeps the front afterwards. |
+| `swipe`, `scroll_to` | Kept | Scroll events addressed to the iPhone Mirroring window. They land with the mirror fully covered and the cursor elsewhere. |
+| `drag`, `pinch`, `rotate` | Borrowed | HID events, which macOS routes to the frontmost app. iPhone Mirroring is activated for the gesture (measured: about 1 s), then the previous front app and the pointer are returned. |
+| `hold_keys`, `touch` | Taken | HID events that span the gesture or several calls. iPhone Mirroring is activated first and keeps the front afterwards. |
 
 Measured on macOS 26.5 with iTerm in front and the front app sampled every 0.2s: Clock tab taps, taps with a Finder window over the whole mirror, typing, a select-all/copy/delete/paste round trip, back-to-back Spotlight launches and a launch that first had to start iPhone Mirroring all left iTerm in front throughout.
 
 ### Why Gestures Still Take the Front
 
-On macOS 26.5, a drag sent as window events loses its intermediate points (iOS sees a press and a release, so a drag reads as a tap), and scroll events routed to a window are ignored. Swipes, drags and multi-step gestures therefore stay on HID input, which needs iPhone Mirroring in front. Generic macOS window targets use HID input for everything.
+On macOS 26.5, a drag sent as window events or window records loses its intermediate points (iOS sees a press and a release, so a drag reads as a tap). Drags and multi-step gestures therefore stay on HID input, which needs iPhone Mirroring in front. Swipes do not: measured on macOS 26.5 with iTerm in front and Finder covering the mirror, window-addressed scroll events moved App Store lists and paged Weather with the front app unchanged in every sample. A swipe that scrolls nothing with the cursor path, such as pulling the Photos grid to older photos, scrolls nothing here either. Generic macOS windows keep their activating behavior.
 
-Read-only tools (`screenshot`, `describe_screen`, `start_recording`, `stop_recording`, `status`, `get_orientation`, `check_health`, `list_skills`, `get_skill`, `list_targets`, `calibrate_component`) do **not** steal focus.
+Read-only tools (`screenshot`, `describe_screen`, `start_recording`, `stop_recording`, `status`, `get_orientation`, `check_health`, `list_skills`, `get_skill`, `list_targets`, `calibrate_component`) do **not** steal focus, with one exception: when ScreenCaptureKit cannot deliver a frame, capture falls back to `screencapture`, which activates the target first. Several mirroir servers running the same binary can cause that.
 
 ### Mitigations for Gestures
 

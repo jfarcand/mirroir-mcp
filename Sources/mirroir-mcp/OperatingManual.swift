@@ -132,10 +132,10 @@ enum OperatingManual {
 
         ## The user's Mac
 
-        Taps and typing go to the iPhone Mirroring window without bringing it to the front, \
-        so the user can keep working. Swipes, drags and other gestures bring it to the front \
-        for their duration. If another window covers the mirror, a gesture is refused rather \
-        than sent to the wrong app.
+        Taps, typing and swipes go to the iPhone Mirroring window without bringing it to the \
+        front, so the user can keep working. Drags and two-finger gestures bring it forward for \
+        their duration and then return the front and the pointer. If another window covers the \
+        mirror, those gestures are refused rather than sent to the wrong app.
 
         ## When the session is blocked
 

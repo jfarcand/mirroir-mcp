@@ -14,6 +14,8 @@ private struct SilentWindowPoster: WindowEventPosting {
     func postButton(down: Bool, at point: CGPoint, clickCount: Int, in window: WindowInfo) -> Bool { true }
     func focusKeys(in window: WindowInfo) -> Bool { true }
     func pause(microseconds: UInt32) {}
+    var canStampEvents: Bool { true }
+    func stamp(_ event: CGEvent, at point: CGPoint, in window: WindowInfo) {}
 }
 
 final class LaunchOnInputTests: XCTestCase {
