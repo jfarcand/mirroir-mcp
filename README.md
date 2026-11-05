@@ -67,17 +67,19 @@ Start recording, open Instagram, scroll the feed and open my profile, stop recor
 
 ### How it compares
 
-| | mirroir | [Maestro](https://github.com/mobile-dev-inc/Maestro) | [mobile-mcp](https://github.com/mobile-next/mobile-mcp) | [Appium](https://github.com/appium/appium) |
+| | mirroir | [phone-harness](https://github.com/phone-harness/phone-harness) | [mobile-mcp](https://github.com/mobile-next/mobile-mcp) | [Appium](https://github.com/appium/appium) |
 |---|---|---|---|---|
-| Physical iPhone, no Developer Mode or signing | Yes — stock phone via iPhone Mirroring | No — its README: *"Physical iOS devices are not yet supported."* | USB-connected, trusted device (see its README) | No — WebDriverAgent via Xcode, Developer Mode |
-| App Store apps you can't build | Yes | No — iOS runs on simulator builds | Yes | Yes, on a provisioned device |
-| Replay without an LLM | Yes — compiled skills, `mirroir test` | Yes — YAML flows | No — the agent drives every run | Yes — test code |
-| Distinct drift verdict | Yes — `DRIFT`, exit 65 | No — pass / fail | No | No — pass / fail |
-| One scenario across iPhone + web + HTTP | Yes — `mirroir-run` | Web in the same flow syntax | No | Via your own test code |
+| Physical iPhone, no Developer Mode or signing | Yes — stock phone via iPhone Mirroring | Yes — stock phone via iPhone Mirroring | USB-connected, trusted device (see its README) | No — WebDriverAgent via Xcode, Developer Mode |
+| App Store apps you can't build | Yes | Yes | Yes | Yes, on a provisioned device |
+| Your own iPhone from any MCP client | Yes | No — its MCP server is cloud-only; local phones use its CLI | Yes | Through the separate [appium-mcp](https://github.com/appium/appium-mcp) |
+| Replay without an LLM | Yes — compiled skills, `mirroir test` | Python scripts you write; no recorder or compiled replay | No — the agent drives every run | Yes — test code |
+| Distinct drift verdict | Yes — `DRIFT`, exit 65 | No | No | No — pass / fail |
+| One scenario across iPhone + web + HTTP | Yes — `mirroir-run` | No | No | Via your own test code |
 | Android | No — an emulator window can be driven only as a generic macOS window | Yes | Yes | Yes |
-| iOS Simulator | No | Yes | Yes | Yes |
+| iOS Simulator | No | No | Yes | Yes |
+| Hosted cloud phones | No | Yes — Phone Harness Cloud | Yes — Mobile Next Cloud | Via third-party device clouds |
 
-Each tool has strengths the table doesn't capture. Maestro, mobile-mcp and Appium cover Android and simulators, which mirroir doesn't. mirroir is built for the case they leave open: a real, unmodified iPhone running apps you don't build.
+phone-harness is the closest tool here: it also drives a stock iPhone through iPhone Mirroring, and it adds Android and hosted phones, which mirroir doesn't have. mobile-mcp and Appium cover Android and simulators too. mirroir goes further after the agent's first run: that run becomes a replay that needs no LLM, and a test that tells you when the output moves.
 
 ## Safety
 

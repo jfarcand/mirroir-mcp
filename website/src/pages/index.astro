@@ -408,23 +408,25 @@ if (!skillsAvailable) {
           <tr>
             <th></th>
             <th>mirroir</th>
-            <th><a href="https://github.com/mobile-dev-inc/Maestro" rel="noopener noreferrer">Maestro</a></th>
+            <th><a href="https://github.com/phone-harness/phone-harness" rel="noopener noreferrer">phone-harness</a></th>
             <th><a href="https://github.com/mobile-next/mobile-mcp" rel="noopener noreferrer">mobile-mcp</a></th>
             <th><a href="https://github.com/appium/appium" rel="noopener noreferrer">Appium</a></th>
           </tr>
         </thead>
         <tbody>
-          <tr><th>Physical iPhone, no Developer Mode or signing</th><td>Yes &mdash; stock phone via iPhone Mirroring</td><td>No &mdash; physical iOS devices not supported</td><td>USB-connected, trusted device</td><td>No &mdash; WebDriverAgent via Xcode, Developer Mode</td></tr>
-          <tr><th>App Store apps you can't build</th><td>Yes</td><td>No &mdash; iOS runs on simulator builds</td><td>Yes</td><td>Yes, on a provisioned device</td></tr>
-          <tr><th>Replay without an LLM</th><td>Yes &mdash; compiled skills</td><td>Yes &mdash; YAML flows</td><td>No &mdash; the agent drives every run</td><td>Yes &mdash; test code</td></tr>
+          <tr><th>Physical iPhone, no Developer Mode or signing</th><td>Yes &mdash; stock phone via iPhone Mirroring</td><td>Yes &mdash; stock phone via iPhone Mirroring</td><td>USB-connected, trusted device</td><td>No &mdash; WebDriverAgent via Xcode, Developer Mode</td></tr>
+          <tr><th>App Store apps you can't build</th><td>Yes</td><td>Yes</td><td>Yes</td><td>Yes, on a provisioned device</td></tr>
+          <tr><th>Your own iPhone from any MCP client</th><td>Yes</td><td>No &mdash; its MCP server is cloud-only; local phones use its CLI</td><td>Yes</td><td>Through the separate <a href="https://github.com/appium/appium-mcp" rel="noopener noreferrer">appium-mcp</a></td></tr>
+          <tr><th>Replay without an LLM</th><td>Yes &mdash; compiled skills</td><td>Python scripts you write; no recorder or compiled replay</td><td>No &mdash; the agent drives every run</td><td>Yes &mdash; test code</td></tr>
           <tr><th>Distinct drift verdict</th><td>Yes &mdash; <code>DRIFT</code>, exit 65</td><td>No</td><td>No</td><td>No</td></tr>
-          <tr><th>One scenario across iPhone + web + HTTP</th><td>Yes &mdash; <code>mirroir-run</code></td><td>Web in the same flow syntax</td><td>No</td><td>Via your own test code</td></tr>
+          <tr><th>One scenario across iPhone + web + HTTP</th><td>Yes &mdash; <code>mirroir-run</code></td><td>No</td><td>No</td><td>Via your own test code</td></tr>
           <tr><th>Android</th><td>No</td><td>Yes</td><td>Yes</td><td>Yes</td></tr>
-          <tr><th>iOS Simulator</th><td>No</td><td>Yes</td><td>Yes</td><td>Yes</td></tr>
+          <tr><th>iOS Simulator</th><td>No</td><td>No</td><td>Yes</td><td>Yes</td></tr>
+          <tr><th>Hosted cloud phones</th><td>No</td><td>Yes &mdash; Phone Harness Cloud</td><td>Yes &mdash; Mobile Next Cloud</td><td>Via third-party device clouds</td></tr>
         </tbody>
       </table>
     </div>
-    <p>Maestro, mobile-mcp and Appium cover Android and simulators, which mirroir doesn't. mirroir is built for the case they leave open: a real, unmodified iPhone running apps you don't build.</p>
+    <p>phone-harness is the closest tool here: it also drives a stock iPhone through iPhone Mirroring, and it adds Android and hosted phones, which mirroir doesn't have. mobile-mcp and Appium cover Android and simulators too. mirroir goes further after the agent's first run: that run becomes a replay that needs no LLM, and a test that tells you when the output moves.</p>
   </section>
 
   <!-- How it works -->
@@ -968,8 +970,8 @@ if (!skillsAvailable) {
         <p>Yes. It operates at the screen level through iPhone Mirroring — no source code, SDK, or jailbreak required. If you can see it on screen, the AI can interact with it.</p>
       </details>
       <details>
-        <summary>How is it different from Maestro or Appium?</summary>
-        <p>Maestro does not support physical iOS devices, and Appium needs WebDriverAgent built with Xcode and Developer Mode on the phone. mirroir drives a stock iPhone through iPhone Mirroring, so nothing is installed or enabled on the device. They cover Android and simulators, which mirroir doesn't. Already have Maestro flows? <code>mirroir-run import maestro</code> converts them.</p>
+        <summary>How is it different from phone-harness or Appium?</summary>
+        <p>phone-harness also drives a stock iPhone through iPhone Mirroring, and it adds Android and hosted phones. mirroir exposes your own iPhone over MCP and turns a run into a replay with no LLM and a distinct drift verdict. Appium needs WebDriverAgent built with Xcode and Developer Mode on the phone; mirroir installs and enables nothing on the device. Appium covers Android and simulators, which mirroir doesn't. Already have Maestro flows? <code>mirroir-run import maestro</code> converts them.</p>
       </details>
       <details>
         <summary>Does it need any kernel extensions or root access?</summary>
