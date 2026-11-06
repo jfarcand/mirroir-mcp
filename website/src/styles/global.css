@@ -1134,6 +1134,13 @@ footer .trademark {
   margin: 1.25rem auto 0;
 }
 
+@media (max-width: 720px) {
+  .hero-flow code {
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+  }
+}
+
 .snippet {
   background: var(--color-code-bg);
   border: 1px solid var(--color-border);
