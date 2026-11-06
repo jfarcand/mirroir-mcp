@@ -8,7 +8,7 @@
 [![Build](https://github.com/jfarcand/mirroir-mcp/actions/workflows/build.yml/badge.svg)](https://github.com/jfarcand/mirroir-mcp/actions/workflows/build.yml)
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue)](LICENSE)
 [![macOS 15+](https://img.shields.io/badge/macOS-15%2B-black?logo=apple)](https://support.apple.com/en-us/120421)
-[![Discord](https://img.shields.io/discord/1481795325953048627?logo=discord&label=Discord)](https://discord.gg/jVDBbMjPMf)
+[![Discord](https://img.shields.io/discord/1481795325953048627?logo=discord&label=Discord)](https://discord.gg/WcBaxWKhs)
 
 ### Let your agent use your real iPhone, then replay what it did without an LLM.
 
@@ -123,7 +123,7 @@ See [Security](docs/security.md) for the full threat model.
 
 ## Community
 
-Join the [Discord server](https://discord.gg/jVDBbMjPMf) to ask questions, share skills, and discuss ideas. Contributions are welcome: see [CONTRIBUTING.md](CONTRIBUTING.md). By submitting a patch, you agree to the [Contributor License Agreement](CLA.md); your Git commit metadata serves as your electronic signature.
+Join the [Discord server](https://discord.gg/WcBaxWKhs) to ask questions, share skills, and discuss ideas. Contributions are welcome: see [CONTRIBUTING.md](CONTRIBUTING.md). By submitting a patch, you agree to the [Contributor License Agreement](CLA.md); your Git commit metadata serves as your electronic signature.
 
 ---
 
