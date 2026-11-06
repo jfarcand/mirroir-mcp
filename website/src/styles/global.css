@@ -954,6 +954,17 @@ section > p {
   display: block;
 }
 
+.demo-slide video.demo-wide {
+  max-width: 720px;
+}
+
+.demo-caption {
+  max-width: 720px;
+  margin: 0.6rem auto 0;
+  font-size: 0.85rem;
+  color: var(--color-muted);
+}
+
 /* Lightbox */
 .demo-lightbox {
   display: none;

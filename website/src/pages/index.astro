@@ -269,27 +269,36 @@ if (!skillsAvailable) {
       Let your agent use your real iPhone, then replay what it did without an LLM.
     </p>
     <p class="subtitle">
-      iPhone automation for AI agents: drive a real, stock iPhone from any MCP client &mdash; <strong>no Developer Mode, no Xcode, no WebDriverAgent, no jailbreak</strong>. mirroir works through macOS iPhone Mirroring, so it reaches any app on your phone, App Store apps you could never build included. Tell your AI to test a login flow or explore an app &mdash; it sees the screen, taps what it needs, and figures the rest out.
+      iPhone automation for AI agents: drive a real, stock iPhone from any MCP client, with <strong>no Developer Mode, no Xcode, no WebDriverAgent and no jailbreak</strong>. mirroir works through macOS iPhone Mirroring, so it reaches any app on your phone, including App Store apps you could never build. Ask your agent to test a login flow or run an errand: it reads the screen, taps what it needs and works out the rest.
     </p>
     <pre class="snippet hero-flow"><code>{agentFlow}</code></pre>
   </header>
 
   <!-- Demo Videos -->
   <section class="demo-section">
-    <h2>See it in action</h2>
+    <h2>Real runs on a real iPhone</h2>
     <div class="carousel demo-carousel">
       <div class="carousel-track">
         <div class="carousel-slide demo-slide">
-          <h3>Login Flow</h3>
+          <h3>Cross-app errand</h3>
+          <video class="demo-wide" loop muted playsinline aria-label="An AI agent reads the commute time in Waze on a real iPhone, then posts it in Slack">
+            <source src={`${import.meta.env.BASE_URL}video2-waze-slack.mp4`} type="video/mp4" />
+          </video>
+          <p class="demo-caption">Sped up. The agent reads the ETA in Waze, then posts it in Slack.</p>
+        </div>
+        <div class="carousel-slide demo-slide">
+          <h3>Chess against the strongest bot</h3>
+          <video class="demo-wide" loop muted playsinline aria-label="The console and a real iPhone side by side during a full chess game: each move is logged as it is played, ending in checkmate against the Maximum bot on Chess.com">
+            <source src={`${import.meta.env.BASE_URL}chess-vs-maximum.mp4`} type="video/mp4" />
+          </video>
+          <p class="demo-caption">A vision model reads the board, Stockfish picks the moves, and mirroir plays them against Chess.com's Maximum bot. The opening runs at 2.5&times;, the middle game at 45&times;, the finish at 2&times;.</p>
+        </div>
+        <div class="carousel-slide demo-slide">
+          <h3>Login flow</h3>
           <video loop muted playsinline aria-label="An AI agent tests a login screen in Expo Go on a real iPhone">
             <source src={`${import.meta.env.BASE_URL}video1-expo-login.mp4`} type="video/mp4" />
           </video>
-        </div>
-        <div class="carousel-slide demo-slide">
-          <h3>Cross-App Workflow</h3>
-          <video loop muted playsinline aria-label="An AI agent reads the commute time in Waze on a real iPhone, then posts it in Slack">
-            <source src={`${import.meta.env.BASE_URL}video2-waze-slack.mp4`} type="video/mp4" />
-          </video>
+          <p class="demo-caption">Sped up. An agent tests a login screen in Expo Go.</p>
         </div>
       </div>
       <button class="carousel-prev" aria-label="Previous">&#8249;</button>
@@ -389,6 +398,10 @@ if (!skillsAvailable) {
         <p class="example-steps">The iPhone stays stock: no signing, no provisioning profile, no on-device agent. If iPhone Mirroring shows it, mirroir can drive it.</p>
       </div>
       <div class="example-card">
+        <p class="example-prompt">Your Mac stays yours</p>
+        <p class="example-steps">Taps, typing and swipes reach the mirror without bringing it to the front, so you can keep working. Drags and two-finger gestures bring it forward for a moment, then hand your app back.</p>
+      </div>
+      <div class="example-card">
         <p class="example-prompt">Explore once, replay without an LLM</p>
         <p class="example-steps"><code>generate_skill</code> explores an app and writes SKILL.md files. A compiled skill replays from the CLI with no AI in the loop, so CI runs are deterministic and cost no tokens.</p>
       </div>
@@ -399,6 +412,10 @@ if (!skillsAvailable) {
       <div class="example-card">
         <p class="example-prompt">One scenario, many surfaces</p>
         <p class="example-steps">A single scenario can drive the iPhone, a browser (Playwright), HTTP endpoints and subprocesses, then compare what the page and the phone showed.</p>
+      </div>
+      <div class="example-card">
+        <p class="example-prompt">It plays games, too</p>
+        <p class="example-steps">A <code>scene:</code> step plays a turn-based or tap-driven game, frame by frame, under a hard budget. <a href="#games">See how</a>.</p>
       </div>
     </div>
 
@@ -454,21 +471,21 @@ if (!skillsAvailable) {
     </div>
 
     <div class="agent-walkthrough">
-      You say <em>"send Alice a message."</em> The AI screenshots the phone, reads the screen via OCR, taps Messages, finds Alice's conversation, types your message, and hits Send. No script. No coordinates. Just intent.
+      You say <em>"send Alice a message."</em> The AI screenshots the phone, reads the screen via OCR, taps Messages, finds Alice's conversation, types your message, and hits Send.
     </div>
   </section>
 
-  <!-- Games & agents -->
-  <section>
-    <h2>Games and agents</h2>
+  <!-- Games -->
+  <section id="games">
+    <h2>It plays games, too</h2>
     <p>
-      mirroir is growing archetype-aware coverage for <strong>games</strong>. A game splits into two surfaces. The <strong>shell</strong> &mdash; menu, shop, settings, win/lose screens &mdash; is ordinary text-labelled UI that today's skills already drive. The <strong>scene</strong> &mdash; the playfield &mdash; is a vision-driven loop an agent follows one touch at a time. The honest targets are game <strong>QA smoke tests, tutorial walkthroughs, and scripted demos</strong> &mdash; not real-time play: iPhone Mirroring exposes a single pointer, so twin-stick and twitch games stay out of reach.
+      A <a href="https://github.com/jfarcand/mirroir-mcp/blob/main/docs/games.md" rel="noopener noreferrer"><code>scene:</code> step</a> plays a turn-based or tap-driven game, frame by frame, until the game is won or lost or its budget of frames, tokens or time runs out. A run that exhausts its budget is inconclusive (exit 66), never a silent pass.
     </p>
     <p>
-      The scene loop ships as the <a href="https://github.com/jfarcand/mirroir-mcp/blob/main/docs/skills-marketplace.md#scenes" rel="noopener noreferrer"><code>scene:</code> step</a>: a <code>kind: game</code> skill names its objective, its calibrated controls and its win/lose screens, and the vision model picks one control per frame until the game is won, lost, or the step's frame, token or time budget runs out. A run that exhausts its budget is inconclusive (exit 66), never a silent pass.
+      The chess game above is one of these runs. A vision model reads the board, Stockfish picks each move, and mirroir plays it on a stock iPhone. It beat Chess.com's Maximum bot (3200) in 65 frames and about 166,000 tokens.
     </p>
     <p>
-      Token efficiency makes the scene loop affordable. Screenshots are roughly 90% of an agent's cost, so text-rich shell screens read through <code>describe_screen</code> with no image at all, and a region/scale capture knob trims the per-frame image cost where a screenshot is unavoidable. On the playfield, <code>describe_screen</code> in vision mode sends the frame to an LLM through embacle &mdash; measured on a live Brawl Stars match, one frame costs ~24k prompt tokens and 3&ndash;14 s, which GitHub Copilot bills as a single premium request on Claude Sonnet 5.5.
+      Menus, shops and win screens are ordinary UI that skills already drive. iPhone Mirroring exposes a single pointer, so twin-stick and twitch games stay out of reach.
     </p>
   </section>
 
@@ -549,7 +566,7 @@ if (!skillsAvailable) {
 
   <!-- Just tell your AI -->
   <section>
-    <h2>Just tell your AI</h2>
+    <h2>Ask your agent</h2>
     <p>Paste any of these into Claude Code, ChatGPT, Cursor, or any MCP client.</p>
 
     <div class="example-cards">
@@ -576,16 +593,16 @@ if (!skillsAvailable) {
   <section>
     <h2>From exploration to CI</h2>
     <p>
-      When you need deterministic, repeatable testing, mirroir provides a full pipeline. Point it at any app &mdash; it autonomously discovers every reachable screen using BFS graph traversal (screens are nodes, taps are edges), then outputs a bundle of ready-to-run SKILL.md files. Pair it with an <code>APP.md</code> map for guided exploration. Edit the skills, test them from the CLI, diagnose failures with <code>--agent</code>.
+      When you need repeatable tests, mirroir takes you from a first exploration to CI. Point it at an app: it explores the screens it can reach, breadth-first, then writes a bundle of SKILL.md files. Pair it with an <code>APP.md</code> map for guided exploration. Edit the skills, test them from the CLI, diagnose failures with <code>--agent</code>.
     </p>
 
     <div class="pipeline-grid">
       <div class="pipeline-step">
         <div class="pipeline-icon">1</div>
         <h3>Generate</h3>
-        <p>A single <code>generate_skill(action: "explore")</code> call runs autonomous BFS traversal &mdash; exploring each screen breadth-first, replaying paths to reach child screens, building a navigation graph of the entire app. Pass <code>explorer: "dfs"</code> for depth-first instead.</p>
+        <p>A single <code>generate_skill(action: "explore")</code> call explores each screen breadth-first, replays paths to reach child screens, and builds a navigation graph of what it reached. Pass <code>explorer: "dfs"</code> for depth-first instead.</p>
         <div class="pipeline-cmd">
-          <code>generate_skill(action: "explore", app_name: "Settings")</code>
+          <code>generate_skill(action: "explore", app_name: "Weather")</code>
         </div>
       </div>
       <div class="pipeline-step">
@@ -859,7 +876,7 @@ if (!skillsAvailable) {
 
   <!-- What it does -->
   <section>
-    <h2>What Does mirroir-mcp Do?</h2>
+    <h2>What mirroir-mcp can do</h2>
     <p>39 tools exposed as an MCP server.</p>
 
     <div class="tool-grid">
@@ -926,9 +943,9 @@ if (!skillsAvailable) {
 
   <!-- Security -->
   <section>
-    <h2>Security-first by design</h2>
+    <h2>Safety</h2>
     <p>
-      Giving an AI access to your phone demands defense in depth. mirroir-mcp is fail-closed at every layer.
+      Giving an AI access to your phone demands defense in depth, so mirroir-mcp is fail-closed.
     </p>
 
     <div class="security-grid">
@@ -941,8 +958,8 @@ if (!skillsAvailable) {
         <p><code>blockedApps</code> in <code>permissions.json</code> prevents the AI from interacting with sensitive apps like Wallet or Banking &mdash; even if mutating tools are allowed.</p>
       </div>
       <div class="security-layer">
-        <h3>No root required</h3>
-        <p>Runs as a regular user process using the macOS CGEvent API. No daemons, no kernel extensions, no root privileges &mdash; just Accessibility permissions.</p>
+        <h3>No root, no daemon</h3>
+        <p>Runs as your user with Screen Recording and Accessibility permissions. No daemons, no kernel extensions, no root privileges.</p>
       </div>
     </div>
 
@@ -963,12 +980,12 @@ if (!skillsAvailable) {
         <p>Without a config file, only read-only tools are exposed. Mutating tools require explicit opt-in. Use <code>blockedApps</code> in <code>permissions.json</code> to deny access to sensitive apps. Closing iPhone Mirroring kills all input immediately.</p>
       </details>
       <details>
-        <summary>Why does my cursor jump when the AI is working?</summary>
-        <p>macOS routes HID input to the frontmost app. The server must activate iPhone Mirroring before each input. Put it in a separate macOS Space to keep your workspace undisturbed, or pass <code>cursor_mode: "preserving"</code> to restore the cursor to its original position after each action.</p>
+        <summary>Will it take over my Mac while it works?</summary>
+        <p>Not for most actions. Taps, typing and swipes reach the mirror without bringing it to the front, so you can keep working. Drags and two-finger gestures bring it forward for a moment, then hand your app back.</p>
       </details>
       <details>
         <summary>Does it work with any iPhone app?</summary>
-        <p>Yes. It operates at the screen level through iPhone Mirroring — no source code, SDK, or jailbreak required. If you can see it on screen, the AI can interact with it.</p>
+        <p>Yes. It works at the screen level through iPhone Mirroring, with no source code, SDK or jailbreak. If you can see it on screen, your agent can interact with it.</p>
       </details>
       <details>
         <summary>How is it different from phone-harness or Appium?</summary>
@@ -976,7 +993,7 @@ if (!skillsAvailable) {
       </details>
       <details>
         <summary>Does it need any kernel extensions or root access?</summary>
-        <p>No. All input (touch and keyboard) is delivered via the macOS CGEvent API, which only requires Accessibility permissions. No kernel extensions, no root privileges, no helper daemons.</p>
+        <p>No. It runs as your user with Screen Recording and Accessibility permissions. No kernel extensions, no root privileges, no helper daemons.</p>
       </details>
       <details>
         <summary>Can it control macOS apps too, not just iPhone?</summary>
