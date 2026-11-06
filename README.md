@@ -61,9 +61,9 @@ Start recording, open Instagram, scroll the feed and open my profile, stop recor
 - **It plays games, too.** A `scene:` step plays a turn-based or tap-driven game, frame by frame, under a hard budget. See [Games](docs/games.md).
 
   <p align="center">
-    <img src="website/public/chess-vs-maximum.gif" alt="A full chess game on a real iPhone, sped up, ending in checkmate against the Maximum bot on Chess.com" width="240" />
+    <img src="website/public/chess-vs-maximum.gif" alt="The console and a real iPhone side by side during a full chess game: each move is logged as it is played, ending in checkmate against the Maximum bot on Chess.com" width="720" />
   </p>
-  <p align="center"><em>A real game on a real iPhone, sped up 45×: the model reads the board, Stockfish picks the moves, mirroir plays them against Chess.com's strongest bot.</em></p>
+  <p align="center"><em>A real game on a real iPhone: the model reads the board, Stockfish picks the moves, mirroir plays them against Chess.com's strongest bot. The opening runs at 2.5×, the middle game at 45×, the finish at 2×.</em></p>
 
 ### How it compares
 
