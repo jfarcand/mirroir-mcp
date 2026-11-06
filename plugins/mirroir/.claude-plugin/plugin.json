@@ -1,7 +1,7 @@
 {
   "name": "mirroir",
   "displayName": "mirroir",
-  "version": "0.44.0",
+  "version": "0.45.0",
   "description": "Drive a real iPhone through macOS iPhone Mirroring: describe_screen (OCR), tap, swipe, type, launch apps, and author replayable skills. Requires macOS 15+ on Apple Silicon with iPhone Mirroring paired.",
   "author": {
     "name": "Jean-Francois Arcand",
