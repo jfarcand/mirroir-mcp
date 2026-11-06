@@ -10,7 +10,7 @@ on:
     # branch AND opens a PR, so the push run would duplicate the PR run.
     branches-ignore: ['dependabot/**']
     # No `paths` here: one paths filter applies to main as well, and main
-    # always runs this lane — the action installs whatever mirroir-run release
+    # runs this lane unless a push changed only documentation — the action installs whatever mirroir-run release
     # is latest, so a new release can break it with no change in this repo. A
     # feature-branch push runs it only when the action changed — the
     # `changes` job below. workflow_dispatch forces a full run on any branch.

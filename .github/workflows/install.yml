@@ -13,8 +13,9 @@ on:
     tags: ['v*']
     # No `paths` here. Path filters ARE evaluated for tag pushes, against the
     # tagged commit's own diff, so a filter would gate the v* release lane;
-    # and one filter applies to main and every branch alike. Main and the
-    # release tags always run this lane; a feature-branch push runs it only
+    # and one filter applies to main and every branch alike. Release tags
+    # always run this lane, and main does unless a push changed only
+    # documentation; a feature-branch push runs it only
     # when a build input changed — the `changes` job below names them, and a
     # Sources/ change on a branch is build.yml's release build to cover.
     # workflow_dispatch forces a full run on any branch.

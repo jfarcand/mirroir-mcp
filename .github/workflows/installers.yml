@@ -14,7 +14,8 @@ on:
     # here (feat/..., fix/...), so non-main pushes were effectively unbuilt.
     tags: ['v*']
     # No `paths` here: one paths filter applies to every ref the trigger
-    # covers, and main and the release tags always run every installer. A
+    # covers. Release tags always run every installer, and main does unless a
+    # push changed only documentation. A
     # feature-branch push runs them only when an installer input changed —
     # the `changes` job below names those inputs; Sources/ and Tests/ on a
     # branch are build.yml's to cover. workflow_dispatch forces a full run.
@@ -58,13 +59,15 @@ jobs:
         with:
           fetch-depth: 0
           filter: blob:none
+      - name: Test the gate
+        run: bash scripts/ci/changed-paths-test.sh
       - id: gate
         env:
           PUSH_BEFORE: ${{ github.event.before }}
         run: >-
           bash scripts/ci/changed-paths.sh
           'mirroir.sh' 'agents/*' 'npm/*' 'Package.swift' 'Package.resolved'
-          'scripts/package-fake-app.sh' 'scripts/ci/changed-paths.sh'
+          'scripts/package-fake-app.sh' 'scripts/ci/changed-paths.sh' 'scripts/ci/changed-paths-test.sh'
           '.github/actions/setup-embacle/*' '.github/actions/setup-fake-mirroring/*'
           '.github/workflows/installers.yml'
 
