@@ -17,6 +17,7 @@ enum SessionBlockMove: String, Sendable, CaseIterable {
     case lockIPhone
     case unlockIPhone
     case pressConnect
+    case reconnectIPhone
     case waitWhileConnecting
     case pressResume
     case clearOnMac
@@ -54,6 +55,10 @@ enum SessionBlockMove: String, Sendable, CaseIterable {
         case .pressConnect:
             return "Press Connect or Try Again in the mirroring window once, then retry. If the "
                 + "same screen comes back, the iPhone is unlocked or out of range."
+        case .reconnectIPhone:
+            return "This needs the user: keep the iPhone near the Mac, powered on and recently "
+                + "unlocked, with Bluetooth and Wi-Fi on, then press Try Again in the mirroring "
+                + "window. Retry once they say it is back."
         case .waitWhileConnecting:
             return "iPhone Mirroring is still connecting. Wait a few seconds, then retry."
         case .pressResume:
@@ -116,7 +121,8 @@ struct InterstitialPhrases: Sendable {
         (.unlockIPhone, ["Unlock Your iPhone"]),
         (.pressConnect, ["Unable to Connect to iPhone", "Timed Out", "iPhone Mirroring timed out connecting."]),
         (.waitWhileConnecting, ["Connecting to %@", "Connecting to"]),
-        (.pressResume, ["Connection Paused", "Connection Interrupted"]),
+        (.reconnectIPhone, ["Connection Interrupted", "iPhone Not Found"]),
+        (.pressResume, ["Connection Paused"]),
     ]
 
     /// The framework inside iPhone Mirroring.app that carries its strings.

@@ -81,17 +81,19 @@ final class CaptureStatsTests: XCTestCase {
         XCTAssertEqual(bridge.activationCount, 0, "an SCK capture never steals focus")
     }
 
-    func testScreenCaptureKitFailureCountsAsFallbackAndActivates() {
+    /// A capture is a read: when ScreenCaptureKit can't answer, the user's front
+    /// window stays where it is and the capture reports no image.
+    func testScreenCaptureKitFailureCountsAsFallbackAndKeepsTheFront() {
         let stats = CaptureStats()
         let bridge = ActivationRecordingBridge(windowID: 7)
         let capture = ScreenCapture(
             bridge: bridge, windowImages: FixedProvider(reply: .windowNotShareable), stats: stats)
 
-        _ = capture.captureWithInfo()
+        XCTAssertNil(capture.captureWithInfo())
 
         XCTAssertEqual(stats.snapshot(),
                        CaptureStatsSnapshot(sck: 0, fallbackReasons: [.windowNotShareable: 1]))
-        XCTAssertEqual(bridge.activationCount, 1, "the CLI fallback activates the target")
+        XCTAssertEqual(bridge.activationCount, 0, "a read never takes the front")
     }
 
     func testMissingWindowIDSkipsScreenCaptureKitAndCountsFallback() {

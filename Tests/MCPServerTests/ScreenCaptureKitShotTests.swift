@@ -66,6 +66,28 @@ private final class ScriptedProvider: WindowImageProviding, @unchecked Sendable 
     }
 }
 
+/// Answers each request with the next reply, and counts the requests.
+private final class SequencedProvider: WindowImageProviding, @unchecked Sendable {
+    private let lock = NSLock()
+    private var replies: [WindowImageReply?]
+    private(set) var requests = 0
+
+    /// A nil reply releases the completion unanswered.
+    init(_ replies: [WindowImageReply?]) {
+        self.replies = replies
+    }
+
+    func captureWindowImage(
+        windowID: CGWindowID, reply: @escaping @Sendable (WindowImageReply) -> Void
+    ) {
+        let next = lock.withLock { () -> WindowImageReply? in
+            requests += 1
+            return replies.isEmpty ? nil : replies.removeFirst()
+        }
+        if let next { reply(next) }
+    }
+}
+
 final class ScreenCaptureKitShotTests: XCTestCase {
 
     private let png = Data([0x89, 0x50, 0x4E, 0x47])
@@ -109,6 +131,43 @@ final class ScreenCaptureKitShotTests: XCTestCase {
     func testProviderErrorIsReported() {
         let (outcome, _) = capture(ScriptedProvider(.replyNow(.failed("no permission"))))
         XCTAssertEqual(failure(of: outcome), .captureError)
+    }
+
+    func testBriefErrorIsTriedAgainAndCaptures() {
+        let provider = SequencedProvider([.failed("-3811"), .image(png)])
+        let outcome = ScreenCaptureKitShot.capture(
+            windowID: windowID, provider: provider, retryDelay: 0)
+        guard case .captured(let data) = outcome else {
+            return XCTFail("expected captured, got \(outcome)")
+        }
+        XCTAssertEqual(data, png)
+        XCTAssertEqual(provider.requests, 2)
+    }
+
+    func testReleasedHandlerIsTriedAgainAndCaptures() {
+        let provider = SequencedProvider([nil, .image(png)])
+        let outcome = ScreenCaptureKitShot.capture(
+            windowID: windowID, provider: provider, retryDelay: 0)
+        guard case .captured = outcome else {
+            return XCTFail("expected captured, got \(outcome)")
+        }
+        XCTAssertEqual(provider.requests, 2)
+    }
+
+    func testBriefFailureStopsAfterItsAttempts() {
+        let provider = SequencedProvider([.failed("a"), .failed("b"), .failed("c"), .image(png)])
+        let outcome = ScreenCaptureKitShot.capture(
+            windowID: windowID, provider: provider, retryDelay: 0)
+        XCTAssertEqual(failure(of: outcome), .captureError)
+        XCTAssertEqual(provider.requests, ScreenCaptureKitShot.briefFailureAttempts)
+    }
+
+    func testWindowNotShareableIsNotTriedAgain() {
+        let provider = SequencedProvider([.windowNotShareable, .image(png)])
+        let outcome = ScreenCaptureKitShot.capture(
+            windowID: windowID, provider: provider, retryDelay: 0)
+        XCTAssertEqual(failure(of: outcome), .windowNotShareable)
+        XCTAssertEqual(provider.requests, 1)
     }
 
     /// The carnet#24 shape: the provider releases its completion without

@@ -26,6 +26,14 @@ enum WindowShotFailure: String, Sendable, CaseIterable {
     case handlerDropped = "handler_dropped"
     /// No answer arrived within `ScreenCaptureKitShot.timeout`.
     case timedOut = "timeout"
+
+    /// Whether the next request is likely to succeed.
+    var isBrief: Bool {
+        switch self {
+        case .captureError, .handlerDropped: return true
+        case .noWindowID, .windowNotShareable, .timedOut: return false
+        }
+    }
 }
 
 /// The result of one window shot.
@@ -54,11 +62,39 @@ enum ScreenCaptureKitShot {
     /// How long to wait for a provider that holds the request but never answers.
     static let timeout: DispatchTimeInterval = .seconds(10)
 
+    /// How many times a brief failure is tried before it counts as a failure.
+    /// `replayd` refuses a request now and then (SCStream error -3811, or the
+    /// released handler above) and serves the next one.
+    static let briefFailureAttempts = 3
+
+    /// The pause between attempts after a brief failure.
+    static let briefFailureDelay: TimeInterval = 0.25
+
     /// Capture the window with `windowID`, or say why no image was produced.
+    /// An error or a released handler is tried again; a window that isn't
+    /// shareable, or a provider that never answered, is not.
     static func capture(
         windowID: CGWindowID,
         provider: any WindowImageProviding = ScreenCaptureKitProvider(),
-        timeout: DispatchTimeInterval = timeout
+        timeout: DispatchTimeInterval = timeout,
+        attempts: Int = briefFailureAttempts,
+        retryDelay: TimeInterval = briefFailureDelay
+    ) -> WindowShotOutcome {
+        var outcome = attempt(windowID: windowID, provider: provider, timeout: timeout)
+        var remaining = attempts - 1
+        while remaining > 0, case .unavailable(let failure) = outcome, failure.isBrief {
+            Thread.sleep(forTimeInterval: retryDelay)
+            outcome = attempt(windowID: windowID, provider: provider, timeout: timeout)
+            remaining -= 1
+        }
+        return outcome
+    }
+
+    /// One capture request, bridged from the provider's completion.
+    private static func attempt(
+        windowID: CGWindowID,
+        provider: any WindowImageProviding,
+        timeout: DispatchTimeInterval
     ) -> WindowShotOutcome {
         let latch = ShotLatch()
         // The sentinel lives only in the closure's capture list: when the
