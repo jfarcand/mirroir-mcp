@@ -23,7 +23,7 @@
       "command": "npx",
       "args": [
         "-y",
-        "mirroir-mcp"
+        "mirroir-mcp@0.45.0"
       ]
     }
   }

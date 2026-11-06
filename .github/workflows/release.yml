@@ -77,6 +77,7 @@ jobs:
           sed -i '' "s/\"version\": \"$OLD_VERSION\"/\"version\": \"$VERSION\"/g" server.json
           sed -i '' "s/static let current = \"$OLD_VERSION\"/static let current = \"$VERSION\"/" Sources/mirroir-mcp/Version.swift
           sed -i '' "s/\"version\": \"$OLD_VERSION\"/\"version\": \"$VERSION\"/" mcpb/manifest.json plugins/mirroir/.claude-plugin/plugin.json
+          sed -i '' "s/mirroir-mcp@$OLD_VERSION/mirroir-mcp@$VERSION/" plugins/mirroir/.claude-plugin/plugin.json
 
       - name: Verify no stale version references
         env:

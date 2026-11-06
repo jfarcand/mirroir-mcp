@@ -50,15 +50,20 @@ jobs:
             echo "ok: $f"
           done
 
-      - name: Plugin version matches server.json
+      - name: Plugin version and npx pin match server.json
         run: |
           python3 -I - <<'EOF'
           import json, sys
           expected = json.load(open("server.json"))["version"]
-          found = json.load(open("plugins/mirroir/.claude-plugin/plugin.json"))["version"]
+          plugin = json.load(open("plugins/mirroir/.claude-plugin/plugin.json"))
+          found = plugin["version"]
           if found != expected:
               sys.exit(f"plugin.json version {found} != server.json version {expected}")
-          print(f"plugin.json version matches {expected}")
+          args = plugin["mcpServers"]["mirroir"]["args"]
+          pin = f"mirroir-mcp@{expected}"
+          if pin not in args:
+              sys.exit(f"plugin.json args {args} do not pin {pin}")
+          print(f"plugin.json version and npx pin match {expected}")
           EOF
 
       - name: MCPB manifest validates
