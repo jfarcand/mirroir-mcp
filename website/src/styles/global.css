@@ -17,6 +17,10 @@
   --color-border: #4a3828;
   --color-code-bg: #241a0d;
   --color-accent: #4da3ff;
+  --color-brand: #4ade80;
+  --color-brand-hover: #6ee7a0;
+  --color-on-brand: #1a1008;
+  --color-column-highlight: rgba(74, 222, 128, 0.08);
   --max-width: 936px;
 }
 
@@ -45,7 +49,7 @@ body {
   align-items: center;
   justify-content: center;
   gap: 0.5rem;
-  margin: -1.5rem auto 2rem;
+  margin: 2rem auto 0;
   padding: 0.5rem 1rem;
   max-width: max-content;
   border: 1px solid var(--color-border);
@@ -94,6 +98,18 @@ a {
 
 a:hover {
   text-decoration: underline;
+}
+
+/* A link inside running text is underlined: color alone does not set it apart. */
+p a,
+td a {
+  text-decoration: underline;
+  text-underline-offset: 0.15em;
+}
+
+:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
 }
 
 code {
@@ -227,8 +243,8 @@ pre code {
 .btn-primary {
   display: inline-block;
   padding: 0.6rem 1.5rem;
-  background: var(--color-accent);
-  color: #fff;
+  background: var(--color-brand);
+  color: var(--color-on-brand);
   border-radius: 6px;
   font-weight: 600;
   font-size: 0.95rem;
@@ -237,8 +253,15 @@ pre code {
 }
 
 .btn-primary:hover {
-  background: #3a8fe6;
+  background: var(--color-brand-hover);
   text-decoration: none;
+}
+
+.hero-requirements {
+  margin-top: 0.9rem;
+  font-size: 0.85rem;
+  color: var(--color-muted);
+  text-align: center;
 }
 
 .btn-secondary {
@@ -481,22 +504,32 @@ section > p {
 .carousel-dots {
   display: flex;
   justify-content: center;
-  gap: 0.5rem;
-  margin-top: 0.75rem;
+  margin-top: 0.5rem;
 }
 
+/* The button is the touch target; the dot drawn inside it stays small. */
 .carousel-dot {
+  width: 1.5rem;
+  height: 1.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+}
+
+.carousel-dot::before {
+  content: "";
   width: 0.5rem;
   height: 0.5rem;
   border-radius: 50%;
   background: var(--color-border);
-  border: none;
-  cursor: pointer;
-  padding: 0;
   transition: background 0.15s;
 }
 
-.carousel-dot.active {
+.carousel-dot.active::before {
   background: var(--color-accent);
 }
 
@@ -551,7 +584,6 @@ section > p {
   border: 1px solid var(--color-border);
   background: var(--color-code-bg);
   color: var(--color-text);
-  outline: none;
   transition: border-color 0.15s;
 }
 
@@ -1095,6 +1127,9 @@ footer .trademark {
 .compare-wrap {
   overflow-x: auto;
   margin: 1rem 0 1.5rem;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background: var(--color-code-bg);
 }
 
 .compare-table {
@@ -1127,7 +1162,26 @@ footer .trademark {
 
 .compare-table td:nth-child(2) {
   color: var(--color-text);
+  background: var(--color-column-highlight);
+}
+
+.compare-table tbody tr:last-child th,
+.compare-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+/* The row labels stay in view while the other columns scroll sideways. */
+.compare-table th:first-child {
+  position: sticky;
+  left: 0;
+  z-index: 1;
   background: var(--color-code-bg);
+}
+
+@media (max-width: 700px) {
+  .compare-table tbody th {
+    min-width: 8.5rem;
+  }
 }
 
 .hero-flow {
