@@ -200,8 +200,9 @@ pre code {
 
 /* Tagline */
 .tagline {
-  font-size: 1.1rem;
-  color: var(--color-muted);
+  font-size: 1.35rem;
+  line-height: 1.35;
+  color: var(--color-text);
   text-align: center;
   margin-top: 0.5rem;
 }
@@ -738,7 +739,7 @@ section > p {
   min-width: 0;
 }
 
-.appmd-code :global(pre) {
+.appmd-code pre {
   margin: 0;
   font-size: 0.78rem;
   line-height: 1.5;
