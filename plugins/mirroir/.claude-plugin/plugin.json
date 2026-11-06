@@ -7,7 +7,10 @@
     "name": "Jean-Francois Arcand",
     "url": "https://github.com/jfarcand"
   },
-  "homepage": "https://github.com/jfarcand/mirroir-mcp",
+  "homepage": "https://mirroir.dev",
+  "documentationUrl": "https://github.com/jfarcand/mirroir-mcp#readme",
+  "supportUrl": "https://github.com/jfarcand/mirroir-mcp/issues",
+  "privacyPolicyUrl": "https://github.com/jfarcand/mirroir-mcp/blob/main/docs/privacy.md",
   "repository": "https://github.com/jfarcand/mirroir-mcp",
   "license": "Apache-2.0",
   "keywords": [

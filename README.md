@@ -108,6 +108,7 @@ See [Security](docs/security.md) for the full threat model.
 | [Configuration](docs/configuration.md) | All settings: screen intelligence, input timing, exploration, AI providers |
 | [FAQ](docs/faq.md) | Security, focus stealing, keyboard layouts, embacle/vision mode |
 | [Security](docs/security.md) | Threat model, kill switch, and recommendations |
+| [Privacy](docs/privacy.md) | What mirroir reads, sends and stores |
 | [Permissions](docs/permissions.md) | Fail-closed permission model and config file |
 | [Known Limitations](docs/limitations.md) | Focus stealing, keyboard layout gaps, autocorrect |
 | [Patterns & Skills](docs/components.md) | Element patterns, screen recipes, APP.md app descriptions, and the detection pipeline |

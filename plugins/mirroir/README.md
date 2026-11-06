@@ -38,6 +38,6 @@ Once tools that act are allowed, Claude can tap and type in any app you have not
 
 ## Learn more
 
-[Documentation](https://github.com/jfarcand/mirroir-mcp) · [Website](https://mirroir.dev) · [Issues](https://github.com/jfarcand/mirroir-mcp/issues)
+[Documentation](https://github.com/jfarcand/mirroir-mcp) · [Website](https://mirroir.dev) · [Issues](https://github.com/jfarcand/mirroir-mcp/issues) · [Privacy](https://github.com/jfarcand/mirroir-mcp/blob/main/docs/privacy.md)
 
 Licensed under Apache-2.0.
