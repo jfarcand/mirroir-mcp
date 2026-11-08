@@ -52,12 +52,17 @@ final class ScreenCapture: Sendable {
             stats.recordFallback(reason)
         }
 
-        // Fallback to the screencapture CLI, which cannot see another Space, so
-        // the target must be activated first. This activation steals focus and
-        // runs only on this fallback path (SCK failed: no window ID, no
-        // permission, window not shareable, handler dropped, or timeout).
-        bridge.activate()
-        usleep(EnvConfig.cursorSettleUs)
+        // Fallback to the screencapture CLI, which cannot see another Space. A
+        // capture is a read and never takes the user's front window, so a known
+        // window that isn't in front reports no image. Only a target with no
+        // window ID, which ScreenCaptureKit cannot address at all, is activated.
+        if info.windowID == 0 {
+            bridge.activate()
+            usleep(EnvConfig.cursorSettleUs)
+        } else if !bridge.isFrontmost() {
+            DebugLog.log("ScreenCapture", "no fallback: '\(bridge.targetName)' is not in front")
+            return nil
+        }
 
         let tempPath = NSTemporaryDirectory()
             + "mirroir-mcp-\(ProcessInfo.processInfo.processIdentifier).png"

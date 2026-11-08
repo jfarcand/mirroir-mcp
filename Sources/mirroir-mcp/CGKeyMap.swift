@@ -113,6 +113,16 @@ enum CGKeyMap {
 
     // MARK: - Character Map
 
+    /// Control characters and the keys that type them on every layout. Return
+    /// and Tab sit on the same virtual keycode whatever the layout, and a
+    /// layout's own key table never lists them, so a non-US layout takes them
+    /// from here instead of routing them through the clipboard.
+    static let layoutIndependentKeys: [Character: CGKeyMapping] = [
+        "\n": CGKeyMapping(keycode: kReturn, flags: CGEventFlags()),
+        "\r": CGKeyMapping(keycode: kReturn, flags: CGEventFlags()),
+        "\t": CGKeyMapping(keycode: kTab, flags: CGEventFlags()),
+    ]
+
     private static let characterMap: [Character: CGKeyMapping] = {
         var map = [Character: CGKeyMapping]()
 
@@ -163,9 +173,7 @@ enum CGKeyMap {
         }
 
         // Special characters
-        map["\n"] = CGKeyMapping(keycode: kReturn, flags: none)
-        map["\r"] = CGKeyMapping(keycode: kReturn, flags: none)
-        map["\t"] = CGKeyMapping(keycode: kTab, flags: none)
+        map.merge(layoutIndependentKeys) { current, _ in current }
         map[" "]  = CGKeyMapping(keycode: kSpace, flags: none)
 
         // Punctuation (unshifted)

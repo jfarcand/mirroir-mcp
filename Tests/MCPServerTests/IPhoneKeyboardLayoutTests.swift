@@ -20,6 +20,8 @@ final class IPhoneKeyboardLayoutTests: XCTestCase {
         static let semicolon: UInt16 = 0x29
         static let slash: UInt16 = 0x2C
         static let period: UInt16 = 0x2F
+        static let returnKey: UInt16 = 0x24
+        static let tab: UInt16 = 0x30
     }
 
     private func stroke(_ keycode: UInt16, shift: Bool = false) -> CGKeySequence {
@@ -50,6 +52,22 @@ final class IPhoneKeyboardLayoutTests: XCTestCase {
 
     func testUnknownLayoutNameIsNotSilentlyUS() {
         XCTAssertNil(IPhoneKeyboardLayout.named("Nonexistent-Layout-XYZ"))
+    }
+
+    // MARK: - Control characters (carnet#48)
+
+    /// Newline and tab have no entry in a layout's own key table. Without
+    /// these keystrokes `typeText` pastes them, and on a non-US iPhone the
+    /// paste delivers whatever the iPhone's clipboard held.
+    func testControlCharactersTypeAsReturnAndTabOnEveryLayout() throws {
+        for layout in [IPhoneKeyboardLayout.usQWERTY, try csa()] {
+            XCTAssertEqual(layout.keySequence(for: "\n"), stroke(Key.returnKey),
+                           "newline on \(layout.sourceID ?? "US")")
+            XCTAssertEqual(layout.keySequence(for: "\r"), stroke(Key.returnKey),
+                           "carriage return on \(layout.sourceID ?? "US")")
+            XCTAssertEqual(layout.keySequence(for: "\t"), stroke(Key.tab),
+                           "tab on \(layout.sourceID ?? "US")")
+        }
     }
 
     // MARK: - US QWERTY URL characters

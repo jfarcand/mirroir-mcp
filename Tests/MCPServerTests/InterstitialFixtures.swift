@@ -96,6 +96,10 @@ enum InterstitialFixtures {
         ], .waitForCameraOrMicrophone),
         overlay("unlock after restart", [text("Unlock Your iPhone")], .unlockIPhone),
         overlay("connection paused", [text("Connection Paused"), button("Resume")], .pressResume),
+        overlay("connection interrupted", [
+            text("Connection Interrupted"), button("Try Again"),
+        ], .reconnectIPhone),
+        overlay("iphone not found", [text("iPhone Not Found"), button("Try Again")], .reconnectIPhone),
         overlay("camera dialog", [
             text("iPhone camera is not available from Mac."), button("OK"),
         ], .clearOnMac),

@@ -48,8 +48,9 @@ enum OperatingManual {
         5. Once a sequence has worked, run it again with run_steps: one call instead of one per step.
         6. Errors that name something the user must do (unlock, approve on the Mac, grant a \
         permission) mean stop: tell the user, and retry once only after they say it is done.
-        Consent: ask before sending, posting, buying, deleting or changing a setting. Never type a \
-        password, PIN or one-time code, and never open the iOS Settings app unless the user asks.
+        Consent: ask before sending, posting, buying, deleting or changing a setting, even when the \
+        request names the item; show the step and wait for a yes. Never type a password, PIN or \
+        one-time code, and never open the iOS Settings app unless the user asks.
         Run `mirroir-mcp skill` for the full manual.
         """
 
@@ -149,7 +150,8 @@ enum OperatingManual {
         ## Consent
 
         - Ask the user before anything that sends, posts, buys, books, deletes or changes a \
-        setting, even when the task seems to imply it. Show what you are about to do.
+        setting, even when the request names the exact item: "get rid of my note X" is not \
+        permission to delete it. Show the step you are about to take, then wait for a yes.
         - Never type a password, PIN or one-time code. Ask the user to enter it.
         - Never open the iOS Settings app unless the user asked for a setting.
         - Tools the user has not allowed are not listed. Do not try to work around a \

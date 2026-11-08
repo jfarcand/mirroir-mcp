@@ -17,9 +17,10 @@ import HelperLib
 /// character is typed with the key that produces it there — `/` on
 /// Canadian-CSA is the ISO section key (keycode 0x0A), not US QWERTY's `/` key
 /// (0x2C), which types `é`. Accented letters the layout builds from a dead
-/// key (`^` then `e` = `ê`) get that two-keystroke sequence. A character the
-/// layout cannot type either way has no sequence, and `typeText` sends it
-/// through the clipboard.
+/// key (`^` then `e` = `ê`) get that two-keystroke sequence. Return and Tab
+/// come from `CGKeyMap.layoutIndependentKeys` on every layout. A character the
+/// layout cannot type any of these ways has no sequence, and `typeText` sends
+/// it through the clipboard.
 struct IPhoneKeyboardLayout: Sendable {
     /// TIS source ID of the layout, or nil for US QWERTY.
     let sourceID: String?
@@ -46,6 +47,9 @@ struct IPhoneKeyboardLayout: Sendable {
         var strokes = LayoutMapper.keyTable(layoutData: data).mapValues { keySequence([$0]) }
         for (char, pair) in LayoutMapper.deadKeyCompositions(layoutData: data) where strokes[char] == nil {
             strokes[char] = keySequence(pair)
+        }
+        for (char, mapping) in CGKeyMap.layoutIndependentKeys where strokes[char] == nil {
+            strokes[char] = CGKeySequence(steps: [mapping])
         }
         return IPhoneKeyboardLayout(sourceID: sourceID, strokes: strokes)
     }
