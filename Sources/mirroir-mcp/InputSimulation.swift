@@ -149,6 +149,10 @@ final class InputSimulation: Sendable {
                 + "No input was sent. The user must bring the window back from the Dock. "
                 + AgentInstruction.waitForUser
         case .notRunning:
+            if let block = (bridge as? MenuActionCapable)?.sessionBlock() {
+                DebugLog.log(tag, "ERROR: not running (\(block.move.rawValue))")
+                return block.refusal(targetName: bridge.targetName)
+            }
             DebugLog.log(tag, "ERROR: not running")
             return "Target '\(bridge.targetName)' is not running. Launch iPhone Mirroring first."
         }

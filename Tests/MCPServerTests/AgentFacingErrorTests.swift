@@ -63,11 +63,16 @@ final class AgentFacingErrorTests: XCTestCase {
             "Failed to capture screenshot. The 'iphone' window is minimized, so it shows nothing to read."),
             minimized)
         XCTAssertTrue(minimized.hasSuffix(AgentInstruction.waitForUser))
-        for state in [WindowState.connected, .paused, .noWindow, .notRunning] {
+        for state in [WindowState.connected, .paused, .noWindow] {
             XCTAssertEqual(
                 ScreenReadFailure.message("Failed to capture screenshot.", targetName: "iphone", state: state),
                 "Failed to capture screenshot. Is the 'iphone' window visible?")
         }
+        let gone = ScreenReadFailure.message("Failed to capture screenshot.", targetName: "iphone", state: .notRunning)
+        XCTAssertTrue(gone.hasPrefix(
+            "Failed to capture screenshot. 'iphone' is not running, so there is no screen to read. "
+            + "The user must open iPhone Mirroring."), gone)
+        XCTAssertTrue(gone.hasSuffix(AgentInstruction.waitForUser))
     }
 
     // MARK: - Permission refusals

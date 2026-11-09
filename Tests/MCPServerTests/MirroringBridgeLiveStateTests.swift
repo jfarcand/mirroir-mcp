@@ -150,6 +150,33 @@ final class MirroringBridgeLiveStateTests: XCTestCase {
     func testABackgroundLaunchAsksLaunchServicesForTheBridgedBundle() {
         XCTAssertTrue(bridge.launchInBackground())
         XCTAssertEqual(probe.launchedBundleIDs, ["com.example.mirroring"])
+        XCTAssertFalse(bridge.wasQuit, "an app never seen running was not quit")
+        XCTAssertNil(bridge.sessionBlock())
+    }
+
+    /// Quitting iPhone Mirroring is a stop: an app this server saw running
+    /// and then gone is not reopened, and every input says why.
+    func testAnAppThatWasQuitIsNotReopened() {
+        show(pid: 300, frame: Self.portrait)
+        XCTAssertEqual(bridge.getState(), .connected)
+        probe.set(pid: nil, axWindow: nil, entries: [])
+
+        XCTAssertEqual(bridge.getState(), .notRunning)
+        XCTAssertTrue(bridge.wasQuit)
+        XCTAssertFalse(bridge.launchInBackground())
+        XCTAssertTrue(probe.launchedBundleIDs.isEmpty, "Launch Services was not asked")
+        let block = bridge.sessionBlock()
+        XCTAssertEqual(block?.move, .reopenAfterQuit)
+        XCTAssertEqual(block?.move.needsUser, true)
+        XCTAssertEqual(block?.refusal(targetName: "iphone").hasPrefix(
+            "'iphone' is not accepting input. The window says: nothing: the app is gone. "
+            + "This needs the user: open iPhone Mirroring again, then retry."), true)
+
+        // Opened again by the user, the session is back and nothing is held against it.
+        show(pid: 301, frame: Self.portrait)
+        XCTAssertEqual(bridge.getState(), .connected)
+        XCTAssertFalse(bridge.wasQuit)
+        XCTAssertNil(bridge.sessionBlock())
     }
 
     func testActivateRaisesTheLiveProcessWindow() {

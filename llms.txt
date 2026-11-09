@@ -235,7 +235,7 @@ Opt-in via `~/.mirroir-mcp/permissions.json`:
 }
 ```
 
-Kill switch: unlocking the iPhone, locking the Mac's screen, or quitting the MCP client ends all input at once (quitting the iPhone Mirroring app does not: the next action reopens it). By default the MCP server communicates exclusively via stdin/stdout: no network ports, no sockets, no daemons. The opt-in `mirroir-mcp serve` command serves the same tools over HTTP on 127.0.0.1 behind a bearer token, for an agent that reaches the Mac through an SSH port forward; it is never started for you.
+Kill switch: quitting iPhone Mirroring, unlocking the iPhone, locking the Mac's screen, or quitting the MCP client ends all input at once; an app the user quit is never reopened by the agent. By default the MCP server communicates exclusively via stdin/stdout: no network ports, no sockets, no daemons. The opt-in `mirroir-mcp serve` command serves the same tools over HTTP on 127.0.0.1 behind a bearer token, for an agent that reaches the Mac through an SSH port forward; it is never started for you.
 
 - [Security model](docs/security.md)
 - [Permissions reference](docs/permissions.md)

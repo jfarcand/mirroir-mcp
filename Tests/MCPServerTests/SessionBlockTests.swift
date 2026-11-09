@@ -108,13 +108,13 @@ final class SessionBlockTests: XCTestCase {
             ["touch id or enter the mac login for"])
     }
 
-    /// Every move the window's words can pick has words to pick it. The four
+    /// Every move the window's words can pick has words to pick it. The five
     /// left out are picked without words: the two fallbacks, and the locked
-    /// Mac and the hidden app, which the system reports.
+    /// Mac, the hidden app and the quit app, which the system reports.
     func testEveryMoveTheWindowCanNameHasPhrases() {
         let covered = Set(englishOnly.entries.filter { !$0.fragments.isEmpty }.map(\.move))
         XCTAssertEqual(covered, Set(SessionBlockMove.allCases)
-            .subtracting([.clearOnMac, .reopenMirroring, .unlockMac, .showMirroring]))
+            .subtracting([.clearOnMac, .reopenMirroring, .unlockMac, .showMirroring, .reopenAfterQuit]))
     }
 
     /// Measured 2026-11-03: with "Connection Paused" on screen, AXMainWindow

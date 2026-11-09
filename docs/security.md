@@ -6,13 +6,12 @@ This gives an AI agent full control of your iPhone screen. It can tap anything, 
 
 ## Kill Switch
 
-mirroir can act only through a live iPhone Mirroring session, and three things end it at once:
+mirroir can act only through a live iPhone Mirroring session, and four things end it at once:
 
+- **Quit iPhone Mirroring.** An app the server saw running and then gone is never reopened by the agent: `status` and every input say it was quit and that only you can open it again. (The server does open the app once, in the background, when it was not running when the server started and an agent's first action needs it.)
 - **Pick up the iPhone and unlock it.** Mirroring disconnects while the phone is in use and cannot reconnect until it is locked again.
 - **Lock the Mac's screen.** Mirroring stops with it.
 - **End the server.** Quit the MCP client that started it; for the `serve` agent described below, `launchctl bootout gui/$(id -u)/dev.mirroir.serve`.
-
-Quitting the iPhone Mirroring app is not a kill switch: the next action an agent sends reopens it, and presses the window's own reconnect button if the session is paused.
 
 By default nothing runs in the background: the server lives and dies with the MCP client that started it. The one exception is the `serve` agent, which you install yourself and which keeps running until you remove it.
 

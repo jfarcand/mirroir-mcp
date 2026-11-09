@@ -96,7 +96,7 @@ Giving an AI access to your phone demands defense in depth, so mirroir-mcp is **
 - **Sensitive apps can be blocked.** `blockedApps` keeps the AI out of apps like Wallet or Banking, even when other tools are allowed.
 - **Passwords stay yours.** mirroir never presses a sheet that asks for a password or Touch ID, and it tells agents to ask you before sending, buying, deleting or changing a setting.
 - **No root, no daemon, no telemetry.** It runs as your user with Screen Recording and Accessibility. The one network call it makes by default is a once-a-day version check against npm (`updateCheck: false` turns it off). What your agent reads from the screen goes to whichever model your client uses.
-- **Kill switch.** Unlock the iPhone, lock the Mac's screen, or quit your MCP client: each stops all input at once. Quitting the iPhone Mirroring app does not, because the next action reopens it.
+- **Kill switch.** Quit iPhone Mirroring, unlock the iPhone, lock the Mac's screen, or quit your MCP client: each stops all input at once, and nothing reopens the app for the agent.
 
 See [Security](docs/security.md) for the full threat model.
 

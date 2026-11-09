@@ -109,6 +109,13 @@ final class StepExecutor {
     }
 
     var bridge: any WindowBridging { subsystems.bridge }
+
+    /// The message for a step whose screen could not be read, naming the
+    /// window state that explains it when one does.
+    func captureFailureMessage() -> String {
+        ScreenReadFailure.message(
+            "Failed to capture screen for OCR.", targetName: bridge.targetName, state: bridge.getState())
+    }
     var input: any InputProviding { subsystems.input }
     var describer: any ScreenDescribing { subsystems.describer }
     var ocrDescriber: any ScreenDescribing { subsystems.ocrDescriber }
@@ -259,7 +266,7 @@ final class StepExecutor {
 
         guard let describeResult = describer.describe() else {
             return StepResult(step: step, status: .failed,
-                              message: "Failed to capture screen for OCR",
+                              message: captureFailureMessage(),
                               durationSeconds: elapsed(startTime))
         }
 
@@ -369,7 +376,7 @@ final class StepExecutor {
 
         guard let describeResult = describer.describe() else {
             return StepResult(step: step, status: .failed,
-                              message: "Failed to capture screen for OCR",
+                              message: captureFailureMessage(),
                               durationSeconds: elapsed(startTime))
         }
 
@@ -390,7 +397,7 @@ final class StepExecutor {
         guard let describeResult = describer.describe() else {
             // If we can't describe the screen, we can't confirm visibility either way
             return StepResult(step: step, status: .failed,
-                              message: "Failed to capture screen for OCR",
+                              message: captureFailureMessage(),
                               durationSeconds: elapsed(startTime))
         }
 

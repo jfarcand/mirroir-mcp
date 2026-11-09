@@ -62,7 +62,7 @@ The script uses `fswatch` to monitor `Sources/` for `.swift` file changes, rebui
 
 **Typed text never appears on the iPhone** — Keystrokes are addressed to the iPhone Mirroring process, so they cannot land in another app. When `type_text` reports success but nothing shows up, the phone side has stopped accepting typed keys (taps and Cmd shortcuts often still work). Quit iPhone Mirroring and open it again; the next input call reconnects. If the text appears but differs from what was sent, iOS autocorrect rewrote it: `type_text` says so in its result.
 
-**iPhone Mirroring is not running** — The first input call starts it in the background (the app you are using stays in front) and waits up to 20 seconds for the session to connect, pressing Resume or Connect when the session shows them. A session that needs you (the iPhone in use, a Mac prompt) is reported instead of waited on.
+**iPhone Mirroring is not running** — If it was not running when the server started, the first input call starts it in the background (the app you are using stays in front) and waits up to 20 seconds for the session to connect, pressing Resume or Connect when the session shows them. If it was running and you quit it, nothing reopens it: `status` and every input say so, and you open it again yourself. Quitting it is a kill switch. A session that needs you (the iPhone in use, a Mac prompt) is reported instead of waited on.
 
 **Taps don't register** — Run `mirroir doctor` to check prerequisites. Verify that iPhone Mirroring is connected (not showing "Connect to your iPhone" screen) and that Accessibility permissions are granted in System Settings > Privacy & Security > Accessibility.
 

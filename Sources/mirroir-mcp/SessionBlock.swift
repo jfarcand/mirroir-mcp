@@ -21,6 +21,7 @@ struct SessionBlock: Sendable, Equatable {
         if move == .reopenMirroring { return "nothing Accessibility can read" }
         if move == .unlockMac { return "nothing that can be read: the Mac's screen is locked" }
         if move == .showMirroring { return "nothing wrong, but its app is hidden" }
+        if move == .reopenAfterQuit { return "nothing: the app is gone" }
         return quoted.isEmpty
             ? "an interruption with no text"
             : quoted.map { $0.hasPrefix("[") ? $0 : "“\($0)”" }.joined(separator: " ")

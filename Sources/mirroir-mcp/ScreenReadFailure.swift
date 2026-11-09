@@ -11,14 +11,18 @@ import HelperLib
 enum ScreenReadFailure {
 
     /// `what` failed (a full sentence), on the target named `targetName` whose
-    /// window is in `state`. A minimized window shows nothing to read, and no
-    /// read brings it back, so the message says who has to.
+    /// window is in `state`. A minimized window shows nothing to read, and an
+    /// app that is not running has no window; no read brings either back, so
+    /// the message says who has to.
     static func message(_ what: String, targetName: String, state: WindowState) -> String {
         switch state {
         case .minimized:
             return "\(what) The '\(targetName)' window is minimized, so it shows nothing to read. "
                 + "The user must bring it back from the Dock. " + AgentInstruction.waitForUser
-        case .connected, .paused, .notRunning, .noWindow:
+        case .notRunning:
+            return "\(what) '\(targetName)' is not running, so there is no screen to read. "
+                + "The user must open iPhone Mirroring. " + AgentInstruction.waitForUser
+        case .connected, .paused, .noWindow:
             return "\(what) Is the '\(targetName)' window visible?"
         }
     }

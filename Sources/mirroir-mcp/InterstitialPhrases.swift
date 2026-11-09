@@ -24,6 +24,7 @@ enum SessionBlockMove: String, Sendable, CaseIterable, Codable {
     case reopenMirroring
     case unlockMac
     case showMirroring
+    case reopenAfterQuit
 
     /// Whether only the user can make this move. The agent has no tool for the
     /// Mac's own windows, settings or prompts, nor for the iPhone's side button;
@@ -71,6 +72,9 @@ enum SessionBlockMove: String, Sendable, CaseIterable, Codable {
             return "This needs the user: unlock the Mac, then retry. iPhone Mirroring stops while "
                 + "the Mac's screen is locked, and nothing can be read from it or sent to it. If "
                 + "the window then says the Mac was locked, press Connect in it once."
+        case .reopenAfterQuit:
+            return "This needs the user: open iPhone Mirroring again, then retry. It was running "
+                + "earlier and is gone now, and that is a stop: nothing reopens it for the agent."
         case .showMirroring:
             return "This needs the user: show iPhone Mirroring again (click its icon in the Dock), "
                 + "then retry. A hidden window can still be read, but input sent to it is lost."

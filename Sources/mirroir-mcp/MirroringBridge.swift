@@ -7,6 +7,7 @@
 import AppKit
 import ApplicationServices
 import HelperLib
+import os
 
 /// Device orientation based on mirroring window dimensions.
 enum DeviceOrientation: String, Sendable {
@@ -59,6 +60,9 @@ final class MirroringBridge: Sendable {
     let targetName: String
     private let bundleIdentifier: String
     private let probe: any MirroringSystemProbing
+    /// Whether the app has been seen running since this server started. Once
+    /// it has, its absence means someone quit it, and a quit is honoured.
+    private let hasBeenRunning = OSAllocatedUnfairLock(initialState: false)
 
     init(targetName: String = "iphone",
          bundleID: String? = nil,
@@ -70,7 +74,15 @@ final class MirroringBridge: Sendable {
 
     /// PID of the iPhone Mirroring process right now, or nil when not running.
     private var processID: pid_t? {
-        probe.processID(bundleID: bundleIdentifier)
+        let pid = probe.processID(bundleID: bundleIdentifier)
+        if pid != nil { hasBeenRunning.withLock { $0 = true } }
+        return pid
+    }
+
+    /// Whether the app ran during this server's life and is gone now: the
+    /// user quit it (or it died), and that is a stop, not a state to repair.
+    var wasQuit: Bool {
+        processID == nil && hasBeenRunning.withLock { $0 }
     }
 
     /// Find the iPhone Mirroring process.
@@ -135,18 +147,26 @@ final class MirroringBridge: Sendable {
     }
 
     /// Launch iPhone Mirroring without making it active: the user's front app
-    /// keeps the focus while the session connects.
+    /// keeps the focus while the session connects. Only an app this server
+    /// never saw running is launched: one that was quit stays quit, so that
+    /// quitting iPhone Mirroring stops an agent.
     func launchInBackground() -> Bool {
+        if wasQuit {
+            DebugLog.log("launch", "\(bundleIdentifier) was quit while this server ran; not reopened")
+            return false
+        }
         let accepted = probe.launchInBackground(bundleID: bundleIdentifier)
         DebugLog.log("launch", "background launch of \(bundleIdentifier): \(accepted ? "requested" : "refused")")
         return accepted
     }
 
     /// What keeps the session from taking input, and the move that frees it:
-    /// what a paused window says, or a connected app that is hidden. Nil while
-    /// the session accepts input or has no window to read.
+    /// what a paused window says, a connected app that is hidden, or an app
+    /// that was quit. Nil while the session accepts input or has no window to read.
     func sessionBlock() -> SessionBlock? {
-        guard let pid = processID else { return nil }
+        guard let pid = processID else {
+            return wasQuit ? SessionBlock(quoted: [], move: .reopenAfterQuit) : nil
+        }
         let state = getState()
         // Measured on macOS 26.5: a hidden app still shows live frames, and a
         // tap or a swipe posted to its window changes nothing on the iPhone.

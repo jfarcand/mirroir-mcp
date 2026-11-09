@@ -182,7 +182,8 @@ extension MirroirMCP {
                         + (block.map { "the window says \($0.said). \($0.move.advice)" }
                             ?? "clear the interruption in its window, then retry.")
                 case .notRunning:
-                    mirroringStatus = "Not running — '\(ctx.name)' is not open"
+                    let quitNote = (bridge as? MenuActionCapable)?.sessionBlock().map { " \($0.move.advice)" } ?? ""
+                    mirroringStatus = "Not running — '\(ctx.name)' is not open.\(quitNote)"
                 case .noWindow:
                     mirroringStatus = "No window — app is running but no mirroring window found"
                 case .minimized:

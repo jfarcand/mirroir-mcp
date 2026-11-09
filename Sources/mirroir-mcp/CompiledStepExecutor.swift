@@ -99,7 +99,9 @@ final class CompiledStepExecutor {
 
         guard let screen = describer.describe() else {
             return StepResult(step: step, status: .failed,
-                              message: "Failed to capture screen for OCR",
+                              message: ScreenReadFailure.message(
+                                  "Failed to capture screen for OCR.", targetName: bridge.targetName,
+                                  state: bridge.getState()),
                               durationSeconds: elapsed(startTime))
         }
         guard let match = ElementMatcher.findMatch(label: label, in: screen.elements,

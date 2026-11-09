@@ -33,7 +33,7 @@ extension StepExecutor {
 
         guard let describeResult = describer.describe() else {
             return StepResult(step: step, status: .failed,
-                              message: "Failed to capture screen for OCR",
+                              message: captureFailureMessage(),
                               durationSeconds: elapsed(startTime))
         }
 
@@ -64,7 +64,7 @@ extension StepExecutor {
 
         guard let describeResult = describer.describe() else {
             return StepResult(step: step, status: .failed,
-                              message: "Failed to capture screen for OCR",
+                              message: captureFailureMessage(),
                               durationSeconds: elapsed(startTime))
         }
 
