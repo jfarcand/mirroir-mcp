@@ -87,9 +87,12 @@ async function main() {
     });
   }
 
-  const { writeFileSync } = await import("node:fs");
+  const { mkdirSync, writeFileSync } = await import("node:fs");
+  const { dirname } = await import("node:path");
   const { fileURLToPath } = await import("node:url");
   const outPath = fileURLToPath(OUTPUT);
+  // src/data/ holds only this generated, git-ignored file, so a fresh checkout lacks it.
+  mkdirSync(dirname(outPath), { recursive: true });
   writeFileSync(outPath, JSON.stringify(skills, null, 2) + "\n");
   console.log(`Wrote ${skills.length} skills to ${outPath}`);
 }
