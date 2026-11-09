@@ -123,6 +123,12 @@ final class InputSimulation: Sendable {
         let state = bridge.getState()
         switch state {
         case .connected:
+            // Connected is not enough: a hidden app shows a live screen and
+            // loses whatever is sent to it.
+            if let block = (bridge as? MenuActionCapable)?.sessionBlock() {
+                DebugLog.log(tag, "ERROR: target connected but blocked (\(block.move.rawValue))")
+                return block.refusal(targetName: bridge.targetName)
+            }
             return nil
         case .paused:
             if let block = (bridge as? MenuActionCapable)?.sessionBlock() {
@@ -137,6 +143,11 @@ final class InputSimulation: Sendable {
             return "Target '\(bridge.targetName)' is running but Accessibility reads no window for it: "
                 + "the window is closed, or Accessibility permission was revoked (run "
                 + "`mirroir-mcp doctor`). No input was sent. " + AgentInstruction.waitForUser
+        case .minimized:
+            DebugLog.log(tag, "ERROR: window minimized")
+            return "Target '\(bridge.targetName)' has its window minimized, so nothing can be sent to it. "
+                + "No input was sent. The user must bring the window back from the Dock. "
+                + AgentInstruction.waitForUser
         case .notRunning:
             DebugLog.log(tag, "ERROR: not running")
             return "Target '\(bridge.targetName)' is not running. Launch iPhone Mirroring first."
@@ -315,8 +326,12 @@ final class InputSimulation: Sendable {
     func validateBounds(x: Double, y: Double, info: WindowInfo, tag: String) -> String? {
         let w = Double(info.size.width)
         let h = Double(info.size.height)
-        if x < 0 || x > w || y < 0 || y > h {
-            let msg = "Coordinates (\(Int(x)), \(Int(y))) are outside the '\(bridge.targetName)' window (\(Int(w))x\(Int(h))). x must be 0-\(Int(w)), y must be 0-\(Int(h))."
+        // Written as a refusal of anything not inside, so a value that is not
+        // a number at all is refused too; and printed without converting to
+        // Int, which traps on a value no integer holds.
+        if !(x >= 0 && x <= w && y >= 0 && y <= h) {
+            let whole = ScreenshotGeometry.whole
+            let msg = "Coordinates (\(whole(x)), \(whole(y))) are outside the '\(bridge.targetName)' window (\(whole(w))x\(whole(h))). x must be 0-\(whole(w)), y must be 0-\(whole(h))."
             DebugLog.log(tag, "REJECTED: \(msg)")
             return msg
         }

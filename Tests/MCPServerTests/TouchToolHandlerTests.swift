@@ -16,7 +16,7 @@ final class TouchToolHandlerTests: XCTestCase {
 
     override func setUp() {
         super.setUp()
-        server = MCPServer(policy: PermissionPolicy(skipPermissions: true, config: nil))
+        server = MCPServer(policy: PermissionPolicy(skipPermissions: true, config: nil), transport: .stdio)
         input = StubInput()
         MirroirMCP.registerTouchTools(
             server: server, registry: makeTestRegistry(bridge: StubBridge(), input: input))

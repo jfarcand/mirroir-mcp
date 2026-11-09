@@ -15,6 +15,7 @@ extension MirroirMCP {
     ) {
         registerScreenTools(server: server, registry: registry)
         registerInputTools(server: server, registry: registry)
+        registerTapTools(server: server, registry: registry)
         registerTouchTools(server: server, registry: registry)
         registerGestureTools(server: server, registry: registry)
         registerHoldKeysTools(server: server, registry: registry)
@@ -29,6 +30,7 @@ extension MirroirMCP {
         registerMeasureTools(server: server, registry: registry)
         registerNetworkTools(server: server, registry: registry)
         registerTargetTools(server: server, registry: registry)
+        registerNotesTools(server: server)
         registerCompilationTools(server: server, registry: registry, session: compilationSession)
         registerGenerateSkillTools(server: server, registry: registry, policy: policy)
         registerComponentTools(server: server, registry: registry)

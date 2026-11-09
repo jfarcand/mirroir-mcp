@@ -6,12 +6,12 @@ This tool gives an AI agent full control of your iPhone screen — it can tap an
 
 To limit exposure:
 
-- **Fail-closed permissions**: Without a config file, only the 12 read-only tools (such as `screenshot`, `describe_screen`, `status`) are exposed. Mutating tools are hidden entirely.
+- **Fail-closed permissions**: Without a config file, only the 13 read-only tools (such as `screenshot`, `describe_screen`, `status`) are exposed. Mutating tools are hidden entirely.
 - **`blockedApps`**: Add sensitive apps to the deny list in `~/.mirroir-mcp/permissions.json`:
   ```json
   { "allow": ["tap", "swipe", "type_text"], "blockedApps": ["Wallet", "Banking"] }
   ```
-- **Kill switch**: Closing the iPhone Mirroring window or locking the phone kills all input immediately. No persistent background access is possible.
+- **Kill switch**: Unlock the iPhone, lock the Mac's screen, or quit the MCP client: each ends all input at once. Quitting the iPhone Mirroring app does not, because the next action reopens it. Nothing runs in the background unless you install the opt-in [`serve` agent](cli.md#serve) yourself.
 
 See [Security](security.md) for the full threat model and recommendations.
 

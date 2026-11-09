@@ -33,16 +33,12 @@ enum MacOSAppTarget {
         displayName: "macOS App",
         coordinateSystem: .desktop,
         cursorMode: .preserving,
-        supportsKeyboardShortcuts: true,
-        supportsDirectURLOpen: true,
-        urlOpenUnsupportedMessage: nil,
+        // A Mac window has no Spotlight launcher, Home Screen or App Switcher
+        // of the iPhone's, and the iOS shortcuts mean something else in a Mac app.
+        operations: [],
         defaultStrategy: .desktop,
         layoutZones: { _ in desktopZones }
     )
-
-    /// Capabilities exposed by `list_targets` for this target.
-    /// macOS apps do not expose iPhone-Mirroring-specific menu actions.
-    static let capabilities: Set<TargetCapability> = []
 
     /// Build a fully-wired TargetContext for a macOS app.
     static func build(config: TargetConfig?, name: String) -> TargetContext {
@@ -57,6 +53,11 @@ enum MacOSAppTarget {
             bridge: bridge, capture: capture,
             isMobile: profile.coordinateSystem == .mobile
         )
+        // A macOS app reports its own text exactly, so both describers gain
+        // it. One decorator when they are the same describer.
+        let describer = AccessibilityTreeDescriber(wrapping: describers.describer, bridge: bridge)
+        let ocrDescriber = (describers.describer as AnyObject) === (describers.ocr as AnyObject)
+            ? describer : AccessibilityTreeDescriber(wrapping: describers.ocr, bridge: bridge)
         return TargetContext(
             name: name,
             targetType: config?.type ?? configTypeName,
@@ -68,12 +69,11 @@ enum MacOSAppTarget {
                                           pasteVerifier: describers.ocr),
                 bridge: bridge),
             capture: capture,
-            describer: describers.describer,
-            ocrDescriber: describers.ocr,
+            describer: describer,
+            ocrDescriber: ocrDescriber,
             recorder: ScreenRecorder(bridge: bridge),
             backtracker: KeyboardShortcutBacktracker.cmdBracket,
-            lifecycle: MacOSAppLifecycle(),
-            capabilities: capabilities
+            lifecycle: MacOSAppLifecycle()
         )
     }
 }

@@ -99,7 +99,7 @@ enum SkillFileLoader {
                 return .invalid(stepType: compiledStep.type, reason: "a scene step is never compiled")
             }
             if case .scrollTo(let label, _, let maxScrolls) = step,
-               let direction = compiledStep.hints?.scrollDirection {
+               let direction = compiledStep.hints?.scrollDirection.flatMap(ScrollDirection.init(rawValue:)) {
                 return .scrollTo(label: label, direction: direction, maxScrolls: maxScrolls)
             }
             return step

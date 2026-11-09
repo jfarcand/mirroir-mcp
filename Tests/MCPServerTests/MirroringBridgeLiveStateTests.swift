@@ -13,7 +13,7 @@ import XCTest
 /// a unit test; the fake stands in for Launch Services, AX and the window
 /// server, and each test mutates it between two bridge calls.
 /// `TargetRestartRecoveryTests` covers the real process restart end to end.
-private final class ScriptedMirroringProbe: MirroringSystemProbing, @unchecked Sendable {
+final class ScriptedMirroringProbe: MirroringSystemProbing, @unchecked Sendable {
     private let lock = NSLock()
     private var pid: pid_t?
     private var axWindow: MirroringAXWindow?
@@ -34,6 +34,23 @@ private final class ScriptedMirroringProbe: MirroringSystemProbing, @unchecked S
     }
 
     func windowList() -> [WindowListEntry] { lock.withLock { entries } }
+
+    /// Whether the scripted app has a window in the Dock.
+    private var minimized = false
+    func set(minimized: Bool) { lock.withLock { self.minimized = minimized } }
+    func hasMinimizedWindow(pid requested: pid_t) -> Bool {
+        lock.withLock { requested == pid && minimized }
+    }
+
+    /// Whether the scripted Mac's screen is locked.
+    private var screenLocked = false
+    func set(screenLocked: Bool) { lock.withLock { self.screenLocked = screenLocked } }
+    func isMacScreenLocked() -> Bool { lock.withLock { screenLocked } }
+
+    /// Whether the scripted app is hidden.
+    private var hidden = false
+    func set(hidden: Bool) { lock.withLock { self.hidden = hidden } }
+    func isAppHidden(pid requested: pid_t) -> Bool { lock.withLock { requested == pid && hidden } }
 
     /// Resume control point the scripted overlay shows (nil = none).
     private var resumePoint: CGPoint?
@@ -285,6 +302,19 @@ final class MirroringBridgeLiveStateTests: XCTestCase {
         XCTAssertNil(bridge.getWindowInfo())
     }
 
+    /// Measured on macOS 26.5: a minimized Mirroring window is still listed
+    /// by Accessibility but is no longer the app's main window. It is named
+    /// as minimized, not taken for a closed window.
+    func testAMinimizedWindowReadsAsMinimizedNotAsNoWindow() {
+        probe.set(pid: 100, axWindow: nil, entries: [])
+        probe.set(minimized: true)
+        XCTAssertEqual(bridge.getState(), .minimized)
+        XCTAssertNil(bridge.getWindowInfo(), "a minimized window has no geometry to act on")
+
+        probe.set(minimized: false)
+        XCTAssertEqual(bridge.getState(), .noWindow)
+    }
+
     // MARK: - Unlabeled controls (macOS 27) and blocked-session guidance
 
     /// A live macOS 27 window: three unlabeled buttons over the video.
@@ -339,6 +369,63 @@ final class MirroringBridgeLiveStateTests: XCTestCase {
         let block = bridge.sessionBlock()
         XCTAssertEqual(block?.move, .lockIPhone)
         XCTAssertEqual(block?.quoted, ["iPhone in Use", "Lock your iPhone to connect.", "[Try Again]"])
+    }
+
+    /// Seen on macOS 26.5 on 2026-11-09 with the screen locked: Accessibility
+    /// answers with no window for an app that is running and showing one.
+    private var unreadableWindow: MirroringAXWindow {
+        MirroringAXWindow(title: nil, frame: nil, hostingView: nil, isWindow: false)
+    }
+
+    func testAnUnreadableWindowOnALockedMacAsksForTheMacToBeUnlocked() {
+        probe.set(pid: 300, axWindow: unreadableWindow, entries: windowList(pid: 300, mirroring: Self.portrait))
+        probe.set(screenLocked: true)
+
+        let block = bridge.sessionBlock()
+        XCTAssertEqual(block?.move, .unlockMac)
+        XCTAssertEqual(block?.said, "nothing that can be read: the Mac's screen is locked")
+        XCTAssertEqual(block?.move.needsUser, true)
+        XCTAssertEqual(block?.move.advice.hasPrefix("This needs the user: unlock the Mac, then retry."), true)
+        XCTAssertEqual(block?.move.advice.contains("quit and reopen"), false,
+                       "reopening iPhone Mirroring does not unlock the Mac")
+    }
+
+    func testAnUnreadableWindowOnAnUnlockedMacStillAsksToReopenMirroring() {
+        probe.set(pid: 300, axWindow: unreadableWindow, entries: windowList(pid: 300, mirroring: Self.portrait))
+        XCTAssertEqual(bridge.sessionBlock()?.move, .reopenMirroring)
+    }
+
+    /// A window that can be read speaks for itself, locked Mac or not.
+    func testAReadableBlockIsNotReplacedByTheLock() {
+        probe.set(pid: 300, axWindow: MirroringAXWindow(
+            title: Self.title, frame: Self.portrait,
+            hostingView: AXNodeSnapshot(role: "AXGroup", children: [
+                AXNodeSnapshot(role: "AXStaticText", label: "iPhone in Use"),
+                AXNodeSnapshot(role: "AXStaticText", label: "Lock your iPhone to connect."),
+                AXNodeSnapshot(role: "AXButton", label: "Try Again"),
+            ])), entries: windowList(pid: 300, mirroring: Self.portrait))
+        probe.set(screenLocked: true)
+        XCTAssertEqual(bridge.sessionBlock()?.move, .lockIPhone)
+    }
+
+    /// Measured on macOS 26.5 with the iPhone XR, 2026-11-09: with the app
+    /// hidden the frames stay live, and a tap and a swipe posted to the window
+    /// changed nothing on the iPhone while both reported success.
+    func testAConnectedButHiddenAppBlocksInput() {
+        probe.set(pid: 300, axWindow: liveWindow(Self.portrait),
+                  entries: windowList(pid: 300, mirroring: Self.portrait))
+        probe.set(hidden: true)
+
+        XCTAssertEqual(bridge.getState(), .connected, "reading still works, so the state does not change")
+        let block = bridge.sessionBlock()
+        XCTAssertEqual(block?.move, .showMirroring)
+        XCTAssertEqual(block?.move.needsUser, true)
+        XCTAssertEqual(block?.refusal(targetName: "iphone").hasPrefix(
+            "'iphone' is not accepting input. The window says: nothing wrong, but its app is hidden. "
+            + "This needs the user: show iPhone Mirroring again"), true)
+
+        probe.set(hidden: false)
+        XCTAssertNil(bridge.sessionBlock())
     }
 
     func testAConnectedSessionHasNoBlock() {

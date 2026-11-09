@@ -18,7 +18,7 @@ final class ScrollToToolTests: XCTestCase {
     override func setUp() {
         super.setUp()
         let policy = PermissionPolicy(skipPermissions: true, config: nil)
-        server = MCPServer(policy: policy)
+        server = MCPServer(policy: policy, transport: .stdio)
         bridge = StubBridge()
         input = StubInput()
         describer = StubDescriber()
@@ -90,18 +90,46 @@ final class ScrollToToolTests: XCTestCase {
 
     // MARK: - Scroll Exhaustion
 
-    func testScrollToExhaustion() {
+    /// One read that looks like the last is not the end: the content has ended
+    /// once it reads the same two scrolls in a row.
+    func testScrollToTheEndOfTheContent() {
         let sameResult = makeDescribeResult(texts: ["Settings", "General"])
-        // First describe (initial check): no match. Second+third: same content → exhaustion.
+        // The read before any scroll, then a scroll that moved, then two that did not.
         describer.describeResults = [
             makeDescribeResult(texts: ["Settings"]),
+            sameResult,
             sameResult,
             sameResult,
         ]
         let response = callTool("scroll_to", args: ["label": .string("Privacy")])
         XCTAssertTrue(isError(response))
-        let text = extractText(response)
-        XCTAssertTrue(text?.contains("scroll exhausted") ?? false)
+        XCTAssertEqual(
+            extractText(response),
+            "'Privacy' not found: the content stopped moving after 3 scroll(s) (stop_reason=end_of_content)")
+        XCTAssertEqual(input.swipeCalls.count, 3)
+    }
+
+    func testAtScrollsAroundThatPoint() {
+        describer.describeResults = [
+            makeDescribeResult(texts: ["A"]), makeDescribeResult(texts: ["A", "Privacy"]),
+        ]
+        let response = callTool("scroll_to", args: [
+            "label": .string("Privacy"), "at": .array([.number(100), .number(600)]),
+        ])
+        XCTAssertFalse(isError(response))
+        XCTAssertEqual(input.swipeCalls.first?.fromX, 100)
+        let call = input.swipeCalls.first
+        XCTAssertEqual(((call?.fromY ?? 0) + (call?.toY ?? 0)) / 2, 600, accuracy: 0.001)
+    }
+
+    func testAtOutsideTheWindowIsRefused() {
+        describer.describeResults = [makeDescribeResult(texts: ["A"])]
+        for at: JSONValue in [.array([.number(900), .number(100)]), .array([.number(10)]), .string("centre")] {
+            let response = callTool("scroll_to", args: ["label": .string("Privacy"), "at": at])
+            XCTAssertTrue(isError(response))
+            XCTAssertEqual(extractText(response), "at must be [x, y] inside the 410x898 window")
+        }
+        XCTAssertTrue(input.swipeCalls.isEmpty)
     }
 
     // MARK: - Max Scrolls Reached
@@ -122,7 +150,7 @@ final class ScrollToToolTests: XCTestCase {
         ])
         XCTAssertTrue(isError(response))
         let text = extractText(response)
-        XCTAssertEqual(text, "'NotHere' not found after 3 scroll(s)")
+        XCTAssertEqual(text, "'NotHere' not found after 3 scroll(s) (stop_reason=max_scrolls)")
     }
 
     // MARK: - Swipe Failure
@@ -159,10 +187,22 @@ final class ScrollToToolTests: XCTestCase {
         ])
         XCTAssertTrue(isError(response))
         let text = extractText(response)
-        XCTAssertEqual(text, "Unknown direction: diagonal. Use up/down/left/right.")
+        XCTAssertEqual(text, "Unknown direction: diagonal. Use down/up/left/right.")
+        XCTAssertTrue(input.swipeCalls.isEmpty)
     }
 
     // MARK: - Scroll Direction Coordinates
+
+    /// With no direction, scroll_to looks further down the page: the finger moves up.
+    func testDefaultDirectionRevealsContentBelow() {
+        describer.describeResults = [
+            makeDescribeResult(texts: ["Settings"]),
+            makeDescribeResult(texts: ["Settings", "Target"]),
+        ]
+        XCTAssertFalse(isError(callTool("scroll_to", args: ["label": .string("Target")])))
+        let call = input.swipeCalls[0]
+        XCTAssertGreaterThan(call.fromY, call.toY)
+    }
 
     func testScrollUpCoordinates() {
         describer.describeResults = [
@@ -176,8 +216,8 @@ final class ScrollToToolTests: XCTestCase {
         XCTAssertFalse(isError(response))
         XCTAssertEqual(input.swipeCalls.count, 1)
         let call = input.swipeCalls[0]
-        XCTAssertGreaterThan(call.fromY, call.toY, "Swipe up: fromY should be greater than toY")
-        XCTAssertEqual(call.fromX, call.toX, "Swipe up: X should stay constant")
+        XCTAssertLessThan(call.fromY, call.toY, "content above: the finger moves down")
+        XCTAssertEqual(call.fromX, call.toX, "a vertical scroll keeps X")
     }
 
     func testScrollDownCoordinates() {
@@ -192,8 +232,8 @@ final class ScrollToToolTests: XCTestCase {
         XCTAssertFalse(isError(response))
         XCTAssertEqual(input.swipeCalls.count, 1)
         let call = input.swipeCalls[0]
-        XCTAssertLessThan(call.fromY, call.toY, "Swipe down: fromY should be less than toY")
-        XCTAssertEqual(call.fromX, call.toX, "Swipe down: X should stay constant")
+        XCTAssertGreaterThan(call.fromY, call.toY, "content below: the finger moves up")
+        XCTAssertEqual(call.fromX, call.toX, "a vertical scroll keeps X")
     }
 
     func testScrollLeftCoordinates() {
@@ -208,8 +248,8 @@ final class ScrollToToolTests: XCTestCase {
         XCTAssertFalse(isError(response))
         XCTAssertEqual(input.swipeCalls.count, 1)
         let call = input.swipeCalls[0]
-        XCTAssertGreaterThan(call.fromX, call.toX, "Swipe left: fromX should be greater than toX")
-        XCTAssertEqual(call.fromY, call.toY, "Swipe left: Y should stay constant")
+        XCTAssertLessThan(call.fromX, call.toX, "content to the left: the finger moves right")
+        XCTAssertEqual(call.fromY, call.toY, "a sideways scroll keeps Y")
     }
 
     func testScrollRightCoordinates() {
@@ -224,7 +264,7 @@ final class ScrollToToolTests: XCTestCase {
         XCTAssertFalse(isError(response))
         XCTAssertEqual(input.swipeCalls.count, 1)
         let call = input.swipeCalls[0]
-        XCTAssertLessThan(call.fromX, call.toX, "Swipe right: fromX should be less than toX")
-        XCTAssertEqual(call.fromY, call.toY, "Swipe right: Y should stay constant")
+        XCTAssertGreaterThan(call.fromX, call.toX, "content to the right: the finger moves left")
+        XCTAssertEqual(call.fromY, call.toY, "a sideways scroll keeps Y")
     }
 }

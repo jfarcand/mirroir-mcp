@@ -18,6 +18,11 @@ struct InterstitialFixture {
 /// draw over the window. Fixture rationale: these screens appear only when
 /// the iPhone is unlocked, out of range, or the Mac's radios are off, so they
 /// cannot be produced on demand in a test run.
+///
+/// A screen that has been captured live is not here: its capture under
+/// `Tests/Fixtures/mirroring-ax/` replaces the hand-built entry, and
+/// `AXWindowCaptureCorpusTests` replays it. Only screens nobody has captured
+/// yet are built by hand.
 enum InterstitialFixtures {
 
     static func text(_ label: String) -> AXNodeSnapshot {
@@ -96,9 +101,6 @@ enum InterstitialFixtures {
         ], .waitForCameraOrMicrophone),
         overlay("unlock after restart", [text("Unlock Your iPhone")], .unlockIPhone),
         overlay("connection paused", [text("Connection Paused"), button("Resume")], .pressResume),
-        overlay("connection interrupted", [
-            text("Connection Interrupted"), button("Try Again"),
-        ], .reconnectIPhone),
         overlay("iphone not found", [text("iPhone Not Found"), button("Try Again")], .reconnectIPhone),
         overlay("camera dialog", [
             text("iPhone camera is not available from Mac."), button("OK"),
@@ -132,7 +134,18 @@ enum InterstitialFixtures {
         "Timed Out": "Expiré",
         "Connection Paused": "Connexion en pause",
         "Unlock Your iPhone": "Déverrouiller l’iPhone",
+        "Resume": "Reprendre",
+        "Try Again": "Réessayer",
+        "Connect": "Connexion",
     ]
+
+    /// A table for a Mac set to Canadian French, built from the renderings above.
+    static let frenchCanadianPhrases = InterstitialPhrases(localize: { key in
+        frenchCanadian[key].map { [$0] } ?? []
+    })
+
+    /// A table for a Mac set to English: the keys alone.
+    static let englishPhrases = InterstitialPhrases(localize: { _ in [] })
 
     static let french: [InterstitialFixture] = [
         overlay("fr in use", [

@@ -18,7 +18,7 @@ final class InfoToolHandlerTests: XCTestCase {
     override func setUp() {
         super.setUp()
         let policy = PermissionPolicy(skipPermissions: true, config: nil)
-        server = MCPServer(policy: policy)
+        server = MCPServer(policy: policy, transport: .stdio)
         bridge = StubBridge()
         input = StubInput()
         capture = StubCapture()
@@ -122,6 +122,21 @@ final class InfoToolHandlerTests: XCTestCase {
         XCTAssertFalse(isError(response))
         let text = extractText(response)
         XCTAssertTrue(text?.contains("Paused") ?? false)
+    }
+
+    func testStatusNamesAMinimizedWindow() {
+        bridge.state = .minimized
+        let response = callTool("status")
+        XCTAssertFalse(isError(response))
+        XCTAssertEqual(extractText(response),
+                       "Window minimized — 'iphone' is running with its window in the Dock. "
+                       + "Bring the window back, then retry.")
+    }
+
+    func testCheckHealthNamesAMinimizedWindow() {
+        bridge.state = .minimized
+        let text = extractText(callTool("check_health")) ?? ""
+        XCTAssertTrue(text.contains("[FAIL] 'iphone' window is minimized: bring it back from the Dock"), text)
     }
 
     // MARK: - check_health

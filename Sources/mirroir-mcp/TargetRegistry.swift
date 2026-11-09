@@ -8,16 +8,6 @@ import Foundation
 import HelperLib
 import os
 
-/// Capabilities that may or may not be available for a given target type.
-/// Exposed in list_targets output so AI clients know which tools work on each target.
-/// Runtime gating uses protocol conformance (e.g. `as? MenuActionCapable`).
-enum TargetCapability: String, Sendable, Codable {
-    case menuActions
-    case spotlight
-    case home
-    case appSwitcher
-}
-
 /// All subsystems needed to interact with a single target. Conforms to `Target`
 /// so callers can use the capability-composition API (`ctx.profile.X`,
 /// `ctx.backtracker.tapBack(...)`) without threading through a separate type.
@@ -37,7 +27,6 @@ struct TargetContext: Target, Sendable {
     let recorder: any ScreenRecording
     let backtracker: any Backtracking
     let lifecycle: any AppLifecycleHandling
-    let capabilities: Set<TargetCapability>
 
     /// Canonical initializer: callers provide every capability explicitly.
     init(
@@ -52,8 +41,7 @@ struct TargetContext: Target, Sendable {
         ocrDescriber: any ScreenDescribing,
         recorder: any ScreenRecording,
         backtracker: any Backtracking,
-        lifecycle: any AppLifecycleHandling,
-        capabilities: Set<TargetCapability>
+        lifecycle: any AppLifecycleHandling
     ) {
         self.name = name
         self.targetType = targetType
@@ -67,7 +55,6 @@ struct TargetContext: Target, Sendable {
         self.recorder = recorder
         self.backtracker = backtracker
         self.lifecycle = lifecycle
-        self.capabilities = capabilities
     }
 
     /// Legacy initializer for existing call sites (tests and targets constructed
@@ -85,8 +72,7 @@ struct TargetContext: Target, Sendable {
         capture: any ScreenCapturing,
         describer: any ScreenDescribing,
         ocrDescriber: (any ScreenDescribing)? = nil,
-        recorder: any ScreenRecording,
-        capabilities: Set<TargetCapability>
+        recorder: any ScreenRecording
     ) {
         let profile = TargetKind.profile(for: targetType)
         let backtracker: any Backtracking = profile.coordinateSystem == .mobile
@@ -100,8 +86,7 @@ struct TargetContext: Target, Sendable {
             profile: profile, bridge: bridge, input: input,
             capture: capture, describer: describer,
             ocrDescriber: ocrDescriber ?? describer, recorder: recorder,
-            backtracker: backtracker, lifecycle: lifecycle,
-            capabilities: capabilities
+            backtracker: backtracker, lifecycle: lifecycle
         )
     }
 }
@@ -172,5 +157,27 @@ final class TargetRegistry: @unchecked Sendable {
             return (ctx, nil)
         }
         return (nil, .error("Unknown target '\(args["target"]?.asString() ?? "")'"))
+    }
+
+    /// Resolve a target for a tool that exists only on some targets. A target
+    /// that lacks `operation` gets the refusal as its error, before the
+    /// handler sends anything.
+    func resolveForTool(
+        _ args: [String: JSONValue], requiring operation: TargetOperation
+    ) -> (TargetContext?, MCPToolResult?) {
+        let (ctx, error) = resolveForTool(args)
+        guard let ctx else { return (nil, error) }
+        if let refusal = refusal(of: operation, on: ctx.profile, named: ctx.name) {
+            return (nil, .error(refusal))
+        }
+        return (ctx, nil)
+    }
+
+    /// Why `operation` is refused on a target with `profile`, naming the
+    /// configured targets that have it; nil when the target has it.
+    func refusal(of operation: TargetOperation, on profile: TargetProfile, named name: String) -> String? {
+        profile.refusal(
+            of: operation, targetName: name,
+            supportedOn: allTargets.filter { $0.profile.supports(operation) }.map(\.name))
     }
 }

@@ -1,4 +1,4 @@
-// ABOUTME: The compiled-skill schema mirroir-mcp writes (`<scenario>.compiled.json`, version 5) and its loader.
+// ABOUTME: The compiled-skill schema mirroir-mcp writes (`<scenario>.compiled.json`, version 6) and its loader.
 // ABOUTME: Mirrors Swift CompiledSkill.swift field for field (camelCase); the runner reads its screen fingerprints.
 
 use std::fs;
@@ -213,7 +213,7 @@ mod tests {
         let path = dir.path().join("world-clock.ios.compiled.json");
         fs::write(&path, FIXTURE)?;
         let compiled = load_compiled(&path)?;
-        assert_eq!(compiled.version, SchemaVersion::new(5, 0));
+        assert_eq!(compiled.version, SchemaVersion::new(6, 0));
         assert_eq!(compiled.steps.len(), 4);
         let written = serde_json::to_value(&compiled)?;
         let original: Value = serde_json::from_str(FIXTURE)?;
@@ -234,10 +234,10 @@ mod tests {
     }
 
     #[test]
-    fn a_major_other_than_five_is_refused() -> TestResult {
+    fn a_major_other_than_six_is_refused() -> TestResult {
         let dir = TempDir::new()?;
         let path = dir.path().join("old.compiled.json");
-        fs::write(&path, FIXTURE.replace("\"version\" : 5", "\"version\" : 4"))?;
+        fs::write(&path, FIXTURE.replace("\"version\" : 6", "\"version\" : 5"))?;
         match load_compiled(&path) {
             Err(RunnerError::UnsupportedVersion { artifact, .. }) => {
                 assert_eq!(artifact, ArtifactKind::CompiledSkill);

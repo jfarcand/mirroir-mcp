@@ -10,9 +10,9 @@ use crate::ios_error::IosError;
 use crate::parser::step::{MeasureArgs, SceneArgs, SkillStep};
 use crate::parser::surface::step_kind;
 
-/// The scroll direction mirroir-mcp's `scroll_to:` uses; the dialect has no
-/// way to name another.
-const SWIPE_SCROLL_DIRECTION: &str = "up";
+/// Where mirroir-mcp's `scroll_to:` looks for its label: further down the
+/// page. The dialect has no way to name another direction.
+const MIRROIR_SCROLL_DIRECTION: &str = "down";
 
 /// The scroll budget the runner grammar defaults to. mirroir-mcp applies its
 /// own configured budget, so only the default crosses unchanged.
@@ -131,9 +131,10 @@ fn step_line(index: usize, step: &SkillStep, scenario_dir: &Path) -> Result<Stri
             );
         }
         SkillStep::ScrollTo(args) => {
-            if args.direction != SWIPE_SCROLL_DIRECTION || args.max_scrolls != DEFAULT_MAX_SCROLLS {
+            if args.direction != MIRROIR_SCROLL_DIRECTION || args.max_scrolls != DEFAULT_MAX_SCROLLS
+            {
                 return refuse(
-                    "mirroir-mcp scrolls up with its configured attempt budget; `direction:` and `max_scrolls:` cannot cross",
+                    "mirroir-mcp scrolls down with its configured attempt budget; `direction:` and `max_scrolls:` cannot cross",
                 );
             }
             format!("scroll_to: {}", q(&args.label)?)
@@ -347,6 +348,32 @@ mod tests {
             Err(RunnerError::Ios(IosError::NotExpressible { reason, .. })) => Ok(reason),
             other => Err(format!("expected NotExpressible, got {other:?}")),
         }
+    }
+
+    /// `scroll_to` in an ios block looks further down the page, as mirroir-mcp
+    /// does: the default direction crosses, written or not, and any other is
+    /// refused because the dialect cannot name it.
+    #[test]
+    fn scroll_to_crosses_only_toward_content_further_down() -> TestResult {
+        for step in [
+            "  - scroll_to: \"Privacy\"\n",
+            "  - scroll_to: { label: \"Privacy\", direction: down }\n",
+        ] {
+            let yaml = block(step)?.map_err(|e| e.to_string())?;
+            if !yaml.ends_with("  - scroll_to: \"Privacy\"\n") {
+                return Err(format!("{step}: wrote {yaml}"));
+            }
+        }
+        for step in [
+            "  - scroll_to: { label: \"Privacy\", direction: up }\n",
+            "  - scroll_to: { label: \"Privacy\", max_scrolls: 3 }\n",
+        ] {
+            let reason = refused(step)?;
+            if !reason.contains("scrolls down") {
+                return Err(format!("{step}: wrong reason {reason}"));
+            }
+        }
+        Ok(())
     }
 
     /// A web-only option has no iOS meaning; dropping it would run a

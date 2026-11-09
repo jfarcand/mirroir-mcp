@@ -115,6 +115,37 @@ extension EnvConfig {
         readInt("defaultScrollMaxAttempts", default: TimingConstants.defaultScrollMaxAttempts)
     }
 
+    /// Most elements read from a macOS app's accessibility tree in one describe.
+    public static var axTreeMaxNodes: Int {
+        readInt("axTreeMaxNodes", default: TimingConstants.axTreeMaxNodes)
+    }
+
+    /// Milliseconds an app has to answer one accessibility request.
+    public static var axTreeMessagingTimeoutMs: Int {
+        readInt("axTreeMessagingTimeoutMs", default: TimingConstants.axTreeMessagingTimeoutMs)
+    }
+
+    /// Earlier reads the current one must agree with for scroll_to to call the content ended.
+    public static var scrollEndConfirmations: Int {
+        readInt("scrollEndConfirmations", default: TimingConstants.scrollEndConfirmations)
+    }
+
+    /// Share of the band's texts that must stay in place for scroll_to to call the content unchanged.
+    public static var scrollUnchangedTextShare: Double {
+        readDouble("scrollUnchangedTextShare", default: TimingConstants.scrollUnchangedTextShare)
+    }
+
+    /// Earlier reads scroll_to compares each read with.
+    public static var scrollRevisitDepth: Int {
+        readInt("scrollRevisitDepth", default: TimingConstants.scrollRevisitDepth)
+    }
+
+    /// Points a text may move between two reads and still count as in place.
+    public static var scrollUnchangedPositionTolerance: Double {
+        readDouble("scrollUnchangedPositionTolerance",
+                   default: TimingConstants.scrollUnchangedPositionTolerance)
+    }
+
     /// Minimum anchor matches required for anchor-based scroll offset detection.
     public static var scrollAnchorMinCount: Int {
         readInt("scrollAnchorMinCount", default: TimingConstants.scrollAnchorMinCount)

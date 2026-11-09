@@ -17,11 +17,12 @@ final class InputToolHandlerTests: XCTestCase {
     override func setUp() {
         super.setUp()
         let policy = PermissionPolicy(skipPermissions: true, config: nil)
-        server = MCPServer(policy: policy)
+        server = MCPServer(policy: policy, transport: .stdio)
         bridge = StubBridge()
         input = StubInput()
         let registry = makeTestRegistry(bridge: bridge, input: input)
         MirroirMCP.registerInputTools(server: server, registry: registry)
+        MirroirMCP.registerTapTools(server: server, registry: registry)
     }
 
     private func callTool(_ name: String, args: [String: JSONValue] = [:]) -> JSONRPCResponse {

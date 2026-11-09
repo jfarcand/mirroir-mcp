@@ -158,7 +158,8 @@ impl<'de> Deserialize<'de> for PressKeyArgs {
 pub struct ScrollToArgs {
     /// The text label to scroll to.
     pub label: String,
-    /// Scroll direction — defaults to `"up"` per mirroir's convention.
+    /// Where the content to reveal lies — defaults to `"down"`, mirroir's
+    /// default: `scroll_to` looks further down the page.
     pub direction: String,
     /// Maximum number of scroll attempts before failing — defaults to `10`.
     pub max_scrolls: u32,
@@ -199,7 +200,7 @@ impl<'de> Deserialize<'de> for ScrollToArgs {
 }
 
 fn default_scroll_direction() -> String {
-    "up".to_owned()
+    "down".to_owned()
 }
 
 fn default_max_scrolls() -> u32 {

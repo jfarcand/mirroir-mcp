@@ -23,7 +23,7 @@ final class CompiledSkillTests: XCTestCase {
                 CompiledStep(index: 2, type: "wait_for", label: "About",
                              hints: .passthrough()),
                 CompiledStep(index: 3, type: "scroll_to", label: "Model",
-                             hints: .scrollSequence(count: 3, direction: "up")),
+                             hints: .scrollSequence(count: 3, direction: "down")),
                 CompiledStep(index: 4, type: "remember", label: nil, hints: nil),
                 CompiledStep(index: 5, type: "assert_visible", label: "OK",
                              hints: .assertion(delayMs: 300)),
@@ -236,10 +236,10 @@ final class CompiledSkillTests: XCTestCase {
     }
 
     func testScrollSequenceHints() {
-        let hints = StepHints.scrollSequence(count: 3, direction: "up")
+        let hints = StepHints.scrollSequence(count: 3, direction: "down")
         XCTAssertEqual(hints.compiledAction, .scrollSequence)
         XCTAssertEqual(hints.scrollCount, 3)
-        XCTAssertEqual(hints.scrollDirection, "up")
+        XCTAssertEqual(hints.scrollDirection, "down")
     }
 
     func testAssertionHints() {
@@ -273,7 +273,7 @@ final class CompiledSkillTests: XCTestCase {
         XCTAssertEqual(SkillStep.home.typeKey, "home")
         XCTAssertEqual(SkillStep.openURL(url: "https://x").typeKey, "open_url")
         XCTAssertEqual(SkillStep.shake.typeKey, "shake")
-        XCTAssertEqual(SkillStep.scrollTo(label: "X", direction: "up", maxScrolls: 10).typeKey, "scroll_to")
+        XCTAssertEqual(SkillStep.scrollTo(label: "X", direction: .down, maxScrolls: 10).typeKey, "scroll_to")
         XCTAssertEqual(SkillStep.resetApp(appName: "X").typeKey, "reset_app")
         XCTAssertEqual(SkillStep.setNetwork(mode: "wifi_on").typeKey, "set_network")
         XCTAssertEqual(SkillStep.skipped(stepType: "remember", reason: "AI").typeKey, "remember")

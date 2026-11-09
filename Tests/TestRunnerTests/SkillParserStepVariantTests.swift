@@ -17,7 +17,7 @@ extension SkillParserTests {
         XCTAssertEqual(steps.count, 1)
         if case .scrollTo(let label, let direction, let maxScrolls) = steps[0] {
             XCTAssertEqual(label, "About")
-            XCTAssertEqual(direction, "up")
+            XCTAssertEqual(direction, .down, "a scroll_to step looks for content further down")
             XCTAssertEqual(maxScrolls, 10)
         } else {
             XCTFail("Expected scroll_to step")
@@ -25,7 +25,7 @@ extension SkillParserTests {
     }
 
     func testDisplayNameScrollTo() {
-        let step = SkillStep.scrollTo(label: "About", direction: "up", maxScrolls: 10)
+        let step = SkillStep.scrollTo(label: "About", direction: .down, maxScrolls: 10)
         XCTAssertEqual(step.displayName, "scroll_to: \"About\"")
     }
 

@@ -35,7 +35,7 @@ final class DescriberRoutingTests: XCTestCase {
         client: StubDescriber, ocr: StubDescriber,
         register: (MCPServer, TargetRegistry) -> Void
     ) -> MCPServer {
-        let server = MCPServer(policy: policy)
+        let server = MCPServer(policy: policy, transport: .stdio)
         let registry = makeTestRegistry(
             bridge: StubBridge(), input: StubInput(), describer: client, ocrDescriber: ocr
         )
@@ -374,7 +374,7 @@ final class DescriberRoutingTests: XCTestCase {
             bridge: StubBridge(), input: input, describer: client, ocrDescriber: ocr)
         let result = MirroirMCP.handleExplore(
             args: ["app_name": .string(app)], session: ExplorationSession(),
-            registry: registry, server: MCPServer(policy: policy), policy: policy)
+            registry: registry, server: MCPServer(policy: policy, transport: .stdio), policy: policy)
         XCTAssertTrue(result.isError, "an undescribable first screen must abort the explore")
         return (client, input)
     }

@@ -38,7 +38,7 @@ extension MirroirMCP {
                 "required": .array([.string("mode")]),
             ],
             handler: { args in
-                let (ctx, err) = registry.resolveForTool(args)
+                let (ctx, err) = registry.resolveForTool(args, requiring: .setNetwork)
                 guard let ctx else { return err! }
                 guard let menuBridge = ctx.bridge as? (any MenuActionCapable) else {
                     return .error("Target '\(ctx.name)' does not support set_network")

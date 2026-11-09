@@ -15,6 +15,8 @@ All settings live in `settings.json` — project-local (`.mirroir-mcp/settings.j
 
 Every setting has a corresponding environment variable (e.g. `MIRROIR_SCREEN_DESCRIBER_MODE`, `MIRROIR_KEYSTROKE_DELAY_US`). Resolution order: project-local `settings.json` → global `settings.json` → environment variable → built-in default.
 
+`MIRROIR_SETTINGS_FILE` names a single settings file to load instead of the project-local and global ones. A path where no file exists loads no settings at all, which is how the unit tests keep a developer's settings out.
+
 Env-var names are derived from the camelCase key by inserting `_` before every uppercase letter and screaming-snake-casing the result. This means adjacent capitals in an acronym are each split: `openAITimeoutSeconds` → `MIRROIR_OPEN_A_I_TIMEOUT_SECONDS` and `defaultAIMaxTokens` → `MIRROIR_DEFAULT_A_I_MAX_TOKENS`. A handful of keys override this with a fixed env var (e.g. `keyboardLayout` → `IPHONE_KEYBOARD_LAYOUT`, `mirroringBundleID` → `MIRROIR_BUNDLE_ID`).
 
 ## Screen Intelligence
@@ -63,6 +65,12 @@ Env-var names are derived from the camelCase key by inserting `_` before every u
 | `scrollSwipeFromYFraction` | `0.56` | Scroll start Y as a fraction of window height |
 | `scrollSwipeToYFraction` | `0.11` | Scroll end Y as a fraction of window height |
 | `defaultScrollMaxAttempts` | `10` | Maximum scroll attempts for `scroll_to` before giving up |
+| `axTreeMaxNodes` | `2000` | Most elements read from a macOS app's accessibility tree in one `describe_screen`; a larger window is cut there and reported as truncated |
+| `axTreeMessagingTimeoutMs` | `1000` | Milliseconds a macOS app has to answer one accessibility request before its tree is given up as unreadable |
+| `scrollEndConfirmations` | `2` | Earlier reads the current one must agree with before `scroll_to` reports the end of the content |
+| `scrollRevisitDepth` | `4` | Earlier reads each read is compared with; a list at its end is not at rest on every read |
+| `scrollUnchangedTextShare` | `0.6` | Share of the text in the scrolling area that must sit where it sat for two reads to agree |
+| `scrollUnchangedPositionTolerance` | `4` | Points a text may move between two reads and still count as in place |
 | `scrollDedupStrategy` | `"exact"` | Dedup strategy for scroll-collected elements: `"exact"`, `"levenshtein"`, `"proximity"` |
 | `scrollDedupLevenshteinMax` | `3` | Maximum Levenshtein edit distance for fuzzy text dedup (used by `"levenshtein"` strategy) |
 | `scrollDedupProximityPt` | `15.0` | Maximum Euclidean distance in points for coordinate proximity dedup (used by `"proximity"` strategy) |

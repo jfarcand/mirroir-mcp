@@ -17,7 +17,9 @@ extension MirroirMCP {
             name: "list_targets",
             description: """
                 Lists all configured targets with status, window size, and which is active. \
-                Targets are window automation endpoints (iPhone Mirroring, Android emulators, etc.).
+                Targets are window automation endpoints (iPhone Mirroring, macOS app windows). \
+                Each line names the tools that do not exist on that target: calling one \
+                returns "unsupported" and sends nothing.
                 """,
             inputSchema: [
                 "type": .string("object"),
@@ -36,10 +38,12 @@ extension MirroirMCP {
                     } else {
                         sizeDesc = "no window"
                     }
-                    let caps = ctx.capabilities.isEmpty
-                        ? "generic"
-                        : ctx.capabilities.map(\.rawValue).sorted().joined(separator: ", ")
-                    lines.append("- \(ctx.name)\(isActive): \(state) (\(sizeDesc)) [\(caps)]")
+                    let unsupported = ctx.profile.unsupportedOperations.map(\.rawValue)
+                    let tools = unsupported.isEmpty
+                        ? "every tool"
+                        : "unsupported here: \(unsupported.joined(separator: ", "))"
+                    lines.append("- \(ctx.name)\(isActive): \(state) (\(sizeDesc)) "
+                        + "[\(ctx.profile.displayName); \(tools)]")
                 }
 
                 return .text(lines.joined(separator: "\n"))

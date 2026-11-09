@@ -35,11 +35,14 @@ pub const MIRROIR_SKILLS_ENV: &str = "MIRROIR_SKILLS";
 /// Name of the binary looked up on `PATH`.
 const MIRROIR_MCP: &str = "mirroir-mcp";
 
+/// The `mirroir-mcp` subcommand that runs a block.
+pub(super) const TEST_SUBCOMMAND: &str = "test";
+
 /// File the block is written to inside the scenario's workspace.
-const BLOCK_FILE: &str = "ios-block.yaml";
+pub(super) const BLOCK_FILE: &str = "ios-block.yaml";
 
 /// File `mirroir-mcp test` writes its report to inside the workspace.
-const REPORT_FILE: &str = "ios-report.json";
+pub(super) const REPORT_FILE: &str = "ios-report.json";
 
 /// Where `mirroir-mcp test --compiled-out` writes the compiled skill a
 /// passing block records, and the file whose digest it stamps on it.
@@ -49,6 +52,38 @@ pub struct CompiledRecording {
     pub out: PathBuf,
     /// `--compiled-source`: the scenario file the block was rendered from.
     pub source: PathBuf,
+}
+
+/// The arguments `mirroir-mcp` runs one block with: the subcommand, the report
+/// it must write, the capture key, the block file and, when the passing run is
+/// recorded, where the compiled skill goes and what it was rendered from.
+///
+/// This is the only place the command line is built.
+/// `fixtures/mirroir-mcp-test-invocation.json` pins it, for this crate and for
+/// the Swift parser that has to accept it.
+pub(super) fn test_arguments(
+    report: &Path,
+    block: &Path,
+    recording: Option<&CompiledRecording>,
+) -> Vec<OsString> {
+    let mut arguments: Vec<OsString> = vec![
+        TEST_SUBCOMMAND.into(),
+        "--report-json".into(),
+        report.into(),
+        "--capture".into(),
+        IOS_CAPTURE_KEY.into(),
+        block.into(),
+    ];
+    // After the block path, so the positional layout before it is stable.
+    if let Some(recording) = recording {
+        arguments.extend([
+            "--compiled-out".into(),
+            recording.out.clone().into_os_string(),
+            "--compiled-source".into(),
+            recording.source.clone().into_os_string(),
+        ]);
+    }
+    arguments
 }
 
 /// Driver for one `mirroir-mcp test` invocation per `ios` block.
@@ -199,19 +234,7 @@ impl MirroirMcpRunner {
         }
 
         let mut cmd = Command::new(&self.binary);
-        cmd.arg("test")
-            .arg("--report-json")
-            .arg(&report)
-            .arg("--capture")
-            .arg(IOS_CAPTURE_KEY)
-            .arg(&block);
-        // After the block path, so the positional layout before it is stable.
-        if let Some(recording) = &self.recording {
-            cmd.arg("--compiled-out")
-                .arg(&recording.out)
-                .arg("--compiled-source")
-                .arg(&recording.source);
-        }
+        cmd.args(test_arguments(&report, &block, self.recording.as_ref()));
         if let Some(skills) = &self.skills {
             cmd.env(MIRROIR_SKILLS_ENV, skills);
         }

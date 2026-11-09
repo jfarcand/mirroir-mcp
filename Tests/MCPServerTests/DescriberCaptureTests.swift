@@ -225,11 +225,10 @@ final class DescriberCaptureTests: XCTestCase {
         let ctx = TargetContext(
             name: "iphone", targetType: "iphone-mirroring", bundleID: nil,
             bridge: StubBridge(), input: StubInput(), capture: capture,
-            describer: describer, ocrDescriber: describer, recorder: StubRecorder(),
-            capabilities: [.menuActions, .spotlight, .home, .appSwitcher]
+            describer: describer, ocrDescriber: describer, recorder: StubRecorder()
         )
         let registry = TargetRegistry(targets: ["iphone": ctx], defaultName: "iphone")
-        let server = MCPServer(policy: PermissionPolicy(skipPermissions: true, config: nil))
+        let server = MCPServer(policy: PermissionPolicy(skipPermissions: true, config: nil), transport: .stdio)
         MirroirMCP.registerScreenTools(server: server, registry: registry)
         let request = JSONRPCRequest(
             jsonrpc: "2.0", id: .number(1), method: "tools/call",

@@ -36,7 +36,7 @@ const actionSnippet = `- uses: jfarcand/mirroir-mcp/actions/setup-mirroir-run@ma
   <!-- What it does -->
   <section id="tools">
     <h2>What mirroir-mcp can do</h2>
-    <p>39 tools exposed as an MCP server.</p>
+    <p>41 tools exposed as an MCP server.</p>
 
     <div class="tool-grid">
       <div class="tool-category cat-touch">
@@ -93,6 +93,8 @@ const actionSnippet = `- uses: jfarcand/mirroir-mcp/actions/setup-mirroir-run@ma
           <li><code>generate_skill</code> <span>Autonomous BFS exploration &rarr; navigation graph &rarr; SKILL.md bundle</span></li>
           <li><code>list_skills</code> <span>List available skills</span></li>
           <li><code>get_skill</code> <span>Read skill with env substitution + compilation status</span></li>
+          <li><code>get_notes</code> <span>Read what an agent learned about an app in earlier sessions</span></li>
+          <li><code>save_note</code> <span>Keep one line about an app for the next session</span></li>
           <li><code>record_step</code> <span>Record a compiled step during execution</span></li>
           <li><code>save_compiled</code> <span>Save compiled .json for zero-OCR replay</span></li>
           <li><code>switch_target</code> <span>Switch active automation target</span></li>

@@ -33,15 +33,10 @@ struct TestRunConfig {
     let compiledOutPath: String?
     /// The file whose SHA-256 the `compiledOutPath` skill records as its source.
     let compiledSourcePath: String?
-    let showHelp: Bool
 }
 
 /// Orchestrates skill test execution from the CLI.
 enum TestRunner {
-
-    /// Exit code for arguments the command refuses (an unknown flag, say), as
-    /// distinct from 1, a run that executed and failed.
-    static let usageExitCode: Int32 = 2
 
     /// Parse CLI arguments and run tests. Returns exit code (0 = all pass, 1 = any
     /// fail, 2 = refused arguments).
@@ -51,13 +46,12 @@ enum TestRunner {
             config = try parseArguments(arguments)
         } catch {
             fputs("Error: \(error.localizedDescription)\n", stderr)
-            return usageExitCode
+            return CLIDispatch.usageExitCode
         }
 
-        if config.showHelp {
-            printUsage()
-            return 0
-        }
+        // Ctrl-C, or the runner ending a run that overran its budget, must not
+        // leave a modifier or a touch held on the Mac.
+        HeldInputReleaseOnExit.install()
 
         // Resolve skill files
         let skillFiles: [String]
@@ -76,7 +70,7 @@ enum TestRunner {
 
         if config.compiledOutPath != nil, skillFiles.count != 1 {
             fputs("Error: \(TestRunnerArgumentError.compiledOutNeedsOneSkill(count: skillFiles.count).localizedDescription)\n", stderr)
-            return usageExitCode
+            return CLIDispatch.usageExitCode
         }
 
         fputs("mirroir test: \(skillFiles.count) skill(s) to run\n", stderr)

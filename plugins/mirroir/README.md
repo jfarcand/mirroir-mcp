@@ -25,7 +25,7 @@ The server fails closed. Until you allow more, Claude only gets read-only tools 
 }
 ```
 
-Once tools that act are allowed, Claude can tap and type in any app you have not blocked, including messages and payments. Claude is told to ask you before sending, buying, deleting or changing a setting. The kill switch is closing the iPhone Mirroring window or locking the phone. See [Permissions](https://github.com/jfarcand/mirroir-mcp/blob/main/docs/permissions.md) and [Security](https://github.com/jfarcand/mirroir-mcp/blob/main/docs/security.md).
+Once tools that act are allowed, Claude can tap and type in any app you have not blocked, including messages and payments. Claude is told to ask you before sending, buying, deleting or changing a setting. The kill switch is unlocking the iPhone, locking the Mac's screen, or quitting Claude; quitting the iPhone Mirroring app is not one, because the next action reopens it. See [Permissions](https://github.com/jfarcand/mirroir-mcp/blob/main/docs/permissions.md) and [Security](https://github.com/jfarcand/mirroir-mcp/blob/main/docs/security.md).
 
 ## What it runs, sends and fetches
 

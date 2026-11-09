@@ -44,7 +44,7 @@ Run `mirroir doctor` to check all prerequisites at once. Each failed check inclu
 mirroir doctor
 ```
 
-Use `--json` for machine-readable output or `--no-color` to disable ANSI colors.
+Use `--json` for machine-readable output. Colors appear only in a terminal: piped output is plain, and `--no-color` or a non-empty `NO_COLOR` turns them off there too.
 
 Doctor also warns about each prompt file that overrides a built-in AI system prompt, with its path. Older `mirroir.sh` installs copied both `diagnosis.md` and `screen-describe.md` into `~/.mirroir-mcp/prompts/`; a copy you did not write is stale — delete it (see [System Prompts](configuration.md#system-prompts)).
 

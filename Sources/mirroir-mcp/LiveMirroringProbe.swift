@@ -43,6 +43,33 @@ struct LiveMirroringProbe: MirroringSystemProbing {
         WindowListHelper.windowEntries()
     }
 
+    /// The key the login session's description holds while the screen is locked.
+    static let screenLockedKey = "CGSSessionScreenIsLocked"
+
+    func isMacScreenLocked() -> Bool {
+        guard let session = CGSessionCopyCurrentDictionary() as? [String: Any] else { return false }
+        return session[Self.screenLockedKey] as? Bool ?? false
+    }
+
+    /// Asked of a freshly made record: one kept from earlier would still hold
+    /// what was true when it was made (see `RunningAppLocator`).
+    func isAppHidden(pid: pid_t) -> Bool {
+        NSRunningApplication(processIdentifier: pid)?.isHidden ?? false
+    }
+
+    func hasMinimizedWindow(pid: pid_t) -> Bool {
+        var value: CFTypeRef?
+        guard AXUIElementCopyAttributeValue(
+            AXUIElementCreateApplication(pid), kAXWindowsAttribute as CFString, &value) == .success,
+              let windows = value as? [AXUIElement] else { return false }
+        return windows.contains { window in
+            var minimized: CFTypeRef?
+            return AXUIElementCopyAttributeValue(
+                window, kAXMinimizedAttribute as CFString, &minimized) == .success
+                && (minimized as? Bool) == true
+        }
+    }
+
     func pressResumeControl(pid: pid_t) -> Bool {
         guard let window = Self.axMainWindow(pid: pid),
               let hostingView = Self.children(of: window).first else { return false }

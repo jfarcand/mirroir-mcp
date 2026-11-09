@@ -43,14 +43,20 @@ enum CompileCommand {
         }
     }
 
-    /// Parse arguments and run the compiler. Returns exit code (0 = success, 1 = error).
+    /// Parse arguments and run the compiler. Returns exit code (0 = success,
+    /// 1 = error, 2 = refused arguments).
     static func run(arguments: [String]) -> Int32 {
-        let config = parseArguments(arguments)
-
-        if config.showHelp {
-            printUsage()
-            return 0
+        let config: CompileConfig
+        do {
+            config = try parseArguments(arguments)
+        } catch {
+            fputs("Error: \(error.localizedDescription)\n", stderr)
+            return CLIDispatch.usageExitCode
         }
+
+        // Ctrl-C, or the runner ending a run that overran its budget, must not
+        // leave a modifier or a touch held on the Mac.
+        HeldInputReleaseOnExit.install()
 
         // Resolve skill files
         let skillFiles: [String]
@@ -330,7 +336,7 @@ enum CompileCommand {
         case .scrollTo(_, let direction, _):
             // Parse scroll count from result message (e.g. "found after 3 scroll(s)")
             let scrollCount = parseScrollCount(from: result.message)
-            return .scrollSequence(count: scrollCount, direction: direction)
+            return .scrollSequence(count: scrollCount, direction: direction.rawValue)
 
         case .measure:
             // Replayed live: a sleep would pass without running the action or the check.
@@ -376,40 +382,45 @@ enum CompileCommand {
     struct CompileConfig {
         let skillArgs: [String]
         let timeoutSeconds: Int
-        let showHelp: Bool
     }
 
-    static func parseArguments(_ args: [String]) -> CompileConfig {
+    /// Parse a `compile` command line.
+    ///
+    /// - Throws: `CLIArgumentError` for an option this command does not know,
+    ///   or a `--timeout` with no value or one that is not a positive whole number.
+    static func parseArguments(_ args: [String]) throws -> CompileConfig {
         var skillArgs: [String] = []
         var timeoutSeconds = EnvConfig.waitForTimeoutSeconds
-        var showHelp = false
 
         var i = 0
         while i < args.count {
             let arg = args[i]
             switch arg {
-            case "--help", "-h":
-                showHelp = true
             case "--timeout":
                 i += 1
-                if i < args.count, let t = Int(args[i]) { timeoutSeconds = t }
-            default:
-                if !arg.hasPrefix("-") {
-                    skillArgs.append(arg)
+                guard i < args.count, !args[i].hasPrefix("-") else {
+                    throw CLIArgumentError.missingValue(flag: arg)
                 }
+                guard let seconds = Int(args[i]), seconds > 0 else {
+                    throw CLIArgumentError.invalidValue(
+                        flag: arg, value: args[i], expected: "a positive whole number of seconds")
+                }
+                timeoutSeconds = seconds
+            default:
+                if arg.hasPrefix("-") {
+                    throw CLIArgumentError.unknownOption(arg, command: "compile")
+                }
+                skillArgs.append(arg)
             }
             i += 1
         }
 
-        return CompileConfig(
-            skillArgs: skillArgs,
-            timeoutSeconds: timeoutSeconds,
-            showHelp: showHelp
-        )
+        return CompileConfig(skillArgs: skillArgs, timeoutSeconds: timeoutSeconds)
     }
 
-    static func printUsage() {
-        let usage = """
+    /// The command's usage text.
+    static var usage: String {
+        """
         Usage: mirroir-mcp compile [options] <skill...>
 
         Run skills against a real device to capture coordinates and timing.
@@ -419,7 +430,7 @@ enum CompileCommand {
           <skill>             Skill name or .yaml file path (multiple allowed)
 
         Options:
-          --timeout <sec>     wait_for timeout in seconds (default: 15)
+          --timeout <sec>     wait_for timeout in seconds (default: \(EnvConfig.waitForTimeoutSeconds))
           --help, -h          Show this help
 
         Examples:
@@ -427,6 +438,5 @@ enum CompileCommand {
           mirroir-mcp compile check-about settings-wifi
           mirroir-mcp compile apps/settings/*.yaml
         """
-        fputs(usage + "\n", stderr)
     }
 }

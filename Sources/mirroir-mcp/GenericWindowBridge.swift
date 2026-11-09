@@ -96,8 +96,11 @@ final class GenericWindowBridge: WindowBridging, Sendable {
            CFGetTypeID(window) == AXUIElementGetTypeID() {
             let axWindow = unsafeDowncast(window, to: AXUIElement.self)
             if let geom = WindowListHelper.geometryFromAXElement(axWindow) {
+                // The main window's title tells its entry from those of
+                // other tabs, which share its geometry but are not on screen.
                 let windowID = WindowListHelper.findWindowID(
-                    pid: pid, position: geom.position, size: geom.size, in: windowList
+                    pid: pid, position: geom.position, size: geom.size,
+                    title: WindowListHelper.title(of: axWindow), in: windowList
                 )
                 if let windowID, windowID != 0,
                    matchesWindowTitle(position: geom.position, pid: pid, in: windowList) {

@@ -8,17 +8,14 @@
 //! parent `AGENTS.md` for the Rust discipline this workspace enforces.
 
 use std::env as std_env;
-use std::error::Error as StdError;
 use std::fs;
 use std::io;
 use std::path::PathBuf;
 use std::process::ExitCode;
-use std::result::Result as StdResult;
 
 use clap::{Parser, Subcommand, ValueEnum};
 use tokio::runtime::Builder as TokioRuntimeBuilder;
 use tracing::{error, info};
-use tracing_subscriber::{EnvFilter, fmt};
 
 mod accept;
 mod baseline_coverage;
@@ -30,6 +27,7 @@ mod emitted_scenario_contract;
 mod error;
 mod http_error;
 mod ios_error;
+mod logging;
 mod maestro;
 mod mirroir;
 mod oracle;
@@ -52,6 +50,7 @@ mod verdict;
 use crate::accept::{AcceptArgs, run_accept};
 use crate::compile::emit::emit_playwright;
 use crate::error::{Result, RunnerError};
+use crate::logging::init_tracing;
 use crate::maestro::cli::{ImportArgs, run_import};
 use crate::mirroir::lock::LockfileMode;
 use crate::mirroir::pack_install::{PackArgs, run_pack};
@@ -411,9 +410,4 @@ fn run_diff_text(paths: &[PathBuf], threshold: f64) -> Result<RunVerdict> {
             Ok(RunVerdict::Drift)
         }
     }
-}
-
-fn init_tracing() -> StdResult<(), Box<dyn StdError + Send + Sync>> {
-    let filter = EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info"));
-    fmt::fmt().with_env_filter(filter).try_init()
 }

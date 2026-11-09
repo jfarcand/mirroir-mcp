@@ -33,6 +33,14 @@ public struct RawTextElement: Sendable {
     }
 }
 
+/// Where an element's text came from.
+public enum TextSource: String, Sendable, Codable, Equatable {
+    /// Read from the frame's pixels, by OCR or a vision model: it may be misread.
+    case pixels
+    /// Reported by the OS accessibility tree: exact.
+    case tree
+}
+
 /// A finalized tap point with coordinates ready for use by the tap tool.
 public struct TapPoint: Sendable, Codable, Equatable {
     /// The recognized text string.
@@ -47,13 +55,42 @@ public struct TapPoint: Sendable, Codable, Equatable {
     public let pageY: Double
     /// Vision confidence score (0.0–1.0).
     public let confidence: Float
+    /// Where the text came from. In a saved file the key is written only for
+    /// text that did not come from pixels, and absent means pixels.
+    public let source: TextSource
 
-    public init(text: String, tapX: Double, tapY: Double, confidence: Float, pageY: Double? = nil) {
+    public init(text: String, tapX: Double, tapY: Double, confidence: Float, pageY: Double? = nil,
+                source: TextSource = .pixels) {
         self.text = text
         self.tapX = tapX
         self.tapY = tapY
         self.pageY = pageY ?? tapY
         self.confidence = confidence
+        self.source = source
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case text, tapX, tapY, pageY, confidence, source
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        text = try container.decode(String.self, forKey: .text)
+        tapX = try container.decode(Double.self, forKey: .tapX)
+        tapY = try container.decode(Double.self, forKey: .tapY)
+        pageY = try container.decode(Double.self, forKey: .pageY)
+        confidence = try container.decode(Float.self, forKey: .confidence)
+        source = try container.decodeIfPresent(TextSource.self, forKey: .source) ?? .pixels
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(text, forKey: .text)
+        try container.encode(tapX, forKey: .tapX)
+        try container.encode(tapY, forKey: .tapY)
+        try container.encode(pageY, forKey: .pageY)
+        try container.encode(confidence, forKey: .confidence)
+        if source != .pixels { try container.encode(source, forKey: .source) }
     }
 }
 

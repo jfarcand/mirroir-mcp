@@ -48,7 +48,7 @@ enum SkillStep {
     case home
     case openURL(url: String)
     case shake
-    case scrollTo(label: String, direction: String, maxScrolls: Int)
+    case scrollTo(label: String, direction: ScrollDirection, maxScrolls: Int)
     case resetApp(appName: String)
     case setNetwork(mode: String)
     indirect case measure(name: String, action: SkillStep, until: String, maxSeconds: Double?)
@@ -344,7 +344,7 @@ enum SkillParser {
         case "shake":
             return .shake
         case "scroll_to":
-            return .scrollTo(label: value, direction: "up", maxScrolls: EnvConfig.defaultScrollMaxAttempts)
+            return .scrollTo(label: value, direction: .down, maxScrolls: EnvConfig.defaultScrollMaxAttempts)
         case "reset_app":
             return .resetApp(appName: value)
         case "set_network":

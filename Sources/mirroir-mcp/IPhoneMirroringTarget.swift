@@ -45,21 +45,15 @@ enum IPhoneMirroringTarget {
         displayName: "iPhone Mirroring",
         coordinateSystem: .mobile,
         cursorMode: .direct,
-        supportsKeyboardShortcuts: false,
-        // Safari implements Cmd+L (verified on-device), so open_url drives it
-        // exactly like a scenario's `open_url:` step: launch, Cmd+L, type, Return.
-        supportsDirectURLOpen: true,
-        urlOpenUnsupportedMessage: nil,
+        // Every operation is the iPhone's own. Safari implements Cmd+L
+        // (verified on-device), so open_url drives it exactly like a scenario's
+        // `open_url:` step: launch, Cmd+L, type, Return.
+        operations: Set(TargetOperation.allCases),
         defaultStrategy: .mobile,
         layoutZones: { orientation in
             orientation == .landscape ? landscapeZones : portraitZones
         }
     )
-
-    /// Capabilities exposed by `list_targets` for this target.
-    static let capabilities: Set<TargetCapability> = [
-        .menuActions, .spotlight, .home, .appSwitcher,
-    ]
 
     /// The input path every entry point that drives the mirror builds (the MCP
     /// target, `test`, `compile` and `record`): taps and keys go to the
@@ -94,8 +88,7 @@ enum IPhoneMirroringTarget {
             ocrDescriber: describers.ocr,
             recorder: ScreenRecorder(bridge: bridge),
             backtracker: OCRChevronBacktracker(),
-            lifecycle: MirroringAppLifecycle(),
-            capabilities: capabilities
+            lifecycle: MirroringAppLifecycle()
         )
     }
 }

@@ -80,7 +80,7 @@ final class DestructiveStepDetectorTests: XCTestCase {
             .assertNotVisible(label: "Send"),
             .waitFor(label: "Purchase complete", timeoutSeconds: nil),
             .screenshot(label: "order sent"),
-            .scrollTo(label: "Delete Account", direction: "down", maxScrolls: 3),
+            .scrollTo(label: "Delete Account", direction: .up, maxScrolls: 3),
             .home,
             .swipe(direction: "up"),
         ]

@@ -21,17 +21,13 @@ final class TestRunnerConfigTests: XCTestCase {
         XCTAssertFalse(config.verbose)
         XCTAssertFalse(config.dryRun)
         XCTAssertNil(config.agent)
-        XCTAssertFalse(config.showHelp)
     }
 
-    func testParseHelpFlag() throws {
-        let config = try TestRunner.parseArguments(["--help"])
-        XCTAssertTrue(config.showHelp)
-    }
-
-    func testParseHelpShortFlag() throws {
-        let config = try TestRunner.parseArguments(["-h"])
-        XCTAssertTrue(config.showHelp)
+    /// Help is the dispatcher's: asked for anywhere, it wins and nothing runs.
+    func testHelpIsAnsweredByTheDispatcher() throws {
+        let command = try XCTUnwrap(CLIDispatch.subcommands.first { $0.name == "test" })
+        XCTAssertEqual(CLIDispatch.preflight(command, ["--help"]), .help)
+        XCTAssertEqual(CLIDispatch.preflight(command, ["skill.yaml", "-h"]), .help)
     }
 
     func testParseVerboseFlag() throws {
@@ -84,36 +80,37 @@ final class TestRunnerConfigTests: XCTestCase {
     /// caller passing a flag the CLI lacks must hear about it.
     func testParseRefusesUnknownFlags() {
         XCTAssertThrowsError(try TestRunner.parseArguments(["--unknown", "skill1"])) { error in
-            XCTAssertEqual(error as? TestRunnerArgumentError, .unknownFlag("--unknown"))
+            XCTAssertEqual(error as? CLIArgumentError, .unknownOption("--unknown", command: "test"))
             XCTAssertTrue(error.localizedDescription.contains("--unknown"))
         }
         XCTAssertThrowsError(try TestRunner.parseArguments(["-x"])) { error in
-            XCTAssertEqual(error as? TestRunnerArgumentError, .unknownFlag("-x"))
+            XCTAssertEqual(error as? CLIArgumentError, .unknownOption("-x", command: "test"))
         }
     }
 
     /// The flag that once disabled the CLI's auto-recompile no longer exists.
     func testParseRefusesTheRemovedAutoRecompileFlag() {
         XCTAssertThrowsError(try TestRunner.parseArguments(["--no-auto-recompile", "s.yaml"])) {
-            XCTAssertEqual($0 as? TestRunnerArgumentError, .unknownFlag("--no-auto-recompile"))
+            XCTAssertEqual($0 as? CLIArgumentError,
+                           .unknownOption("--no-auto-recompile", command: "test"))
         }
     }
 
     func testRunExitsTwoNamingAnUnknownFlag() {
-        XCTAssertEqual(TestRunner.run(arguments: ["--bogus", "skill.yaml"]), TestRunner.usageExitCode)
-        XCTAssertEqual(TestRunner.usageExitCode, 2)
+        XCTAssertEqual(TestRunner.run(arguments: ["--bogus", "skill.yaml"]), CLIDispatch.usageExitCode)
     }
 
     func testParseRefusesAFlagMissingItsValue() {
         XCTAssertThrowsError(try TestRunner.parseArguments(["--report-json"])) {
-            XCTAssertEqual($0 as? TestRunnerArgumentError, .missingValue(flag: "--report-json"))
+            XCTAssertEqual($0 as? CLIArgumentError, .missingValue(flag: "--report-json"))
         }
         XCTAssertThrowsError(try TestRunner.parseArguments(["--junit", "--verbose"])) {
-            XCTAssertEqual($0 as? TestRunnerArgumentError, .missingValue(flag: "--junit"))
+            XCTAssertEqual($0 as? CLIArgumentError, .missingValue(flag: "--junit"))
         }
         XCTAssertThrowsError(try TestRunner.parseArguments(["--timeout", "soon"])) {
-            XCTAssertEqual($0 as? TestRunnerArgumentError,
-                           .invalidValue(flag: "--timeout", value: "soon"))
+            XCTAssertEqual($0 as? CLIArgumentError,
+                           .invalidValue(flag: "--timeout", value: "soon",
+                                         expected: "a positive whole number of seconds"))
         }
     }
 
@@ -136,7 +133,7 @@ final class TestRunnerConfigTests: XCTestCase {
         let report = dir + "/report.json"
 
         XCTAssertEqual(TestRunner.run(arguments: ["--dry-run", "--report-json", report, skill]),
-                       TestRunner.usageExitCode)
+                       CLIDispatch.usageExitCode)
         XCTAssertFalse(FileManager.default.fileExists(atPath: report))
     }
 

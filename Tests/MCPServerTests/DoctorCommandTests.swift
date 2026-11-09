@@ -11,38 +11,35 @@ final class DoctorCommandTests: XCTestCase {
 
     // MARK: - Argument Parsing
 
-    func testParseArgumentsDefault() {
-        let config = DoctorCommand.parseArguments([])
-        XCTAssertFalse(config.showHelp)
+    func testParseArgumentsDefault() throws {
+        let config = try DoctorCommand.parseArguments([])
         XCTAssertFalse(config.noColor)
         XCTAssertFalse(config.json)
     }
 
-    func testParseArgumentsHelp() {
-        let config = DoctorCommand.parseArguments(["--help"])
-        XCTAssertTrue(config.showHelp)
-    }
-
-    func testParseArgumentsHelpShort() {
-        let config = DoctorCommand.parseArguments(["-h"])
-        XCTAssertTrue(config.showHelp)
-    }
-
-    func testParseArgumentsNoColor() {
-        let config = DoctorCommand.parseArguments(["--no-color"])
+    func testParseArgumentsNoColor() throws {
+        let config = try DoctorCommand.parseArguments(["--no-color"])
         XCTAssertTrue(config.noColor)
     }
 
-    func testParseArgumentsJSON() {
-        let config = DoctorCommand.parseArguments(["--json"])
+    func testParseArgumentsJSON() throws {
+        let config = try DoctorCommand.parseArguments(["--json"])
         XCTAssertTrue(config.json)
     }
 
-    func testParseArgumentsCombined() {
-        let config = DoctorCommand.parseArguments(["--no-color", "--json"])
+    func testParseArgumentsCombined() throws {
+        let config = try DoctorCommand.parseArguments(["--no-color", "--json"])
         XCTAssertTrue(config.noColor)
         XCTAssertTrue(config.json)
-        XCTAssertFalse(config.showHelp)
+    }
+
+    func testParseArgumentsRefusesWhatDoctorDoesNotTake() {
+        XCTAssertThrowsError(try DoctorCommand.parseArguments(["--jsno"])) {
+            XCTAssertEqual($0 as? CLIArgumentError, .unknownOption("--jsno", command: "doctor"))
+        }
+        XCTAssertThrowsError(try DoctorCommand.parseArguments(["extra"])) {
+            XCTAssertEqual($0 as? CLIArgumentError, .unexpectedArgument("extra", command: "doctor"))
+        }
     }
 
     // MARK: - formatCheck Output

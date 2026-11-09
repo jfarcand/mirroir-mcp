@@ -2,8 +2,9 @@
 // Licensed under the Apache License, Version 2.0
 //
 // ABOUTME: Registers the scroll_to MCP tool for scrolling until an element becomes visible.
-// ABOUTME: Combines swipe and OCR describe to find elements that are off-screen.
+// ABOUTME: The handler parses arguments; ScrollSeeker scrolls, reads the screen and decides when the content has ended.
 
+import CoreGraphics
 import Foundation
 import HelperLib
 
@@ -16,10 +17,14 @@ extension MirroirMCP {
         server.registerTool(MCPToolDefinition(
             name: "scroll_to",
             description: """
-                Scroll in a direction until a target text element becomes visible \
-                on the mirrored iPhone screen. Uses OCR to detect the element after \
-                each scroll. Stops early if the screen content stops changing \
-                (scroll exhaustion). Direction "up" means swipe up (scroll content down).
+                Scroll until a text becomes visible on the mirrored iPhone screen, \
+                reading the screen after each scroll. direction says where the \
+                content you want is: "down" (the default) shows what is further \
+                down the page, "up" what is above, "left" and "right" what is to \
+                that side. It is the opposite of the finger's motion; to move the \
+                finger, use swipe. Stops when the content stops moving \
+                (stop_reason=end_of_content) or the scroll budget is spent \
+                (stop_reason=max_scrolls).
                 """,
             inputSchema: [
                 "type": .string("object"),
@@ -30,12 +35,14 @@ extension MirroirMCP {
                     ]),
                     "direction": .object([
                         "type": .string("string"),
-                        "enum": .array([
-                            .string("up"), .string("down"),
-                            .string("left"), .string("right"),
-                        ]),
+                        "enum": .array(ScrollDirection.allCases.map { .string($0.rawValue) }),
+                        "description": .string("Where the content you want is (default: down)."),
+                    ]),
+                    "at": .object([
+                        "type": .string("array"),
                         "description": .string(
-                            "Scroll direction (default: up). 'up' = swipe up = scroll content down."),
+                            "Point [x, y] in window points to scroll at, for a list inside the "
+                            + "screen (a carousel, a sheet). Default: the window centre."),
                     ]),
                     "max_scrolls": .object([
                         "type": .string("integer"),
@@ -56,67 +63,32 @@ extension MirroirMCP {
                     return .error("Missing required parameter: label (string)")
                 }
 
-                let direction = args["direction"]?.asString() ?? "up"
+                let directionName = args["direction"]?.asString() ?? ScrollDirection.down.rawValue
+                guard let direction = ScrollDirection(rawValue: directionName.lowercased()) else {
+                    return .error("Unknown direction: \(directionName). Use \(ScrollDirection.names).")
+                }
                 let maxScrolls = args["max_scrolls"]?.asInt() ?? EnvConfig.defaultScrollMaxAttempts
 
-                // Check if already visible
-                if let describeResult = describer.describe(),
-                   ElementMatcher.isVisible(label: label, in: describeResult.elements) {
-                    return .text("'\(label)' is already visible on screen")
+                var anchor: CGPoint?
+                if let at = args["at"] {
+                    guard case .array(let pair) = at, pair.count == 2,
+                          let x = pair[0].asNumber(), let y = pair[1].asNumber(),
+                          let window = bridge.getWindowInfo()?.size,
+                          (0 ... window.width).contains(x), (0 ... window.height).contains(y) else {
+                        let size = bridge.getWindowInfo().map {
+                            "\(Int($0.size.width))x\(Int($0.size.height)) "
+                        } ?? ""
+                        return .error("at must be [x, y] inside the \(size)window")
+                    }
+                    anchor = CGPoint(x: x, y: y)
                 }
 
-                guard let windowInfo = bridge.getWindowInfo() else {
-                    return .error("Could not get window info for scroll")
-                }
-
-                let centerX = Double(windowInfo.size.width) / 2.0
-                let centerY = Double(windowInfo.size.height) / 2.0
-                let swipeDistance = Double(windowInfo.size.height) * EnvConfig.swipeDistanceFraction
-
-                var previousTexts: [String] = []
-
-                for attempt in 0..<maxScrolls {
-                    let fromX: Double, fromY: Double, toX: Double, toY: Double
-                    switch direction.lowercased() {
-                    case "up":
-                        fromX = centerX; fromY = centerY + swipeDistance / 2
-                        toX = centerX; toY = centerY - swipeDistance / 2
-                    case "down":
-                        fromX = centerX; fromY = centerY - swipeDistance / 2
-                        toX = centerX; toY = centerY + swipeDistance / 2
-                    case "left":
-                        fromX = centerX + swipeDistance / 2; fromY = centerY
-                        toX = centerX - swipeDistance / 2; toY = centerY
-                    case "right":
-                        fromX = centerX - swipeDistance / 2; fromY = centerY
-                        toX = centerX + swipeDistance / 2; toY = centerY
-                    default:
-                        return .error("Unknown direction: \(direction). Use up/down/left/right.")
-                    }
-
-                    if let error = input.swipe(fromX: fromX, fromY: fromY,
-                                                toX: toX, toY: toY, durationMs: EnvConfig.defaultSwipeDurationMs) {
-                        return .error("Swipe failed: \(error)")
-                    }
-
-                    usleep(EnvConfig.toolSettlingDelayUs)
-
-                    if let describeResult = describer.describe() {
-                        if ElementMatcher.isVisible(label: label, in: describeResult.elements) {
-                            return .text("Found '\(label)' after \(attempt + 1) scroll(s)")
-                        }
-
-                        // Scroll exhaustion detection
-                        let currentTexts = describeResult.elements.map { $0.text }.sorted()
-                        if currentTexts == previousTexts {
-                            return .error(
-                                "'\(label)' not found — scroll exhausted after \(attempt + 1) scroll(s)")
-                        }
-                        previousTexts = currentTexts
-                    }
-                }
-
-                return .error("'\(label)' not found after \(maxScrolls) scroll(s)")
+                let outcome = ScrollSeeker.seek(
+                    label: label, toward: direction, maxScrolls: maxScrolls, anchor: anchor,
+                    band: ScrollSeeker.band(for: ctx.profile, orientation: bridge.getOrientation()),
+                    bridge: bridge, input: input, describer: describer)
+                let reply = outcome.toolReply(label: label)
+                return reply.isError ? .error(reply.text) : .text(reply.text)
             }
         ))
     }

@@ -80,6 +80,12 @@ protocol MirroringSystemProbing: Sendable {
     func processID(bundleID: String) -> pid_t?
     /// Snapshot of the app's AX main window, or nil when it exposes none.
     func mainWindow(pid: pid_t) -> MirroringAXWindow?
+    /// Whether the app has a window minimized to the Dock.
+    func hasMinimizedWindow(pid: pid_t) -> Bool
+    /// Whether the Mac's screen is locked: no window can be read or reached then.
+    func isMacScreenLocked() -> Bool
+    /// Whether the app is hidden (Cmd+H): its window can be read, not reached.
+    func isAppHidden(pid: pid_t) -> Bool
     /// The window server's current window list.
     func windowList() -> [WindowListEntry]
     /// Press the resume control of the paused overlay in the main window of
@@ -184,6 +190,13 @@ protocol HeldInputPosting: PointerEngaging {
     func post(_ event: HeldInputEvent, targetPID: pid_t?) -> Bool
     /// Wait between events.
     func pause(microseconds: UInt32)
+}
+
+/// Reads the text a macOS app reports for one window through its accessibility tree.
+protocol AccessibilityTextReading: Sendable {
+    /// The text nodes of the window `window` names, frames in window-local
+    /// points; or why the tree could not be read.
+    func readText(in window: WindowInfo) -> Result<AccessibilityTextSnapshot, AccessibilityTextUnreadable>
 }
 
 /// Posts the key events of type_text and press_key, to the HID event tap or,
@@ -457,6 +470,13 @@ protocol SceneDeciding: Sendable {
 
     /// Send `input` (one JSON object) and wait at most `timeoutSeconds` for its answer.
     func decide(input: Data, timeoutSeconds: Int) -> SceneDecisionOutcome
+}
+
+/// A listener that hands each HTTP request to a responder; `start` throws `HTTPServerError`.
+protocol HTTPServing: Sendable {
+    func start(responder: HTTPResponder) throws
+    var boundPort: UInt16? { get }
+    func stop()
 }
 
 // MARK: - Conformances

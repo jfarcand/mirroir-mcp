@@ -63,6 +63,13 @@ extension MirroirMCP {
                 let maxSeconds = args["max_seconds"]?.asNumber()
                 let name = args["name"]?.asString() ?? "measure"
 
+                // `launch:` goes through iPhone Spotlight: on a target without
+                // it, the action is refused the way launch_app itself is.
+                if actionStr.trimmingCharacters(in: .whitespaces).hasPrefix(launchActionPrefix),
+                   let refusal = registry.refusal(of: .launchApp, on: ctx.profile, named: ctx.name) {
+                    return .error(refusal)
+                }
+
                 // Parse and execute the action
                 let actionError = executeAction(actionStr, bridge: bridge,
                                                  input: input, describer: describer)
@@ -98,6 +105,9 @@ extension MirroirMCP {
             }
         ))
     }
+
+    /// How a `measure` action that launches an app starts.
+    static let launchActionPrefix = "launch:"
 
     /// Parse an action string like "tap:Label" or "launch:AppName" and execute it.
     private static func executeAction(

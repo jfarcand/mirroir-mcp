@@ -101,20 +101,35 @@ enum WindowListHelper {
         abs(a - b) < geometryMatchTolerance
     }
 
-    /// Find a CGWindowID by matching PID and approximate geometry.
+    /// Find a CGWindowID by matching PID and approximate geometry. Several
+    /// windows of one app can share a geometry: the tabs of a tabbed window
+    /// do, and only one of them is on screen. `title` picks the one that
+    /// carries it; without a title, or when none carries it, the first match wins.
     static func findWindowID(
         pid: pid_t,
         position: CGPoint,
         size: CGSize,
+        title: String? = nil,
         in windowList: [WindowListEntry]
     ) -> CGWindowID? {
-        windowList.first { entry in
+        let sameGeometry = windowList.filter { entry in
             entry.ownerPID == pid
                 && matches(entry.bounds.origin.x, position.x)
                 && matches(entry.bounds.origin.y, position.y)
                 && matches(entry.bounds.width, size.width)
                 && matches(entry.bounds.height, size.height)
-        }?.windowID
+        }
+        if let title, !title.isEmpty, let titled = sameGeometry.first(where: { $0.name == title }) {
+            return titled.windowID
+        }
+        return sameGeometry.first?.windowID
+    }
+
+    /// The `AXTitle` of an AX element, or nil when it has none.
+    static func title(of element: AXUIElement) -> String? {
+        var value: CFTypeRef?
+        AXUIElementCopyAttributeValue(element, kAXTitleAttribute as CFString, &value)
+        return value as? String
     }
 
     // MARK: - Private

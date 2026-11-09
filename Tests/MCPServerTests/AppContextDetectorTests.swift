@@ -1,3 +1,6 @@
+// Copyright 2026 jfarcand@apache.org
+// Licensed under the Apache License, Version 2.0
+//
 // ABOUTME: Tests for AppContextDetector: home screen grid detection, system screen pattern matching.
 // ABOUTME: Validates that the detector correctly distinguishes in-app screens from escaped states.
 
@@ -55,14 +58,55 @@ final class AppContextDetectorTests: XCTestCase {
 
     // MARK: - System Screen Detection
 
+    /// The lock-screen fragments the skills checkout ships for an English phone.
+    private static let englishLockScreen = ["slide to unlock", "enter passcode", "face id"]
+
+    /// Diagnose with explicit tables, so the result does not depend on the
+    /// Mac's language or on which pattern files this machine has.
+    private func diagnoseSystem(
+        _ elements: [TapPoint], lockScreen: [String] = englishLockScreen,
+        interstitials: InterstitialPhrases = InterstitialFixtures.englishPhrases
+    ) -> AppContextDiagnosis {
+        AppContextDetector.diagnose(
+            elements: elements, screenHeight: screenHeight,
+            lockScreen: lockScreen, interstitials: interstitials)
+    }
+
+    /// iPhone Mirroring draws its "in use" words on the Mac, in the Mac's language.
+    func testDetectsALocalizedInterstitialThroughTheMacsStrings() {
+        let elements = [TapPoint(text: "iPhone en cours d’utilisation", tapX: 205, tapY: 400, confidence: 0.95)]
+        XCTAssertEqual(diagnoseSystem(elements, interstitials: InterstitialFixtures.frenchCanadianPhrases),
+                       .lockOrSystemScreen(description: "iPhone en cours d’utilisation"))
+        XCTAssertEqual(diagnoseSystem(elements), .inApp, "an English Mac never draws the French words")
+    }
+
+    /// The iOS lock screen is drawn on the phone: its words are pattern data.
+    func testLockScreenPhrasesComeFromTheGivenList() {
+        let elements = [TapPoint(text: "Saisir le code", tapX: 205, tapY: 300, confidence: 0.95)]
+        XCTAssertEqual(diagnoseSystem(elements, lockScreen: ["saisir le code"]),
+                       .lockOrSystemScreen(description: "Saisir le code"))
+        XCTAssertEqual(diagnoseSystem(elements), .inApp)
+    }
+
+    func testNoPhrasesMeansNoLockScreenMatch() {
+        let elements = [TapPoint(text: "Enter Passcode", tapX: 205, tapY: 300, confidence: 0.95)]
+        XCTAssertEqual(diagnoseSystem(elements, lockScreen: []), .inApp)
+    }
+
+    /// The camera notice is a different interruption: waiting, not a locked phone.
+    func testCameraInUseIsNotTheLockInterstitial() {
+        let elements = [TapPoint(text: "iPhone Camera in Use", tapX: 205, tapY: 400, confidence: 0.95)]
+        XCTAssertEqual(diagnoseSystem(elements), .inApp)
+    }
+
     func testDetectsIPhoneInUse() {
         let elements = [
             TapPoint(text: "iPhone in Use", tapX: 205, tapY: 400, confidence: 0.95),
             TapPoint(text: "Open iPhone to continue", tapX: 205, tapY: 450, confidence: 0.95),
         ]
-        let diagnosis = AppContextDetector.diagnose(elements: elements, screenHeight: screenHeight)
+        let diagnosis = diagnoseSystem(elements)
         if case .lockOrSystemScreen(let desc) = diagnosis {
-            XCTAssertEqual(desc, "iphone in use")
+            XCTAssertEqual(desc, "iPhone in Use", "the description is the screen's own words")
         } else {
             XCTFail("Expected lockOrSystemScreen, got \(diagnosis)")
         }
@@ -72,9 +116,9 @@ final class AppContextDetectorTests: XCTestCase {
         let elements = [
             TapPoint(text: "Lock your iPhone to connect.", tapX: 205, tapY: 400, confidence: 0.95),
         ]
-        let diagnosis = AppContextDetector.diagnose(elements: elements, screenHeight: screenHeight)
+        let diagnosis = diagnoseSystem(elements)
         if case .lockOrSystemScreen(let desc) = diagnosis {
-            XCTAssertEqual(desc, "lock your iphone")
+            XCTAssertEqual(desc, "Lock your iPhone to connect.")
         } else {
             XCTFail("Expected lockOrSystemScreen, got \(diagnosis)")
         }
@@ -87,7 +131,7 @@ final class AppContextDetectorTests: XCTestCase {
             TapPoint(text: "2", tapX: 205, tapY: 500, confidence: 0.95),
             TapPoint(text: "3", tapX: 310, tapY: 500, confidence: 0.95),
         ]
-        let diagnosis = AppContextDetector.diagnose(elements: elements, screenHeight: screenHeight)
+        let diagnosis = diagnoseSystem(elements)
         if case .lockOrSystemScreen = diagnosis {
             // pass
         } else {
@@ -99,7 +143,7 @@ final class AppContextDetectorTests: XCTestCase {
         let elements = [
             TapPoint(text: "IPHONE IN USE", tapX: 205, tapY: 400, confidence: 0.95),
         ]
-        let diagnosis = AppContextDetector.diagnose(elements: elements, screenHeight: screenHeight)
+        let diagnosis = diagnoseSystem(elements)
         if case .lockOrSystemScreen = diagnosis {
             // pass
         } else {

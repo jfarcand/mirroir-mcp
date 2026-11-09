@@ -37,6 +37,41 @@ final class RepeatedSequenceAdvisorTests: XCTestCase {
             + "\"press_key: return\"], changing the values.")
     }
 
+    /// A point read off an image is in the image's pixels; the step form takes
+    /// window points, so repeating it as a step would tap somewhere else.
+    func testATapOnAnImagePointIsNeverOfferedAsAStep() {
+        let advisor = RepeatedSequenceAdvisor()
+        let imageTap: [String: JSONValue] = [
+            "x": .number(300), "y": .number(700), "image_size": .array([.number(820), .number(1796)]),
+        ]
+        for _ in 0..<3 {
+            XCTAssertNil(advisor.observe(tool: "tap", arguments: imageTap, failed: false))
+            XCTAssertNil(type(advisor, "weather"))
+        }
+    }
+
+    /// The step form of scroll_to scrolls down at the centre, and nothing else.
+    func testAScrollThatNamesADirectionOrAPlaceIsNeverOfferedAsAStep() {
+        for extra: [String: JSONValue] in [["direction": .string("up")], ["direction": .string("Left")],
+                                           ["at": .array([.number(100), .number(400)])]] {
+            let advisor = RepeatedSequenceAdvisor()
+            var arguments: [String: JSONValue] = ["label": .string("Privacy")]
+            arguments.merge(extra) { _, new in new }
+            for _ in 0..<3 {
+                XCTAssertNil(advisor.observe(tool: "scroll_to", arguments: arguments, failed: false), "\(extra)")
+                XCTAssertNil(advisor.observe(tool: "tap", arguments: ["text": .string("Privacy")], failed: false))
+            }
+        }
+
+        let advisor = RepeatedSequenceAdvisor()
+        let down: [String: JSONValue] = ["label": .string("Privacy"), "direction": .string("Down")]
+        _ = advisor.observe(tool: "scroll_to", arguments: down, failed: false)
+        _ = advisor.observe(tool: "tap", arguments: ["text": .string("Privacy")], failed: false)
+        _ = advisor.observe(tool: "scroll_to", arguments: down, failed: false)
+        let advice = advisor.observe(tool: "tap", arguments: ["text": .string("Privacy")], failed: false)
+        XCTAssertEqual(advice?.contains("\"scroll_to: Privacy\""), true, "the default direction has a step form")
+    }
+
     func testAShapeIsOfferedOnce() {
         let advisor = RepeatedSequenceAdvisor()
         var offers = 0
@@ -92,7 +127,7 @@ final class RepeatedSequenceAdvisorTests: XCTestCase {
     // MARK: - Through the server
 
     private func server(policy: PermissionPolicy) -> MCPServer {
-        let server = MCPServer(policy: policy)
+        let server = MCPServer(policy: policy, transport: .stdio)
         for name in ["tap", "type_text", "run_steps"] {
             server.registerTool(MCPToolDefinition(
                 name: name, description: name, inputSchema: ["type": .string("object")],

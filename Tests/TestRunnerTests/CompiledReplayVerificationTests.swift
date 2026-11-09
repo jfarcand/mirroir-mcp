@@ -184,8 +184,8 @@ final class CompiledReplayVerificationTests: XCTestCase {
     func testZeroScrollsPassWhenTheTargetIsVisible() {
         describer.describeResult = screen([element("About", x: 100, y: 300)])
 
-        let result = run(.scrollTo(label: "About", direction: "up", maxScrolls: 10),
-                         .scrollSequence(count: 0, direction: "up"))
+        let result = run(.scrollTo(label: "About", direction: .down, maxScrolls: 10),
+                         .scrollSequence(count: 0, direction: "down"))
 
         XCTAssertEqual(result.status, .passed)
         XCTAssertTrue(input.swipeCalls.isEmpty)
@@ -197,8 +197,8 @@ final class CompiledReplayVerificationTests: XCTestCase {
             screen([element("About", x: 100, y: 300)]),
         ]
 
-        let result = run(.scrollTo(label: "About", direction: "up", maxScrolls: 10),
-                         .scrollSequence(count: 0, direction: "up"))
+        let result = run(.scrollTo(label: "About", direction: .down, maxScrolls: 10),
+                         .scrollSequence(count: 0, direction: "down"))
 
         XCTAssertEqual(result.status, .passed)
         XCTAssertEqual(input.swipeCalls.count, 1)
@@ -209,8 +209,8 @@ final class CompiledReplayVerificationTests: XCTestCase {
     func testTargetNeverVisibleFailsAfterTheExtraScroll() {
         describer.describeResult = screen([element("General", x: 100, y: 300)])
 
-        let result = run(.scrollTo(label: "About", direction: "up", maxScrolls: 10),
-                         .scrollSequence(count: 2, direction: "up"))
+        let result = run(.scrollTo(label: "About", direction: .down, maxScrolls: 10),
+                         .scrollSequence(count: 2, direction: "down"))
 
         XCTAssertEqual(result.status, .failed)
         XCTAssertEqual(input.swipeCalls.count, 3)
@@ -222,8 +222,8 @@ final class CompiledReplayVerificationTests: XCTestCase {
         describer.describeResult = screen([element("General", x: 100, y: 300)])
         input.swipeResult = "Swipe failed"
 
-        let result = run(.scrollTo(label: "About", direction: "up", maxScrolls: 10),
-                         .scrollSequence(count: 0, direction: "up"))
+        let result = run(.scrollTo(label: "About", direction: .down, maxScrolls: 10),
+                         .scrollSequence(count: 0, direction: "down"))
 
         XCTAssertEqual(result.status, .failed)
         XCTAssertTrue(result.message?.contains("extra scroll failed") ?? false,
@@ -231,7 +231,7 @@ final class CompiledReplayVerificationTests: XCTestCase {
     }
 
     func testScrollHintOnAnotherStepTypeFailsWithoutScrolling() {
-        let result = run(.tap(label: "General"), .scrollSequence(count: 2, direction: "up"))
+        let result = run(.tap(label: "General"), .scrollSequence(count: 2, direction: "down"))
 
         XCTAssertEqual(result.status, .failed)
         XCTAssertTrue(input.swipeCalls.isEmpty)

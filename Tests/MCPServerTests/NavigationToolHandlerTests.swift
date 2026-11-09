@@ -19,7 +19,7 @@ final class NavigationToolHandlerTests: XCTestCase {
     override func setUp() {
         super.setUp()
         let policy = PermissionPolicy(skipPermissions: true, config: nil)
-        server = MCPServer(policy: policy)
+        server = MCPServer(policy: policy, transport: .stdio)
         bridge = StubBridge()
         input = StubInput()
         describer = StubDescriber()
@@ -69,7 +69,7 @@ final class NavigationToolHandlerTests: XCTestCase {
     func testLaunchAppBlockedByPolicy() {
         let config = PermissionConfig(allow: ["*"], blockedApps: ["Settings"])
         let policy = PermissionPolicy(skipPermissions: true, config: config)
-        let policyServer = MCPServer(policy: policy)
+        let policyServer = MCPServer(policy: policy, transport: .stdio)
         let policyRegistry = makeTestRegistry(bridge: bridge, input: input)
         MirroirMCP.registerNavigationTools(
             server: policyServer, registry: policyRegistry, policy: policy
@@ -124,9 +124,11 @@ final class NavigationToolHandlerTests: XCTestCase {
         XCTAssertEqual(extractText(response), "Failed to select address bar")
     }
 
-    func testOpenURLSuccessForGenericWindow() {
+    /// open_url opens Safari through iPhone Spotlight, which a Mac window does
+    /// not have: it is refused there, and nothing is sent.
+    func testOpenURLIsUnsupportedOnAGenericWindow() {
         let policy = PermissionPolicy(skipPermissions: true, config: nil)
-        let gwServer = MCPServer(policy: policy)
+        let gwServer = MCPServer(policy: policy, transport: .stdio)
         let gwCtx = TargetContext(
             name: "browser",
             targetType: "generic-window",
@@ -135,8 +137,7 @@ final class NavigationToolHandlerTests: XCTestCase {
             input: input,
             capture: StubCapture(),
             describer: StubDescriber(),
-            recorder: StubRecorder(),
-            capabilities: [.menuActions]
+            recorder: StubRecorder()
         )
         let gwRegistry = TargetRegistry(targets: ["browser": gwCtx], defaultName: "browser")
         MirroirMCP.registerNavigationTools(
@@ -153,8 +154,10 @@ final class NavigationToolHandlerTests: XCTestCase {
             ])
         )
         let response = gwServer.handleRequest(request)!
-        XCTAssertFalse(isError(response))
-        XCTAssertEqual(extractText(response), "Opened URL: https://example.com")
+        XCTAssertTrue(isError(response))
+        XCTAssertEqual(extractText(response), MacOSAppTarget.profile.refusal(
+            of: .openURL, targetName: "browser", supportedOn: []))
+        XCTAssertEqual(input.openURLCalls, [])
     }
 
     // MARK: - press_home

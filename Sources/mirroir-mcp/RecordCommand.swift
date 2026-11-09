@@ -30,26 +30,15 @@ struct RecordConfig: Equatable {
     let outputDir: String?
 }
 
-/// What a `record` command line asks for.
-enum RecordInvocation: Equatable {
-    case help
-    case record(RecordConfig)
-}
-
-/// Command lines `record` refuses, each naming what to change.
+/// Command lines only `record` refuses, each naming what to change. The
+/// errors every command shares are `CLIArgumentError`.
 enum RecordArgumentError: LocalizedError, Equatable {
-    case missingValue(flag: String)
-    case unknownArgument(String)
     case missingRequired(flags: [String])
     case noOCRUnsupported
     case conflictsWithSavedRecording(flags: [String])
 
     var errorDescription: String? {
         switch self {
-        case .missingValue(let flag):
-            return "\(flag) needs a value"
-        case .unknownArgument(let arg):
-            return "unknown argument \"\(arg)\""
         case .missingRequired(let flags):
             return "live recording requires \(flags.joined(separator: " and "))"
         case .noOCRUnsupported:
@@ -75,19 +64,15 @@ enum RecordCommand {
     /// Directory under the global `~/.mirroir-mcp/` home holding saved recordings.
     static let recordingsDirName = "recordings"
 
-    /// Parse arguments and run the recorder. Returns exit code (0 = success, 1 = error).
+    /// Parse arguments and run the recorder. Returns exit code (0 = success,
+    /// 1 = error, 2 = refused arguments).
     static func run(arguments: [String]) -> Int32 {
-        let invocation: RecordInvocation
+        let config: RecordConfig
         do {
-            invocation = try parseArguments(arguments)
+            config = try parseArguments(arguments)
         } catch {
-            fputs("Error: \(error.localizedDescription)\n\n", stderr)
-            printUsage()
-            return 1
-        }
-        guard case .record(let config) = invocation else {
-            printUsage()
-            return 0
+            fputs("Error: \(error.localizedDescription)\n", stderr)
+            return CLIDispatch.usageExitCode
         }
 
         switch config.source {
@@ -244,10 +229,10 @@ enum RecordCommand {
 
     /// Parse a `record` command line.
     ///
-    /// - Throws: `RecordArgumentError` for an unknown argument, a flag with
-    ///   no value, `--no-ocr`, a live recording missing `--app` or `--name`,
-    ///   or `--from-recording` alongside either.
-    static func parseArguments(_ args: [String]) throws -> RecordInvocation {
+    /// - Throws: `CLIArgumentError` for an unknown argument or a flag with no
+    ///   value; `RecordArgumentError` for `--no-ocr`, a live recording missing
+    ///   `--app` or `--name`, or `--from-recording` alongside either.
+    static func parseArguments(_ args: [String]) throws -> RecordConfig {
         var appName: String?
         var flowName: String?
         var outputDir: String?
@@ -257,7 +242,7 @@ enum RecordCommand {
         func value(for flag: String) throws -> String {
             i += 1
             guard i < args.count, !args[i].isEmpty else {
-                throw RecordArgumentError.missingValue(flag: flag)
+                throw CLIArgumentError.missingValue(flag: flag)
             }
             return args[i]
         }
@@ -265,8 +250,6 @@ enum RecordCommand {
         while i < args.count {
             let arg = args[i]
             switch arg {
-            case "--help", "-h":
-                return .help
             case "--app":
                 appName = try value(for: arg)
             case "--name":
@@ -278,7 +261,7 @@ enum RecordCommand {
             case "--no-ocr":
                 throw RecordArgumentError.noOCRUnsupported
             default:
-                throw RecordArgumentError.unknownArgument(arg)
+                throw CLIArguments.unrecognized(arg, command: "record")
             }
             i += 1
         }
@@ -289,19 +272,20 @@ enum RecordCommand {
             guard conflicts.isEmpty else {
                 throw RecordArgumentError.conflictsWithSavedRecording(flags: conflicts)
             }
-            return .record(RecordConfig(source: .savedRecording(path: fromRecording), outputDir: outputDir))
+            return RecordConfig(source: .savedRecording(path: fromRecording), outputDir: outputDir)
         }
         guard let appName, let flowName else {
             let missing = [("--app", appName), ("--name", flowName)]
                 .filter { $0.1 == nil }.map(\.0)
             throw RecordArgumentError.missingRequired(flags: missing)
         }
-        return .record(RecordConfig(
-            source: .live(appName: appName, flowName: flowName), outputDir: outputDir))
+        return RecordConfig(
+            source: .live(appName: appName, flowName: flowName), outputDir: outputDir)
     }
 
-    static func printUsage() {
-        let usage = """
+    /// The command's usage text.
+    static var usage: String {
+        """
         Usage: mirroir-mcp record --app <name> --name <flow> [--output-dir <repo>]
                mirroir-mcp record --from-recording <file> [--output-dir <repo>]
 
@@ -331,6 +315,5 @@ enum RecordCommand {
           mirroir-mcp record --app Calculator --name calculator-add --output-dir .
           mirroir-mcp record --from-recording ~/.mirroir-mcp/recordings/calculator/calculator-add.recording.json
         """
-        fputs(usage + "\n", stderr)
     }
 }

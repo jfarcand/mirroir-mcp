@@ -77,6 +77,7 @@ let package = Package(
                 .linkedFramework("AppKit"),
                 .linkedFramework("Vision"),
                 .linkedFramework("CoreML"),
+                .linkedFramework("Network"),
             ] + embacleLinkerSettings
         ),
         .executableTarget(

@@ -64,10 +64,24 @@ enum InstallChannel: Equatable {
 /// Usage: `mirroir-mcp update [--dry-run] [--help]`
 enum UpdateCommand {
 
+    /// The option that prints the upgrade command without running it.
+    static let dryRunOption = "--dry-run"
+
+    /// Refuse anything but `--dry-run`: a mistyped option must never start an upgrade.
+    ///
+    /// - Throws: `CLIArgumentError` naming the argument this command does not take.
+    static func validate(_ arguments: [String]) throws {
+        try CLIArguments.requireOnly([dryRunOption], in: arguments, command: "update")
+    }
+
+    /// Upgrade this install. Returns the upgrade command's exit code, or 2 for
+    /// refused arguments.
     static func run(arguments: [String]) -> Int32 {
-        if arguments.contains("--help") || arguments.contains("-h") {
-            printUsage()
-            return 0
+        do {
+            try validate(arguments)
+        } catch {
+            fputs("Error: \(error.localizedDescription)\n", stderr)
+            return CLIDispatch.usageExitCode
         }
         let executable = URL(fileURLWithPath: Bundle.main.executablePath ?? CommandLine.arguments[0])
             .resolvingSymlinksInPath().path
@@ -76,7 +90,7 @@ enum UpdateCommand {
         }
         fputs("mirroir-mcp \(MirroirVersion.current). \(channel.advice)\n", stderr)
         guard let command = channel.command else { return 0 }
-        if arguments.contains("--dry-run") {
+        if arguments.contains(dryRunOption) {
             fputs("Would run: \(command)\n", stderr)
             return 0
         }
@@ -94,8 +108,9 @@ enum UpdateCommand {
         return process.terminationStatus
     }
 
-    static func printUsage() {
-        fputs("""
+    /// The command's usage text.
+    static var usage: String {
+        """
             Usage: mirroir-mcp update [--dry-run]
 
             Upgrades mirroir-mcp the way it was installed: `brew upgrade` for Homebrew,
@@ -103,7 +118,6 @@ enum UpdateCommand {
             it says what to change instead.
 
             --dry-run   Print the upgrade command without running it
-
-            """, stderr)
+            """
     }
 }

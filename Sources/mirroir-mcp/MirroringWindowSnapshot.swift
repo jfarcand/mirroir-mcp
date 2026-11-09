@@ -8,7 +8,7 @@ import CoreGraphics
 
 /// One node of an Accessibility subtree, copied out of AX so it can be
 /// classified without holding (or faking) live `AXUIElement` references.
-struct AXNodeSnapshot: Sendable, Equatable {
+struct AXNodeSnapshot: Sendable, Equatable, Codable {
     /// AX role, e.g. `AXButton`, `AXGroup`, `AXStaticText`.
     let role: String?
     /// AX subrole, e.g. `AXCloseButton` on a window control; nil when unset.
@@ -34,7 +34,7 @@ struct AXNodeSnapshot: Sendable, Equatable {
 }
 
 /// The iPhone Mirroring main window as Accessibility reports it at one instant.
-struct MirroringAXWindow: Sendable, Equatable {
+struct MirroringAXWindow: Sendable, Equatable, Codable {
     /// Window title (`AXTitle`), matched against the window server's window
     /// name to pick the right window without trusting AX geometry.
     let title: String?

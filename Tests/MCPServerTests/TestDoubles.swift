@@ -152,7 +152,12 @@ final class StubInput: InputProviding, @unchecked Sendable {
     }
     func longPress(x: Double, y: Double, durationMs: Int, cursorMode: CursorMode? = nil) -> String? { longPressResult }
     func doubleTap(x: Double, y: Double, cursorMode: CursorMode? = nil) -> String? { doubleTapResult }
-    func shake() -> TypeResult { shakeResult }
+    /// How many times shake() was called.
+    var shakeCalls = 0
+    func shake() -> TypeResult {
+        shakeCalls += 1
+        return shakeResult
+    }
     func typeText(_ text: String) -> TypeResult {
         typeCalls.append(text)
         return typeTextResult
@@ -162,7 +167,12 @@ final class StubInput: InputProviding, @unchecked Sendable {
         launchAppCalls.append(name)
         return launchAppResult
     }
-    func openURL(_ url: String) -> String? { openURLResult }
+    /// Records every openURL() invocation.
+    var openURLCalls: [String] = []
+    func openURL(_ url: String) -> String? {
+        openURLCalls.append(url)
+        return openURLResult
+    }
 
     /// Result returned by touch(); nil answers with the outcome the command implies.
     var touchResult: Result<TouchOutcome, TouchSessionError>?
@@ -360,8 +370,7 @@ func makeTestRegistry(
         capture: capture,
         describer: describer,
         ocrDescriber: ocrDescriber,
-        recorder: recorder,
-        capabilities: [.menuActions, .spotlight, .home, .appSwitcher]
+        recorder: recorder
     )
     return TargetRegistry(targets: ["iphone": ctx], defaultName: "iphone")
 }

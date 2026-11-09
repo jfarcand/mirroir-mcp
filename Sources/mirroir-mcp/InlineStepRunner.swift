@@ -116,7 +116,7 @@ enum InlineStepRunner {
         return StepExecutor(bridge: ctx.bridge, input: ctx.input,
                             describer: ctx.describer, capture: ctx.capture,
                             config: config, registry: registry,
-                            ocrDescriber: ctx.ocrDescriber)
+                            ocrDescriber: ctx.ocrDescriber, profile: ctx.profile)
     }
 
     /// The name failure screenshots are filed under.

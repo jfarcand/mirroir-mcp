@@ -7,6 +7,9 @@ pub mod dark_port;
 pub mod http;
 pub mod ios;
 pub mod ios_budget;
+/// Test-only: the command line mirroir-run hands to mirroir-mcp.
+#[cfg(test)]
+mod ios_invocation_contract;
 /// Test-only: the AI-only report seam with mirroir-mcp.
 #[cfg(test)]
 mod ios_report_contract;

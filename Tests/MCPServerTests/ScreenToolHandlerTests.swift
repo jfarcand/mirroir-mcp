@@ -19,7 +19,7 @@ final class ScreenToolHandlerTests: XCTestCase {
     override func setUp() {
         super.setUp()
         let policy = PermissionPolicy(skipPermissions: true, config: nil)
-        server = MCPServer(policy: policy)
+        server = MCPServer(policy: policy, transport: .stdio)
         bridge = StubBridge()
         capture = StubCapture()
         recorder = StubRecorder()

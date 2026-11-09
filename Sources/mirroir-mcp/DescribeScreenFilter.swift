@@ -21,13 +21,37 @@ enum DescribeScreenFilter {
         return sorted.filter { fold($0.text).contains(needle) }
     }
 
-    /// One line per element: its quoted text, then its tap point unless `textOnly`.
+    /// The mark on an element whose text the accessibility tree reported.
+    static let treeMark = "[tree]"
+
+    /// One line per element: its quoted text, then its tap point unless
+    /// `textOnly`, then `treeMark` when the text is exact. A pixel-read
+    /// element carries no mark, so a screen with no tree text reads as before.
     static func lines(for elements: [TapPoint], textOnly: Bool) -> [String] {
         elements.map { element in
-            textOnly
+            let line = textOnly
                 ? "- \"\(element.text)\""
                 : "- \"\(element.text)\" at (\(Int(element.tapX)), \(Int(element.tapY)))"
+            return element.source == .tree ? "\(line) \(treeMark)" : line
         }
+    }
+
+    /// The first line of the element list. It explains the tree mark only
+    /// when an element carries it. `coordinates` says which points are listed.
+    static func header(coordinates: String, elements: [TapPoint]) -> String {
+        guard elements.contains(where: { $0.source == .tree }) else {
+            return "Screen elements (\(coordinates)):"
+        }
+        return "Screen elements (\(coordinates); \(treeMark) = exact text from the macOS "
+            + "accessibility tree, unmarked = read from pixels, may misread):"
+    }
+
+    /// The `_meta` fields that count elements by source, when any is exact.
+    static func sourceCounts(_ elements: [TapPoint], truncated: Bool) -> String {
+        let tree = elements.filter { $0.source == .tree }.count
+        guard tree > 0 || truncated else { return "" }
+        return " tree_count=\(tree) pixel_count=\(elements.count - tree)"
+            + (truncated ? " tree_truncated=true" : "")
     }
 
     /// The line saying a query matched nothing, naming how much the screen held,

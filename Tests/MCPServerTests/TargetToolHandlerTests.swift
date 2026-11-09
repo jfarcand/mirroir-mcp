@@ -16,7 +16,7 @@ final class TargetToolHandlerTests: XCTestCase {
     override func setUp() {
         super.setUp()
         let policy = PermissionPolicy(skipPermissions: true, config: nil)
-        server = MCPServer(policy: policy)
+        server = MCPServer(policy: policy, transport: .stdio)
 
         let iphoneBridge = StubBridge()
         iphoneBridge.targetName = "iphone"
@@ -26,13 +26,11 @@ final class TargetToolHandlerTests: XCTestCase {
         let iphoneCtx = TargetContext(
             name: "iphone", targetType: "iphone-mirroring", bundleID: nil,
             bridge: iphoneBridge, input: StubInput(),
-            capture: StubCapture(), describer: StubDescriber(), recorder: StubRecorder(),
-            capabilities: [.menuActions, .spotlight, .home, .appSwitcher])
+            capture: StubCapture(), describer: StubDescriber(), recorder: StubRecorder())
         let androidCtx = TargetContext(
             name: "android", targetType: "generic-window", bundleID: nil,
             bridge: androidBridge, input: StubInput(),
-            capture: StubCapture(), describer: StubDescriber(), recorder: StubRecorder(),
-            capabilities: [])
+            capture: StubCapture(), describer: StubDescriber(), recorder: StubRecorder())
 
         registry = TargetRegistry(
             targets: ["iphone": iphoneCtx, "android": androidCtx],
@@ -75,6 +73,18 @@ final class TargetToolHandlerTests: XCTestCase {
         XCTAssertNotNil(text)
         XCTAssertTrue(text?.contains("iphone") ?? false)
         XCTAssertTrue(text?.contains("android") ?? false)
+    }
+
+    /// Each line says which tools do not exist on that target, so an agent
+    /// can tell before it calls one.
+    func testListTargetsNamesUnsupportedToolsPerTarget() throws {
+        let lines = try XCTUnwrap(extractText(callTool("list_targets"))).components(separatedBy: "\n")
+        let iphone = try XCTUnwrap(lines.first { $0.hasPrefix("- iphone") })
+        let android = try XCTUnwrap(lines.first { $0.hasPrefix("- android") })
+        XCTAssertTrue(iphone.hasSuffix("[iPhone Mirroring; every tool]"), iphone)
+        XCTAssertTrue(android.hasSuffix(
+            "[macOS App; unsupported here: launch_app, open_url, press_app_switcher, press_home, "
+            + "reset_app, set_network, shake, spotlight]"), android)
     }
 
     func testListTargetsShowsActiveMarker() {

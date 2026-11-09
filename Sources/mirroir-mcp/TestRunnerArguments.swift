@@ -14,9 +14,10 @@ extension TestRunner {
 
     /// Parse CLI arguments into TestRunConfig.
     ///
-    /// - Throws: `TestRunnerArgumentError` for a flag this command does not know, a
-    ///   flag missing its value, or `--dry-run` with `--report-json`: a dry run
-    ///   executes nothing, so it must never write a report a caller reads as a verdict.
+    /// - Throws: `CLIArgumentError` for a flag this command does not know or a
+    ///   flag missing its value; `TestRunnerArgumentError` for `--dry-run` with
+    ///   `--report-json`: a dry run executes nothing, so it must never write a
+    ///   report a caller reads as a verdict.
     ///   `--compiled-out` and `--compiled-source` come together, name exactly one
     ///   skill, and are refused with `--dry-run`, which has no screens to record.
     static func parseArguments(_ args: [String]) throws -> TestRunConfig {
@@ -33,14 +34,13 @@ extension TestRunner {
         var captureKey: String?
         var compiledOutPath: String?
         var compiledSourcePath: String?
-        var showHelp = false
 
         /// The value after flag `args[i]`, advancing past it.
         func value(at i: inout Int) throws -> String {
             let flag = args[i]
             i += 1
             guard i < args.count, !args[i].hasPrefix("-") else {
-                throw TestRunnerArgumentError.missingValue(flag: flag)
+                throw CLIArgumentError.missingValue(flag: flag)
             }
             return args[i]
         }
@@ -49,8 +49,6 @@ extension TestRunner {
         while i < args.count {
             let arg = args[i]
             switch arg {
-            case "--help", "-h":
-                showHelp = true
             case "--junit":
                 junitPath = try value(at: &i)
             case "--report-json":
@@ -66,7 +64,8 @@ extension TestRunner {
             case "--timeout":
                 let raw = try value(at: &i)
                 guard let seconds = Int(raw), seconds > 0 else {
-                    throw TestRunnerArgumentError.invalidValue(flag: arg, value: raw)
+                    throw CLIArgumentError.invalidValue(
+                        flag: arg, value: raw, expected: "a positive whole number of seconds")
                 }
                 timeoutSeconds = seconds
             case "--verbose", "-v":
@@ -95,7 +94,7 @@ extension TestRunner {
                 }
             default:
                 if arg.hasPrefix("-") {
-                    throw TestRunnerArgumentError.unknownFlag(arg)
+                    throw CLIArgumentError.unknownOption(arg, command: "test")
                 }
                 skillArgs.append(arg)
             }
@@ -134,8 +133,7 @@ extension TestRunner {
             reportJSONPath: reportJSONPath,
             captureKey: captureKey,
             compiledOutPath: compiledOutPath,
-            compiledSourcePath: compiledSourcePath,
-            showHelp: showHelp
+            compiledSourcePath: compiledSourcePath
         )
     }
 
@@ -269,9 +267,9 @@ extension TestRunner {
         }.sorted()
     }
 
-    /// Print usage information.
-    static func printUsage() {
-        let usage = """
+    /// The command's usage text.
+    static var usage: String {
+        """
         Usage: mirroir-mcp test [options] [skill...]
 
         Run skills deterministically against iPhone Mirroring. A YAML skill runs
@@ -303,7 +301,7 @@ extension TestRunner {
                               The file whose SHA-256 the --compiled-out skill
                               records as its source (the scenario it came from)
           --screenshot-dir    Failure screenshot directory (default: ./mirroir-test-results/)
-          --timeout <sec>     wait_for timeout in seconds (default: 15)
+          --timeout <sec>     wait_for timeout in seconds (default: \(EnvConfig.waitForTimeoutSeconds))
           --verbose, -v       Show detailed output
           --dry-run           Parse and validate without executing (refused
                               with --report-json: a dry run reports no verdict)
@@ -328,16 +326,13 @@ extension TestRunner {
           mirroir-mcp test --agent claude-sonnet-5-5 skill.yaml  # AI diagnosis
           mirroir-mcp test                    # run all discovered skills
         """
-        fputs(usage + "\n", stderr)
     }
 }
 
-/// Errors in the arguments given to `mirroir test`. The run exits with
-/// `TestRunner.usageExitCode`, naming the offending flag.
+/// Command lines only `mirroir test` refuses: combinations of its own flags.
+/// The errors every command shares are `CLIArgumentError`. Either way the run
+/// exits with `CLIDispatch.usageExitCode`.
 enum TestRunnerArgumentError: LocalizedError, Equatable {
-    case unknownFlag(String)
-    case missingValue(flag: String)
-    case invalidValue(flag: String, value: String)
     case dryRunWithReport
     case compiledFlagWithoutPartner(given: String, missing: String)
     case compiledOutNeedsOneSkill(count: Int)
@@ -345,12 +340,6 @@ enum TestRunnerArgumentError: LocalizedError, Equatable {
 
     var errorDescription: String? {
         switch self {
-        case .unknownFlag(let flag):
-            return "unknown option '\(flag)' (see mirroir-mcp test --help)"
-        case .missingValue(let flag):
-            return "option '\(flag)' needs a value"
-        case .invalidValue(let flag, let value):
-            return "option '\(flag)' got '\(value)', expected a positive whole number of seconds"
         case .dryRunWithReport:
             return "--dry-run cannot be combined with --report-json: a dry run executes "
                 + "no step, so it has no verdict to report"

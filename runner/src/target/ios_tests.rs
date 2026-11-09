@@ -75,15 +75,6 @@ async fn a_passing_block_returns_its_final_screen_capture() -> TestResult {
             .map(String::as_str),
         Some("Alarmes Aucune alarme\n")
     );
-    let args = std_fs::read_to_string(dir.path().join("args"))?;
-    assert!(
-        args.starts_with("test --report-json "),
-        "unexpected argv: {args}"
-    );
-    assert!(
-        args.contains(&format!("--capture {IOS_CAPTURE_KEY} ")),
-        "no capture key: {args}"
-    );
     Ok(())
 }
 

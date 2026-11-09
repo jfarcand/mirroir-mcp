@@ -180,7 +180,13 @@ final class MirroringWindowResolverTests: XCTestCase {
     func testResumeControlAcceptsOnlyKnownTitles() {
         XCTAssertTrue(MirroringWindowResolver.isResumeControl(label: "Resume"))
         XCTAssertTrue(MirroringWindowResolver.isResumeControl(label: " OK "))
-        XCTAssertTrue(MirroringWindowResolver.isResumeControl(label: "Réessayer"))
+        // A title in the Mac's language is accepted on a Mac set to that
+        // language, where iPhone Mirroring draws it; not on an English one.
+        XCTAssertTrue(MirroringWindowResolver.isResumeControl(
+            label: "Réessayer", phrases: InterstitialFixtures.frenchCanadianPhrases))
+        XCTAssertFalse(MirroringWindowResolver.isResumeControl(
+            label: "Réessayer", phrases: InterstitialFixtures.englishPhrases))
+        XCTAssertFalse(MirroringWindowResolver.isResumeControl(label: "Close"))
     }
 
     func testResumeControlRejectsUnlabeledButtons() {

@@ -202,8 +202,8 @@ mirroir-mcp/
 |------|---------|
 | Build | `swift build` |
 | Build release | `swift build -c release` |
-| Run all tests | `swift test` |
-| Run specific test | `swift test --filter <TestClassName>/<testMethodName>` |
+| Run the unit tests | `scripts/unit-tests.sh` (a bare `swift test` deadlocks) |
+| Run specific test | `scripts/unit-tests.sh xctest --filter <TestClassName>/<testMethodName>` |
 | Clean | `swift package clean` |
 | Resolve dependencies | `swift package resolve` |
 
@@ -212,20 +212,22 @@ mirroir-mcp/
 **Tier 1 — Quick Iteration** (during development):
 ```bash
 swift build
-swift test --filter <TestClassName>/<testMethodName>
+scripts/unit-tests.sh xctest --filter <TestClassName>/<testMethodName>
 ```
 
 **Tier 2 — Pre-Commit** (before committing):
 ```bash
 swift build
-swift test --skip IntegrationTests
+scripts/unit-tests.sh
 ```
 
 **Tier 3 — Full Validation** (before merge):
 ```bash
 swift build -c release
-swift test --skip IntegrationTests
+scripts/unit-tests.sh
 ```
+
+`scripts/unit-tests.sh` runs XCTest and swift-testing in two passes (together they deadlock) under a throwaway home directory, so your own `~/.mirroir-mcp` and `settings.json` cannot change a result. Run the suites without it and the isolation guard tests fail, naming the script.
 
 ### Git Hooks
 

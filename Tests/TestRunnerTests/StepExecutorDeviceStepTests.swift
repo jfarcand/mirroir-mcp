@@ -19,7 +19,7 @@ extension StepExecutorTests {
         )
 
         let result = executor.execute(
-            step: .scrollTo(label: "About", direction: "up", maxScrolls: 10),
+            step: .scrollTo(label: "About", direction: .down, maxScrolls: 10),
             stepIndex: 0, skillName: "test")
         XCTAssertEqual(result.status, .passed)
         XCTAssertEqual(result.message, "already visible")
@@ -43,15 +43,15 @@ extension StepExecutorTests {
         describer.describeResults = [noMatch, noMatch, differentContent, found]
 
         let result = executor.execute(
-            step: .scrollTo(label: "About", direction: "up", maxScrolls: 10),
+            step: .scrollTo(label: "About", direction: .down, maxScrolls: 10),
             stepIndex: 0, skillName: "test")
         XCTAssertEqual(result.status, .passed)
         XCTAssertTrue(result.message?.contains("scroll(s)") ?? false)
         XCTAssertTrue(input.swipeCalls.count > 0)
     }
 
-    func testScrollToExhausted() {
-        // Return same content every time — triggers scroll exhaustion
+    func testScrollToTheEndOfTheContent() {
+        // The same content on every read: the end, after two scrolls confirm it
         let sameContent = ScreenDescriber.DescribeResult(
             elements: [TapPoint(text: "General", tapX: 100, tapY: 200, confidence: 0.95)],
             screenshotBase64: ""
@@ -59,10 +59,11 @@ extension StepExecutorTests {
         describer.describeResult = sameContent
 
         let result = executor.execute(
-            step: .scrollTo(label: "About", direction: "up", maxScrolls: 5),
+            step: .scrollTo(label: "About", direction: .down, maxScrolls: 5),
             stepIndex: 0, skillName: "test")
         XCTAssertEqual(result.status, .failed)
-        XCTAssertTrue(result.message?.contains("exhausted") ?? false)
+        XCTAssertEqual(result.message, "Content stopped moving after 2 scroll(s) (end_of_content)")
+        XCTAssertEqual(input.swipeCalls.count, 2)
     }
 
     func testScrollToMaxReached() {
@@ -83,7 +84,7 @@ extension StepExecutorTests {
         describer.describeResults = [page1, page1, page2, page2, page3]
 
         let result = executor.execute(
-            step: .scrollTo(label: "Target", direction: "up", maxScrolls: 2),
+            step: .scrollTo(label: "Target", direction: .down, maxScrolls: 2),
             stepIndex: 0, skillName: "test")
         XCTAssertEqual(result.status, .failed)
         XCTAssertTrue(result.message?.contains("Not found after") ?? false)
@@ -96,7 +97,7 @@ extension StepExecutorTests {
         bridge.windowInfo = nil
 
         let result = executor.execute(
-            step: .scrollTo(label: "About", direction: "up", maxScrolls: 5),
+            step: .scrollTo(label: "About", direction: .down, maxScrolls: 5),
             stepIndex: 0, skillName: "test")
         XCTAssertEqual(result.status, .failed)
         XCTAssertTrue(result.message?.contains("window info") ?? false)

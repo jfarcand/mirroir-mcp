@@ -83,11 +83,11 @@ jobs:
 
       - name: Unit tests (XCTest)
         timeout-minutes: 15
-        run: swift test --skip IntegrationTests --disable-swift-testing
+        run: scripts/unit-tests.sh xctest
 
       - name: Unit tests (Swift Testing)
         timeout-minutes: 5
-        run: swift test --skip IntegrationTests --disable-xctest --no-parallel
+        run: scripts/unit-tests.sh swift-testing
 
       - uses: ./.github/actions/setup-fake-mirroring
       - name: Pre-test runner diagnostics
@@ -147,7 +147,7 @@ jobs:
           ./target/debug/mirroir-run --sample samples/ios-fixture 2>&1 | tee ios-fixture.log
           # A skipped block must not pass as green: the run has to show the
           # hand-off, the live capture, and the comparison it fed.
-          plain=$(sed 's/\x1b\[[0-9;]*m//g' ios-fixture.log)
+          plain=$(cat ios-fixture.log)
           for marker in \
               "dispatching the scenario's ios block to mirroir-mcp" \
               "cross_surface capture written" \
@@ -182,7 +182,7 @@ jobs:
           for sample in game-shell game-result; do
             echo "=== $sample ==="
             ./target/debug/mirroir-run --sample "samples/$sample" 2>&1 | tee "$sample.log"
-            plain=$(sed 's/\x1b\[[0-9;]*m//g' "$sample.log")
+            plain=$(cat "$sample.log")
             grep -qF "dispatching the scenario's ios block to mirroir-mcp" <<<"$plain" \
               || { echo "$sample: no ios block was handed to mirroir-mcp"; exit 1; }
             # Negative checks are `if` blocks: a bare `grep … && exit` that
@@ -551,7 +551,7 @@ jobs:
           BLOCKS=target/mirroir-ios/clock
           rm -rf "$BLOCKS"
           ./target/debug/mirroir-run --sample "$APP_DIR" 2>&1 | tee "$CONTRACT_DIR/$consumer-replay.log"
-          plain=$(sed 's/\x1b\[[0-9;]*m//g' "$CONTRACT_DIR/$consumer-replay.log")
+          plain=$(cat "$CONTRACT_DIR/$consumer-replay.log")
           for marker in \
               "dispatching the scenario's ios block to mirroir-mcp" \
               "verdict=pass"; do
@@ -570,7 +570,7 @@ jobs:
           python3 - "$CONTRACT_DIR/$consumer-replay.log" "$APP_DIR/scenarios" "$BLOCKS" <<'EOF'
           import pathlib, re, sys
           log, scenarios_dir, blocks_dir = sys.argv[1], pathlib.Path(sys.argv[2]), pathlib.Path(sys.argv[3])
-          text = re.sub(r"\x1b\[[0-9;]*m", "", open(log, encoding="utf-8", errors="replace").read())
+          text = open(log, encoding="utf-8", errors="replace").read()
           step = re.compile(r"^  - ", re.M)
           scenarios = sorted(scenarios_dir.glob("*.ios.yaml"))
           emitted = sum(len(step.findall(s.read_text())) for s in scenarios)
@@ -834,11 +834,11 @@ jobs:
 
       - name: Unit tests (XCTest)
         timeout-minutes: 25
-        run: swift test --skip IntegrationTests --disable-swift-testing
+        run: scripts/unit-tests.sh xctest
 
       - name: Unit tests (Swift Testing)
         timeout-minutes: 10
-        run: swift test --skip IntegrationTests --disable-xctest --no-parallel
+        run: scripts/unit-tests.sh swift-testing
 
   # The install path most people take: a machine with no embacle-ffi. Every
   # other job installs it first, so without this one the source build is never
@@ -896,4 +896,4 @@ jobs:
 
       - name: Unit tests still pass on the stub path
         timeout-minutes: 20
-        run: swift test --skip IntegrationTests --disable-swift-testing
+        run: scripts/unit-tests.sh xctest

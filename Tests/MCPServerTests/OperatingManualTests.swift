@@ -12,7 +12,7 @@ final class OperatingManualTests: XCTestCase {
 
     /// Every registered tool, with the names of its parameters.
     static func registeredCatalog() -> [String: Set<String>] {
-        let server = MCPServer(policy: PermissionPolicy(skipPermissions: true, config: nil))
+        let server = MCPServer(policy: PermissionPolicy(skipPermissions: true, config: nil), transport: .stdio)
         MirroirMCP.registerTools(
             server: server, registry: makeTestRegistry(bridge: StubBridge(), input: StubInput()),
             policy: PermissionPolicy(skipPermissions: true, config: nil))
@@ -46,7 +46,7 @@ final class OperatingManualTests: XCTestCase {
     }
 
     func testInitializeCarriesTheEssentials() {
-        let server = MCPServer(policy: PermissionPolicy(skipPermissions: true, config: nil))
+        let server = MCPServer(policy: PermissionPolicy(skipPermissions: true, config: nil), transport: .stdio)
         let request = JSONRPCRequest(jsonrpc: "2.0", id: .number(1), method: "initialize",
                                      params: .object([:]))
         guard case .object(let result)? = server.handleRequest(request)?.result else {
@@ -98,6 +98,13 @@ final class OperatingManualTests: XCTestCase {
             .union(Self.codeIdentifiers(in: OperatingManual.essentials))
         XCTAssertTrue(named.contains("run_steps"), "the scan must see the tools the manual names")
         XCTAssertEqual(named.subtracting(known), [], "named in the manual but not a tool or parameter")
+    }
+
+    func testTheEssentialsAskTheAgentToNarrateItsActions() {
+        XCTAssertTrue(OperatingManual.essentials.contains("Keep the user informed"))
+        XCTAssertTrue(OperatingManual.essentials.contains("in silence"))
+        XCTAssertTrue(OperatingManual.skillMarkdown.contains("Keep the user informed"),
+                      "the full manual carries the essentials")
     }
 
     func testTheEssentialsNameTheirToolsAsTools() {

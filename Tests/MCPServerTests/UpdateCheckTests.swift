@@ -75,7 +75,7 @@ final class UpdateCheckTests: XCTestCase {
     // MARK: - Where the notice shows
 
     private func call(_ tool: String, notice: String?) -> String {
-        let server = MCPServer(policy: PermissionPolicy(skipPermissions: true, config: nil))
+        let server = MCPServer(policy: PermissionPolicy(skipPermissions: true, config: nil), transport: .stdio)
         let capture = StubCapture()
         capture.captureResult = "base64data"
         MirroirMCP.registerInfoTools(

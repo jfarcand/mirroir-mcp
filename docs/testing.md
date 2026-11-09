@@ -85,9 +85,9 @@ The packaging script creates the standard `Contents/MacOS/` + `Contents/Info.pli
 
 ## Test Tiers
 
-### Unit Tests (`swift test --skip IntegrationTests`)
+### Unit Tests (`scripts/unit-tests.sh`)
 
-Run without any external dependencies. Three test targets:
+Run without any external dependencies, and without the developer's own configuration: the script points the home directory at a throwaway folder and loads no `settings.json`, so `~/.mirroir-mcp` and a project-local settings file cannot change a result. It makes one pass per test runner (`xctest`, then `swift-testing`), because the two deadlock in one invocation; anything after the runner name goes to `swift test`. Three test targets:
 
 | Target | Tests | What It Validates |
 |--------|-------|-------------------|
@@ -178,6 +178,23 @@ scenario, with the PASSED counts summing to the emitted step count (the opening 
 `--confirm-destructive`). It also checks that the rendered `ios-block.yaml` files carried a
 `reset_app:`, a `tap:` and a `wait_for:` across the bridge. The emitted tree and both logs are
 uploaded as the `clock-emit-contract` artifact.
+
+## Capturing the Mirroring Window
+
+Whether a session is live or blocked is read from the iPhone Mirroring window's Accessibility tree: "iPhone in Use", "Timed Out", "Connection Paused", a Touch ID sheet. None of these screens can be produced on demand in a test run, so the tests replay captures of the real window:
+
+```bash
+mirroir-mcp ax-capture connection-interrupted --out Tests/Fixtures/mirroring-ax/macos-26.5-en
+```
+
+The command is read-only. It writes `<name>.axwindow.json`: the exact tree the session-state check reads, tagged with the macOS version and build, the app's version, and the Mac's language (with the app's strings in that language, so a French capture replays on an English CI runner). It also records what the binary made of the window, a state and a move. `--watch <seconds>` writes one numbered file per distinct window, for screens that pass too fast to catch by hand.
+
+Before committing a capture:
+
+1. **Compare the printed state and move with what was on screen.** They are written by the code under test, so a capture is only evidence when a person confirmed it.
+2. **Read the printed labels.** The repository is public, and some screens name the iPhone: replace the name with `iPhone` in the file.
+3. **File it under `macos-<major.minor>-<language>/`.** `AXWindowCaptureCorpusTests` checks the folder against the tags inside the file, and replays every capture through the state check and the block classifier.
+4. **Delete the hand-built twin** in `Tests/MCPServerTests/InterstitialFixtures.swift`, if the screen had one. Only screens nobody has captured yet stay built by hand.
 
 ## CI Workflow: `installers.yml`
 

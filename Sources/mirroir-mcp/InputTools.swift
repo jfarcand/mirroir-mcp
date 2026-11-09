@@ -1,7 +1,7 @@
 // Copyright 2026 jfarcand@apache.org
 // Licensed under the Apache License, Version 2.0
 //
-// ABOUTME: Registers input-related MCP tools: tap, swipe, drag, type_text, press_key, long_press, double_tap, shake.
+// ABOUTME: Registers input-related MCP tools: swipe, drag, type_text, press_key, long_press, double_tap, shake (tap is in TapTools).
 // ABOUTME: Each tool maps MCP JSON-RPC calls to the InputSimulation subsystem via CGEvent.
 
 import Foundation
@@ -9,7 +9,7 @@ import HelperLib
 
 extension MirroirMCP {
     /// Schema fragment for the optional cursor_mode parameter on coordinate tools.
-    private static let cursorModeSchema: JSONValue = .object([
+    static let cursorModeSchema: JSONValue = .object([
         "type": .string("string"),
         "enum": .array([.string("direct"), .string("preserving")]),
         "description": .string(
@@ -19,7 +19,7 @@ extension MirroirMCP {
     ])
 
     /// Result of parsing cursor_mode: a valid mode (or nil for default) vs an error message.
-    private enum CursorModeResult {
+    enum CursorModeResult {
         case ok(CursorMode?)
         case invalid(String)
     }
@@ -27,7 +27,7 @@ extension MirroirMCP {
     /// Parse an optional cursor_mode string from tool args into a CursorMode.
     /// Returns `.ok(nil)` when absent, `.ok(mode)` for valid values,
     /// or `.invalid(message)` for unrecognized values.
-    private static func parseCursorMode(_ args: [String: JSONValue]) -> CursorModeResult {
+    static func parseCursorMode(_ args: [String: JSONValue]) -> CursorModeResult {
         guard let value = args["cursor_mode"]?.asString() else { return .ok(nil) }
         switch value {
         case "direct": return .ok(.direct)
@@ -41,66 +41,6 @@ extension MirroirMCP {
         server: MCPServer,
         registry: TargetRegistry
     ) {
-        // tap — click at coordinates on the mirrored iPhone
-        server.registerTool(MCPToolDefinition(
-            name: "tap",
-            description: """
-                Tap on the mirrored iPhone screen, either on visible text or at a \
-                position. With `text`, the text is found by OCR and tapped; when \
-                it is not on screen, the reply lists the text that is. With `x` \
-                and `y`, the point is relative to the iPhone Mirroring window \
-                (0,0 is the top-left of the mirrored content); take coordinates \
-                from describe_screen, which reports each element's tap point.
-                """,
-            inputSchema: [
-                "type": .string("object"),
-                "properties": .object([
-                    "x": .object([
-                        "type": .string("number"),
-                        "description": .string(
-                            "X coordinate relative to the mirroring window (0 = left edge)"),
-                    ]),
-                    "y": .object([
-                        "type": .string("number"),
-                        "description": .string(
-                            "Y coordinate relative to the mirroring window (0 = top edge)"),
-                    ]),
-                    "text": .object([
-                        "type": .string("string"),
-                        "description": .string(
-                            "Visible text to tap, matched by OCR (exact, then case- and "
-                            + "accent-insensitive, then substring). Use instead of x and y."),
-                    ]),
-                    "cursor_mode": cursorModeSchema,
-                ]),
-            ],
-            handler: { args in
-                let (ctx, err) = registry.resolveForTool(args)
-                guard let ctx else { return err! }
-                let input = ctx.input
-
-                if let text = args["text"]?.asString() {
-                    let executor = InlineStepRunner.executor(for: ctx, registry: registry)
-                    let report = InlineStepRunner.run([.tap(label: text)], executor: executor)
-                    return report.failed ? .error(report.text) : .text(report.text)
-                }
-                guard let x = args["x"]?.asNumber(), let y = args["y"]?.asNumber() else {
-                    return .error("Missing parameters: give text (string), or x and y (numbers)")
-                }
-
-                let cursorMode: CursorMode?
-                switch parseCursorMode(args) {
-                case .ok(let mode): cursorMode = mode
-                case .invalid(let msg): return .error(msg)
-                }
-
-                if let error = input.tap(x: x, y: y, cursorMode: cursorMode) {
-                    return .error(error)
-                }
-                return .text("Tapped at (\(Int(x)), \(Int(y)))")
-            }
-        ))
-
         // swipe — drag gesture on the mirrored iPhone
         server.registerTool(MCPToolDefinition(
             name: "swipe",
@@ -484,7 +424,7 @@ extension MirroirMCP {
                 "properties": .object([:]),
             ],
             handler: { args in
-                let (ctx, err) = registry.resolveForTool(args)
+                let (ctx, err) = registry.resolveForTool(args, requiring: .shake)
                 guard let ctx else { return err! }
                 let input = ctx.input
 

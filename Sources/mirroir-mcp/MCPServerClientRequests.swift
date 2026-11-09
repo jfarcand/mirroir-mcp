@@ -7,6 +7,14 @@
 import Foundation
 import HelperLib
 
+/// How requests reach an `MCPServer`.
+enum MCPTransport: Sendable {
+    /// Line-delimited JSON on stdin and stdout, one client for the life of the process.
+    case stdio
+    /// One POST per message (`mirroir-mcp serve`); nothing is ever written unasked.
+    case http
+}
+
 extension MCPServer {
 
     /// Build the `InputRequiredResult` for a tool that needs the client to
@@ -69,11 +77,12 @@ extension MCPServer {
     }
 
     /// Whether a server-initiated request may be written to stdout right now.
-    /// The `2026-07-28` stdio transport forbids it outright: a server writes
-    /// only responses and notifications, and reaches the client through
-    /// `InputRequiredResult` instead.
+    /// Only on stdio, where stdout reaches the client: over HTTP there is no
+    /// channel to write one on. And never while serving a `2026-07-28`
+    /// request: that revision's server writes only responses and
+    /// notifications, and reaches the client through `InputRequiredResult`.
     func mayInitiateRequest() -> Bool {
-        !servingModernRequest.withLock { $0 }
+        transport == .stdio && !servingModernRequest.withLock { $0 }
     }
 
     /// Send a sampling/createMessage request to the MCP client and wait for the response.
@@ -82,12 +91,13 @@ extension MCPServer {
     /// the client's response from stdin. Safe to call from within a tool handler because
     /// the server's main loop is blocked waiting for the handler to return.
     ///
-    /// Two conditions gate it. The `2026-07-28` stdio transport forbids a server
-    /// from writing JSON-RPC requests to stdout at all, so nothing is sent while
-    /// serving a request from that revision — it reaches the client through
-    /// `InputRequiredResult`, which this server does not implement. Beyond that,
-    /// only clients that declared `sampling` in their `initialize` handshake are
-    /// asked, since sampling is a client capability.
+    /// Two conditions gate it. `mayInitiateRequest()` must hold: the transport
+    /// is stdio, and the request being served is not from the `2026-07-28`
+    /// revision, which forbids a server from writing JSON-RPC requests to
+    /// stdout; a tool reaches that client by returning input requests instead
+    /// (`inputRequiredResponse`). Beyond that, only clients that declared
+    /// `sampling` in their `initialize` handshake are asked, since sampling is
+    /// a client capability.
     ///
     /// - Parameter params: Sampling parameters (messages, max tokens, system prompt).
     /// - Returns: The sampling response text, or nil if the client doesn't support sampling.
@@ -95,7 +105,7 @@ extension MCPServer {
         guard mayInitiateRequest() else {
             DebugLog.log(
                 "sampling",
-                "Serving a 2026-07-28 request — that revision forbids server-initiated requests")
+                "No server-initiated request here: HTTP transport, or a 2026-07-28 request")
             return nil
         }
         guard clientSupportsSampling() else {

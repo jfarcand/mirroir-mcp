@@ -270,10 +270,10 @@ struct AgentDiagnosticTests {
 
     @Test("scroll_to: element visible after scrolls suggests count adjustment")
     func scrollElementVisibleAfterScrolls() {
-        let hints = StepHints.scrollSequence(count: 3, direction: "up")
+        let hints = StepHints.scrollSequence(count: 3, direction: "down")
         let compiled = CompiledStep(
             index: 4, type: "scroll_to", label: "About", hints: hints)
-        let step = SkillStep.scrollTo(label: "About", direction: "up", maxScrolls: 10)
+        let step = SkillStep.scrollTo(label: "About", direction: .down, maxScrolls: 10)
 
         let describer = makeDescriber(elements: [
             makeTapPoint("About", x: 200, y: 500)
@@ -289,10 +289,10 @@ struct AgentDiagnosticTests {
 
     @Test("scroll_to: element not found recommends more scrolls")
     func scrollElementNotFoundRecommendsMore() {
-        let hints = StepHints.scrollSequence(count: 2, direction: "up")
+        let hints = StepHints.scrollSequence(count: 2, direction: "down")
         let compiled = CompiledStep(
             index: 4, type: "scroll_to", label: "About", hints: hints)
-        let step = SkillStep.scrollTo(label: "About", direction: "up", maxScrolls: 10)
+        let step = SkillStep.scrollTo(label: "About", direction: .down, maxScrolls: 10)
 
         let describer = makeDescriber(elements: [
             makeTapPoint("General", x: 200, y: 300),

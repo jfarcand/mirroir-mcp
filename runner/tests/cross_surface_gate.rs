@@ -48,7 +48,7 @@ use common::parity_tree::{
     IOS_BASELINE, PAGE, REWORDED_PAGE, SAMPLE_SOURCE, WEB_BASELINE, panel_lines, plant_sample,
     reword_scenario, shipped_ios_baseline,
 };
-use common::{Sandbox, free_port, global_drift_defaults, strip_ansi};
+use common::{Sandbox, free_port, global_drift_defaults};
 
 /// Exit code for a genuine failure — every `Err` the runner returns.
 const EXIT_FAIL: i32 = 1;
@@ -164,7 +164,7 @@ impl<'a> ParityGate<'a> {
         };
         Ok(GateOutcome {
             code: run.code,
-            output: strip_ansi(&run.output()),
+            output: run.output(),
         })
     }
 

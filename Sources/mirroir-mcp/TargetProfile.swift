@@ -67,13 +67,9 @@ struct TargetProfile: Sendable {
     let coordinateSystem: CoordinateSystem
     /// Cursor behavior for tap/swipe/drag actions.
     let cursorMode: CursorMode
-    /// Whether Cmd+L / Cmd+T / etc. reach the target app.
-    let supportsKeyboardShortcuts: Bool
-    /// Whether the `open_url` MCP tool works on this target.
-    let supportsDirectURLOpen: Bool
-    /// User-facing explanation when `open_url` is invoked on a target that does
-    /// not support it. `nil` when the target supports URL opening.
-    let urlOpenUnsupportedMessage: String?
+    /// The operations that exist on this target. One it lacks is refused with
+    /// `refusal(of:targetName:supportedOn:)`, never emulated.
+    let operations: Set<TargetOperation>
     /// Default exploration strategy when no explicit override or recipe match applies.
     let defaultStrategy: StrategyChoice
     /// Orientation-aware layout zones. Accepts the current `DeviceOrientation`

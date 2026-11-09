@@ -10,7 +10,7 @@ use std::time::Duration;
 
 use super::loop_tree::{plant_archetype, plant_plan};
 use super::oracle_stub::stub_oracle;
-use super::{Run, Sandbox, free_port, global_drift_defaults, repo_path, strip_ansi};
+use super::{Run, Sandbox, free_port, global_drift_defaults, repo_path};
 
 /// SHA-256 of the runner's built-in judge prompt template, the value every
 /// `judge:` step pins. Kept in step with `oracle::judge::user_prompt_template_hash`
@@ -304,7 +304,7 @@ impl<'a> LoopFixture<'a> {
         let judge_request = oracle.request.recv_timeout(ORACLE_HANDOFF).ok();
         Ok(LoopOutcome {
             code: run.code,
-            output: strip_ansi(&run.output()),
+            output: run.output(),
             judge_request,
             npx_invocations: self.npx_invocations()? - before,
         })

@@ -157,7 +157,7 @@ final class ComponentClassifiersTests: XCTestCase {
     /// A client that can sample is asked directly — nothing needs configuring
     /// on this machine for that path to work.
     func testSamplingPreferredWhenClientDeclaresIt() {
-        let server = MCPServer(policy: PermissionPolicy(skipPermissions: true, config: nil))
+        let server = MCPServer(policy: PermissionPolicy(skipPermissions: true, config: nil), transport: .stdio)
         _ = server.handleRequest(JSONRPCRequest(
             id: .number(1), method: "initialize",
             params: .object(["capabilities": .object(["sampling": .object([:])])])
@@ -176,7 +176,7 @@ final class ComponentClassifiersTests: XCTestCase {
     /// A client that cannot sample still gets LLM classification, through the
     /// agent configured here.
     func testAgentUsedWhenClientCannotSample() {
-        let server = MCPServer(policy: PermissionPolicy(skipPermissions: true, config: nil))
+        let server = MCPServer(policy: PermissionPolicy(skipPermissions: true, config: nil), transport: .stdio)
         _ = server.handleRequest(JSONRPCRequest(
             id: .number(1), method: "initialize",
             params: .object(["capabilities": .object(["roots": .object([:])])])

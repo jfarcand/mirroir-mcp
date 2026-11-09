@@ -12,15 +12,6 @@ import Foundation
 /// answers. Stateless: every call resolves from the snapshots it is handed.
 enum MirroringWindowResolver {
 
-    /// Button titles that dismiss a Continuity interruption overlay and free the
-    /// session: the camera dialog's "OK", the pause overlay's resume action and
-    /// the timed-out screen's Connect (localized variants; fr "Connecter",
-    /// fr_CA "Connexion"). Compared lower-cased.
-    static let resumeControlTitles: Set<String> = [
-        "ok", "resume", "try again", "connect",
-        "reprendre", "continuer", "réessayer", "reessayer", "connecter", "connexion",
-    ]
-
     /// Subroles of the window's own traffic-light controls. iPhone Mirroring
     /// hosts them inside the hosting view, where they surface whenever the
     /// toolbar is revealed; they are chrome, not an interruption.
@@ -91,15 +82,16 @@ enum MirroringWindowResolver {
     }
 
     /// Whether a button with `label` resumes or dismisses an interruption.
-    /// Only a button naming a known resume action qualifies. An unlabeled
+    /// Only a button naming a known resume action qualifies, in English or in
+    /// the Mac's language as iPhone Mirroring's own strings render it
+    /// (`InterstitialPhrases.resumeControlKeys`). An unlabeled
     /// button is explicitly NOT a resume control: AX-pressing the overlay's
     /// first unlabeled button terminates iPhone Mirroring when that button is a
     /// close/quit control rather than the resume one, so it is never pressed —
     /// a paused session with only an unlabeled control is left for a manual
     /// resume instead of risking the crash.
-    static func isResumeControl(label: String?) -> Bool {
-        let normalized = label?.trimmingCharacters(in: .whitespaces).lowercased() ?? ""
-        return resumeControlTitles.contains(normalized)
+    static func isResumeControl(label: String?, phrases: InterstitialPhrases = .live) -> Bool {
+        phrases.isResumeControl(label: label)
     }
 
     // MARK: - Private

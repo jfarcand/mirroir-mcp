@@ -1,6 +1,6 @@
 # Onboarding: for the agent setting up mirroir
 
-This page is written for you, the coding agent a user asked to set up mirroir. Follow it in order. The user's hands are needed for exactly three things: approving macOS permissions, connecting iPhone Mirroring, and answering at most two questions. Do everything else yourself, and end with proof that you can read their iPhone.
+This page is written for you, the coding agent a user asked to set up mirroir. Follow it in order. The user's hands are needed for exactly three things: approving macOS permissions, connecting iPhone Mirroring, and answering at most two questions. Do everything else yourself, and end with proof that you can read their iPhone. A first errand on the phone is offered after that, and only runs if the user says yes.
 
 ## Rules
 
@@ -8,7 +8,7 @@ This page is written for you, the coding agent a user asked to set up mirroir. F
 - **Ask at most two questions** in the whole setup. Prefer telling the user what you found and what you are about to do.
 - **Never change a permission yourself.** macOS privacy grants are the user's to approve: tell them which pane and which app, and wait.
 - **Never type a password, PIN or one-time code**, on the Mac or on the iPhone.
-- **Never open the iOS Settings app**, and never tap on the iPhone during setup. The proof at the end only reads the screen.
+- **Never open the iOS Settings app**, and never tap on the iPhone during setup. The proof in step 3 only reads the screen. Step 4 acts on the phone, and only after the user says yes.
 - **Never retry in a loop.** When a step needs the user, say what they must do, wait for them to say it is done, then retry once.
 
 ## Step 0: what this Mac can do
@@ -84,6 +84,21 @@ describe_screen(omit_screenshot: true)
 ```
 
 Read back to the user, in one or two sentences, which app is on their iPhone and a few words of what it shows. That is the proof setup worked. Do not tap, type or open anything to produce it.
+
+## Step 4: a first errand, if the user wants one
+
+Setup is finished at step 3. Offer one thing more, once, and take no for an answer:
+
+> Want to see it act? I can open mirroir.dev in Safari on your iPhone and read the page back to you.
+
+Only if the user says yes:
+
+1. Call `open_url` with `https://mirroir.dev/?utm_source=onboarding&utm_medium=agent&utm_campaign=first-errand`. Say what you are doing in one line first.
+2. Call `describe_screen(omit_screenshot: true)` and tell the user the headline the page shows. That is the errand: the phone did something they watched.
+3. The page has a "Star on GitHub" banner. Ask whether they want you to tap it, and tap it only on a second yes. If GitHub asks to sign in, stop: never type a password or a code. Give them the link instead: `https://github.com/jfarcand/mirroir-mcp`.
+4. Leave Safari as it is and say that setup is done.
+
+If the user says no at any point, stop there. Do not ask again.
 
 ## If something does not fit
 

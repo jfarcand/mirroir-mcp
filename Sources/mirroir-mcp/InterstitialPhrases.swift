@@ -9,7 +9,7 @@ import Foundation
 import HelperLib
 
 /// What frees a blocked mirroring session.
-enum SessionBlockMove: String, Sendable, CaseIterable {
+enum SessionBlockMove: String, Sendable, CaseIterable, Codable {
     case approveOnMac
     case turnOnMacWiFi
     case turnOnMacBluetooth
@@ -22,6 +22,8 @@ enum SessionBlockMove: String, Sendable, CaseIterable {
     case pressResume
     case clearOnMac
     case reopenMirroring
+    case unlockMac
+    case showMirroring
 
     /// Whether only the user can make this move. The agent has no tool for the
     /// Mac's own windows, settings or prompts, nor for the iPhone's side button;
@@ -65,6 +67,13 @@ enum SessionBlockMove: String, Sendable, CaseIterable {
             return "Click Resume in the mirroring window, then retry."
         case .clearOnMac:
             return "Clear it in the iPhone Mirroring window on the Mac, then retry."
+        case .unlockMac:
+            return "This needs the user: unlock the Mac, then retry. iPhone Mirroring stops while "
+                + "the Mac's screen is locked, and nothing can be read from it or sent to it. If "
+                + "the window then says the Mac was locked, press Connect in it once."
+        case .showMirroring:
+            return "This needs the user: show iPhone Mirroring again (click its icon in the Dock), "
+                + "then retry. A hidden window can still be read, but input sent to it is lost."
         case .reopenMirroring:
             return "Accessibility cannot read the iPhone Mirroring window, so whether it is "
                 + "connected cannot be told; a screenshot shows what it displays. This needs the "
@@ -93,6 +102,10 @@ struct InterstitialPhrases: Sendable {
     /// some languages word "iPhone Camera in Use" around "iPhone in Use", and a
     /// specific failure comes before the generic "Connecting to" it embeds.
     let entries: [Entry]
+
+    /// Normalized titles of the buttons that resume or dismiss an
+    /// interruption: English plus the Mac's language.
+    let resumeControlTitles: Set<String>
 
     /// Localization keys of iPhone Mirroring's interstitials, by move, in
     /// priority order. Credential prompts also match on a text field, which
@@ -125,6 +138,11 @@ struct InterstitialPhrases: Sendable {
         (.pressResume, ["Connection Paused"]),
     ]
 
+    /// Localization keys of the buttons that resume or dismiss an
+    /// interruption: the camera dialog's OK, the pause overlay's Resume, and
+    /// the Try Again and Connect of the in-use and timed-out screens.
+    static let resumeControlKeys: [String] = ["OK", "Resume", "Try Again", "Connect"]
+
     /// The framework inside iPhone Mirroring.app that carries its strings.
     static let stringsFrameworkPath = "Contents/Frameworks/ScreenContinuityUI.framework"
 
@@ -139,12 +157,23 @@ struct InterstitialPhrases: Sendable {
 
     /// Build the table, asking `localize` for every rendering of each key.
     init(localize: (String) -> [String]) {
+        resumeControlTitles = Set(
+            Self.resumeControlKeys.flatMap { [$0] + localize($0) }.map(Self.normalize))
         entries = Self.appKeys.map { move, keys in
             var seen = Set<String>()
             let fragments = keys.flatMap { key in ([key] + localize(key)).flatMap(Self.fragments) }
                 .filter { seen.insert($0).inserted }
             return Entry(move: move, fragments: fragments)
         }
+    }
+
+    /// Whether a button titled `label` resumes or dismisses an interruption:
+    /// its title, in English or the Mac's language, is one of
+    /// `resumeControlKeys`. A button with no title never is.
+    func isResumeControl(label: String?) -> Bool {
+        guard let label else { return false }
+        let normalized = Self.normalize(label)
+        return !normalized.isEmpty && resumeControlTitles.contains(normalized)
     }
 
     /// The move for the first entry, in priority order, whose fragment one of
@@ -181,9 +210,14 @@ struct InterstitialPhrases: Sendable {
     /// Reads each key's rendering in the Mac's language from the installed
     /// app's strings framework.
     static func liveLocalizer(bundleID: String) -> (String) -> [String] {
-        guard let appURL = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleID),
-              let bundle = Bundle(url: appURL.appendingPathComponent(stringsFrameworkPath))
-        else { return { _ in [] } }
+        guard let bundle = stringsBundle(bundleID: bundleID) else { return { _ in [] } }
         return { key in [bundle.localizedString(forKey: key, value: key, table: nil)] }
+    }
+
+    /// The bundle inside the installed iPhone Mirroring app that carries its
+    /// strings, or nil when the app or the framework is not found.
+    static func stringsBundle(bundleID: String) -> Bundle? {
+        NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleID)
+            .flatMap { Bundle(url: $0.appendingPathComponent(stringsFrameworkPath)) }
     }
 }

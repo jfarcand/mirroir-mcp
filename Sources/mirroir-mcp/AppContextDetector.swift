@@ -41,28 +41,23 @@ enum AppContextDetector {
     /// Tolerance in points for grouping elements into the same coordinate band.
     static let bandTolerance: Double = 30.0
 
-    /// Known system/lock screen text patterns (lowercased for case-insensitive matching).
-    static let systemScreenPatterns: [String] = [
-        "iphone in use",
-        "lock your iphone",
-        "slide to unlock",
-        "enter passcode",
-        "face id",
-        "swipe up to open",
-        "press home to open",
-        "emergency",
-    ]
-
     /// Diagnose whether OCR elements indicate the explorer is still inside an app,
     /// or has escaped to the home screen or a system screen.
     ///
     /// - Parameters:
     ///   - elements: OCR elements from the current screen.
     ///   - screenHeight: Height of the mirroring window in points.
+    ///   - lockScreen: lock-screen fragments iOS draws, from the pattern data.
+    ///   - interstitials: the words iPhone Mirroring itself draws, on the Mac.
     /// - Returns: A diagnosis of the current screen context.
-    static func diagnose(elements: [TapPoint], screenHeight: Double) -> AppContextDiagnosis {
+    static func diagnose(
+        elements: [TapPoint], screenHeight: Double,
+        lockScreen: [String] = SystemPhrases.live.lockScreen,
+        interstitials: InterstitialPhrases = .live
+    ) -> AppContextDiagnosis {
         // Check system/lock screen first (quick string match)
-        if let systemMatch = detectSystemScreen(elements: elements) {
+        if let systemMatch = detectSystemScreen(
+            elements: elements, lockScreen: lockScreen, interstitials: interstitials) {
             return .lockOrSystemScreen(description: systemMatch)
         }
 
@@ -187,16 +182,23 @@ enum AppContextDetector {
 
     // MARK: - System/Lock Screen Detection
 
-    /// Check if any element text matches a known system/lock screen pattern.
-    /// Returns the matched pattern description, or nil if no match.
-    static func detectSystemScreen(elements: [TapPoint]) -> String? {
+    /// The text of the first element that says the phone is locked or held
+    /// by its user, or nil when none does.
+    ///
+    /// Two sources, one per side of the glass. iPhone Mirroring's own "iPhone
+    /// in Use" words are drawn on the Mac, so they come from Apple's strings
+    /// in the Mac's language (`interstitials`). The iOS lock screen is drawn
+    /// on the phone, in a language the Mac cannot know, so its fragments come
+    /// from pattern data (`lockScreen`).
+    static func detectSystemScreen(
+        elements: [TapPoint],
+        lockScreen: [String] = SystemPhrases.live.lockScreen,
+        interstitials: InterstitialPhrases = .live
+    ) -> String? {
         for element in elements {
+            if interstitials.move(for: [element.text]) == .lockIPhone { return element.text }
             let lowered = element.text.lowercased()
-            for pattern in systemScreenPatterns {
-                if lowered.contains(pattern) {
-                    return pattern
-                }
-            }
+            if lockScreen.contains(where: { lowered.contains($0) }) { return element.text }
         }
         return nil
     }

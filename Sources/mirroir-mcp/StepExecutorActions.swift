@@ -11,65 +11,18 @@ extension StepExecutor {
 
     // MARK: - scroll_to
 
-    func executeScrollTo(label: String, direction: String, maxScrolls: Int,
+    func executeScrollTo(label: String, direction: ScrollDirection, maxScrolls: Int,
                           startTime: CFAbsoluteTime) -> StepResult {
         let step = SkillStep.scrollTo(label: label, direction: direction,
                                           maxScrolls: maxScrolls)
 
-        // Check if already visible
-        if let describeResult = describer.describe(),
-           ElementMatcher.isVisible(label: label, in: describeResult.elements) {
-            return StepResult(step: step, status: .passed,
-                              message: "already visible",
-                              durationSeconds: elapsed(startTime))
-        }
-
-        guard let windowInfo = bridge.getWindowInfo() else {
-            return StepResult(step: step, status: .failed,
-                              message: "Could not get window info for scroll",
-                              durationSeconds: elapsed(startTime))
-        }
-
-        guard let ep = swipeEndpoints(direction: direction, windowInfo: windowInfo) else {
-            return StepResult(step: step, status: .failed,
-                              message: "Unknown direction: \(direction)",
-                              durationSeconds: elapsed(startTime))
-        }
-
-        var previousTexts: [String] = []
-
-        for attempt in 0..<maxScrolls {
-            if let error = input.swipe(fromX: ep.fromX, fromY: ep.fromY,
-                                        toX: ep.toX, toY: ep.toY, durationMs: EnvConfig.defaultSwipeDurationMs) {
-                return StepResult(step: step, status: .failed,
-                                  message: "Swipe failed: \(error)",
-                                  durationSeconds: elapsed(startTime))
-            }
-
-            usleep(config.settlingDelayMs * 1000)
-
-            // Check for element
-            if let describeResult = describer.describe() {
-                if ElementMatcher.isVisible(label: label, in: describeResult.elements) {
-                    return StepResult(step: step, status: .passed,
-                                      message: "found after \(attempt + 1) scroll(s)",
-                                      durationSeconds: elapsed(startTime))
-                }
-
-                // Scroll exhaustion: if OCR results unchanged, list reached its end
-                let currentTexts = describeResult.elements.map { $0.text }.sorted()
-                if currentTexts == previousTexts {
-                    return StepResult(step: step, status: .failed,
-                                      message: "Scroll exhausted after \(attempt + 1) scroll(s) — content stopped changing",
-                                      durationSeconds: elapsed(startTime))
-                }
-                previousTexts = currentTexts
-            }
-        }
-
-        return StepResult(step: step, status: .failed,
-                          message: "Not found after \(maxScrolls) scroll(s)",
-                          durationSeconds: elapsed(startTime))
+        let outcome = ScrollSeeker.seek(
+            label: label, toward: direction, maxScrolls: maxScrolls, anchor: nil,
+            band: ScrollSeeker.band(for: profile, orientation: bridge.getOrientation()),
+            bridge: bridge, input: input, describer: describer)
+        let result = outcome.stepResult
+        return StepResult(step: step, status: result.passed ? .passed : .failed,
+                          message: result.message, durationSeconds: elapsed(startTime))
     }
 
     // MARK: - long_press
@@ -137,6 +90,18 @@ extension StepExecutor {
         return StepResult(step: step, status: .passed,
                           message: "dragged from \"\(fromLabel)\" to \"\(toLabel)\"",
                           durationSeconds: elapsed(startTime))
+    }
+
+    // MARK: - Operations a target lacks
+
+    /// Why `step` cannot run on the current target, or nil when it can: the
+    /// same refusal the MCP tool gives, so a step is never emulated either.
+    func unsupportedRefusal(of step: SkillStep) -> String? {
+        guard let operation = TargetOperation(step: step) else { return nil }
+        if let registry {
+            return registry.refusal(of: operation, on: profile, named: bridge.targetName)
+        }
+        return profile.refusal(of: operation, targetName: bridge.targetName, supportedOn: [])
     }
 
     // MARK: - reset_app
@@ -302,46 +267,11 @@ extension StepExecutor {
 
         switchSubsystems(bridge: ctx.bridge, input: ctx.input,
                          describer: ctx.describer, ocrDescriber: ctx.ocrDescriber,
-                         capture: ctx.capture)
+                         capture: ctx.capture, profile: ctx.profile)
 
         return StepResult(step: step, status: .passed,
                           message: "Switched to target '\(ctx.name)'",
                           durationSeconds: elapsed(startTime))
-    }
-
-    // MARK: - Swipe Geometry
-
-    /// Swipe endpoints computed from a direction string and window dimensions.
-    struct SwipeEndpoints {
-        let fromX: Double, fromY: Double, toX: Double, toY: Double
-    }
-
-    /// Compute swipe start/end coordinates from a direction and window info.
-    /// Returns nil for unknown directions.
-    func swipeEndpoints(
-        direction: String, windowInfo: WindowInfo
-    ) -> SwipeEndpoints? {
-        let centerX = Double(windowInfo.size.width) / 2.0
-        let centerY = Double(windowInfo.size.height) / 2.0
-        let dist = Double(windowInfo.size.height) * EnvConfig.swipeDistanceFraction
-        let half = dist / 2
-
-        switch direction.lowercased() {
-        case "up":
-            return SwipeEndpoints(fromX: centerX, fromY: centerY + half,
-                                  toX: centerX, toY: centerY - half)
-        case "down":
-            return SwipeEndpoints(fromX: centerX, fromY: centerY - half,
-                                  toX: centerX, toY: centerY + half)
-        case "left":
-            return SwipeEndpoints(fromX: centerX + half, fromY: centerY,
-                                  toX: centerX - half, toY: centerY)
-        case "right":
-            return SwipeEndpoints(fromX: centerX - half, fromY: centerY,
-                                  toX: centerX + half, toY: centerY)
-        default:
-            return nil
-        }
     }
 
     // MARK: - Screenshot Helpers

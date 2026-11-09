@@ -223,17 +223,22 @@ final class CompiledStepExecutor {
             return mismatch(step: step, hints: hints, startTime: startTime)
         }
         let count = hints.scrollCount ?? 0
-        let direction = hints.scrollDirection ?? "up"
+        let recorded = hints.scrollDirection ?? ScrollDirection.down.rawValue
+        guard let direction = ScrollDirection(rawValue: recorded) else {
+            return StepResult(step: step, status: .failed,
+                              message: "Unknown compiled scroll direction: \(recorded)",
+                              durationSeconds: elapsed(startTime))
+        }
 
         guard let windowInfo = bridge.getWindowInfo() else {
             return StepResult(step: step, status: .failed,
                               message: "Could not get window info for compiled scroll",
                               durationSeconds: elapsed(startTime))
         }
-        guard let ep = normalExecutor.swipeEndpoints(direction: direction,
-                                                     windowInfo: windowInfo) else {
+        guard let ep = ScrollSeeker.endpoints(
+            fingerDirection: direction.fingerDirection, window: windowInfo.size, around: nil) else {
             return StepResult(step: step, status: .failed,
-                              message: "Unknown compiled scroll direction: \(direction)",
+                              message: "No swipe reveals content to the \(direction.rawValue)",
                               durationSeconds: elapsed(startTime))
         }
 
@@ -247,7 +252,7 @@ final class CompiledStepExecutor {
 
         if isVisible(label) {
             return StepResult(step: step, status: .passed,
-                              message: "compiled \(count) scroll(s) \(direction), target verified",
+                              message: "compiled \(count) scroll(s) \(direction.rawValue), target verified",
                               durationSeconds: elapsed(startTime))
         }
 
@@ -258,18 +263,18 @@ final class CompiledStepExecutor {
         }
         if isVisible(label) {
             return StepResult(step: step, status: .passed,
-                              message: "compiled \(count + 1) scroll(s) \(direction), target verified after extra scroll",
+                              message: "compiled \(count + 1) scroll(s) \(direction.rawValue), target verified after extra scroll",
                               durationSeconds: elapsed(startTime))
         }
 
         return StepResult(step: step, status: .failed,
-                          message: "compiled \(count + 1) scroll(s) \(direction), target \"\(label)\" not found after OCR verification",
+                          message: "compiled \(count + 1) scroll(s) \(direction.rawValue), target \"\(label)\" not found after OCR verification",
                           durationSeconds: elapsed(startTime))
     }
 
     // MARK: - Helpers
 
-    private func swipe(_ ep: StepExecutor.SwipeEndpoints) -> String? {
+    private func swipe(_ ep: SwipeEndpoints) -> String? {
         let error = input.swipe(fromX: ep.fromX, fromY: ep.fromY, toX: ep.toX, toY: ep.toY,
                                 durationMs: EnvConfig.defaultSwipeDurationMs)
         usleep(config.settlingDelayMs * 1000)

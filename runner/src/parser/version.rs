@@ -161,7 +161,7 @@ impl ArtifactKind {
             | Self::AppMd
             | Self::LastGreen
             | Self::ComposeManifest => 1..=1,
-            Self::CompiledSkill => 5..=5,
+            Self::CompiledSkill => 6..=6,
         }
     }
 

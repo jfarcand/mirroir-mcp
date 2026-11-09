@@ -90,7 +90,7 @@ final class StepScreenCaptureTests: XCTestCase {
         let code = TestRunner.run(arguments: [
             "--compiled-out", out, "--compiled-source", tmpDir + "/a.yaml", tmpDir + "/*.yaml",
         ])
-        XCTAssertEqual(code, TestRunner.usageExitCode)
+        XCTAssertEqual(code, CLIDispatch.usageExitCode)
         XCTAssertFalse(FileManager.default.fileExists(atPath: out))
     }
 
@@ -176,7 +176,7 @@ final class StepScreenCaptureTests: XCTestCase {
 
         let compiled = try JSONDecoder().decode(
             CompiledSkill.self, from: try Data(contentsOf: URL(fileURLWithPath: out)))
-        XCTAssertEqual(compiled.version, 5)
+        XCTAssertEqual(compiled.version, CompiledSkill.currentVersion)
         XCTAssertEqual(compiled.source.sha256, try CompiledSkillIO.sha256(of: source))
         XCTAssertNotEqual(compiled.source.sha256, try CompiledSkillIO.sha256(of: skillPath))
         XCTAssertEqual(compiled.device,

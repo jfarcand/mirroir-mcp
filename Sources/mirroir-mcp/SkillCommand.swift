@@ -12,12 +12,37 @@ import HelperLib
 /// Usage: `mirroir-mcp skill [--install] [--help]`
 enum SkillCommand {
 
+    /// The option that writes the manual into each host's skills directory.
+    static let installOption = "--install"
+
+    /// The option that prints the manual with Agent Skills front matter only.
+    static let portableOption = "--portable"
+
+    /// Refuse anything but `--install` or `--portable`, and the two together:
+    /// what is installed is the form each of those hosts reads.
+    ///
+    /// - Throws: `CLIArgumentError` naming the argument this command does not take.
+    static func validate(_ arguments: [String]) throws {
+        try CLIArguments.requireOnly([installOption, portableOption], in: arguments, command: "skill")
+        if arguments.contains(installOption), arguments.contains(portableOption) {
+            throw CLIArgumentError.unexpectedArgument(installOption, command: "skill")
+        }
+    }
+
+    /// Print the manual, or install it. Returns 0, 1 when a file could not be
+    /// written, or 2 for refused arguments.
     static func run(arguments: [String]) -> Int32 {
-        if arguments.contains("--help") || arguments.contains("-h") {
-            printUsage()
+        do {
+            try validate(arguments)
+        } catch {
+            fputs("Error: \(error.localizedDescription)\n", stderr)
+            return CLIDispatch.usageExitCode
+        }
+        if arguments.contains(portableOption) {
+            print(OperatingManual.portableSkillMarkdown)
             return 0
         }
-        guard arguments.contains("--install") else {
+        guard arguments.contains(installOption) else {
             print(OperatingManual.skillMarkdown)
             return 0
         }
@@ -54,9 +79,10 @@ enum SkillCommand {
         ]
     }
 
-    static func printUsage() {
-        fputs("""
-            Usage: mirroir-mcp skill [--install]
+    /// The command's usage text.
+    static var usage: String {
+        """
+            Usage: mirroir-mcp skill [--install | --portable]
 
             Prints the agent operating manual (how to drive the iPhone with the
             mirroir tools) as a SKILL.md on stdout.
@@ -64,7 +90,8 @@ enum SkillCommand {
             --install   Write it to ~/.claude/skills/\(OperatingManual.skillName)/SKILL.md,
                         ${CODEX_HOME:-~/.codex}/skills/\(OperatingManual.skillName)/SKILL.md and
                         ${OPENCLAW_STATE_DIR:-~/.openclaw}/skills/\(OperatingManual.skillName)/SKILL.md
-
-            """, stderr)
+            --portable  Print it with Agent Skills front matter only, the form the
+                        Hermes package in plugins/hermes ships
+            """
     }
 }

@@ -41,10 +41,32 @@ final class AgentFacingErrorTests: XCTestCase {
     }
 
     func testAPausedOrUnreadableWindowSaysToStop() {
-        for state in [WindowState.paused, .noWindow] {
+        for state in [WindowState.paused, .noWindow, .minimized] {
             let message = refusal(for: state) ?? ""
             XCTAssertTrue(message.contains(AgentInstruction.waitForUser), "\(state): \(message)")
             XCTAssertTrue(message.contains("No input was sent"), "\(state): \(message)")
+        }
+    }
+
+    /// A minimized window is named as the cause: no input can reach it, and
+    /// only the user can bring it back.
+    func testAMinimizedWindowIsNamedAsTheCause() {
+        let message = refusal(for: .minimized) ?? ""
+        XCTAssertTrue(message.hasPrefix("Target 'iphone' has its window minimized"), message)
+        XCTAssertTrue(message.contains("from the Dock"), message)
+    }
+
+    func testAScreenReadOfAMinimizedWindowSaysSo() {
+        let minimized = ScreenReadFailure.message(
+            "Failed to capture screenshot.", targetName: "iphone", state: .minimized)
+        XCTAssertTrue(minimized.hasPrefix(
+            "Failed to capture screenshot. The 'iphone' window is minimized, so it shows nothing to read."),
+            minimized)
+        XCTAssertTrue(minimized.hasSuffix(AgentInstruction.waitForUser))
+        for state in [WindowState.connected, .paused, .noWindow, .notRunning] {
+            XCTAssertEqual(
+                ScreenReadFailure.message("Failed to capture screenshot.", targetName: "iphone", state: state),
+                "Failed to capture screenshot. Is the 'iphone' window visible?")
         }
     }
 

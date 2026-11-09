@@ -82,7 +82,7 @@ final class SkillStepReplayValueTests: XCTestCase {
     }
 
     func testScrollToKeepsItsLabel() {
-        let step = SkillStep.scrollTo(label: "Privacy", direction: "up",
+        let step = SkillStep.scrollTo(label: "Privacy", direction: .down,
                                       maxScrolls: EnvConfig.defaultScrollMaxAttempts)
         assertRoundTrips(step)
     }

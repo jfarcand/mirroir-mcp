@@ -31,7 +31,9 @@ struct CompiledSkill: Codable, Equatable {
     /// the `sleep` action, which passed without looking at the screen, is gone.
     /// Version 5: a tap recorded by coordinates alone carries `arrivalFingerprint`, the
     /// screen it led to, and replay fails it without one.
-    static let currentVersion = 5
+    /// Version 6: a scroll sequence's `scrollDirection` names the content it reveals
+    /// (`down` shows what is below), where earlier versions named the finger's motion.
+    static let currentVersion = 6
 }
 
 /// Structural fingerprint of a screen: the one a compiled skill starts from, or the
@@ -87,6 +89,7 @@ struct StepHints: Codable, Equatable {
 
     // Scroll hints
     let scrollCount: Int?
+    /// A `ScrollDirection` raw value: where the scrolled-to content lies.
     let scrollDirection: String?
 
     /// The screen a tap recorded by coordinates alone (an icon with no text) led

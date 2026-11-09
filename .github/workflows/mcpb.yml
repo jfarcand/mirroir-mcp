@@ -45,7 +45,7 @@ jobs:
 
       - name: Manifests parse as JSON
         run: |
-          for f in .claude-plugin/marketplace.json plugins/mirroir/.claude-plugin/plugin.json mcpb/manifest.json; do
+          for f in .claude-plugin/marketplace.json plugins/mirroir/.claude-plugin/plugin.json mcpb/manifest.json plugins/hermes/plugin.json plugins/hermes/mcp.json; do
             python3 -I -m json.tool "$f" > /dev/null
             echo "ok: $f"
           done
@@ -64,6 +64,13 @@ jobs:
           if pin not in args:
               sys.exit(f"plugin.json args {args} do not pin {pin}")
           print(f"plugin.json version and npx pin match {expected}")
+          hermes = json.load(open("plugins/hermes/plugin.json"))
+          if hermes["version"] != expected:
+              sys.exit(f"plugins/hermes/plugin.json version {hermes['version']} != server.json version {expected}")
+          hermes_args = json.load(open("plugins/hermes/mcp.json"))["mcpServers"]["mirroir"]["args"]
+          if pin not in hermes_args:
+              sys.exit(f"plugins/hermes/mcp.json args {hermes_args} do not pin {pin}")
+          print(f"plugins/hermes version and npx pin match {expected}")
           EOF
 
       - name: MCPB manifest validates

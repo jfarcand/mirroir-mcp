@@ -281,13 +281,11 @@ final class StepExecutorTests: XCTestCase {
         let iphoneCtx = TargetContext(
             name: "iphone", targetType: "iphone-mirroring", bundleID: nil,
             bridge: bridge, input: input,
-            capture: capture, describer: describer, recorder: StubRecorder(),
-            capabilities: [.menuActions])
+            capture: capture, describer: describer, recorder: StubRecorder())
         let androidCtx = TargetContext(
             name: "android", targetType: "generic-window", bundleID: nil,
             bridge: bridge2, input: input2,
-            capture: capture2, describer: describer2, recorder: StubRecorder(),
-            capabilities: [])
+            capture: capture2, describer: describer2, recorder: StubRecorder())
         let registry = TargetRegistry(
             targets: ["iphone": iphoneCtx, "android": androidCtx],
             defaultName: "iphone")
@@ -311,8 +309,7 @@ final class StepExecutorTests: XCTestCase {
         let ctx = TargetContext(
             name: "iphone", targetType: "iphone-mirroring", bundleID: nil,
             bridge: bridge, input: input,
-            capture: capture, describer: describer, recorder: StubRecorder(),
-            capabilities: [.menuActions])
+            capture: capture, describer: describer, recorder: StubRecorder())
         let registry = TargetRegistry(targets: ["iphone": ctx], defaultName: "iphone")
 
         let config = StepExecutorConfig(

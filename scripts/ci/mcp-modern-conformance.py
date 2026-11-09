@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # ABOUTME: Validates mirroir-mcp's modern (2026-07-28) MCP results against the official schema.
-# ABOUTME: Drives the revision's handshake over stdio and checks each result with jsonschema.
+# ABOUTME: Drives the revision's handshake over stdio and over `mirroir-mcp serve`, checking each result with jsonschema.
 
 """Modern-revision MCP conformance check.
 
@@ -15,12 +15,24 @@ The schema lives alongside this script (`mcp-schema-2026-07-28.json`), copied
 verbatim from the modelcontextprotocol specification repository, so the check
 neither hits the network nor restates the contract in hand-written assertions.
 
+The same cases then run over HTTP against `mirroir-mcp serve`, along with the
+refusals the transport must make before a request reaches the server: no token,
+a browser Origin, a method other than POST, and MCP headers that disagree with
+the body. None of it needs a phone.
+
 Usage: mcp-modern-conformance.py <path-to-mirroir-mcp-binary>
 """
 
 import json
+import os
+import secrets
+import socket
 import subprocess
 import sys
+import tempfile
+import time
+import urllib.error
+import urllib.request
 from pathlib import Path
 
 try:
@@ -93,6 +105,129 @@ def run_requests(binary):
     return responses
 
 
+def free_port():
+    """A loopback port nothing is listening on."""
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as probe:
+        probe.bind(("127.0.0.1", 0))
+        return probe.getsockname()[1]
+
+
+def wait_for_listener(port, process, seconds=30):
+    """Block until the server accepts connections; False if it exits or never does."""
+    deadline = time.monotonic() + seconds
+    while time.monotonic() < deadline:
+        if process.poll() is not None:
+            return False
+        try:
+            with socket.create_connection(("127.0.0.1", port), timeout=1):
+                return True
+        except OSError:
+            time.sleep(0.2)
+    return False
+
+
+def http_post(url, body, headers):
+    """POST `body` and return (status, parsed JSON body or None)."""
+    request = urllib.request.Request(url, data=body, headers=headers, method="POST")
+    try:
+        with urllib.request.urlopen(request, timeout=120) as response:
+            status, raw = response.status, response.read()
+    except urllib.error.HTTPError as error:
+        status, raw = error.code, error.read()
+    try:
+        return status, json.loads(raw)
+    except json.JSONDecodeError:
+        return status, None
+
+
+def http_status(url, method, headers):
+    """The status of a bodiless request."""
+    request = urllib.request.Request(url, headers=headers, method=method)
+    try:
+        with urllib.request.urlopen(request, timeout=30) as response:
+            return response.status
+    except urllib.error.HTTPError as error:
+        return error.code
+
+
+def modern_headers(token, method, params):
+    """The headers a 2026-07-28 request repeats its routing facts in."""
+    headers = {
+        "Authorization": f"Bearer {token}",
+        "Content-Type": "application/json",
+        "MCP-Protocol-Version": PROTOCOL_VERSION,
+        "Mcp-Method": method,
+    }
+    if method == "tools/call":
+        headers["Mcp-Name"] = params["name"]
+    return headers
+
+
+def run_http(binary):
+    """Serve over HTTP and return (responses keyed by id, transport failures)."""
+    failures = []
+    responses = {}
+    with tempfile.TemporaryDirectory() as scratch:
+        token = secrets.token_hex(32)
+        token_file = Path(scratch) / "serve-token"
+        descriptor = os.open(token_file, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
+        with os.fdopen(descriptor, "w") as handle:
+            handle.write(token + "\n")
+
+        port = free_port()
+        url = f"http://127.0.0.1:{port}/mcp"
+        process = subprocess.Popen(
+            [binary, "serve", "--port", str(port), "--token-file", str(token_file)],
+            stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, text=True,
+        )
+        try:
+            if not wait_for_listener(port, process):
+                process.kill()
+                return {}, [f"serve did not start listening: {process.stderr.read().strip()[-400:]}"]
+
+            ping = json.dumps({
+                "jsonrpc": "2.0", "id": 99, "method": "ping", "params": {"_meta": envelope(True)},
+            }).encode()
+            authorized = modern_headers(token, "ping", {})
+
+            status, _ = http_post(url, ping, {k: v for k, v in authorized.items() if k != "Authorization"})
+            if status != 401:
+                failures.append(f"http: no token answered {status}, expected 401")
+            status, _ = http_post(url, ping, dict(authorized, Authorization="Bearer " + "0" * 64))
+            if status != 401:
+                failures.append(f"http: a wrong token answered {status}, expected 401")
+            status, _ = http_post(url, ping, dict(authorized, Origin="http://evil.example"))
+            if status != 403:
+                failures.append(f"http: a browser Origin answered {status}, expected 403")
+            status = http_status(url, "GET", {"Authorization": f"Bearer {token}"})
+            if status != 405:
+                failures.append(f"http: GET answered {status}, expected 405")
+            status, body = http_post(url, ping, dict(authorized, **{"Mcp-Method": "tools/list"}))
+            code = (body or {}).get("error", {}).get("code")
+            if status != 400 or code != -32020:
+                failures.append(f"http: a mismatched Mcp-Method answered {status} code {code}, "
+                                "expected 400 code -32020")
+
+            for index, (method, params, _, with_client_info) in enumerate(CASES):
+                payload = dict(params)
+                payload["_meta"] = envelope(with_client_info)
+                body = json.dumps(
+                    {"jsonrpc": "2.0", "id": index, "method": method, "params": payload}
+                ).encode()
+                status, message = http_post(url, body, modern_headers(token, method, params))
+                if status != 200 or message is None:
+                    failures.append(f"http: {method} answered {status}, expected 200 with a JSON body")
+                    continue
+                responses[index] = message
+        finally:
+            process.terminate()
+            try:
+                process.wait(timeout=10)
+            except subprocess.TimeoutExpired:
+                process.kill()
+    return responses, failures
+
+
 def validate(schema, responses):
     """Check every case's result against its schema definition.
 
@@ -126,8 +261,12 @@ def main():
 
     binary = sys.argv[1]
     schema = json.loads(SCHEMA_PATH.read_text())
-    responses = run_requests(binary)
-    failures = validate(schema, responses)
+    failures = [f"stdio: {failure}" for failure in validate(schema, run_requests(binary))]
+
+    http_responses, transport_failures = run_http(binary)
+    failures += transport_failures
+    if not transport_failures:
+        failures += [f"http: {failure}" for failure in validate(schema, http_responses)]
 
     if failures:
         print(f"MCP {PROTOCOL_VERSION} conformance FAILED:")
@@ -135,7 +274,8 @@ def main():
             print(f"  - {failure}")
         return 1
 
-    print(f"OK ({len(CASES)} modern results conform to {PROTOCOL_VERSION})")
+    print(f"OK ({len(CASES)} modern results conform to {PROTOCOL_VERSION} over stdio and over HTTP; "
+          "the HTTP transport refuses a missing token, a browser Origin, GET and mismatched headers)")
     return 0
 
 

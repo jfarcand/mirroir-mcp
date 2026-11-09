@@ -130,7 +130,8 @@ enum OverlapDeduplicator {
             tapX: el.tapX,
             tapY: el.tapY,
             confidence: el.confidence,
-            pageY: el.tapY + offset
+            pageY: el.tapY + offset,
+            source: el.source
         )
     }
 

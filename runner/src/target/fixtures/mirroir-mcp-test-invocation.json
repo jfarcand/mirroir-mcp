@@ -1,0 +1,8 @@
+{
+  "subcommand": "test",
+  "environment": ["MIRROIR_SKILLS"],
+  "invocations": {
+    "block": ["--report-json", "ios-report.json", "--capture", "ios", "ios-block.yaml"],
+    "recording_block": ["--report-json", "ios-report.json", "--capture", "ios", "ios-block.yaml", "--compiled-out", "out.compiled.json", "--compiled-source", "flow.ios.yaml"]
+  }
+}

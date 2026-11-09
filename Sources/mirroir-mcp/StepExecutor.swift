@@ -75,6 +75,8 @@ final class StepExecutor {
         /// Local OCR, whatever `describer` is: a scene judges its predicates on it.
         var ocrDescriber: any ScreenDescribing
         var capture: any ScreenCapturing
+        /// What the current target is: which operations exist on it, and its layout.
+        var profile: TargetProfile
     }
 
     private var subsystems: Subsystems
@@ -91,13 +93,15 @@ final class StepExecutor {
          config: StepExecutorConfig = .default,
          registry: TargetRegistry? = nil,
          ocrDescriber: (any ScreenDescribing)? = nil,
-         vision: (any VisionCompleting)? = nil) {
+         vision: (any VisionCompleting)? = nil,
+         profile: TargetProfile = IPhoneMirroringTarget.profile) {
         self.subsystems = Subsystems(
             bridge: bridge,
             input: input,
             describer: describer,
             ocrDescriber: ocrDescriber ?? describer,
-            capture: capture
+            capture: capture,
+            profile: profile
         )
         self.config = config
         self.registry = registry
@@ -109,13 +113,14 @@ final class StepExecutor {
     var describer: any ScreenDescribing { subsystems.describer }
     var ocrDescriber: any ScreenDescribing { subsystems.ocrDescriber }
     var capture: any ScreenCapturing { subsystems.capture }
+    var profile: TargetProfile { subsystems.profile }
 
     /// Swap subsystem references when switching targets.
     func switchSubsystems(bridge: any WindowBridging, input: any InputProviding,
                           describer: any ScreenDescribing, ocrDescriber: any ScreenDescribing,
-                          capture: any ScreenCapturing) {
+                          capture: any ScreenCapturing, profile: TargetProfile) {
         subsystems = Subsystems(bridge: bridge, input: input, describer: describer,
-                                ocrDescriber: ocrDescriber, capture: capture)
+                                ocrDescriber: ocrDescriber, capture: capture, profile: profile)
     }
 
     /// Execute a single step and return the result.
@@ -126,6 +131,10 @@ final class StepExecutor {
         // that no run of this command can evaluate.
         if let stepType = step.aiOnlyStepType {
             return .notEvaluated(step, stepType: stepType)
+        }
+        if let refusal = unsupportedRefusal(of: step) {
+            return StepResult(step: step, status: .failed, message: refusal,
+                              durationSeconds: elapsed(startTime))
         }
 
         if config.dryRun {
@@ -306,7 +315,8 @@ final class StepExecutor {
                               durationSeconds: elapsed(startTime))
         }
 
-        guard let ep = swipeEndpoints(direction: direction, windowInfo: windowInfo) else {
+        guard let ep = ScrollSeeker.endpoints(
+            fingerDirection: direction, window: windowInfo.size, around: nil) else {
             return StepResult(step: step, status: .failed,
                               message: "Unknown swipe direction: \(direction). Use up/down/left/right.",
                               durationSeconds: elapsed(startTime))

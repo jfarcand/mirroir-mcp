@@ -101,11 +101,11 @@ jobs:
 
       - name: Run unit tests (XCTest)
         timeout-minutes: 15
-        run: swift test --skip IntegrationTests --disable-swift-testing
+        run: scripts/unit-tests.sh xctest
 
       - name: Run unit tests (Swift Testing)
         timeout-minutes: 5
-        run: swift test --skip IntegrationTests --disable-xctest --no-parallel
+        run: scripts/unit-tests.sh swift-testing
 
       - uses: ./.github/actions/setup-fake-mirroring
       - name: Integration tests (FakeMirroring)

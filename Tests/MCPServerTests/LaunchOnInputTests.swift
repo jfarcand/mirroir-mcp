@@ -84,9 +84,18 @@ final class LaunchOnInputTests: XCTestCase {
         XCTAssertLessThan(Date().timeIntervalSince(started), 10, "the launch timeout was not waited out")
     }
 
-    func testConnectIsAResumeControlInEveryShippedLanguage() {
-        for title in ["Connect", "Connecter", "Connexion", "Try Again", "Réessayer"] {
-            XCTAssertTrue(MirroringWindowResolver.isResumeControl(label: title), title)
+    /// The titles come from iPhone Mirroring's own strings: English always,
+    /// plus the Mac's language. Canadian French says "Connexion" for Connect.
+    func testConnectIsAResumeControlInEnglishAndInTheMacsLanguage() {
+        for title in ["Connect", "Try Again"] {
+            XCTAssertTrue(MirroringWindowResolver.isResumeControl(
+                label: title, phrases: InterstitialFixtures.englishPhrases), title)
         }
+        for title in ["Connect", "Connexion", "Try Again", "Réessayer", "Reprendre"] {
+            XCTAssertTrue(MirroringWindowResolver.isResumeControl(
+                label: title, phrases: InterstitialFixtures.frenchCanadianPhrases), title)
+        }
+        XCTAssertTrue(InterstitialPhrases.live.isResumeControl(label: "Connect"),
+                      "the live table always holds the English titles")
     }
 }

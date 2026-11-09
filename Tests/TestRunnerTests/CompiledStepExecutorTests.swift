@@ -252,10 +252,10 @@ final class CompiledStepExecutorTests: XCTestCase {
         describer.describeResult = ScreenDescriber.DescribeResult(
             elements: [aboutElement], hints: [], screenshotBase64: "", ocrTimeMs: 0)
 
-        let step = SkillStep.scrollTo(label: "About", direction: "up", maxScrolls: 10)
+        let step = SkillStep.scrollTo(label: "About", direction: .down, maxScrolls: 10)
         let compiledStep = CompiledStep(
             index: 0, type: "scroll_to", label: "About",
-            hints: .scrollSequence(count: 3, direction: "up")
+            hints: .scrollSequence(count: 3, direction: "down")
         )
 
         let result = compiledExecutor.execute(
@@ -270,10 +270,10 @@ final class CompiledStepExecutorTests: XCTestCase {
     func testCompiledScrollSequenceNoWindowInfo() {
         bridge.windowInfo = nil
 
-        let step = SkillStep.scrollTo(label: "About", direction: "up", maxScrolls: 10)
+        let step = SkillStep.scrollTo(label: "About", direction: .down, maxScrolls: 10)
         let compiledStep = CompiledStep(
             index: 0, type: "scroll_to", label: "About",
-            hints: .scrollSequence(count: 2, direction: "up")
+            hints: .scrollSequence(count: 2, direction: "down")
         )
 
         let result = compiledExecutor.execute(
@@ -287,10 +287,10 @@ final class CompiledStepExecutorTests: XCTestCase {
     func testCompiledScrollSequenceSwipeError() {
         input.swipeResult = "Swipe failed"
 
-        let step = SkillStep.scrollTo(label: "About", direction: "up", maxScrolls: 10)
+        let step = SkillStep.scrollTo(label: "About", direction: .down, maxScrolls: 10)
         let compiledStep = CompiledStep(
             index: 0, type: "scroll_to", label: "About",
-            hints: .scrollSequence(count: 2, direction: "up")
+            hints: .scrollSequence(count: 2, direction: "down")
         )
 
         let result = compiledExecutor.execute(

@@ -67,7 +67,24 @@ for skill_dir in "$HOME/.claude/skills/mirroir" "${CODEX_HOME:-$HOME/.codex}/ski
     fi
 done
 
-# --- Step 4: Remove config directory ---
+# --- Step 4: Remove the serve agent (mirroir-mcp install-agent) ---
+
+echo ""
+echo "--- Serve agent ---"
+
+SERVE_LABEL="dev.mirroir.serve"
+SERVE_PLIST="$HOME/Library/LaunchAgents/$SERVE_LABEL.plist"
+
+# Stop it first: a running agent keeps the port open and restarts at login.
+launchctl bootout "gui/$(id -u)/$SERVE_LABEL" 2>/dev/null || true
+if [ -f "$SERVE_PLIST" ]; then
+    rm -f "$SERVE_PLIST"
+    echo "Removed $SERVE_PLIST"
+fi
+# The token grants control of the phone; it does not outlive the agent.
+rm -f "$HOME/.mirroir-mcp/serve-token" "$HOME/.mirroir-mcp/serve.log"
+
+# --- Step 5: Remove config directory ---
 
 echo ""
 echo "--- Config ---"

@@ -87,7 +87,7 @@ This project uses **Swift Package Manager** (SPM) exclusively. The `Package.swif
 |------|---------|
 | Build | `swift build` |
 | Build release | `swift build -c release` |
-| Run tests | Two passes — see [Tier 2](#tier-2-pre-commit-before-committing). A bare `swift test` deadlocks. |
+| Run tests | `scripts/unit-tests.sh` — see [Tier 2](#tier-2-pre-commit-before-committing). A bare `swift test` deadlocks. |
 | Clean | `swift package clean` |
 | Resolve dependencies | `swift package resolve` |
 
@@ -422,7 +422,7 @@ When creating a new type or file, walk this checklist in order:
   - Examples: `feat: add check_health tool`, `fix(skills): handle YAML block scalars`, `docs: update architecture guide`
   - The `commit-msg` hook in `.githooks/` enforces this — non-conventional commits are rejected.
 - Always create a branch when adding new features. Bug fixes go directly to main branch.
-- Always run validation after making changes: `swift build`, then BOTH test passes from Tier 2 below. A bare `swift test --skip IntegrationTests` deadlocks.
+- Always run validation after making changes: `swift build`, then `scripts/unit-tests.sh` (both test passes, Tier 2 below). A bare `swift test --skip IntegrationTests` deadlocks.
 
 ## Security Engineering Rules
 
@@ -451,14 +451,16 @@ Run after each code change to catch errors fast:
 # 1. Build
 swift build
 
-# 2. Run ONLY tests related to your changes
-swift test --filter <TestClassName>/<testMethodName>
-# Example: swift test --filter HelperLibTests.AppleScriptKeyMapTests
+# 2. Run ONLY tests related to your changes. The script runs them under a
+#    throwaway home, so your own ~/.mirroir-mcp and settings.json cannot change
+#    a result; options after the runner name go to `swift test`.
+scripts/unit-tests.sh xctest --filter <TestClassName>/<testMethodName>
+# Example: scripts/unit-tests.sh xctest --filter HelperLibTests.AppleScriptKeyMapTests
 
-# A swift-testing @Suite (e.g. AppleVisionTextRecognizerTests) needs its own flags.
-# Filtering one WITHOUT them reports "Executed 0 tests" — which is a FAILED
-# verification, not a pass. Always confirm the test count is greater than zero.
-swift test --filter AppleVisionTextRecognizerTests --disable-xctest --no-parallel
+# A swift-testing @Suite (e.g. AppleVisionTextRecognizerTests) runs in the other
+# runner. Filtering one in the XCTest runner reports "Executed 0 tests" — which
+# is a FAILED verification, not a pass. Always confirm the test count is greater than zero.
+scripts/unit-tests.sh swift-testing --filter AppleVisionTextRecognizerTests
 ```
 
 #### Tier 2: Pre-Commit (before committing)
@@ -467,20 +469,19 @@ Run before creating a commit:
 # 1. Full build
 swift build
 
-# 2. Run unit tests in TWO passes (integration tests run on CI only).
-#    XCTest and swift-testing deadlock when run together in parallel, so each
-#    test runner gets its own invocation. This is exactly what every workflow
-#    in .github/workflows/ runs — never a bare `swift test`.
-swift test --skip IntegrationTests --disable-swift-testing
-swift test --skip IntegrationTests --disable-xctest --no-parallel
+# 2. Run the unit tests (integration tests run on CI only). The script makes
+#    TWO passes, because XCTest and swift-testing deadlock when run together in
+#    parallel, and it runs both under a throwaway home. This is exactly what
+#    every workflow in .github/workflows/ runs — never a bare `swift test`:
+#    outside the script, the isolation guard tests fail and name it.
+scripts/unit-tests.sh
 ```
 
 #### Tier 3: Full Validation (before merge only)
 Run the full suite when preparing to merge:
 ```bash
 swift build -c release
-swift test --skip IntegrationTests --disable-swift-testing
-swift test --skip IntegrationTests --disable-xctest --no-parallel
+scripts/unit-tests.sh
 ```
 
 #### Tier 4: Real-Device Validation (REQUIRED before squash-merge to main)
@@ -580,8 +581,7 @@ Mocks are permitted ONLY in test code for:
 1. **Run Validation:**
    ```bash
    swift build
-   swift test --skip IntegrationTests --disable-swift-testing
-   swift test --skip IntegrationTests --disable-xctest --no-parallel
+   scripts/unit-tests.sh
    ```
 
 2. **Manual Pattern Audit:**

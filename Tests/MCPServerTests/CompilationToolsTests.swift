@@ -158,7 +158,7 @@ final class CompilationToolsTests: XCTestCase {
         XCTAssertNotNil(hints)
         XCTAssertEqual(hints?.compiledAction, .scrollSequence)
         XCTAssertEqual(hints?.scrollCount, 1)
-        XCTAssertEqual(hints?.scrollDirection, "up")
+        XCTAssertEqual(hints?.scrollDirection, "down")
     }
 
     func testDeriveHintsPassthroughTypes() {

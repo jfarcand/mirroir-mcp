@@ -91,7 +91,7 @@ The CLI compiler:
    - **wait_for** → marked as `passthrough` (a recorded delay would pass without looking at the screen; live, it polls until the element shows or its timeout passes)
    - **measure** → marked as `passthrough` (a recorded delay would pass without running its action or its `until` check)
    - **assert_visible** / **assert_not_visible** → compiles to an `assertion` (records the observed delay, then re-runs real OCR verification on replay)
-   - **scroll_to** → captures number of scrolls and direction used
+   - **scroll_to** → captures the number of scrolls and where the content was (`down` for further down the page)
    - **drag** → marked as `passthrough` (needs two runtime OCR lookups, so it is not pre-resolved)
    - **launch, type, swipe, press_key, home, shake, open_url, reset_app, set_network, target** → marked as `passthrough` (nothing to pre-resolve; a `type` that pastes still OCR-confirms each paste)
    - **screenshot** → marked as `passthrough` (still captures, useful for verification)
@@ -126,7 +126,7 @@ mirroir test --no-compiled apps/settings/check-about
 
 ```json
 {
-  "version": 5,
+  "version": 6,
   "source": {
     "sha256": "a1b2c3...",
     "compiledAt": "2026-02-19T14:30:00Z"
@@ -167,7 +167,7 @@ mirroir test --no-compiled apps/settings/check-about
       "hints": {
         "compiledAction": "scroll_sequence",
         "scrollCount": 3,
-        "scrollDirection": "up"
+        "scrollDirection": "down"
       }
     },
     {

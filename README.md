@@ -13,11 +13,18 @@
 ### Let your agent use your real iPhone, then replay what it did without an LLM.
 
 <p align="center">
+  <a href="https://mirroir.dev/?utm_source=github&utm_medium=readme&utm_campaign=header">Website</a> ·
+  <a href="docs/onboarding.md">Set up with your agent</a> ·
+  <a href="docs/tools.md">Tools</a> ·
+  <a href="https://discord.gg/u8ug9QCSqF">Discord</a>
+</p>
+
+<p align="center">
   <img src="website/public/video2-waze-slack.gif" alt="An agent reads the commute time in Waze on a real iPhone, then posts it in a Slack channel" width="720" />
 </p>
 <p align="center"><em>A real run on a real iPhone, sped up: the agent reads the ETA in Waze, then posts it in Slack.</em></p>
 
-No Developer Mode, no Xcode, no WebDriverAgent, no jailbreak. mirroir-mcp works through macOS iPhone Mirroring, so it reaches any app on your phone, including App Store apps you could never build. It works from any MCP client, with [39 tools](docs/tools.md).
+No Developer Mode, no Xcode, no WebDriverAgent, no jailbreak. mirroir-mcp works through macOS iPhone Mirroring, so it reaches any app on your phone, including App Store apps you could never build. It works from any MCP client, with [41 tools](docs/tools.md).
 
 ## Quick start
 
@@ -85,11 +92,11 @@ phone-harness is the closest tool here: it also drives a stock iPhone through iP
 
 Giving an AI access to your phone demands defense in depth, so mirroir-mcp is **fail-closed**.
 
-- **Read-only until you say otherwise.** Without a config file, only the 12 read-only tools are exposed. Every tool that changes something stays hidden from the client until you allow it in [`permissions.json`](docs/permissions.md).
+- **Read-only until you say otherwise.** Without a config file, only the 13 read-only tools are exposed. Every tool that changes something stays hidden from the client until you allow it in [`permissions.json`](docs/permissions.md).
 - **Sensitive apps can be blocked.** `blockedApps` keeps the AI out of apps like Wallet or Banking, even when other tools are allowed.
 - **Passwords stay yours.** mirroir never presses a sheet that asks for a password or Touch ID, and it tells agents to ask you before sending, buying, deleting or changing a setting.
 - **No root, no daemon, no telemetry.** It runs as your user with Screen Recording and Accessibility. The one network call it makes by default is a once-a-day version check against npm (`updateCheck: false` turns it off). What your agent reads from the screen goes to whichever model your client uses.
-- **Kill switch.** Close iPhone Mirroring to stop all input instantly.
+- **Kill switch.** Unlock the iPhone, lock the Mac's screen, or quit your MCP client: each stops all input at once. Quitting the iPhone Mirroring app does not, because the next action reopens it.
 
 See [Security](docs/security.md) for the full threat model.
 
@@ -98,8 +105,8 @@ See [Security](docs/security.md) for the full threat model.
 | | |
 |---|---|
 | [Install](docs/install.md) | Every install path, per-client setup, updating, uninstalling |
-| [Onboarding](docs/onboarding.md) | Setup written for the agent: prerequisites, install, doctor, and a read-only proof |
-| [Tools Reference](docs/tools.md) | All 39 tools, parameters, and input workflows |
+| [Onboarding](docs/onboarding.md) | Setup written for the agent: prerequisites, install, doctor, a read-only proof, and an optional first errand |
+| [Tools Reference](docs/tools.md) | All 41 tools, parameters, and input workflows |
 | [How mirroir sees the screen](docs/screen-intelligence.md) | The observe, reason, act loop; OCR, icon detection, AI vision |
 | [Skills, exploration and CI](docs/skills-and-ci.md) | APP.md, skills, `generate_skill`, `mirroir test`, compiled replay, AI diagnosis, patterns |
 | [`mirroir-run`](docs/mirroir-run.md) | Replay across iPhone, web, HTTP and subprocesses; GitHub Actions; Maestro import |

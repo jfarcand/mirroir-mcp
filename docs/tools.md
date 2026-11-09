@@ -1,16 +1,16 @@
 # Tools Reference
 
-All 39 tools exposed by the MCP server. Mutating tools require [permission](permissions.md) to appear in `tools/list`.
+All 41 tools exposed by the MCP server. Mutating tools require [permission](permissions.md) to appear in `tools/list`.
 
 ## Tool List
 
 | Tool | Parameters | Description |
 |------|-----------|-------------|
-| `screenshot` | — | Capture the iPhone screen as base64 PNG |
+| `screenshot` | `settle_ms`?, `scale`?, `region`? | Capture the iPhone screen as a PNG, with a line stating its pixel size, the window points it shows, and the pixels-per-point factor |
 | `describe_screen` | `scroll`?, `omit_screenshot`?, `query`?, `text_only`?, `settle_ms`? | Analyze the screen and return UI elements with tap coordinates plus a grid-overlaid screenshot. Uses local OCR or AI vision depending on `screenDescriberMode`. `scroll: true` does a full-page scroll to capture all elements. `omit_screenshot: true` returns text only (no image). `query` lists only elements whose text contains it (case- and accent-insensitive; icons omitted), and `text_only: true` drops the coordinates, so reading one value costs a line or two. `settle_ms` sets how long to wait for the screen to stop changing first. |
 | `start_recording` | `output_path`? | Start video recording of the mirrored screen |
 | `stop_recording` | — | Stop recording and return the .mov file path |
-| `tap` | `text`? or `x`, `y`; `cursor_mode`? | Tap visible text found by OCR (`text`; a miss lists the text on screen), or tap at coordinates relative to the mirroring window |
+| `tap` | `text`? or `x`, `y`; `image_size`?, `image_region`?, `cursor_mode`? | Tap visible text found by OCR (`text`; a miss lists the text on screen), or tap at coordinates relative to the mirroring window. With `image_size`, `x` and `y` are a position in a screenshot and are converted to window points |
 | `double_tap` | `x`, `y`, `cursor_mode`? | Two rapid taps for zoom/text selection |
 | `long_press` | `x`, `y`, `duration_ms`?, `cursor_mode`? | Hold tap for context menus (default 500ms) |
 | `swipe` | `from_x`, `from_y`, `to_x`, `to_y`, `duration_ms`?, `cursor_mode`? | Swipe between two points (default 300ms) |
@@ -28,7 +28,7 @@ All 39 tools exposed by the MCP server. Mutating tools require [permission](perm
 | `press_app_switcher` | — | Open app switcher |
 | `press_back` | — | Navigate back by OCR-tapping the `<` back chevron, with a canonical-position fallback |
 | `spotlight` | — | Open Spotlight search |
-| `scroll_to` | `label`, `direction`?, `max_scrolls`? | Scroll until a text element becomes visible via OCR |
+| `scroll_to` | `label`, `direction`?, `at`?, `max_scrolls`? | Scroll until a text element becomes visible via OCR; reports why it stopped when the text never shows |
 | `reset_app` | `name` | Force-quit an app via the App Switcher |
 | `measure` | `action`, `until`, `max_seconds`?, `name`? | Time a screen transition after an action |
 | `run_steps` | `steps` | Run several proven steps in one call, in the [step grammar](#step-types) (`"tap: <text on screen>"`, `"tap: @324,113"` for a point, `"type: calculator"`, `"wait_for: Get"`, `"home"`). Every step is checked against the permission policy before the first runs; the run stops at the first failure and the reply ends with the text on screen |
@@ -39,16 +39,18 @@ All 39 tools exposed by the MCP server. Mutating tools require [permission](perm
 | `list_skills` | — | List available skills (SKILL.md and YAML) from project-local and global config dirs |
 | `get_skill` | `name` | Read a skill file (SKILL.md or YAML) with ${VAR} env substitution. Appends compilation status. |
 | `generate_skill` | `action`, `app_name`?, `goal`?, `goals`?, `arrived_via`?, `action_type`?, `max_depth`?, `max_screens`?, `max_time`?, `strategy`?, `fresh`?, `seed`?, `skip_calibration`?, `explorer`?, `emit`?, `output_dir`? | Generate a SKILL.md by exploring an app. Session-based: start → capture → finish. `action: "explore"` runs autonomous exploration — `explorer: "bfs"` (default) or `"dfs"`. `fresh: false` resumes a persisted navigation graph; `seed` makes exploration ordering deterministic. `emit: true` (on `finish` / `explore`) also writes a runnable iOS leg into the consumer repo's `.mirroir/apps/<app>/` — see [Web and iOS in one scenario](web-and-ios.md); `output_dir` names the repo root when the server is not running from it. `save_compiled` and `mirroir record` write the same tree. |
-| `list_targets` | — | List all configured automation targets with status and window size |
+| `list_targets` | — | List all configured automation targets with status, window size, and the tools each one lacks |
 | `switch_target` | `target` | Switch active target for subsequent tool calls |
 | `classify_screen` | `target`? | Group the current screen's OCR elements into UI components with an AI model: each component, its definition, and the elements it covers. Read-only |
 | `calibrate_component` | `component_path`, `target`?, `scroll`? | Test a component definition (.md) against the current screen and return a diagnostic report |
 | `record_step` | `step_index`, `type`, `label`?, `tap_x`?, `tap_y`?, `match_strategy`?, `elapsed_ms`?, `scroll_count`?, `scroll_direction`? | Record a compiled step during AI-driven skill execution; a tap with coordinates and no label also records the screen it led to, which replay must reach, and is refused when that screen is the one before the tap |
+| `get_notes` | `topic`? | Read the notes an agent saved in earlier sessions about an app; without `topic`, list the topics that have notes |
+| `save_note` | `topic`, `note`, `replaces`? | Save one short dated note for future sessions under a topic, usually the app's name |
 | `save_compiled` | `skill_name`, `emit`?, `output_dir`? | Save accumulated compiled steps as .compiled.json next to the source skill (the speed cache `mirroir test` replays). `emit: true` also writes the walk into the consumer repo's `.mirroir/apps/<app>/` as a runnable iOS scenario — its app is the one the skill's opening `launch:` names; no `.compiled.json` is written into `.mirroir/`. See [Compiled Skills](compiled-skills.md#emitting-the-walk-into-mirroir). |
 
 ## Coordinates
 
-Coordinates are in points relative to the mirroring window's top-left corner. Use `describe_screen` to get exact tap coordinates — it detects both text (via Vision OCR) and icons (via YOLO CoreML, if a model is installed). The grid overlay helps target any remaining unlabeled elements. For raw screenshots, coordinates are Retina 2x — divide pixel coordinates by 2 to get tap coordinates.
+Coordinates are in points relative to the mirroring window's top-left corner. Use `describe_screen` to get exact tap coordinates — it detects both text (via Vision OCR) and icons (via YOLO CoreML, if a model is installed). The grid overlay helps target any remaining unlabeled elements. A raw `screenshot` is in pixels, and the factor between pixels and points is not fixed: it follows the display, the `scale` argument and the `region` crop. Each screenshot's reply states its pixel size and that factor. To tap something only the image shows, pass its position in the image to `tap` as `x` and `y` with `image_size` (and `image_region` when the screenshot was cropped), and the point is converted for you.
 
 ## Describe Screen
 
@@ -64,6 +66,17 @@ Set `omit_screenshot: true` to return only the text description without the base
 Set `settle_ms` to control how long the call waits for two identical consecutive frames before describing. In both OCR and vision mode the default is the `frameSettleTimeoutUs` setting (1.5s), exactly like `screenshot`: the mirrored frame lags the device, so a frame taken right after an action can still show the pre-action screen, and in vision mode a frame caught mid-transition would still bill a full model call. A constantly animated screen (a game scene, a video) never settles, so pass `settle_ms: 0` there to skip the wait. Requested values are capped at the `frameSettleMaxTimeoutUs` setting (10s), because the wait blocks the tool call.
 
 A frame that is a uniform fill (rotation, launch, scene change) with no text or icons found by local OCR is reported as `SCREEN BLANK` (`screen_blank=true` in `_meta`). In vision mode such a frame is never sent to the model; a dark splash whose only content is a short label ("Tap to play") is still described, because the local OCR pass on the same frame finds the label.
+
+
+On a **macOS app target**, the app reports its own text through Accessibility, exactly and with each element's frame. `describe_screen` lists that text marked `[tree]`, at the centre of its frame, and drops the pixel reading of the same text; everything the tree does not report (and everything on the iPhone, whose mirrored screen has no tree) stays read from pixels, unmarked:
+
+```
+Screen elements (tap coordinates in points; [tree] = exact text from the macOS accessibility tree, unmarked = read from pixels, may misread):
+- "Notes.app" at (68, 116) [tree]
+- "Recents" at (79, 69)
+```
+
+Only labels are taken from the tree: a region that merely has a name (a browser, a list), the group an app with no tree of its own exposes for its whole window (Chrome, Slack), and a text area holding a whole document are left to the pixel reading. `_meta` counts both sources (`tree_count`, `pixel_count`), and a line says so when the tree could not be read. Measured on macOS 26.5: Finder's tree reads in about 0.1 s, and its frames sit within 2 points of the OCR tap points.
 
 ## Typing Workflow
 
@@ -100,11 +113,14 @@ True independent multi-touch would need a virtual touchscreen HID device on the 
 
 ## Scroll To
 
-`scroll_to` scrolls in a direction until a target text element becomes visible via OCR. It checks if the element is already on screen before scrolling, and detects scroll exhaustion (when the screen content stops changing, meaning the list has reached its end).
+`scroll_to` scrolls until a target text element becomes visible via OCR. It checks if the element is already on screen before scrolling, and tells the end of the content from a scroll that has not arrived yet.
 
 - `label` (required): Text to find on screen
-- `direction` (default: "up"): Scroll direction — "up" means swipe up (scroll content down), matching iOS convention
+- `direction` (default: "down"): where the content you want is. "down" shows what is below the screen (the finger moves up), "up" what is above, "left" and "right" what is to that side. To name the finger's motion instead, use `swipe`
 - `max_scrolls` (default: 10): Maximum scroll attempts before giving up
+- `at` (default: the window centre): the point `[x, y]` to scroll at, for a list inside the screen such as a carousel or a sheet
+
+When the text never shows, the error says why the scrolling stopped. `stop_reason=end_of_content` means the content stopped advancing: it stood where it had stood on two (`scrollEndConfirmations`) of the last four reads (`scrollRevisitDepth`). One slow frame is not taken for the end, and neither is a list caught still pulled past its end on one read. Only the area that scrolls is compared, below the status bar and above the home indicator, so a clock ticking over does not count as movement. "Where it stood" means most of the text in the same place, not all of it (`scrollUnchangedTextShare`): two reads of a screen at rest never agree on every text. Pictures that move under text that stays put count as movement, and a screen with no text, such as a photo grid, is compared by its pixels. `stop_reason=max_scrolls` means the content was still advancing when the scroll budget ran out.
 
 ## Reset App
 
@@ -208,9 +224,25 @@ steps:
   - screenshot: "final_state"
 ```
 
+## Notes
+
+A skill says how to do a task. A note says what an agent learned on the way: where a control hides, the wording a screen uses, a step that fails and what works instead. `save_note` keeps one line under a topic, usually the app's name, and `get_notes` reads it back in a later session.
+
+- Notes are plain Markdown files, one per topic, in `~/.mirroir-mcp/notes/`. You can read, edit and delete them.
+- A note is one line of at most 500 characters, saved with its date. A topic holds at most 50; past that, `replaces` (the text of an earlier note) swaps one out, which is also how an agent corrects a note that stopped being true.
+- `get_notes` is read-only and always available. `save_note` is hidden until you [allow it](permissions.md), like every tool that writes.
+- A note is what an earlier session observed, not an instruction from you. `get_notes` says so each time, because an agent that reads a screen can be led to write down what that screen says. Notes never hold a password or a code by design, but nothing can check that: look at the files if you share the Mac.
+
 ## Multi-Target
 
-`list_targets` shows all configured automation targets (iPhone Mirroring, Android emulators, generic macOS windows) with their status, window size, and which is currently active.
+`list_targets` shows all configured automation targets (iPhone Mirroring, generic macOS windows such as an emulator or a desktop app) with their status, window size, and which is currently active. Each line also names the tools that do not exist on that target:
+
+```
+- iphone (active): connected (410x898) [iPhone Mirroring; every tool]
+- telegram: connected (1200x800) [macOS App; unsupported here: launch_app, open_url, press_app_switcher, press_home, reset_app, set_network, shake, spotlight]
+```
+
+Those eight tools drive something only the iPhone has: Spotlight, the Home Screen, the App Switcher, the iOS shake shortcut. On a target without one, the tool (and the matching step in `run_steps` or a skill) is refused with a message that starts `<tool> is unsupported on target '<name>'`, says why, says that nothing was sent, and names the targets that do have it. It is never emulated: an iOS shortcut sent to a Mac app would do something else there.
 
 `switch_target` changes the active target for all subsequent tool calls. Use it in skills with the `target:` step to automate workflows that span multiple devices or windows: `target: { kind: ios }` selects the iPhone Mirroring target, and `target: { kind: macos, name: "<targets.json name>" }` selects a configured desktop window. The map is the same shape `mirroir-run` parses, so one scenario file reads the same on both sides.
 

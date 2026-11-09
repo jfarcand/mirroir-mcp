@@ -29,12 +29,17 @@ final class RepeatedSequenceAdvisor: @unchecked Sendable {
     private var calls: [Call] = []
     private var offered: Set<[String]> = []
 
+    /// The tool that saves a note: it writes mirroir's own files, not the phone.
+    static let noteTool = "save_note"
+
     /// Record one finished tools/call. Returns the advice when this call
     /// completes a sequence's second run.
     func observe(tool: String, arguments: [String: JSONValue], failed: Bool) -> String? {
         lock.lock()
         defer { lock.unlock() }
-        if PermissionPolicy.readonlyTools.contains(tool) { return nil }
+        // A read changes nothing on the phone, and neither does a note about
+        // it: neither breaks a sequence of actions in two.
+        if PermissionPolicy.readonlyTools.contains(tool) || tool == Self.noteTool { return nil }
         guard !failed, let step = Self.step(tool: tool, arguments: arguments) else {
             calls.removeAll()
             return nil
@@ -81,7 +86,10 @@ final class RepeatedSequenceAdvisor: @unchecked Sendable {
         switch tool {
         case "tap":
             if let text = arguments["text"]?.asString() { return "tap: \(text)" }
-            guard let x = arguments["x"]?.asNumber(), let y = arguments["y"]?.asNumber() else { return nil }
+            // A point read off an image is not a window point, and the step
+            // form takes only window points: no step is offered for it.
+            guard arguments["image_size"] == nil,
+                  let x = arguments["x"]?.asNumber(), let y = arguments["y"]?.asNumber() else { return nil }
             return "tap: \(TapStepPoint.format(x: x, y: y))"
         case "type_text":
             return "type: \(text("text"))"
@@ -92,7 +100,13 @@ final class RepeatedSequenceAdvisor: @unchecked Sendable {
             let names = modifiers.compactMap { $0.asString() }.map { "\"\($0)\"" }.joined(separator: ", ")
             return "press_key: \(text("key")) modifiers: [\(names)]"
         case "launch_app": return "launch: \(text("name"))"
-        case "scroll_to": return "scroll_to: \(text("label"))"
+        case "scroll_to":
+            // The step form scrolls down at the centre; a call that named a
+            // direction or a place has no step that repeats it.
+            let direction = arguments["direction"]?.asString()?.lowercased()
+            guard direction == nil || direction == ScrollDirection.down.rawValue,
+                  arguments["at"] == nil else { return nil }
+            return "scroll_to: \(text("label"))"
         case "open_url": return "open_url: \(text("url"))"
         case "press_home": return "home"
         default: return nil

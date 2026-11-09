@@ -60,6 +60,12 @@ extension EnvConfig {
                 ("defaultDragDurationMs", "\(defaultDragDurationMs)"),
                 ("defaultLongPressDurationMs", "\(defaultLongPressDurationMs)"),
                 ("defaultScrollMaxAttempts", "\(defaultScrollMaxAttempts)"),
+                ("scrollEndConfirmations", "\(scrollEndConfirmations)"),
+                ("scrollUnchangedTextShare", "\(scrollUnchangedTextShare)"),
+                ("scrollRevisitDepth", "\(scrollRevisitDepth)"),
+                ("scrollUnchangedPositionTolerance", "\(scrollUnchangedPositionTolerance)"),
+                ("axTreeMaxNodes", "\(axTreeMaxNodes)"),
+                ("axTreeMessagingTimeoutMs", "\(axTreeMessagingTimeoutMs)"),
             ]),
             ("OCR", [
                 ("ocrBackend", ocrBackend),

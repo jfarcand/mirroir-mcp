@@ -97,15 +97,17 @@ extension MirroirMCP {
                     guard let scrollResult = describer.describeFullPage(
                         input: input, bridge: bridge
                     ) else {
-                        return .error(
-                            "Failed to capture/analyze screen. Is the '\(ctx.name)' window visible?")
+                        return .error(ScreenReadFailure.message(
+                            "Failed to capture/analyze screen.", targetName: ctx.name,
+                            state: ctx.bridge.getState()))
                     }
                     elements = scrollResult.elements
                     screenshotBase64 = scrollResult.screenshotBase64
                 } else {
                     guard let result = describer.describe() else {
-                        return .error(
-                            "Failed to capture/analyze screen. Is the '\(ctx.name)' window visible?")
+                        return .error(ScreenReadFailure.message(
+                            "Failed to capture/analyze screen.", targetName: ctx.name,
+                            state: ctx.bridge.getState()))
                     }
                     elements = result.elements
                     screenshotBase64 = result.screenshotBase64

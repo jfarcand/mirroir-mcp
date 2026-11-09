@@ -138,6 +138,15 @@ jobs:
           .build/release/mirroir-mcp update --dry-run 2>&1 | tee update.txt
           grep -q "Installed from the source checkout" update.txt
 
+      - name: CLI refuses what it does not know, and piped output is plain
+        run: |
+          set +e
+          .build/release/mirroir-mcp bogus </dev/null; [ $? -eq 2 ] || { echo "an unknown command must exit 2"; exit 1; }
+          .build/release/mirroir-mcp update --dryrun; [ $? -eq 2 ] || { echo "a mistyped option must exit 2"; exit 1; }
+          .build/release/mirroir-mcp --version | grep -q '^mirroir-mcp [0-9]' || { echo "no version line"; exit 1; }
+          .build/release/mirroir-mcp doctor 2>doctor-plain.txt
+          if grep -q "$(printf '\033')" doctor-plain.txt; then echo "piped doctor output carries an escape code"; exit 1; fi
+
       - name: Doctor reads the screen end to end (installed binary + FakeMirroring)
         run: |
           .build/release/mirroir-mcp doctor --json 2>doctor.json || true

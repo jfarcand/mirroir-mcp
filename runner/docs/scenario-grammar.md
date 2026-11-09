@@ -330,7 +330,7 @@ Key combos with mirroir-style modifier names (mapped to Playwright's
 
 ```yaml
 - swipe: "up"                                       # up|down|left|right; parks the pointer, then page.mouse.wheel
-- scroll_to: "Welcome"
+- scroll_to: "Welcome"                              # looks further down the page; { label, direction, max_scrolls } names another
 - long_press: { label: "Send", duration_ms: 1000 }
 - drag: { from: "card-1", to: "drop-zone" }
 ```

@@ -151,8 +151,7 @@ final class TargetSelectorTests: XCTestCase {
             targets[name] = TargetContext(
                 name: name, targetType: type, bundleID: nil,
                 bridge: bridge, input: StubInput(),
-                capture: StubCapture(), describer: StubDescriber(), recorder: StubRecorder(),
-                capabilities: [])
+                capture: StubCapture(), describer: StubDescriber(), recorder: StubRecorder())
         }
         return TargetRegistry(targets: targets, defaultName: defaultName)
     }

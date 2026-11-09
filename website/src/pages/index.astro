@@ -575,7 +575,7 @@ const skillsJson = JSON.stringify(skills).replace(/</g, "\\u003c");
     <div class="security-grid">
       <div class="security-layer">
         <h3>Tool permissions</h3>
-        <p>Without a config file, only the 12 read-only tools (<code>screenshot</code>, <code>describe_screen</code>, <code>status</code>, <code>list_skills</code>, &hellip;) are exposed. Mutating tools are hidden from the MCP client entirely &mdash; it never sees them.</p>
+        <p>Without a config file, only the 13 read-only tools (<code>screenshot</code>, <code>describe_screen</code>, <code>status</code>, <code>list_skills</code>, &hellip;) are exposed. Mutating tools are hidden from the MCP client entirely &mdash; it never sees them.</p>
       </div>
       <div class="security-layer">
         <h3>App blocking</h3>
@@ -591,7 +591,7 @@ const skillsJson = JSON.stringify(skills).replace(/</g, "\\u003c");
 
     <p>
       Drop this in <code>~/.mirroir-mcp/permissions.json</code> to control
-      exactly which tools your AI agent can use. Close iPhone Mirroring to kill all input instantly.
+      exactly which tools your AI agent can use. Unlock the iPhone or lock the Mac to stop all input instantly.
     </p>
   </section>
 
@@ -861,7 +861,7 @@ const skillsJson = JSON.stringify(skills).replace(/</g, "\\u003c");
   <section>
     <h2>What mirroir-mcp can do</h2>
     <p>
-      39 tools exposed as an MCP server: touch, typing, screen reading, navigation and skills.
+      41 tools exposed as an MCP server: touch, typing, screen reading, navigation and skills.
       <a href={`${import.meta.env.BASE_URL}docs/#tools`}>See every tool</a>.
     </p>
   </section>
@@ -872,7 +872,7 @@ const skillsJson = JSON.stringify(skills).replace(/</g, "\\u003c");
     <div class="faq-list">
       <details>
         <summary>Is this safe? Can the AI access my banking apps?</summary>
-        <p>Without a config file, only read-only tools are exposed. Mutating tools require explicit opt-in. Use <code>blockedApps</code> in <code>permissions.json</code> to deny access to sensitive apps. Closing iPhone Mirroring kills all input immediately.</p>
+        <p>Without a config file, only read-only tools are exposed. Mutating tools require explicit opt-in. Use <code>blockedApps</code> in <code>permissions.json</code> to deny access to sensitive apps. Unlocking the iPhone, locking the Mac's screen, or quitting your MCP client stops all input at once.</p>
       </details>
       <details>
         <summary>Will it take over my Mac while it works?</summary>

@@ -1,0 +1,29 @@
+{
+  "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
+  "name": "mirroir",
+  "version": "0.45.0",
+  "description": "Drive a real iPhone through macOS iPhone Mirroring: read the screen, tap, type, swipe, open apps and replay skills. Needs macOS 15 or later with iPhone Mirroring connected.",
+  "author": {
+    "name": "Jean-Francois Arcand",
+    "url": "https://github.com/jfarcand"
+  },
+  "homepage": "https://mirroir.dev",
+  "repository": "https://github.com/jfarcand/mirroir-mcp",
+  "license": "Apache-2.0",
+  "keywords": [
+    "iphone",
+    "ios",
+    "iphone-mirroring",
+    "automation",
+    "mcp"
+  ],
+  "extensions": {
+    "com.nousresearch.hermes": {
+      "servers": {
+        "mirroir": {
+          "trust": "untrusted"
+        }
+      }
+    }
+  }
+}

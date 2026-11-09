@@ -1,7 +1,7 @@
 // Copyright 2026 jfarcand@apache.org
 // Licensed under the Apache License, Version 2.0
 //
-// ABOUTME: MCP (Model Context Protocol) server implementing JSON-RPC 2.0 over stdio.
+// ABOUTME: MCP (Model Context Protocol) server: JSON-RPC 2.0 dispatch, and the stdio loop that feeds it.
 // ABOUTME: Handles initialize, tools/list, and tools/call methods per the MCP specification.
 
 import Foundation
@@ -25,8 +25,11 @@ final class MCPServer: Sendable {
     /// client. The run loop serves one request at a time, so this describes the
     /// request a tool handler is running under.
     let servingModernRequest = OSAllocatedUnfairLock(initialState: false)
-    init(policy: PermissionPolicy) {
+    /// How requests reach this server, which decides whether it may send its own.
+    let transport: MCPTransport
+    init(policy: PermissionPolicy, transport: MCPTransport) {
         self.policy = policy
+        self.transport = transport
         encoder = JSONEncoder()
         decoder = JSONDecoder()
     }
@@ -241,7 +244,7 @@ final class MCPServer: Sendable {
     /// range is implementation-defined, so a code there carries no meaning
     /// across implementations and a client cannot recognise the version
     /// mismatch it signals.
-    private static let unsupportedProtocolVersionCode = -32022
+    static let unsupportedProtocolVersionCode = -32022
 
     /// Modern `server/discover` — advertise supported versions, capabilities,
     /// and identity so a client can pick a version without a round-trip error.

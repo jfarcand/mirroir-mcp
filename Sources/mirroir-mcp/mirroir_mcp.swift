@@ -2,16 +2,11 @@
 // Licensed under the Apache License, Version 2.0
 //
 // ABOUTME: Entry point for the mirroir-mcp server.
-// ABOUTME: Initializes subsystems and starts the JSON-RPC server loop over stdio.
+// ABOUTME: Initializes subsystems, then serves JSON-RPC over stdio; `serve` reuses the same startup over HTTP.
 
 import Darwin
 import Foundation
 import HelperLib
-
-/// iPhone Mirroring capabilities for building the default target context.
-private let iphoneMirroringCapabilities: Set<TargetCapability> = [
-    .menuActions, .spotlight, .home, .appSwitcher,
-]
 
 @main
 struct MirroirMCP {
@@ -22,43 +17,47 @@ struct MirroirMCP {
 
         // Parse CLI flags. `--debug` is global: the server and every
         // subcommand honor it, so it is removed before a subcommand parses.
-        DebugLog.enabled = CommandLine.arguments.contains("--debug")
-        let args = CommandLine.arguments.filter { $0 != "--debug" }
+        DebugLog.enabled = CommandLine.arguments.contains(CLIDispatch.debugOption)
 
-        // Handle subcommands before MCP server initialization
-        if args.count >= 2 && args[1] == "test" {
-            let exitCode = TestRunner.run(arguments: Array(args.dropFirst(2)))
-            Darwin.exit(exitCode)
+        // A subcommand, the usage text or a refusal ends the process here: only
+        // a command line that asks for the server goes on to start it.
+        let serverArguments: [String]
+        switch CLIDispatch.route(Array(CommandLine.arguments.dropFirst())) {
+        case .subcommand(let command, let arguments):
+            Darwin.exit(CLIDispatch.execute(command, arguments))
+        case .help:
+            fputs(CLIDispatch.usage + "\n", stderr)
+            Darwin.exit(0)
+        case .version:
+            print("mirroir-mcp \(MirroirVersion.current)")
+            Darwin.exit(0)
+        case .refused(let message):
+            fputs("Error: \(message)\n", stderr)
+            Darwin.exit(CLIDispatch.usageExitCode)
+        case .server(let arguments):
+            serverArguments = arguments
         }
-        if args.count >= 2 && args[1] == "record" {
-            let exitCode = RecordCommand.run(arguments: Array(args.dropFirst(2)))
-            Darwin.exit(exitCode)
+        let server = startServer(
+            skipPermissions: PermissionPolicy.parseSkipPermissions(from: serverArguments),
+            transport: .stdio)
+
+        // Start the MCP server loop
+        server.run()
+
+        // stdin closed: the client is gone and nothing can end a held input.
+        HeldInputReleaseOnExit.releaseAll(reason: "client disconnected", session: .shared,
+                                          interruption: .shared)
+
+        // Shutdown embedded embacle runtime if it was initialized
+        if AgentTransport.embeddedRunnerEnabled {
+            EmbacleFFI.shutdown()
         }
-        if args.count >= 2 && args[1] == "compile" {
-            let exitCode = CompileCommand.run(arguments: Array(args.dropFirst(2)))
-            Darwin.exit(exitCode)
-        }
-        if args.count >= 2 && args[1] == "migrate" {
-            let exitCode = MigrateCommand.run(arguments: Array(args.dropFirst(2)))
-            Darwin.exit(exitCode)
-        }
-        if args.count >= 2 && args[1] == "doctor" {
-            let exitCode = DoctorCommand.run(arguments: Array(args.dropFirst(2)))
-            Darwin.exit(exitCode)
-        }
-        if args.count >= 2 && args[1] == "update" {
-            let exitCode = UpdateCommand.run(arguments: Array(args.dropFirst(2)))
-            Darwin.exit(exitCode)
-        }
-        if args.count >= 2 && args[1] == "skill" {
-            let exitCode = SkillCommand.run(arguments: Array(args.dropFirst(2)))
-            Darwin.exit(exitCode)
-        }
-        if args.count >= 2 && args[1] == "configure" {
-            let exitCode = ConfigureCommand.run(arguments: Array(args.dropFirst(2)))
-            Darwin.exit(exitCode)
-        }
-        let skipPermissions = PermissionPolicy.parseSkipPermissions(from: args)
+    }
+
+    /// Everything a server needs before its first request, whatever carries
+    /// the requests: the permission policy, the log, the agent runtime, the
+    /// targets, the tools, and the release of held input on every way out.
+    static func startServer(skipPermissions: Bool, transport: MCPTransport) -> MCPServer {
         DebugLog.reset()
         DebugLog.persist("startup", "version: \(GitVersion.commitHash)")
         if DebugLog.enabled {
@@ -116,7 +115,7 @@ struct MirroirMCP {
         }
 
         let registry = buildTargetRegistry()
-        let server = MCPServer(policy: policy)
+        let server = MCPServer(policy: policy, transport: transport)
 
         // Log active targets
         let targetNames = registry.allTargetNames
@@ -127,18 +126,7 @@ struct MirroirMCP {
         // A touch, key, button or gesture left held would break input for the
         // whole Mac, so every way out of the server releases it.
         HeldInputReleaseOnExit.install()
-
-        // Start the MCP server loop
-        server.run()
-
-        // stdin closed: the client is gone and nothing can end a held input.
-        HeldInputReleaseOnExit.releaseAll(reason: "client disconnected", session: .shared,
-                                          interruption: .shared)
-
-        // Shutdown embedded embacle runtime if it was initialized
-        if AgentTransport.embeddedRunnerEnabled {
-            EmbacleFFI.shutdown()
-        }
+        return server
     }
 
     /// Build a TargetRegistry from targets.json or fall back to a single iPhone target.

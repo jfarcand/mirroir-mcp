@@ -12,13 +12,15 @@ import Foundation
 ///        `mirroir-mcp migrate --dir <path>`
 enum MigrateCommand {
 
-    /// Parse arguments and run the migration. Returns exit code (0 = success, 1 = error).
+    /// Parse arguments and run the migration. Returns exit code (0 = success,
+    /// 1 = error, 2 = refused arguments).
     static func run(arguments: [String]) -> Int32 {
-        let config = parseArguments(arguments)
-
-        if config.showHelp {
-            printUsage()
-            return 0
+        let config: MigrateConfig
+        do {
+            config = try parseArguments(arguments)
+        } catch {
+            fputs("Error: \(error.localizedDescription)\n", stderr)
+            return CLIDispatch.usageExitCode
         }
 
         // Collect YAML files to migrate
@@ -32,8 +34,7 @@ enum MigrateCommand {
         yamlFiles.append(contentsOf: config.files)
 
         if yamlFiles.isEmpty {
-            fputs("Error: No YAML files specified. Use --dir <path> or provide file paths.\n", stderr)
-            printUsage()
+            fputs("Error: no YAML file found in \(config.directory ?? "the given paths")\n", stderr)
             return 1
         }
 
@@ -289,49 +290,54 @@ enum MigrateCommand {
         let directory: String?
         let outputDir: String?
         let dryRun: Bool
-        let showHelp: Bool
     }
 
-    private static func parseArguments(_ args: [String]) -> MigrateConfig {
+    /// Parse a `migrate` command line.
+    ///
+    /// - Throws: `CLIArgumentError` for an option this command does not know,
+    ///   a `--dir` or `--output-dir` with no value, or no file and no `--dir`.
+    static func parseArguments(_ args: [String]) throws -> MigrateConfig {
         var files: [String] = []
         var directory: String?
         var outputDir: String?
         var dryRun = false
-        var showHelp = false
 
         var i = 0
+        func value(for flag: String) throws -> String {
+            i += 1
+            guard i < args.count, !args[i].hasPrefix("-") else {
+                throw CLIArgumentError.missingValue(flag: flag)
+            }
+            return args[i]
+        }
+
         while i < args.count {
             let arg = args[i]
             switch arg {
-            case "--help", "-h":
-                showHelp = true
             case "--dir":
-                i += 1
-                if i < args.count { directory = args[i] }
+                directory = try value(for: arg)
             case "--output-dir":
-                i += 1
-                if i < args.count { outputDir = args[i] }
+                outputDir = try value(for: arg)
             case "--dry-run":
                 dryRun = true
             default:
-                if !arg.hasPrefix("-") {
-                    files.append(arg)
+                if arg.hasPrefix("-") {
+                    throw CLIArgumentError.unknownOption(arg, command: "migrate")
                 }
+                files.append(arg)
             }
             i += 1
         }
 
-        return MigrateConfig(
-            files: files,
-            directory: directory,
-            outputDir: outputDir,
-            dryRun: dryRun,
-            showHelp: showHelp
-        )
+        if files.isEmpty, directory == nil {
+            throw CLIArgumentError.missingArgument("a YAML file or --dir <path>", command: "migrate")
+        }
+        return MigrateConfig(files: files, directory: directory, outputDir: outputDir, dryRun: dryRun)
     }
 
-    private static func printUsage() {
-        let usage = """
+    /// The command's usage text.
+    static var usage: String {
+        """
         Usage: mirroir-mcp migrate [options] <file.yaml> [file2.yaml ...]
 
         Convert YAML skill files to SKILL.md format (YAML front matter + markdown).
@@ -350,6 +356,5 @@ enum MigrateCommand {
           mirroir-mcp migrate --dir ../iphone-mirroir-skills
           mirroir-mcp migrate --dry-run apps/mail/email-triage.yaml
         """
-        fputs(usage + "\n", stderr)
     }
 }

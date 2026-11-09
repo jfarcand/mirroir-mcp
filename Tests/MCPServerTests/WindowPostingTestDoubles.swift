@@ -49,15 +49,21 @@ final class RecordingKeyPoster: KeyEventPosting, @unchecked Sendable {
     private(set) var targets: [pid_t?] = []
     /// The single keys pressed, in order; typed text goes through key sequences.
     private(set) var keycodes: [UInt16] = []
+    /// The flags each single key press carried, in the same order as `keycodes`.
+    private(set) var flags: [CGEventFlags] = []
+    /// The key sequences typed, in order.
+    private(set) var sequences: [CGKeySequence] = []
 
     func postKey(keycode: UInt16, flags: CGEventFlags, targetPID: pid_t?) -> Bool {
         targets.append(targetPID)
         keycodes.append(keycode)
+        self.flags.append(flags)
         return true
     }
 
     func postKeySequence(_ sequence: CGKeySequence, targetPID: pid_t?) -> Bool {
         targets.append(targetPID)
+        sequences.append(sequence)
         return true
     }
 }

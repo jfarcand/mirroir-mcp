@@ -12,7 +12,7 @@ final class MCPServerRoutingTests: XCTestCase {
 
     func makeServer(skipPermissions: Bool = true) -> MCPServer {
         let policy = PermissionPolicy(skipPermissions: skipPermissions, config: nil)
-        return MCPServer(policy: policy)
+        return MCPServer(policy: policy, transport: .stdio)
     }
 
     func makeRequest(method: String, id: RequestID? = .number(1), params: JSONValue? = nil) -> JSONRPCRequest {
@@ -136,7 +136,7 @@ final class MCPServerRoutingTests: XCTestCase {
     func testToolsListRespectsPermissionPolicy() {
         // Without skip-permissions, mutating tools are hidden
         let policy = PermissionPolicy(skipPermissions: false, config: nil)
-        let server = MCPServer(policy: policy)
+        let server = MCPServer(policy: policy, transport: .stdio)
 
         server.registerTool(MCPToolDefinition(
             name: "tap",
@@ -197,7 +197,7 @@ final class MCPServerRoutingTests: XCTestCase {
 
     func testToolsCallDeniedTool() {
         let policy = PermissionPolicy(skipPermissions: false, config: nil)
-        let server = MCPServer(policy: policy)
+        let server = MCPServer(policy: policy, transport: .stdio)
 
         server.registerTool(MCPToolDefinition(
             name: "tap",

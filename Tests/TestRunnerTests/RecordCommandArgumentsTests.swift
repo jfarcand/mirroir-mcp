@@ -10,8 +10,17 @@ import HelperLib
 
 final class RecordCommandArgumentsTests: XCTestCase {
 
-    private func parse(_ args: [String]) throws -> RecordInvocation {
+    private func parse(_ args: [String]) throws -> RecordConfig {
         try RecordCommand.parseArguments(args)
+    }
+
+    private func assertRefused(
+        _ args: [String], _ expected: CLIArgumentError,
+        file: StaticString = #filePath, line: UInt = #line
+    ) {
+        XCTAssertThrowsError(try parse(args), file: file, line: line) { error in
+            XCTAssertEqual(error as? CLIArgumentError, expected, file: file, line: line)
+        }
     }
 
     private func assertRefused(
@@ -26,15 +35,15 @@ final class RecordCommandArgumentsTests: XCTestCase {
     func testLiveRecordingParsesAppNameAndOutputDir() throws {
         XCTAssertEqual(
             try parse(["--app", "Calculator", "--name", "calculator-add", "--output-dir", "/repo"]),
-            .record(RecordConfig(
+            RecordConfig(
                 source: .live(appName: "Calculator", flowName: "calculator-add"),
-                outputDir: "/repo")))
+                outputDir: "/repo"))
     }
 
     func testOutputDirIsOptional() throws {
         XCTAssertEqual(
             try parse(["--name", "f", "--app", "Notes"]),
-            .record(RecordConfig(source: .live(appName: "Notes", flowName: "f"), outputDir: nil)))
+            RecordConfig(source: .live(appName: "Notes", flowName: "f"), outputDir: nil))
     }
 
     func testLiveRecordingRequiresAppAndName() {
@@ -57,12 +66,13 @@ final class RecordCommandArgumentsTests: XCTestCase {
     func testFromRecordingParses() throws {
         XCTAssertEqual(
             try parse(["--from-recording", "r.json", "--output-dir", "/repo"]),
-            .record(RecordConfig(source: .savedRecording(path: "r.json"), outputDir: "/repo")))
+            RecordConfig(source: .savedRecording(path: "r.json"), outputDir: "/repo"))
     }
 
     func testRemovedAndUnknownFlagsAreRefused() {
-        assertRefused(["-o", "out.yaml"], .unknownArgument("-o"))
-        assertRefused(["--description", "x"], .unknownArgument("--description"))
+        assertRefused(["-o", "out.yaml"], .unknownOption("-o", command: "record"))
+        assertRefused(["--description", "x"], .unknownOption("--description", command: "record"))
+        assertRefused(["stray"], .unexpectedArgument("stray", command: "record"))
     }
 
     func testFlagWithoutValueIsRefused() {
@@ -70,13 +80,15 @@ final class RecordCommandArgumentsTests: XCTestCase {
         assertRefused(["--app", "Notes", "--name", ""], .missingValue(flag: "--name"))
     }
 
+    /// Help is the dispatcher's: asked for anywhere, it wins and nothing runs.
     func testHelp() throws {
-        XCTAssertEqual(try parse(["--app", "Notes", "-h"]), .help)
-        XCTAssertEqual(RecordCommand.run(arguments: ["--help"]), 0)
+        let command = try XCTUnwrap(CLIDispatch.subcommands.first { $0.name == "record" })
+        XCTAssertEqual(CLIDispatch.preflight(command, ["--app", "Notes", "-h"]), .help)
+        XCTAssertEqual(CLIDispatch.execute(command, ["--help"]), 0)
     }
 
-    func testBadArgumentsExitOne() {
-        XCTAssertEqual(RecordCommand.run(arguments: ["--no-ocr"]), 1)
+    func testBadArgumentsExitTwo() {
+        XCTAssertEqual(RecordCommand.run(arguments: ["--no-ocr"]), CLIDispatch.usageExitCode)
     }
 
     /// A live session is saved under the global home, slugged by app and flow.

@@ -48,6 +48,12 @@ final class ScreenDescriber: Sendable {
         /// `elements` is empty because the screen is transitioning, not because
         /// it holds no text. The vision describer makes no model call for it.
         let screenBlank: Bool
+        /// Why the target's accessibility tree could not be read, on a target
+        /// that has one. Nil when it was read, and on targets with none.
+        var treeFailure: String?
+        /// The accessibility tree was larger than the read limit, so some of
+        /// its text may be missing.
+        var treeTruncated = false
 
         init(elements: [TapPoint], icons: [IconDetector.DetectedIcon] = [],
              hints: [String] = [], screenshotBase64: String, ocrTimeMs: Int = 0,
@@ -61,6 +67,18 @@ final class ScreenDescriber: Sendable {
             self.ocrFailure = ocrFailure
             self.visionUsage = visionUsage
             self.screenBlank = screenBlank
+        }
+
+        /// This result with `elements` in place of its own, and what reading
+        /// the accessibility tree came to.
+        func withTree(elements: [TapPoint], failure: String?, truncated: Bool) -> DescribeResult {
+            var copy = DescribeResult(
+                elements: elements, icons: icons, hints: hints, screenshotBase64: screenshotBase64,
+                ocrTimeMs: ocrTimeMs, ocrFailure: ocrFailure, visionUsage: visionUsage,
+                screenBlank: screenBlank)
+            copy.treeFailure = failure
+            copy.treeTruncated = truncated
+            return copy
         }
     }
 

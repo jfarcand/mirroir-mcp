@@ -19,6 +19,8 @@ struct SessionBlock: Sendable, Equatable {
     /// What the window says, as one sentence fragment.
     var said: String {
         if move == .reopenMirroring { return "nothing Accessibility can read" }
+        if move == .unlockMac { return "nothing that can be read: the Mac's screen is locked" }
+        if move == .showMirroring { return "nothing wrong, but its app is hidden" }
         return quoted.isEmpty
             ? "an interruption with no text"
             : quoted.map { $0.hasPrefix("[") ? $0 : "“\($0)”" }.joined(separator: " ")

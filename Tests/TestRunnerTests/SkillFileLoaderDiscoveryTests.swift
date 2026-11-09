@@ -196,7 +196,7 @@ extension SkillFileLoaderTests {
         let md = try write("privacy.md", loginMd)
         try saveCompiled(for: md, steps: [
             CompiledStep(index: 0, type: "scroll_to", label: "Privacy",
-                         hints: .scrollSequence(count: 3, direction: "down")),
+                         hints: .scrollSequence(count: 3, direction: "up")),
         ])
 
         guard case .scrollTo(let label, let direction, _) =
@@ -204,7 +204,7 @@ extension SkillFileLoaderTests {
             return XCTFail("expected a scroll_to step")
         }
         XCTAssertEqual(label, "Privacy")
-        XCTAssertEqual(direction, "down")
+        XCTAssertEqual(direction, .up, "the recorded direction, not the parser's default")
     }
 
     // MARK: - Recompiling from the CLI

@@ -183,9 +183,9 @@ public struct JSONRPCError: Encodable, Sendable {
     public let code: Int
     public let message: String
     /// Optional structured payload. Carries `{supported, requested}` for the
-    /// modern `UnsupportedProtocolVersionError` (-32004) and
+    /// modern `UnsupportedProtocolVersionError` (-32022) and
     /// `{requiredCapabilities}` for `MissingRequiredClientCapabilityError`
-    /// (-32003). Omitted from the wire when nil (synthesized `encodeIfPresent`).
+    /// (-32021). Omitted from the wire when nil (synthesized `encodeIfPresent`).
     public let data: JSONValue?
 
     public init(code: Int, message: String, data: JSONValue? = nil) {

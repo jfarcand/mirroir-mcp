@@ -103,6 +103,7 @@ public struct PermissionPolicy: Sendable {
         "get_skill",
         "calibrate_component",
         "classify_screen",
+        "get_notes",
     ]
 
     /// Tools that mutate iPhone state and require explicit permission.
@@ -134,6 +135,7 @@ public struct PermissionPolicy: Sendable {
         "save_compiled",
         "generate_skill",
         "run_steps",
+        "save_note",
     ]
 
     /// Mutating tools that only move around the iPhone's UI or mirroir's own
@@ -148,6 +150,7 @@ public struct PermissionPolicy: Sendable {
         "scroll_to",
         "switch_target",
         "record_step",
+        "save_note",
     ]
 
     /// Mutating tools that leave the same state however often they are called
@@ -355,8 +358,11 @@ public struct PermissionPolicy: Sendable {
     /// Parse CLI arguments for the skip-permissions flag.
     /// Returns true if `--dangerously-skip-permissions` or `--yolo` is present.
     public static func parseSkipPermissions(from args: [String]) -> Bool {
-        args.contains("--dangerously-skip-permissions") || args.contains("--yolo")
+        args.contains { skipPermissionsOptions.contains($0) }
     }
+
+    /// The command-line options that expose every tool regardless of the config.
+    public static let skipPermissionsOptions: Set<String> = ["--dangerously-skip-permissions", "--yolo"]
 }
 
 private extension Dictionary where Key == String {

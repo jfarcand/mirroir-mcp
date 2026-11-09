@@ -36,7 +36,7 @@ extension MirroirMCP {
                 "required": .array([.string("name")]),
             ],
             handler: { args in
-                let (ctx, err) = registry.resolveForTool(args)
+                let (ctx, err) = registry.resolveForTool(args, requiring: .launchApp)
                 guard let ctx else { return err! }
                 let input = ctx.input
 
@@ -80,17 +80,12 @@ extension MirroirMCP {
                 "required": .array([.string("url")]),
             ],
             handler: { args in
-                let (ctx, err) = registry.resolveForTool(args)
+                let (ctx, err) = registry.resolveForTool(args, requiring: .openURL)
                 guard let ctx else { return err! }
                 let input = ctx.input
 
                 guard let url = args["url"]?.asString() else {
                     return .error("Missing required parameter: url (string)")
-                }
-
-                if !ctx.profile.supportsDirectURLOpen {
-                    return .error(ctx.profile.urlOpenUnsupportedMessage
-                        ?? "open_url is not supported for \(ctx.profile.displayName) targets.")
                 }
 
                 if let error = input.openURL(url) {
@@ -112,7 +107,7 @@ extension MirroirMCP {
                 "properties": .object([:]),
             ],
             handler: { args in
-                let (ctx, err) = registry.resolveForTool(args)
+                let (ctx, err) = registry.resolveForTool(args, requiring: .pressHome)
                 guard let ctx else { return err! }
                 guard let menuBridge = ctx.bridge as? (any MenuActionCapable) else {
                     return .error("Target '\(ctx.name)' does not support press_home")
@@ -138,7 +133,7 @@ extension MirroirMCP {
                 "properties": .object([:]),
             ],
             handler: { args in
-                let (ctx, err) = registry.resolveForTool(args)
+                let (ctx, err) = registry.resolveForTool(args, requiring: .pressAppSwitcher)
                 guard let ctx else { return err! }
                 guard let menuBridge = ctx.bridge as? (any MenuActionCapable) else {
                     return .error("Target '\(ctx.name)' does not support press_app_switcher")
@@ -183,8 +178,9 @@ extension MirroirMCP {
                 }
 
                 guard let result = ctx.ocrDescriber.describe() else {
-                    return .error(
-                        "Failed to capture/analyze screen. Is the '\(ctx.name)' window visible?")
+                    return .error(ScreenReadFailure.message(
+                        "Failed to capture/analyze screen.", targetName: ctx.name,
+                        state: ctx.bridge.getState()))
                 }
                 guard let info = bridge.getWindowInfo() else {
                     return .error("Cannot determine window size for '\(ctx.name)'")
@@ -213,7 +209,7 @@ extension MirroirMCP {
                 "properties": .object([:]),
             ],
             handler: { args in
-                let (ctx, err) = registry.resolveForTool(args)
+                let (ctx, err) = registry.resolveForTool(args, requiring: .spotlight)
                 guard let ctx else { return err! }
                 guard let menuBridge = ctx.bridge as? (any MenuActionCapable) else {
                     return .error("Target '\(ctx.name)' does not support spotlight")

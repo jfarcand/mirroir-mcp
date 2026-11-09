@@ -30,7 +30,7 @@ mirroir does not sync or upload any of them. To remove them, delete the files an
 
 - Only read-only tools are available until you allow more in `permissions.json`. See [Permissions](permissions.md).
 - `blockedApps` stops `launch_app` from opening the apps you name.
-- Closing the iPhone Mirroring window or locking the phone stops all input and capture.
+- Unlocking the iPhone, locking the Mac's screen, or quitting your MCP client stops all input and capture. Quitting the iPhone Mirroring app does not: the next action reopens it.
 
 mirroir is not intended for users under 18.
 

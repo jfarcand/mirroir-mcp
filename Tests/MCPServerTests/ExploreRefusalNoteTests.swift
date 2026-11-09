@@ -43,7 +43,7 @@ final class ExploreRefusalNoteTests: XCTestCase {
             ocrDescriber: StubDescriber())
         return MirroirMCP.handleExplore(
             args: ["app_name": .string(app)], session: ExplorationSession(),
-            registry: registry, server: MCPServer(policy: policy), policy: policy,
+            registry: registry, server: MCPServer(policy: policy, transport: .stdio), policy: policy,
             appMdSearchPaths: searchPaths)
     }
 

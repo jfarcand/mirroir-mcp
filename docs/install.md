@@ -49,6 +49,14 @@ brew tap jfarcand/tap && brew install mirroir-mcp
 openclaw mcp add mirroir --command mirroir-mcp
 ```
 
+or from [Hermes Agent](https://github.com/NousResearch/hermes-agent) 0.21.6 or later, as a plugin that brings the server, the operating manual as a skill, and an approval prompt before every call that can change the phone:
+
+```bash
+hermes plugins install jfarcand/mirroir-mcp/plugins/hermes --enable
+```
+
+The package is [plugins/hermes](../plugins/hermes/README.md). It is checked in CI against the rules Hermes's loader states; it has not yet been loaded by a running Hermes, so report what you see.
+
 or as an MCP Bundle for Claude Desktop and other MCPB hosts: download `mirroir-mcp.mcpb` from the [latest release](https://github.com/jfarcand/mirroir-mcp/releases/latest) (v0.43.0 and later) and double-click it. The bundle carries the native Apple Silicon binary, so it needs no Node.js. To build one from a release build: `mcpb/build-mcpb.sh .build/release/mirroir-mcp mirroir-mcp.mcpb`.
 
 The first time you take a screenshot, macOS will prompt for **Screen Recording** and **Accessibility** permissions. Grant both. `mirroir doctor` names the app that needs each grant and links the System Settings pane to open.
@@ -181,4 +189,11 @@ brew uninstall mirroir-mcp
 
 # From source
 ./uninstall-mirroir.sh
+```
+
+If you installed the [`serve` agent](cli.md#serve), stop and remove it as well; `uninstall-mirroir.sh` does this for you, `brew uninstall` does not:
+
+```bash
+launchctl bootout gui/$(id -u)/dev.mirroir.serve
+rm ~/Library/LaunchAgents/dev.mirroir.serve.plist ~/.mirroir-mcp/serve-token
 ```

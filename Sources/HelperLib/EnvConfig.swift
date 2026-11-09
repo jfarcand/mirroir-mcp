@@ -11,7 +11,8 @@ import Foundation
 ///
 /// Resolution order for each key (first found wins):
 /// 1. `settings.json` value (project-local `<cwd>/.mirroir-mcp/settings.json`,
-///    then global `~/.mirroir-mcp/settings.json`)
+///    then global `~/.mirroir-mcp/settings.json`; or the one file
+///    `MIRROIR_SETTINGS_FILE` names, which replaces both)
 /// 2. `MIRROIR_<SCREAMING_SNAKE_CASE>` environment variable
 /// 3. ``TimingConstants`` default
 ///
@@ -25,7 +26,10 @@ import Foundation
 /// ```
 public enum EnvConfig {
     /// Loaded settings dictionary. Lazily initialized once from settings.json.
-    nonisolated(unsafe) static let settings: [String: Any] = loadSettings()
+    nonisolated(unsafe) static let settings: [String: Any] = loadSettings(
+        environment: env,
+        localConfigDir: PermissionPolicy.localConfigDir,
+        globalConfigDir: PermissionPolicy.globalConfigDir)
 
     // MARK: - Cursor & Input Settling
 
@@ -264,46 +268,6 @@ public enum EnvConfig {
 
     public static var eventLabelMaxDistance: Double {
         readDouble("eventLabelMaxDistance", default: TimingConstants.eventLabelMaxDistance)
-    }
-
-    // MARK: - Settings File Loading
-
-    /// Load settings from the project-local and global settings.json files.
-    /// Resolution is per key: a key in the project-local file overrides the
-    /// same key in the global file, and every global key the project file does
-    /// not set still applies.
-    private static func loadSettings() -> [String: Any] {
-        let configDirName = ".mirroir-mcp"
-        let fileName = "settings.json"
-
-        let localPath = FileManager.default.currentDirectoryPath + "/" + configDirName + "/" + fileName
-        let globalPath = ("~/" + configDirName + "/" + fileName as NSString).expandingTildeInPath
-        return mergedSettings(localPath: localPath, globalPath: globalPath)
-    }
-
-    /// Merge the global file under the project-local file, key by key.
-    /// A missing file contributes nothing.
-    static func mergedSettings(localPath: String, globalPath: String) -> [String: Any] {
-        let global = readSettingsFile(atPath: globalPath)
-        let local = readSettingsFile(atPath: localPath)
-        return global.merging(local) { _, projectValue in projectValue }
-    }
-
-    /// Read one settings.json file; a missing or malformed file yields an
-    /// empty dictionary (malformed files warn on stderr).
-    private static func readSettingsFile(atPath path: String) -> [String: Any] {
-        guard FileManager.default.fileExists(atPath: path) else { return [:] }
-        do {
-            let data = try Data(contentsOf: URL(fileURLWithPath: path))
-            guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {
-                fputs("Warning: settings.json at \(path) is not a JSON object\n", stderr)
-                return [:]
-            }
-            return json
-        } catch {
-            fputs("Warning: Failed to parse settings.json at \(path): \(error.localizedDescription)\n", stderr)
-            return [:]
-        }
     }
 
     // MARK: - Internal Helpers (used by extension in EnvConfigFeatures.swift)

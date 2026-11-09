@@ -211,8 +211,10 @@ enum TapStepPoint {
         return (x, y)
     }
 
-    /// The step value for a point.
+    /// The step value for a point: whole points, the fraction dropped.
+    /// Formatted, not converted: `Int(_:)` traps on a value no integer holds.
     static func format(x: Double, y: Double) -> String {
-        "\(prefix)\(Int(x)),\(Int(y))"
+        let whole = { (value: Double) in String(format: "%.0f", value.rounded(.towardZero)) }
+        return "\(prefix)\(whole(x)),\(whole(y))"
     }
 }

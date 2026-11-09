@@ -90,7 +90,9 @@ extension MirroirMCP {
                     ]),
                     "scroll_direction": .object([
                         "type": .string("string"),
-                        "description": .string("Scroll direction: up, down, left, right (for scroll_to). Optional."),
+                        "description": .string(
+                            "Where the scrolled-to content was: down, up, left, right (for scroll_to). "
+                            + "Optional; default down."),
                     ]),
                 ]),
                 "required": .array([.string("step_index"), .string("type")]),
@@ -123,7 +125,12 @@ extension MirroirMCP {
                 let matchStrategy = args["match_strategy"]?.asString()
                 let elapsedMs = args["elapsed_ms"]?.asInt()
                 let scrollCount = args["scroll_count"]?.asInt()
-                let scrollDirection = args["scroll_direction"]?.asString()
+                // Stored as replay reads it: lower-case, and one of the four.
+                let scrollDirection = args["scroll_direction"]?.asString()?.lowercased()
+                if let scrollDirection, ScrollDirection(rawValue: scrollDirection) == nil {
+                    return .error("scroll_direction must be one of \(ScrollDirection.names); "
+                        + "got '\(scrollDirection)'")
+                }
 
                 // The screen this step left on display is kept for the next step to
                 // start from. A tap by coordinates alone has no label for replay to
@@ -343,7 +350,7 @@ extension MirroirMCP {
 
         case "scroll_to":
             let count = scrollCount ?? 1
-            let direction = scrollDirection ?? "up"
+            let direction = scrollDirection ?? ScrollDirection.down.rawValue
             return .scrollSequence(count: count, direction: direction)
 
         case "launch", "type", "press_key", "swipe", "home", "open_url",

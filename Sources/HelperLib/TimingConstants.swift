@@ -276,6 +276,43 @@ public enum TimingConstants {
     /// Default maximum scroll attempts before giving up.
     public static let defaultScrollMaxAttempts: Int = 10
 
+    /// Most elements read from a macOS app's accessibility tree in one
+    /// describe. Each is a request to the app, so a huge window is cut here.
+    public static let axTreeMaxNodes: Int = 2000
+
+    /// Milliseconds an app has to answer one accessibility request before the
+    /// tree is given up as unreadable.
+    public static let axTreeMessagingTimeoutMs: Int = 1000
+
+    /// Earlier reads the current one must agree with for scroll_to to call the
+    /// content ended. One is not proof: a scroll can land after the read.
+    public static let scrollEndConfirmations: Int = 2
+
+    /// Share of the texts in the scrolling band that must sit where they sat
+    /// on an earlier read for scroll_to to say the two reads agree. Far from
+    /// 1, because two reads of the same screen never list the same text: a
+    /// detection comes and goes, a symbol is read three ways. Measured on an
+    /// iPhone XR in Weather, 2026-11-09, comparing whole strings: reads of
+    /// the same place shared 64 to 100% of their text, reads a scroll apart
+    /// 0 to 32%. The bar sits between the two.
+    public static let scrollUnchangedTextShare: Double = 0.6
+
+    /// How many earlier reads scroll_to compares each read with. Twice the
+    /// confirmations, because a list pushed past its end does not always
+    /// spring back before it is read: the content is then seen at rest on one
+    /// read and pulled past the end, by a varying amount, on the next.
+    /// Measured on an iPhone XR at the bottom of Weather, 2026-11-09: every
+    /// second read was the resting position (88 to 100% of the text in place
+    /// against the read two before it), the reads between them were not.
+    /// Content that advances never returns to where it stood, so agreeing
+    /// with `scrollEndConfirmations` of these reads means it has stopped.
+    public static let scrollRevisitDepth: Int = 4
+
+    /// How far, in points, a text may sit from where it sat in the read before
+    /// and still count as the same text in the same place. OCR places a text
+    /// within a point or two from one read to the next.
+    public static let scrollUnchangedPositionTolerance: Double = 4
+
     /// Minimum number of matching anchors required for anchor-based scroll offset.
     /// When fewer anchors match, falls back to text-set deduplication.
     public static let scrollAnchorMinCount: Int = 1

@@ -19,13 +19,11 @@ final class TargetRegistryTests: XCTestCase {
         let iphoneCtx = TargetContext(
             name: "iphone", targetType: "iphone-mirroring", bundleID: nil,
             bridge: iphoneBridge, input: StubInput(),
-            capture: StubCapture(), describer: StubDescriber(), recorder: StubRecorder(),
-            capabilities: [.menuActions, .spotlight, .home, .appSwitcher])
+            capture: StubCapture(), describer: StubDescriber(), recorder: StubRecorder())
         let androidCtx = TargetContext(
             name: "android", targetType: "generic-window", bundleID: nil,
             bridge: androidBridge, input: StubInput(),
-            capture: StubCapture(), describer: StubDescriber(), recorder: StubRecorder(),
-            capabilities: [])
+            capture: StubCapture(), describer: StubDescriber(), recorder: StubRecorder())
 
         let registry = TargetRegistry(
             targets: ["iphone": iphoneCtx, "android": androidCtx],

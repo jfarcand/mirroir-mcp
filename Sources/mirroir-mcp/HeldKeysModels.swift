@@ -11,7 +11,8 @@ import HelperLib
 /// A key hold_keys can keep pressed: a plain key that auto-repeats while held,
 /// or a modifier that is held through flagsChanged events and never repeats.
 struct HeldKey: Sendable, Equatable {
-    /// The name the caller gave, lowercased.
+    /// The name the caller gave, lowercased, or the keycode spelled out for a
+    /// key that was pressed by keycode.
     let name: String
     /// macOS virtual keycode (Carbon kVK_*), the same code CGEvent posts.
     let keycode: UInt16
@@ -35,6 +36,11 @@ struct HeldKey: Sendable, Equatable {
             return nil
         }
         return HeldKey(name: name, keycode: mapping.keycode, modifier: nil)
+    }
+
+    /// A key pressed by keycode, with no name of the caller's.
+    static func unnamed(keycode: UInt16, modifier: CGEventFlags?) -> HeldKey {
+        HeldKey(name: "keycode \(keycode)", keycode: keycode, modifier: modifier)
     }
 }
 

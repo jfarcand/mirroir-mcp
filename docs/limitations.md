@@ -18,7 +18,7 @@ Measured on macOS 26.5 with iTerm in front and the front app sampled every 0.2s:
 
 On macOS 26.5, a drag sent as window events or window records loses its intermediate points (iOS sees a press and a release, so a drag reads as a tap). Drags and multi-step gestures therefore stay on HID input, which needs iPhone Mirroring in front. Swipes do not: measured on macOS 26.5 with iTerm in front and Finder covering the mirror, window-addressed scroll events moved App Store lists and paged Weather with the front app unchanged in every sample. A swipe that scrolls nothing with the cursor path, such as pulling the Photos grid to older photos, scrolls nothing here either. Generic macOS windows keep their activating behavior.
 
-Read-only tools (`screenshot`, `describe_screen`, `start_recording`, `stop_recording`, `status`, `get_orientation`, `check_health`, `list_skills`, `get_skill`, `list_targets`, `calibrate_component`) do **not** steal focus, with one exception: when ScreenCaptureKit cannot deliver a frame, capture falls back to `screencapture`, which activates the target first. Several mirroir servers running the same binary can cause that.
+Read-only tools (`screenshot`, `describe_screen`, `start_recording`, `stop_recording`, `status`, `get_orientation`, `check_health`, `list_skills`, `get_skill`, `list_targets`, `calibrate_component`) do **not** take the front, with no exception. When ScreenCaptureKit refuses a frame for a moment (several mirroir servers running the same binary can cause that), the capture is retried; a mirror that still cannot be captured while another app is in front returns an error instead of being brought forward.
 
 ### Mitigations for Gestures
 
@@ -31,7 +31,21 @@ Read-only tools (`screenshot`, `describe_screen`, `start_recording`, `stop_recor
 
 ## Cross-Space Interaction
 
-The MCP client (e.g. the terminal running the server) and the target window **must be in the same macOS Space** for reliable interaction. `tap`, `type_text`, and `screenshot` all fail when the target window lives in a different Space — AppleScript `activate` plus CGEvent cannot reach across Spaces. This is the flip side of the "Separate macOS Space" mitigation above: a separate Space preserves your cursor and selection, but the server can only drive a window that shares the active Space with the client.
+**iPhone Mirroring** can sit on another Space. Measured on macOS 26.5: with the mirror on another Space for two minutes, a stopwatch on the phone matched wall time in every read, and taps landed without a Space switch. The same holds with the mirror fully covered by another window. Drags and two-finger gestures still activate iPhone Mirroring, which switches to its Space for the gesture.
+
+**Generic macOS windows** are driven through the cursor, so the MCP client (e.g. the terminal running the server) and the target window **must be in the same macOS Space**: AppleScript `activate` plus CGEvent cannot reach across Spaces.
+
+## Hidden and Minimized Windows
+
+Measured on macOS 26.5 with an iPhone XR:
+
+| State of the iPhone Mirroring window | What the tools report |
+|---|---|
+| App hidden (Cmd+H) | The screen can still be read: `screenshot` and `describe_screen` return live frames. Input cannot reach it: a tap and a swipe sent to the hidden window changed nothing on the iPhone. So `status` says Connected and adds that the app is hidden, and every input tool refuses, sends nothing, and asks for the app to be shown again. Keys were not measured while hidden; they are refused with the rest. |
+| Mac screen locked | Nothing can be read or sent. `status` and every input say the Mac's screen is locked and ask for it to be unlocked. After unlocking, the window may show "Mac Locked" with a Connect button to press once. |
+| Window minimized (Cmd+M) | The window is no longer the app's main window, so nothing can be read from it or sent to it. `status` says `Window minimized`, and every read and input says the window is minimized and that the user must bring it back from the Dock. |
+
+No tool brings a minimized or hidden window back: on this macOS version that takes activating the app, which mirroir does not do for you. Stage Manager has not been measured.
 
 ### Alternatives That Don't Work
 

@@ -24,10 +24,11 @@ final class InlineStepRunnerTests: XCTestCase {
     }
 
     private func makeServer(policy: PermissionPolicy) -> MCPServer {
-        let server = MCPServer(policy: policy)
+        let server = MCPServer(policy: policy, transport: .stdio)
         let registry = makeTestRegistry(bridge: StubBridge(), input: input, describer: describer)
         MirroirMCP.registerRunStepsTools(server: server, registry: registry, policy: policy)
         MirroirMCP.registerInputTools(server: server, registry: registry)
+        MirroirMCP.registerTapTools(server: server, registry: registry)
         return server
     }
 

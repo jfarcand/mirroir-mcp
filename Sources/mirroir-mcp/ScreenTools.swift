@@ -29,7 +29,10 @@ extension MirroirMCP {
             description: """
                 Capture a screenshot of the iPhone Mirroring window. \
                 Returns the current screen content as a PNG image. \
-                Use this to see what is displayed on the mirrored iPhone.
+                Use this to see what is displayed on the mirrored iPhone. \
+                The reply states the image's pixel size and the window points it \
+                shows. tap takes points, not pixels: to tap a point seen in the \
+                image, give tap its position with image_size.
 
                 By default the capture waits for the screen to stop changing, \
                 because the mirrored frame lags the device: a capture taken \
@@ -82,8 +85,8 @@ extension MirroirMCP {
                 // the first available frame and accepts that it may be stale.
                 let settleUs = settleTimeoutUs(from: args) ?? EnvConfig.frameSettleTimeoutUs
                 guard let captured = capture.captureSettledWithInfo(timeoutUs: settleUs) else {
-                    return .error(
-                        "Failed to capture screenshot. Is the '\(ctx.name)' window visible?")
+                    return .error(ScreenReadFailure.message(
+                        "Failed to capture screenshot.", targetName: ctx.name, state: bridge.getState()))
                 }
 
                 // Optional token lever: crop to a region and/or downscale before
@@ -110,7 +113,12 @@ extension MirroirMCP {
                     pngData = captured.data
                 }
 
-                return .image(pngData.base64EncodedString())
+                let image = MCPContent.image(pngData.base64EncodedString(), mimeType: "image/png")
+                guard let geometry = ScreenshotGeometry.of(
+                    png: pngData, windowSize: captured.info.size, region: region) else {
+                    return MCPToolResult(content: [image], isError: false)
+                }
+                return MCPToolResult(content: [.text(geometry.summary), image], isError: false)
             }
         ))
 
@@ -134,7 +142,10 @@ extension MirroirMCP {
                 be billed). Use settle_ms to tune the wait, or 0 on a constantly animated \
                 screen such as a game, which never settles. \
                 To read one value, pass query (only elements containing that text \
-                are listed) and text_only (no coordinates) with omit_screenshot.
+                are listed) and text_only (no coordinates) with omit_screenshot. \
+                On a macOS app target, text the app itself reports through \
+                Accessibility is marked [tree]: it is exact, where unmarked text was \
+                read from pixels and may be misread.
                 """,
             inputSchema: [
                 "type": .string("object"),
@@ -194,11 +205,14 @@ extension MirroirMCP {
                     guard let scrollResult = describer.describeFullPage(
                         input: input, bridge: bridge
                     ) else {
-                        return .error(
-                            "Failed to capture/analyze screen. Is the '\(ctx.name)' window visible?")
+                        return .error(ScreenReadFailure.message(
+                            "Failed to capture/analyze screen.", targetName: ctx.name,
+                            state: ctx.bridge.getState()))
                     }
 
-                    var lines = ["Screen elements (page-absolute tap coordinates in points):"]
+                    var lines = [DescribeScreenFilter.header(
+                        coordinates: "page-absolute tap coordinates in points",
+                        elements: scrollResult.elements)]
                     let listed = DescribeScreenFilter.matching(query, in: scrollResult.elements)
                     lines += DescribeScreenFilter.lines(for: listed, textOnly: textOnly)
                     if scrollResult.elements.isEmpty {
@@ -208,7 +222,8 @@ extension MirroirMCP {
                             query: query, onScreen: scrollResult.elements.count))
                     }
                     lines.append("")
-                    lines.append("_meta: scroll_count=\(scrollResult.scrollCount) total_offset=\(Int(scrollResult.totalScrollOffset)) element_count=\(scrollResult.elements.count)")
+                    lines.append("_meta: scroll_count=\(scrollResult.scrollCount) total_offset=\(Int(scrollResult.totalScrollOffset)) element_count=\(scrollResult.elements.count)"
+                        + DescribeScreenFilter.sourceCounts(scrollResult.elements, truncated: false))
                     let description = lines.joined(separator: "\n")
 
                     let scrollContent: [MCPContent] = omitScreenshot
@@ -223,11 +238,13 @@ extension MirroirMCP {
                 // and keep the describer's own (OCR: no settle) policy.
                 let settleUs = settleTimeoutUs(from: args) ?? EnvConfig.frameSettleTimeoutUs
                 guard let result = describer.describe(settleTimeoutUs: settleUs) else {
-                    return .error(
-                        "Failed to capture/analyze screen. Is the '\(ctx.name)' window visible?")
+                    return .error(ScreenReadFailure.message(
+                        "Failed to capture/analyze screen.", targetName: ctx.name,
+                        state: ctx.bridge.getState()))
                 }
 
-                var lines = ["Screen elements (tap coordinates in points):"]
+                var lines = [DescribeScreenFilter.header(
+                    coordinates: "tap coordinates in points", elements: result.elements)]
                 let listed = DescribeScreenFilter.matching(query, in: result.elements)
                 lines += DescribeScreenFilter.lines(for: listed, textOnly: textOnly)
                 if let query, listed.isEmpty, !result.elements.isEmpty {
@@ -247,6 +264,10 @@ extension MirroirMCP {
                         + "Describe again once the screen has drawn.)")
                 } else if result.elements.isEmpty {
                     lines.append("(no text detected)")
+                }
+                if let failure = result.treeFailure {
+                    lines.append("(accessibility tree not readable: \(failure); every element "
+                        + "is read from pixels)")
                 }
                 if !result.icons.isEmpty, query == nil {
                     lines.append("")
@@ -269,6 +290,7 @@ extension MirroirMCP {
                 }
                 lines.append("")
                 lines.append("_meta: ocr_time_ms=\(result.ocrTimeMs) recognition_level=\(EnvConfig.ocrRecognitionLevel) element_count=\(result.elements.count)"
+                    + DescribeScreenFilter.sourceCounts(result.elements, truncated: result.treeTruncated)
                     + (result.ocrFailure == nil ? "" : " ocr_status=failed")
                     + (result.screenBlank ? " screen_blank=true" : "")
                     + (result.visionUsage.map {

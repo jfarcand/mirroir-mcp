@@ -86,7 +86,13 @@ extension MirroirMCP {
                     let size = info.map {
                         "\(Int($0.size.width))x\(Int($0.size.height))"
                     } ?? "unknown"
-                    checks.append("[ok] '\(ctx.name)' connected (window: \(size))")
+                    if let block = (bridge as? MenuActionCapable)?.sessionBlock() {
+                        checks.append("[WARN] '\(ctx.name)' connected (window: \(size)), but its app is "
+                            + "hidden. \(block.move.advice)")
+                        allOk = false
+                    } else {
+                        checks.append("[ok] '\(ctx.name)' connected (window: \(size))")
+                    }
                 case .paused:
                     let block = (bridge as? MenuActionCapable)?.sessionBlock()
                     checks.append("[WARN] '\(ctx.name)' is paused: "
@@ -95,6 +101,9 @@ extension MirroirMCP {
                     allOk = false
                 case .noWindow:
                     checks.append("[FAIL] '\(ctx.name)' running but no window found")
+                    allOk = false
+                case .minimized:
+                    checks.append("[FAIL] '\(ctx.name)' window is minimized: bring it back from the Dock")
                     allOk = false
                 case .notRunning:
                     checks.append("[FAIL] '\(ctx.name)' not running")
@@ -158,11 +167,15 @@ extension MirroirMCP {
                 case .connected:
                     let info = bridge.getWindowInfo()
                     let sizeDesc =
-                        info.map { "\(Int($0.size.width))x\(Int($0.size.height))" } ?? "unknown"
+                        info.map { "\(Int($0.size.width))x\(Int($0.size.height)) pt" } ?? "unknown"
                     let posDesc =
                         info.map { "pos=(\(Int($0.position.x)),\(Int($0.position.y)))" } ?? "pos=unknown"
                     let orientDesc = info?.orientation.rawValue ?? "unknown"
-                    mirroringStatus = "Connected — mirroring active (window: \(sizeDesc), \(posDesc), \(orientDesc))"
+                    let hiddenNote = (bridge as? MenuActionCapable)?.sessionBlock().map {
+                        ". Its app is hidden, so input will not reach it. \($0.move.advice)"
+                    } ?? ""
+                    mirroringStatus = "Connected — mirroring active (window: \(sizeDesc), \(posDesc), "
+                        + "\(orientDesc))\(hiddenNote)"
                 case .paused:
                     let block = (bridge as? MenuActionCapable)?.sessionBlock()
                     mirroringStatus = "Paused — "
@@ -172,6 +185,9 @@ extension MirroirMCP {
                     mirroringStatus = "Not running — '\(ctx.name)' is not open"
                 case .noWindow:
                     mirroringStatus = "No window — app is running but no mirroring window found"
+                case .minimized:
+                    mirroringStatus = "Window minimized — '\(ctx.name)' is running with its window in the "
+                        + "Dock. Bring the window back, then retry."
                 }
 
                 return .text(updateNotice().map { "\(mirroringStatus)\n\n\($0)" } ?? mirroringStatus)

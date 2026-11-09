@@ -371,31 +371,3 @@ pub fn free_port() -> Result<u16, String> {
         .map(|addr| addr.port())
         .map_err(|e| format!("read the reserved port: {e}"))
 }
-
-/// Drop every ANSI escape sequence from `raw`.
-///
-/// The runner's `tracing` subscriber colorizes its output, which splices escape
-/// codes between a field's name and its value — `id=fixture` reaches a pipe as
-/// `\x1b[3mid\x1b[0m\x1b[2m=\x1b[0mfixture`. Assertions read the plain text, and
-/// so does a human reading a failure dump.
-#[must_use]
-pub fn strip_ansi(raw: &str) -> String {
-    let mut out = String::with_capacity(raw.len());
-    let mut chars = raw.chars();
-    while let Some(c) = chars.next() {
-        if c != '\u{1b}' {
-            out.push(c);
-            continue;
-        }
-        // CSI sequences run until a byte in 0x40..=0x7E; anything else after
-        // ESC is a two-character sequence whose second character we drop.
-        if chars.next() == Some('[') {
-            for terminator in chars.by_ref() {
-                if ('\u{40}'..='\u{7e}').contains(&terminator) {
-                    break;
-                }
-            }
-        }
-    }
-    out
-}

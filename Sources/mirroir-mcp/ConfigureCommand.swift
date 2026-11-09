@@ -28,10 +28,21 @@ enum ConfigureCommand {
         ("Portuguese", "Portuguese"),
     ]
 
+    /// Refuse any argument: the command takes none, and it rewrites settings.
+    ///
+    /// - Throws: `CLIArgumentError` naming the argument.
+    static func validate(_ arguments: [String]) throws {
+        try CLIArguments.requireOnly([], in: arguments, command: "configure")
+    }
+
+    /// Ask for the iPhone keyboard layout and save it. Returns 0, 1 when
+    /// nothing was chosen or saved, or 2 for refused arguments.
     static func run(arguments: [String]) -> Int32 {
-        if arguments.contains("--help") || arguments.contains("-h") {
-            printUsage()
-            return 0
+        do {
+            try validate(arguments)
+        } catch {
+            fputs("Error: \(error.localizedDescription)\n", stderr)
+            return CLIDispatch.usageExitCode
         }
 
         fputs("\niPhone Keyboard Layout\n", stderr)
@@ -125,8 +136,9 @@ enum ConfigureCommand {
         }
     }
 
-    private static func printUsage() {
-        let usage = """
+    /// The command's usage text.
+    static var usage: String {
+        """
         Usage: mirroir-mcp configure [options]
 
         Interactive setup for mirroir-mcp. Configures the iPhone keyboard
@@ -140,6 +152,5 @@ enum ConfigureCommand {
         Examples:
           mirroir-mcp configure
         """
-        fputs(usage + "\n", stderr)
     }
 }

@@ -16,14 +16,13 @@ final class RecordStepHandlerTests: XCTestCase {
 
     override func setUp() {
         super.setUp()
-        server = MCPServer(policy: PermissionPolicy(skipPermissions: true, config: nil))
+        server = MCPServer(policy: PermissionPolicy(skipPermissions: true, config: nil), transport: .stdio)
         describer = StubDescriber()
         session = CompilationSession()
         let context = TargetContext(
             name: "iphone", targetType: "iphone-mirroring", bundleID: nil,
             bridge: StubBridge(), input: StubInput(),
-            capture: StubCapture(), describer: describer, recorder: StubRecorder(),
-            capabilities: [])
+            capture: StubCapture(), describer: describer, recorder: StubRecorder())
         let registry = TargetRegistry(targets: ["iphone": context], defaultName: "iphone")
         MirroirMCP.registerCompilationTools(
             server: server, registry: registry, session: session)
@@ -57,6 +56,24 @@ final class RecordStepHandlerTests: XCTestCase {
         XCTAssertTrue(MirroirMCP.skillMdReplayProblems([
             CompiledStep(index: 0, type: "press_back", label: nil, hints: nil),
         ]).isEmpty, "a save is not blocked: re-recording cannot change the step")
+    }
+
+    /// Replay matches the direction exactly, so it is stored the way replay
+    /// reads it, and a word replay could never match is refused when recorded.
+    func testScrollDirectionIsStoredLowerCaseAndValidated() {
+        let refused = recordStep([
+            "step_index": .number(0), "type": .string("scroll_to"), "label": .string("Privacy"),
+            "scroll_count": .number(2), "scroll_direction": .string("sideways"),
+        ])
+        XCTAssertTrue(refused.isError)
+        XCTAssertEqual(refused.text, "scroll_direction must be one of down/up/left/right; got 'sideways'")
+
+        let accepted = recordStep([
+            "step_index": .number(0), "type": .string("scroll_to"), "label": .string("Privacy"),
+            "scroll_count": .number(2), "scroll_direction": .string("Up"),
+        ])
+        XCTAssertFalse(accepted.isError, accepted.text)
+        XCTAssertEqual(session.recordedSteps.first?.hints?.scrollDirection, "up")
     }
 
     func testTargetLabelMustBeTheSelectorMap() {

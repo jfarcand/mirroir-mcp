@@ -65,7 +65,7 @@ final class ClockWalkDouble: ScreenDescribing, @unchecked Sendable {
         let phone = TargetContext(
             name: "iphone", targetType: IPhoneMirroringTarget.configTypeName, bundleID: nil,
             bridge: bridge, input: input, capture: capture, describer: self,
-            recorder: StubRecorder(), capabilities: [])
+            recorder: StubRecorder())
         return StepExecutor(
             bridge: bridge, input: input, describer: self, capture: capture,
             config: StepExecutorConfig(

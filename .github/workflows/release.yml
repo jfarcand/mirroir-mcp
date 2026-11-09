@@ -76,14 +76,14 @@ jobs:
           sed -i '' "s/const VERSION = \"$OLD_VERSION\"/const VERSION = \"$VERSION\"/" npm/install.js
           sed -i '' "s/\"version\": \"$OLD_VERSION\"/\"version\": \"$VERSION\"/g" server.json
           sed -i '' "s/static let current = \"$OLD_VERSION\"/static let current = \"$VERSION\"/" Sources/mirroir-mcp/Version.swift
-          sed -i '' "s/\"version\": \"$OLD_VERSION\"/\"version\": \"$VERSION\"/" mcpb/manifest.json plugins/mirroir/.claude-plugin/plugin.json
-          sed -i '' "s/mirroir-mcp@$OLD_VERSION/mirroir-mcp@$VERSION/" plugins/mirroir/.claude-plugin/plugin.json
+          sed -i '' "s/\"version\": \"$OLD_VERSION\"/\"version\": \"$VERSION\"/" mcpb/manifest.json plugins/mirroir/.claude-plugin/plugin.json plugins/hermes/plugin.json
+          sed -i '' "s/mirroir-mcp@$OLD_VERSION/mirroir-mcp@$VERSION/" plugins/mirroir/.claude-plugin/plugin.json plugins/hermes/mcp.json
 
       - name: Verify no stale version references
         env:
           OLD_VERSION: ${{ steps.current.outputs.version }}
         run: |
-          FILES="npm/package.json npm/install.js server.json Sources/mirroir-mcp/Version.swift mcpb/manifest.json plugins/mirroir/.claude-plugin/plugin.json"
+          FILES="npm/package.json npm/install.js server.json Sources/mirroir-mcp/Version.swift mcpb/manifest.json plugins/mirroir/.claude-plugin/plugin.json plugins/hermes/plugin.json plugins/hermes/mcp.json"
           if grep -l "$OLD_VERSION" $FILES; then
             echo "ERROR: Stale version references remain in the files above"
             exit 1
@@ -100,11 +100,11 @@ jobs:
 
       - name: Run tests (XCTest)
         timeout-minutes: 15
-        run: swift test --skip IntegrationTests --disable-swift-testing
+        run: scripts/unit-tests.sh xctest
 
       - name: Run tests (Swift Testing)
         timeout-minutes: 5
-        run: swift test --skip IntegrationTests --disable-xctest --no-parallel
+        run: scripts/unit-tests.sh swift-testing
 
       - uses: ./.github/actions/setup-fake-mirroring
       - name: Integration tests (FakeMirroring)
@@ -120,7 +120,8 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add npm/package.json npm/install.js server.json \
             Sources/mirroir-mcp/Version.swift \
-            mcpb/manifest.json plugins/mirroir/.claude-plugin/plugin.json
+            mcpb/manifest.json plugins/mirroir/.claude-plugin/plugin.json \
+            plugins/hermes/plugin.json plugins/hermes/mcp.json
           git commit -m "chore: bump version to $VERSION"
           git push origin main
 

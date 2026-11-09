@@ -11,7 +11,6 @@ import HelperLib
 
 /// Configuration parsed from `doctor` subcommand arguments.
 struct DoctorConfig {
-    let showHelp: Bool
     let noColor: Bool
     let json: Bool
 }
@@ -39,16 +38,18 @@ struct DoctorCheck {
 /// Usage: `mirroir-mcp doctor [--no-color] [--json] [--help]`
 enum DoctorCommand {
 
-    /// Parse arguments and run all checks. Returns exit code (0 = all pass, 1 = any failure).
+    /// Parse arguments and run all checks. Returns exit code (0 = all pass,
+    /// 1 = any failure, 2 = refused arguments).
     static func run(arguments: [String]) -> Int32 {
-        let config = parseArguments(arguments)
-
-        if config.showHelp {
-            printUsage()
-            return 0
+        let config: DoctorConfig
+        do {
+            config = try parseArguments(arguments)
+        } catch {
+            fputs("Error: \(error.localizedDescription)\n", stderr)
+            return CLIDispatch.usageExitCode
         }
 
-        let useColor = config.noColor ? false : isatty(STDERR_FILENO) != 0
+        let useColor = TerminalColor.isEnabled(for: STDERR_FILENO, disabledByFlag: config.noColor)
 
         let hostApp = HostApp.current
         var checks = [DoctorCheck]()
@@ -80,36 +81,38 @@ enum DoctorCommand {
 
     // MARK: - Argument Parsing
 
-    static func parseArguments(_ args: [String]) -> DoctorConfig {
-        var showHelp = false
+    /// Parse a `doctor` command line.
+    ///
+    /// - Throws: `CLIArgumentError` for anything but `--no-color` and `--json`.
+    static func parseArguments(_ args: [String]) throws -> DoctorConfig {
         var noColor = false
         var json = false
 
         for arg in args {
             switch arg {
-            case "--help", "-h":
-                showHelp = true
             case "--no-color":
                 noColor = true
             case "--json":
                 json = true
             default:
-                break
+                throw CLIArguments.unrecognized(arg, command: "doctor")
             }
         }
 
-        return DoctorConfig(showHelp: showHelp, noColor: noColor, json: json)
+        return DoctorConfig(noColor: noColor, json: json)
     }
 
-    static func printUsage() {
-        let usage = """
+    /// The command's usage text.
+    static var usage: String {
+        """
         Usage: mirroir-mcp doctor [options]
 
         Check every prerequisite for a working mirroir-mcp setup.
         Runs diagnostic checks and reports results with fix hints.
 
         Options:
-          --no-color    Disable colored output
+          --no-color    Disable colored output (it is also off when NO_COLOR is
+                        set, or when the output is not a terminal)
           --json        Output results as JSON
           --help, -h    Show this help
 
@@ -118,7 +121,6 @@ enum DoctorCommand {
           mirroir-mcp doctor --json
           mirroir-mcp doctor --no-color
         """
-        fputs(usage + "\n", stderr)
     }
 
     // MARK: - Diagnostic Checks
@@ -209,6 +211,13 @@ enum DoctorCommand {
                 status: .failed,
                 detail: "no window",
                 fixHint: "iPhone Mirroring has no window. Try closing and reopening the app."
+            )
+        case .minimized:
+            return DoctorCheck(
+                name: "Mirroring connected",
+                status: .failed,
+                detail: "window minimized",
+                fixHint: "Bring the iPhone Mirroring window back: click it in the Dock."
             )
         }
     }
@@ -390,19 +399,21 @@ enum DoctorCommand {
 
     /// Returns (icon, colorCode, resetCode) for a check status.
     static func statusSymbols(_ status: CheckStatus, useColor: Bool) -> (String, String, String) {
+        let (green, red, yellow, reset) = allColors(useColor: useColor)
         switch status {
         case .passed:
-            return ("✓", useColor ? "\u{001B}[32m" : "", useColor ? "\u{001B}[0m" : "")
+            return ("✓", green, reset)
         case .failed:
-            return ("✗", useColor ? "\u{001B}[31m" : "", useColor ? "\u{001B}[0m" : "")
+            return ("✗", red, reset)
         case .warned:
-            return ("!", useColor ? "\u{001B}[33m" : "", useColor ? "\u{001B}[0m" : "")
+            return ("!", yellow, reset)
         }
     }
 
+    /// The green, red, yellow and reset codes, or empty strings without colour.
     private static func allColors(useColor: Bool) -> (String, String, String, String) {
         if useColor {
-            return ("\u{001B}[32m", "\u{001B}[31m", "\u{001B}[33m", "\u{001B}[0m")
+            return (TerminalColor.green, TerminalColor.red, TerminalColor.yellow, TerminalColor.reset)
         }
         return ("", "", "", "")
     }

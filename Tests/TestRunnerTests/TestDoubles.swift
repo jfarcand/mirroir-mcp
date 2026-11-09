@@ -89,7 +89,12 @@ final class StubInput: InputProviding, @unchecked Sendable {
     }
     func longPress(x: Double, y: Double, durationMs: Int, cursorMode: CursorMode? = nil) -> String? { longPressResult }
     func doubleTap(x: Double, y: Double, cursorMode: CursorMode? = nil) -> String? { doubleTapResult }
-    func shake() -> TypeResult { shakeResult }
+    /// How many times shake() was called.
+    var shakeCalls = 0
+    func shake() -> TypeResult {
+        shakeCalls += 1
+        return shakeResult
+    }
     func typeText(_ text: String) -> TypeResult { typeTextResult }
     func pressKey(keyName: String, modifiers: [String]) -> TypeResult { pressKeyResult }
     func launchApp(name: String) -> String? {

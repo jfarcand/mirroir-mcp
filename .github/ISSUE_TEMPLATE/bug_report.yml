@@ -6,18 +6,16 @@ body:
   - type: markdown
     attributes:
       value: |
-        Thanks for reporting! The more detail you provide, the faster we can diagnose.
+        Thanks for reporting. Two things make a report actionable: the output of `doctor --json`, and what the phone actually showed. Remove anything private (names, messages, codes) before you paste.
 
   - type: dropdown
     id: target
     attributes:
-      label: Target type
-      description: What are you controlling with mirroir?
+      label: Target
+      description: What is mirroir driving?
       options:
-        - iPhone Mirroring
-        - Android (scrcpy / emulator)
-        - macOS Desktop window
-        - Other
+        - iPhone through iPhone Mirroring
+        - A macOS window (generic target)
     validations:
       required: true
 
@@ -26,48 +24,31 @@ body:
     attributes:
       label: Install method
       options:
-        - Homebrew (`brew install mirroir-mcp`)
         - npx (`npx -y mirroir-mcp`)
-        - curl installer (`mirroir.sh`)
+        - Homebrew (`brew install jfarcand/tap/mirroir-mcp`)
+        - curl installer (`get-mirroir.sh`)
+        - MCP Bundle (`mirroir-mcp.mcpb`)
         - Source (`swift build`)
     validations:
       required: true
 
-  - type: input
-    id: mirroir-version
+  - type: textarea
+    id: doctor
     attributes:
-      label: mirroir version
-      description: Run `mirroir doctor` or check your install version
-      placeholder: "v0.30.0"
-    validations:
-      required: true
-
-  - type: input
-    id: macos-version
-    attributes:
-      label: macOS version
-      placeholder: "macOS 15.4 (Sequoia)"
+      label: Output of doctor
+      description: |
+        Run `npx -y mirroir-mcp doctor --json` (or `mirroir-mcp doctor --json`) and paste everything it prints.
+        It names the mirroir version, the macOS version and the result of each check, with the fix it suggests for any that fail.
+      render: json
     validations:
       required: true
 
   - type: input
     id: device-info
     attributes:
-      label: Device & OS version
-      description: iPhone model + iOS version, or Android version, or N/A for desktop
-      placeholder: "iPhone 15 Pro, iOS 18.3"
-    validations:
-      required: false
-
-  - type: dropdown
-    id: describer-mode
-    attributes:
-      label: Screen describer mode
-      description: Check `~/.mirroir-mcp/settings.json` or leave as default
-      options:
-        - auto (default)
-        - ocr
-        - vision (embacle)
+      label: iPhone and iOS version
+      description: Leave empty for a macOS window target.
+      placeholder: "iPhone 15 Pro, iOS 26.1"
     validations:
       required: false
 
@@ -75,28 +56,36 @@ body:
     id: mcp-client
     attributes:
       label: MCP client
-      description: Which AI tool are you using?
-      placeholder: "Claude Code / Cursor / GitHub Copilot / Claude Desktop / other"
+      description: The app that runs mirroir, with its version if you know it.
+      placeholder: "Claude Code 2.1 / Cursor / Codex / Claude Desktop / OpenClaw / other"
     validations:
       required: true
 
   - type: textarea
-    id: description
+    id: asked
     attributes:
-      label: Bug description
-      description: What happened? What did you expect?
-    validations:
-      required: true
-
-  - type: textarea
-    id: steps
-    attributes:
-      label: Steps to reproduce
-      description: Minimal steps to trigger the bug
+      label: What you asked for
+      description: The prompt, or the tool calls in order with their arguments.
       placeholder: |
-        1. Launch mirroir
-        2. Call `describe_screen`
-        3. See error "..."
+        1. launch_app(name: "Weather")
+        2. tap(text: "Tomorrow")
+    validations:
+      required: true
+
+  - type: textarea
+    id: observed
+    attributes:
+      label: What the iPhone showed
+      description: |
+        What you saw on the phone or in the iPhone Mirroring window after each step, and what the tool replied.
+        "The tap returned success but the screen did not change" is a useful answer. A screenshot helps.
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: What you expected
     validations:
       required: true
 
@@ -105,8 +94,7 @@ body:
     attributes:
       label: Debug log
       description: |
-        Paste relevant lines from `~/.mirroir-mcp/debug.log`.
-        Run `mirroir doctor` and include the output if relevant.
+        Start the server with `--debug`, reproduce, then paste the matching lines of `~/.mirroir-mcp/debug.log`.
       render: text
     validations:
       required: false

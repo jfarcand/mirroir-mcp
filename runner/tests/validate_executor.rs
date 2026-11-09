@@ -222,3 +222,21 @@ fn validate_rejects_a_launch_outside_the_ios_block() -> Result<(), String> {
     }
     Ok(())
 }
+
+/// A captured run is plain text: the log lines a script greps carry no ANSI
+/// escape, whatever the log level.
+#[test]
+fn piped_output_carries_no_escape_codes() -> Result<(), String> {
+    let sandbox = Sandbox::new()?;
+    let scenario = sandbox.scenario("ios-target.yaml", IOS_SCENARIO)?;
+
+    let run = sandbox.run_with_env(&["--validate", &scenario], &[("RUST_LOG", "debug")])?;
+    let output = run.output();
+    if output.is_empty() {
+        return Err("the run printed nothing, so the check proves nothing".to_owned());
+    }
+    if output.contains('\u{1b}') {
+        return Err(format!("piped output carries an escape code\n{output:?}"));
+    }
+    Ok(())
+}
