@@ -8,6 +8,8 @@ interface Props {
 const { title, description, softwareVersion } = Astro.props;
 const base = import.meta.env.BASE_URL;
 const canonicalUrl = new URL(Astro.url.pathname, Astro.site).href;
+const docsPath = `${base}docs/`;
+const onDocs = Astro.url.pathname === docsPath;
 const imageUrl = new URL("og-image.png", Astro.site).href;
 const imageAlt = "mirroir-mcp: let your agent use your real iPhone";
 const keywords = "iPhone automation, MCP, MCP server, AI agent, real iPhone, iPhone Mirroring, no Developer Mode, mobile testing";
@@ -59,7 +61,29 @@ const softwareApplication = {
     <script defer src="https://static.cloudflareinsights.com/beacon.min.js" data-cf-beacon='{"token": "b6d2802f48e6447c9f8ddef519445431"}'></script>
   </head>
   <body>
+    <nav class="site-nav" aria-label="Site">
+      <a class="site-nav-brand" href={base}>mirroir-mcp</a>
+      <ul>
+        <li><a href={`${base}#install`}>Install</a></li>
+        <li><a href={`${base}#skills`}>Skills</a></li>
+        <li><a href={docsPath} aria-current={onDocs ? "page" : undefined}>Docs</a></li>
+        <li><a href="https://github.com/jfarcand/mirroir-mcp" rel="noopener noreferrer">GitHub</a></li>
+      </ul>
+    </nav>
     <slot />
+    <footer>
+      <p>
+        Why "mirroir"? It's the old French spelling of <em>miroir</em> (mirror) — a nod to the author's roots, not a typo.
+      </p>
+      <p>
+        <a href="https://github.com/jfarcand/mirroir-mcp">GitHub</a> &middot;
+        <a href={docsPath}>Docs</a> &middot;
+        <a href="https://discord.gg/u8ug9QCSqF">Discord</a> &middot;
+        <a href="https://github.com/sponsors/jfarcand">Sponsor</a> &middot;
+        Apache-2.0 &middot;
+        macOS 15+
+      </p>
+    </footer>
     <script>
       document.querySelectorAll("[data-copy]").forEach((btn) => {
         btn.addEventListener("click", () => {
