@@ -70,6 +70,9 @@ let package = Package(
         .executableTarget(
             name: "mirroir-mcp",
             dependencies: ["HelperLib"] + embacleDependencies,
+            // Compiled into the executable, not a bundle beside it: an install
+            // that copies the binary alone (Homebrew, npm) still carries it.
+            resources: [.embedInCode("Resources/system-phrases.md")],
             swiftSettings: embacleSwiftSettings,
             linkerSettings: [
                 .linkedFramework("ApplicationServices"),

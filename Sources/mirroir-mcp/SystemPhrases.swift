@@ -1,20 +1,21 @@
 // Copyright 2026 jfarcand@apache.org
 // Licensed under the Apache License, Version 2.0
 //
-// ABOUTME: The words iOS itself draws on its system screens, read from the system-phrases.md pattern data file.
+// ABOUTME: The words iOS itself draws on its system screens, parsed from Resources/system-phrases.md compiled into the binary.
 // ABOUTME: The iPhone's language is unknown to the Mac, so the file is a union across languages that anyone can extend.
 
 import Foundation
 import HelperLib
 
-/// Words iOS draws on system screens, read from `system-phrases.md` in the
-/// element pattern paths.
+/// Words iOS draws on system screens, from `Resources/system-phrases.md`.
 ///
 /// These are texts on the iPhone, in the iPhone's language, which the Mac
-/// cannot know. They are pattern data, one bullet per phrase as read on a
-/// phone, not a table in the binary. Text the iPhone Mirroring app draws on
-/// the Mac is a different matter: `InterstitialPhrases` takes that from
-/// Apple's own strings.
+/// cannot know. They are data, one bullet per phrase as read on a phone,
+/// kept in a Markdown file rather than in Swift. The file is compiled into
+/// the executable: launch_app, the alert detector and the lock-screen check
+/// need it on every install, including one that copies the binary alone and
+/// has no skills checkout. Text the iPhone Mirroring app draws on the Mac is
+/// a different matter: `InterstitialPhrases` takes that from Apple's own strings.
 struct SystemPhrases: Sendable, Equatable {
 
     /// A section of the file: its `##` heading names it.
@@ -43,30 +44,11 @@ struct SystemPhrases: Sendable, Equatable {
 
     var lockScreen: [String] { phrases(.lockScreen) }
 
-    /// No phrases at all: what runs when no file is found.
-    static let empty = SystemPhrases(sections: [:])
+    /// The file as compiled into the binary.
+    static var shippedContent: String { String(decoding: PackageResources.system_phrases_md, as: UTF8.self) }
 
-    /// The data file's name inside an element pattern directory.
-    static let fileName = "system-phrases.md"
-
-    /// The phrases this process runs with, read once.
-    static let live = load()
-
-    /// Every path the file is looked up at, in resolution order.
-    static func candidates() -> [String] {
-        ComponentLoader.searchPaths().map { $0.appendingPathComponent(fileName).path }
-    }
-
-    /// The phrases in the first candidate that exists. With no file anywhere
-    /// there are no phrases, and the paths that were tried are logged.
-    static func load(candidates: [String] = candidates()) -> SystemPhrases {
-        for candidate in candidates {
-            guard let content = try? String(contentsOfFile: candidate, encoding: .utf8) else { continue }
-            return parse(content: content)
-        }
-        DebugLog.log("patterns", "no \(fileName) in \(candidates.joined(separator: ", "))")
-        return .empty
-    }
+    /// The phrases this process runs with, parsed once.
+    static let live = parse(content: shippedContent)
 
     /// Text as the file and the screen are compared: lower-cased, with the
     /// curly apostrophe iOS draws read as a straight one.

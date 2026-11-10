@@ -1,7 +1,7 @@
 // Copyright 2026 jfarcand@apache.org
 // Licensed under the Apache License, Version 2.0
 //
-// ABOUTME: Tests the loader of system-phrases.md, the pattern data file holding the words iOS draws on its system screens.
+// ABOUTME: Tests the system-phrases.md data compiled into the binary: the words iOS draws on its system screens.
 // ABOUTME: Also checks the titles of the resume buttons, which come from iPhone Mirroring's own strings instead.
 
 import XCTest
@@ -9,26 +9,6 @@ import HelperLib
 @testable import mirroir_mcp
 
 final class SystemPhrasesTests: XCTestCase {
-
-    private var directory: URL!
-
-    override func setUpWithError() throws {
-        directory = FileManager.default.temporaryDirectory
-            .appendingPathComponent("SystemPhrasesTests-\(UUID().uuidString)")
-        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-    }
-
-    override func tearDownWithError() throws {
-        try FileManager.default.removeItem(at: directory)
-    }
-
-    private func write(_ content: String, in folder: String) throws -> String {
-        let dir = directory.appendingPathComponent(folder)
-        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
-        let path = dir.appendingPathComponent(SystemPhrases.fileName).path
-        try content.write(toFile: path, atomically: true, encoding: .utf8)
-        return path
-    }
 
     func testParsesLockScreenBulletsLowerCased() {
         let phrases = SystemPhrases.parse(content: """
@@ -56,34 +36,26 @@ final class SystemPhrasesTests: XCTestCase {
         XCTAssertEqual(SystemPhrases.parse(content: "# System Phrases\n\n## Other\n\n- x\n").lockScreen, [])
     }
 
-    func testLoadTakesTheFirstCandidateThatExists() throws {
-        let missing = directory.appendingPathComponent("absent/\(SystemPhrases.fileName)").path
-        let first = try write("## Lock Screen\n\n- first\n", in: "a")
-        let second = try write("## Lock Screen\n\n- second\n", in: "b")
-        XCTAssertEqual(SystemPhrases.load(candidates: [missing, first, second]).lockScreen, ["first"])
-    }
-
-    func testNoFileAnywhereYieldsNoPhrases() {
-        let missing = directory.appendingPathComponent("absent/\(SystemPhrases.fileName)").path
-        XCTAssertEqual(SystemPhrases.load(candidates: [missing]), .empty)
-    }
-
-    /// The skills checkout ships the file, where the explorer looks for it.
-    func testTheSkillsCheckoutDeclaresTheLockScreenPhrases() {
-        let phrases = SystemPhrases.load().lockScreen
-        XCTAssertTrue(phrases.contains("enter passcode"), "\(phrases) from \(SystemPhrases.candidates())")
-        XCTAssertTrue(phrases.contains("slide to unlock"))
-    }
-
-    /// Every section the detectors read is in the checkout, with its English words.
-    func testTheSkillsCheckoutDeclaresEverySection() {
-        let phrases = SystemPhrases.load()
+    /// A Homebrew or npx install ships the binary alone: no skills checkout,
+    /// no `~/.mirroir-mcp/skills`. The words come with the binary, so
+    /// launch_app, the alert detector and the lock-screen check work there;
+    /// without them every launch is refused.
+    func testTheBinaryCarriesEverySectionWithoutAnyCheckout() {
+        let shipped = SystemPhrases.parse(content: SystemPhrases.shippedContent)
         for section in SystemPhrases.Section.allCases {
-            XCTAssertFalse(phrases.phrases(section).isEmpty, "\(section.rawValue) from \(SystemPhrases.candidates())")
+            XCTAssertFalse(shipped.phrases(section).isEmpty, "\(section.rawValue) is not in the binary")
         }
+        XCTAssertEqual(SystemPhrases.live, shipped, "the detectors run on the compiled copy, nothing else")
+    }
+
+    /// The English and French words the detectors were measured with.
+    func testTheShippedWordsHoldWhatTheDetectorsWereMeasuredWith() {
+        let phrases = SystemPhrases.live
         XCTAssertEqual(phrases.phrases(.alertDismiss).first, "don't allow", "the most conservative button leads")
         XCTAssertTrue(phrases.phrases(.spotlightTopHit).contains("top hit"))
         XCTAssertTrue(phrases.phrases(.spotlightOpen).contains("ouvrir"))
+        XCTAssertTrue(phrases.lockScreen.contains("enter passcode"))
+        XCTAssertTrue(phrases.lockScreen.contains("slide to unlock"))
     }
 
     func testEachHeadingFillsItsOwnSectionAndOthersAreIgnored() {
@@ -115,13 +87,6 @@ final class SystemPhrasesTests: XCTestCase {
             TapPoint(text: "Allow Once", tapX: 280, tapY: 420, confidence: 0.9),
         ])
         XCTAssertEqual(alert?.dismissTarget.text, "Don’t Allow")
-    }
-
-    /// It is data, not a component: it must not join the component definitions.
-    func testTheDataFileIsNotLoadedAsAComponent() {
-        let definitions = ComponentLoader.loadAll()
-        XCTAssertFalse(definitions.isEmpty, "the checkout's components must load for this to mean anything")
-        XCTAssertFalse(definitions.contains { $0.name == "system-phrases" })
     }
 
     // MARK: - Resume buttons, from iPhone Mirroring's own strings

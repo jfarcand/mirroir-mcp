@@ -235,7 +235,7 @@ Two match rules are typically set through calibration rather than written by han
 
 ### Built-in Element Patterns
 
-The [mirroir-skills](https://github.com/jfarcand/mirroir-skills) repo includes 33 iOS element patterns in `patterns/elements/`, covering Apple's Human Interface Guidelines (the `patterns/elements/` directory also holds three non-pattern data files, `text-cleanup.md`, `vision-indicators.md` and `system-phrases.md`, which the loader skips):
+The [mirroir-skills](https://github.com/jfarcand/mirroir-skills) repo includes 33 iOS element patterns in `patterns/elements/`, covering Apple's Human Interface Guidelines (the `patterns/elements/` directory also holds two non-pattern data files, `text-cleanup.md` and `vision-indicators.md`, which the loader skips):
 
 **Navigation & Structure**
 
@@ -475,11 +475,8 @@ This is data-driven — add entries to the file rather than hardcoding in Swift.
 
 The explorer has to notice when the phone leaves the app it is driving for a system screen. The words of those screens come from two places, one per side of the glass:
 
-- **Text iOS draws on the phone** (the lock screen, the passcode prompt) is in the iPhone's language, which the Mac cannot know. It lives in `system-phrases.md` in the element patterns directory, as a union across languages:
-  - **`## Lock Screen`** — one fragment per bullet, as it reads on a phone, lower-cased. Add your language's wording by adding bullets; a fragment is enough as long as no ordinary app screen would contain it.
+- **Text iOS draws on the phone** (the lock screen and passcode prompt, Spotlight's top-hit heading and its Open word, the Home Screen search pill, system-alert titles and buttons) is in the iPhone's language, which the Mac cannot know. It lives in [`Sources/mirroir-mcp/Resources/system-phrases.md`](../Sources/mirroir-mcp/Resources/system-phrases.md), compiled into the binary so every install has it, as a union across languages: one section per `##` heading, one phrase per bullet, as it reads on a phone. Add your language's wording by adding bullets; a fragment is enough as long as no ordinary app screen would contain it, unless the section asks for the whole label. The order of `## Alert Dismiss` is the order the buttons are tried, most conservative first.
 - **Text iPhone Mirroring draws on the Mac** (`iPhone in Use`, and the `Resume`, `Try Again`, `Connect` and `OK` buttons that free a paused session) is read from Apple's own strings inside the installed iPhone Mirroring app, in the Mac's language. Nothing to configure.
-
-Without the file, no lock-screen phrase matches; the debug log names the paths that were searched.
 
 ## Vision Indicators
 
