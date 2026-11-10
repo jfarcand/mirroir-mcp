@@ -373,7 +373,7 @@ Apply the pattern whose trigger condition matches your situation:
 |---------|---------|---------|
 | New MCP tool category | **Extension-Based Tool Registration**: create `XxxTools.swift` with `registerXxxTools()`, wire from `ToolHandlers.registerTools()` | `InputTools.swift`, `ScreenTools.swift` |
 | Tool handler needs business logic | **Thin Registration → Delegate**: tool file owns schema + arg parsing only; separate type owns logic | `InputTools.swift` → `InputSimulation.swift` |
-| New system boundary (hardware, OS API, network) | **Protocol Abstraction**: define protocol in `Protocols.swift`, implement in concrete type | `WindowBridging`/`MirroringBridge`, `InputProviding`/`InputSimulation` |
+| New system boundary (hardware, OS API, network) | **Protocol Abstraction**: define protocol in its boundary family's `*Protocols.swift`, implement in concrete type | `WindowBridging`/`MirroringBridge`, `InputProviding`/`InputSimulation` |
 | Pure transformation (filter, format, match, compute) | **Enum Namespace**: stateless enum, all `static func`, no stored properties | `LandmarkPicker`, `ActionStepFormatter`, `ElementMatcher` |
 | Multi-step stateful workflow (start/accumulate/finalize) | **Session Accumulator**: `final class` with `NSLock`, explicit lifecycle methods | `ExplorationSession` |
 | Wrapping a protocol to add observation/caching | **Decorator**: new type conforming to same protocol, forwarding + adding behavior | `RecordingDescriber` wraps `ScreenDescribing` |
@@ -386,7 +386,7 @@ Apply the pattern whose trigger condition matches your situation:
 
 When creating a new type or file, walk this checklist in order:
 
-1. **Does it cross a system boundary?** → Protocol in `Protocols.swift` + concrete implementation file.
+1. **Does it cross a system boundary?** → Protocol in its boundary family's `*Protocols.swift` + concrete implementation file.
 2. **Is it an MCP tool?** → `XxxTools.swift` with `registerXxxTools()`, wired from `ToolHandlers`. Business logic in a separate type.
 3. **Is it a pure transformation?** → Enum with `static` methods. No init, no stored properties.
 4. **Is it a stateful workflow?** → Session accumulator with explicit lifecycle and `NSLock`.
@@ -395,7 +395,7 @@ When creating a new type or file, walk this checklist in order:
 ### Prohibited Structural Choices
 
 - NEVER put business logic directly inside a tool registration handler. The handler parses args and delegates.
-- NEVER define a new protocol outside `Protocols.swift` (system boundaries) or `ExplorationProtocols.swift` (exploration domain: strategy, explorer, navigation graph, backtracking, lifecycle, advising) unless it is internal to a single file.
+- NEVER define a new protocol outside the protocol files, unless it is internal to a single file. System-boundary protocols go in one file per boundary family: `WindowProtocols.swift` (target window and session), `InputProtocols.swift` (input), `CaptureProtocols.swift` (capture, OCR, describers) and `Protocols.swift` (outside services: vision model, scene picker, HTTP). A family that outgrows its file, or a boundary that fits none, gets its own `<Family>Protocols.swift`. Exploration-domain protocols (strategy, explorer, navigation graph, backtracking, lifecycle, advising) go in `ExplorationProtocols.swift`.
 - NEVER add a new SPM target without discussing with ChefFamille first.
 - NEVER put types used only by `mirroir-mcp` into `HelperLib`. HelperLib is for cross-target shared types only.
 
@@ -601,7 +601,7 @@ Mocks are permitted ONLY in test code for:
    - Every new file follows a pattern from the Architecture Pattern Catalog
    - No file exceeds 500 lines
    - Tool registration files contain zero business logic
-   - New system boundaries have a protocol in `Protocols.swift`
+   - New system boundaries have a protocol in their boundary family's `*Protocols.swift`
 
 ### Failure Criteria
 If ANY of the above checks fail, the task is NOT complete regardless of test passing status.

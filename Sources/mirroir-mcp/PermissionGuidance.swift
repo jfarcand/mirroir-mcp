@@ -41,8 +41,11 @@ enum PermissionGuidance {
         var text = "Open System Settings > Privacy & Security > \(pane.title) "
             + "(open \"\(pane.url)\") and turn on \(app)."
         if pane == .screenRecording {
-            text += " Then quit and reopen \(hostApp ?? "that app"): Screen Recording takes "
-                + "effect only after a restart."
+            // The serve agent's bundle is a launchd job, not an app to quit.
+            let restart = hostApp == ServeAppBundle.displayName
+                ? "restart the agent (launchctl kickstart -k gui/$(id -u)/\(InstallAgentCommand.label))"
+                : "quit and reopen \(hostApp ?? "that app")"
+            text += " Then \(restart): Screen Recording takes effect only after a restart."
         }
         return text
     }

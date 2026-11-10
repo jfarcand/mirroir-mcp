@@ -2,7 +2,7 @@
 // Licensed under the Apache License, Version 2.0
 //
 // ABOUTME: Exploration-domain protocol abstractions (strategy, explorer, navigation graph, backtracking, lifecycle, advising).
-// ABOUTME: Split from Protocols.swift; system-boundary protocols stay there.
+// ABOUTME: System-boundary protocols live in the *Protocols.swift file of their boundary family.
 
 import CoreGraphics
 import Foundation

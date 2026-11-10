@@ -85,10 +85,9 @@ enum SpotlightAppTile {
     /// heading. A section heading further down ("App Store", "Notes") can have a
     /// result's icon above it and read as a tile, but it opens nothing.
     static func isInTopHitRow(_ label: TapPoint, in elements: [TapPoint]) -> Bool {
+        let headings = SpotlightDetector.topHitHeadings
         guard let heading = elements.first(where: { element in
-            SpotlightDetector.topHitHeadings.contains {
-                element.text.lowercased().contains($0.lowercased())
-            }
+            headings.contains { SystemPhrases.fold(element.text).contains($0) }
         }) else { return false }
         return (heading.tapY ... (heading.tapY + topHitReach)).contains(label.tapY)
     }

@@ -83,6 +83,23 @@ if [ -f "$SERVE_PLIST" ]; then
 fi
 # The token grants control of the phone; it does not outlive the agent.
 rm -f "$HOME/.mirroir-mcp/serve-token" "$HOME/.mirroir-mcp/serve.log"
+# The app bundle the agent ran from, holding its own copy of the binary.
+SERVE_BUNDLE="$HOME/.mirroir-mcp/mirroir serve.app"
+if [ -d "$SERVE_BUNDLE" ]; then
+    rm -rf "$SERVE_BUNDLE"
+    echo "Removed $SERVE_BUNDLE"
+fi
+# Its Accessibility and Screen Recording grants outlive the bundle.
+if tccutil reset All "$SERVE_LABEL" >/dev/null 2>&1; then
+    echo "Removed the privacy grants of $SERVE_LABEL"
+fi
+# The certificate install-agent signed the bundle with, found by its name only.
+SERVE_CERT="mirroir serve local signing"
+LOGIN_KEYCHAIN="$HOME/Library/Keychains/login.keychain-db"
+while security find-certificate -c "$SERVE_CERT" "$LOGIN_KEYCHAIN" >/dev/null 2>&1; do
+    security delete-identity -c "$SERVE_CERT" "$LOGIN_KEYCHAIN" >/dev/null 2>&1 || break
+    echo "Removed the certificate '$SERVE_CERT' from the login keychain"
+done
 
 # --- Step 5: Remove config directory ---
 

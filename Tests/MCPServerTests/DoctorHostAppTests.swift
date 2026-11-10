@@ -53,6 +53,18 @@ final class DoctorHostAppTests: XCTestCase {
             + "only after a restart.")
     }
 
+    /// Under launchd the serve agent's own bundle holds the grants, and it
+    /// restarts through launchctl, not by quitting an app.
+    func testTheServeAgentIsNamedAndRestartedThroughLaunchctl() {
+        let chain = ["/Users/u/.mirroir-mcp/mirroir serve.app/Contents/MacOS/mirroir serve"]
+        let host = HostApp.bundlePath(chain: chain).map { HostApp.displayName(bundlePath: $0) }
+        XCTAssertEqual(host, ServeAppBundle.displayName)
+        let hint = PermissionGuidance.hint(.screenRecording, hostApp: host)
+        XCTAssertTrue(hint.contains("turn on \"mirroir serve\""), hint)
+        XCTAssertTrue(hint.contains("launchctl kickstart -k gui/$(id -u)/dev.mirroir.serve"), hint)
+        XCTAssertFalse(hint.contains("quit and reopen"), hint)
+    }
+
     func testAccessibilityNeedsNoRestartAndAnUnknownHostIsDescribed() {
         let hint = PermissionGuidance.hint(.accessibility, hostApp: nil)
         XCTAssertTrue(hint.contains("Privacy_Accessibility"), hint)

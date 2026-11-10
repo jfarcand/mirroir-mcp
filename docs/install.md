@@ -55,7 +55,7 @@ or from [Hermes Agent](https://github.com/NousResearch/hermes-agent) 0.21.6 or l
 hermes plugins install jfarcand/mirroir-mcp/plugins/hermes --enable
 ```
 
-The package is [plugins/hermes](../plugins/hermes/README.md). It is checked in CI against the rules Hermes's loader states; it has not yet been loaded by a running Hermes, so report what you see.
+The package is [plugins/hermes](../plugins/hermes/README.md). It is checked in CI against the rules Hermes's loader states, and Hermes 0.23.0 has installed it, started the server and listed its tools: the read-only ones run unasked, every other one asks first. Hermes needs its MCP support (the `mcp` extra) to start the server.
 
 or as an MCP Bundle for Claude Desktop and other MCPB hosts: download `mirroir-mcp.mcpb` from the [latest release](https://github.com/jfarcand/mirroir-mcp/releases/latest) (v0.43.0 and later) and double-click it. The bundle carries the native Apple Silicon binary, so it needs no Node.js. To build one from a release build: `mcpb/build-mcpb.sh .build/release/mirroir-mcp mirroir-mcp.mcpb`.
 

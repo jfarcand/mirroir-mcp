@@ -17,14 +17,37 @@ import HelperLib
 /// Apple's own strings.
 struct SystemPhrases: Sendable, Equatable {
 
-    /// Lower-cased fragments of lock-screen and passcode text.
-    let lockScreen: [String]
+    /// A section of the file: its `##` heading names it.
+    enum Section: String, CaseIterable, Sendable {
+        /// Fragments of lock-screen and passcode text.
+        case lockScreen = "Lock Screen"
+        /// The heading above Spotlight's top result.
+        case spotlightTopHit = "Spotlight Top Hit"
+        /// The whole word the search field adds when Return would open an app.
+        case spotlightOpen = "Spotlight Open"
+        /// Other fragments shown only while Spotlight covers the screen.
+        case spotlightOverlay = "Spotlight Overlay"
+        /// The whole label of the Home Screen's search pill.
+        case homeSearchPill = "Home Search Pill"
+        /// Whole system-alert button labels, most conservative first.
+        case alertDismiss = "Alert Dismiss"
+        /// Fragments of a system alert's title, `.*` standing for any text.
+        case alertTitle = "Alert Title"
+    }
+
+    /// Each section's bullets, folded with `fold`, in file order.
+    let sections: [Section: [String]]
+
+    /// The phrases of `section`, none when the file lacks it.
+    func phrases(_ section: Section) -> [String] { sections[section] ?? [] }
+
+    var lockScreen: [String] { phrases(.lockScreen) }
+
+    /// No phrases at all: what runs when no file is found.
+    static let empty = SystemPhrases(sections: [:])
 
     /// The data file's name inside an element pattern directory.
     static let fileName = "system-phrases.md"
-
-    /// The section whose bullets are lock-screen fragments.
-    static let lockScreenSection = "## Lock Screen"
 
     /// The phrases this process runs with, read once.
     static let live = load()
@@ -42,23 +65,30 @@ struct SystemPhrases: Sendable, Equatable {
             return parse(content: content)
         }
         DebugLog.log("patterns", "no \(fileName) in \(candidates.joined(separator: ", "))")
-        return SystemPhrases(lockScreen: [])
+        return .empty
     }
 
-    /// The bullets under `## Lock Screen`, lower-cased, in file order.
+    /// Text as the file and the screen are compared: lower-cased, with the
+    /// curly apostrophe iOS draws read as a straight one.
+    static func fold(_ text: String) -> String {
+        text.lowercased().replacingOccurrences(of: "\u{2019}", with: "'")
+    }
+
+    /// The bullets under each known `##` heading, folded, in file order.
+    /// Bullets under any other heading are ignored.
     static func parse(content: String) -> SystemPhrases {
-        var phrases: [String] = []
-        var inSection = false
+        var sections: [Section: [String]] = [:]
+        var current: Section?
         for line in content.components(separatedBy: .newlines) {
             let trimmed = line.trimmingCharacters(in: .whitespaces)
             if trimmed.hasPrefix("##") {
-                inSection = trimmed == lockScreenSection
+                current = Section(rawValue: trimmed.drop { $0 == "#" }.trimmingCharacters(in: .whitespaces))
                 continue
             }
-            guard inSection, trimmed.hasPrefix("- ") else { continue }
-            let phrase = trimmed.dropFirst(2).trimmingCharacters(in: .whitespaces).lowercased()
-            if !phrase.isEmpty { phrases.append(phrase) }
+            guard let section = current, trimmed.hasPrefix("- ") else { continue }
+            let phrase = fold(trimmed.dropFirst(2).trimmingCharacters(in: .whitespaces))
+            if !phrase.isEmpty { sections[section, default: []].append(phrase) }
         }
-        return SystemPhrases(lockScreen: phrases)
+        return SystemPhrases(sections: sections)
     }
 }

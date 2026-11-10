@@ -20,7 +20,10 @@ mirroir-mcp/
 │   │   ├── mirroir_mcp.swift        # Entry point, CLI dispatch, target registry init
 │   │   ├── MCPServer.swift          # JSON-RPC 2.0 server (stdin/stdout)
 │   │   ├── ToolHandlers.swift       # Tool registration orchestrator (delegates to *Tools.swift)
-│   │   ├── Protocols.swift          # All DI protocol abstractions (WindowBridging, InputProviding, etc.)
+│   │   ├── WindowProtocols.swift    # DI protocols for the target window and session (WindowBridging, ...)
+│   │   ├── InputProtocols.swift     # DI protocols for input (InputProviding, ...)
+│   │   ├── CaptureProtocols.swift   # DI protocols for capture, OCR and describers (ScreenCapturing, ...)
+│   │   ├── Protocols.swift          # DI protocols for outside services (vision model, scene picker, HTTP)
 │   │   ├── DebugLog.swift           # Debug logging to stderr + ~/.mirroir-mcp/debug.log
 │   │   │
 │   │   │── # ── Tool Registration (one file per category, thin handlers) ──
@@ -287,7 +290,7 @@ public static let mutatingTools: Set<String> = [
 
 ### Step 2: Add Protocol Method
 
-If the tool needs a protocol abstraction (most input tools do), add a method to the relevant protocol in `Sources/mirroir-mcp/Protocols.swift`:
+If the tool needs a protocol abstraction (most input tools do), add a method to the relevant protocol in `Sources/mirroir-mcp/InputProtocols.swift` (other boundaries have their own `*Protocols.swift`):
 
 ```swift
 protocol InputProviding: Sendable {

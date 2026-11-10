@@ -65,7 +65,7 @@ final class SystemPhrasesTests: XCTestCase {
 
     func testNoFileAnywhereYieldsNoPhrases() {
         let missing = directory.appendingPathComponent("absent/\(SystemPhrases.fileName)").path
-        XCTAssertEqual(SystemPhrases.load(candidates: [missing]), SystemPhrases(lockScreen: []))
+        XCTAssertEqual(SystemPhrases.load(candidates: [missing]), .empty)
     }
 
     /// The skills checkout ships the file, where the explorer looks for it.
@@ -73,6 +73,48 @@ final class SystemPhrasesTests: XCTestCase {
         let phrases = SystemPhrases.load().lockScreen
         XCTAssertTrue(phrases.contains("enter passcode"), "\(phrases) from \(SystemPhrases.candidates())")
         XCTAssertTrue(phrases.contains("slide to unlock"))
+    }
+
+    /// Every section the detectors read is in the checkout, with its English words.
+    func testTheSkillsCheckoutDeclaresEverySection() {
+        let phrases = SystemPhrases.load()
+        for section in SystemPhrases.Section.allCases {
+            XCTAssertFalse(phrases.phrases(section).isEmpty, "\(section.rawValue) from \(SystemPhrases.candidates())")
+        }
+        XCTAssertEqual(phrases.phrases(.alertDismiss).first, "don't allow", "the most conservative button leads")
+        XCTAssertTrue(phrases.phrases(.spotlightTopHit).contains("top hit"))
+        XCTAssertTrue(phrases.phrases(.spotlightOpen).contains("ouvrir"))
+    }
+
+    func testEachHeadingFillsItsOwnSectionAndOthersAreIgnored() {
+        let phrases = SystemPhrases.parse(content: """
+            ## Spotlight Open
+
+            - Open
+            - Ouvrir
+
+            ## Something Else
+
+            - ignored
+
+            ## Alert Dismiss
+
+            - Don’t Allow
+            - OK
+            """)
+        XCTAssertEqual(phrases.phrases(.spotlightOpen), ["open", "ouvrir"])
+        XCTAssertEqual(phrases.phrases(.alertDismiss), ["don't allow", "ok"], "curly apostrophe folded")
+        XCTAssertEqual(phrases.lockScreen, [])
+    }
+
+    /// iOS draws a curly apostrophe; the data file is typed with a straight one.
+    func testACurlyApostropheOnScreenMatchesTheStraightOneInTheData() {
+        let alert = AlertDetector.detectAlert(elements: [
+            TapPoint(text: "“Maps” Would Like to Use Your Location", tapX: 200, tapY: 300, confidence: 0.9),
+            TapPoint(text: "Don’t Allow", tapX: 120, tapY: 420, confidence: 0.9),
+            TapPoint(text: "Allow Once", tapX: 280, tapY: 420, confidence: 0.9),
+        ])
+        XCTAssertEqual(alert?.dismissTarget.text, "Don’t Allow")
     }
 
     /// It is data, not a component: it must not join the component definitions.

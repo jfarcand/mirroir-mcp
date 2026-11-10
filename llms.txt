@@ -272,7 +272,8 @@ swift test               # run all tests
 ### Core Infrastructure
 - `Sources/mirroir-mcp/MCPServer.swift` — JSON-RPC 2.0 server implementation
 - `Sources/mirroir-mcp/ToolHandlers.swift` — Tool registration orchestrator
-- `Sources/mirroir-mcp/Protocols.swift` — All protocol abstractions (WindowBridging, InputProviding, ScreenCapturing, ScreenDescribing, ExplorationStrategy)
+- `Sources/mirroir-mcp/WindowProtocols.swift`, `InputProtocols.swift`, `CaptureProtocols.swift`, `Protocols.swift` — System-boundary protocols, one file per boundary family (WindowBridging, InputProviding, ScreenCapturing, ScreenDescribing; vision, scene picker, HTTP)
+- `Sources/mirroir-mcp/ExplorationProtocols.swift` — Exploration-domain protocols (ExplorationStrategy, ...)
 
 ### Window & Input
 - `Sources/mirroir-mcp/MirroringBridge.swift` — iPhone Mirroring window discovery via AXUIElement

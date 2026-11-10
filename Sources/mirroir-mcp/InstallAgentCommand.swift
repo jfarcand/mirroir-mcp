@@ -19,6 +19,8 @@ struct InstallAgentConfig: Equatable {
 struct InstallAgentPaths: Equatable {
     /// The absolute path this binary was started from, symlinks kept.
     let executable: String
+    /// The app bundle the agent runs from, built around a copy of `executable`.
+    let bundle: String
     let plist: String
     let tokenFile: String
     let log: String
@@ -27,6 +29,7 @@ struct InstallAgentPaths: Equatable {
     static var live: InstallAgentPaths {
         InstallAgentPaths(
             executable: InstallAgentCommand.invokedExecutablePath(),
+            bundle: PermissionPolicy.globalConfigDir + "/\(ServeAppBundle.displayName).app",
             plist: NSHomeDirectory() + "/Library/LaunchAgents/\(InstallAgentCommand.label).plist",
             tokenFile: ServeToken.defaultPath,
             log: PermissionPolicy.globalConfigDir + "/serve.log")
@@ -61,6 +64,12 @@ enum InstallAgentCommand {
 
         Writes ~/Library/LaunchAgents/\(label).plist, which runs `mirroir-mcp serve`
         in your login session, and creates the token file if there is none.
+        The agent runs from its own copy of this binary, in the app bundle
+        ~/.mirroir-mcp/\(ServeAppBundle.displayName).app, so macOS lists it by name
+        and icon when it asks for Accessibility and Screen Recording. The bundle
+        is signed with a self-signed certificate it keeps in your login keychain,
+        so those grants hold across upgrades. Run install-agent again after
+        upgrading mirroir-mcp.
         It does not start the agent: it prints the command that does.
 
         Options:
@@ -104,7 +113,7 @@ enum InstallAgentCommand {
             fputs("Error: \(error.localizedDescription)\n", stderr)
             return CLIDispatch.usageExitCode
         }
-        let outcome = install(config: config, paths: .live)
+        let outcome = install(config: config, paths: .live, sign: ServeSigningIdentity.signWithLocalIdentity)
         if !outcome.standardOutput.isEmpty { print(outcome.standardOutput) }
         if !outcome.standardError.isEmpty { fputs(outcome.standardError + "\n", stderr) }
         return outcome.exitCode
@@ -125,8 +134,15 @@ enum InstallAgentCommand {
         ]
     }
 
-    /// Write the plist and create the token file, or print the plist.
-    static func install(config: InstallAgentConfig, paths: InstallAgentPaths) -> InstallAgentOutcome {
+    /// Write the plist, the app bundle and the token file, or print the plist.
+    ///
+    /// - Parameters:
+    ///   - sign: signs the app bundle; `ServeSigningIdentity.signWithLocalIdentity` outside tests.
+    ///   - isAdHocSigned: whether the bundle already in place is signed ad hoc,
+    ///     so its grants are tied to that one build.
+    static func install(config: InstallAgentConfig, paths: InstallAgentPaths,
+                        sign: (String) -> String?,
+                        isAdHocSigned: (String) -> Bool = ServeSigningIdentity.isAdHocSigned) -> InstallAgentOutcome {
         let resolved = URL(fileURLWithPath: paths.executable).resolvingSymlinksInPath().path
         let channel = InstallChannel.of(executable: resolved) {
             FileManager.default.fileExists(atPath: $0 + "/.git")
@@ -140,7 +156,8 @@ enum InstallAgentCommand {
         let data: Data
         do {
             data = try PropertyListSerialization.data(
-                fromPropertyList: plist(executable: paths.executable, port: config.port, logPath: paths.log),
+                fromPropertyList: plist(executable: ServeAppBundle.executablePath(in: paths.bundle),
+                                        port: config.port, logPath: paths.log),
                 format: .xml, options: 0)
         } catch {
             return InstallAgentOutcome(exitCode: 1, standardError: "Error: the plist could not be built: \(error)")
@@ -150,11 +167,16 @@ enum InstallAgentCommand {
                 exitCode: 0, standardOutput: String(decoding: data, as: UTF8.self))
         }
 
+        let replacesAdHoc = isAdHocSigned(paths.bundle)
         do {
             // Read it back, new or not: a token file `serve` would refuse must
             // fail here, not every ten seconds under launchd.
             _ = try ServeToken.create(path: paths.tokenFile)
             _ = try ServeToken.load(path: paths.tokenFile)
+            try FileManager.default.createDirectory(
+                atPath: (paths.bundle as NSString).deletingLastPathComponent,
+                withIntermediateDirectories: true)
+            try ServeAppBundle.build(at: paths.bundle, executable: resolved, version: MirroirVersion.current, sign: sign)
             try FileManager.default.createDirectory(
                 atPath: (paths.plist as NSString).deletingLastPathComponent,
                 withIntermediateDirectories: true)
@@ -162,20 +184,45 @@ enum InstallAgentCommand {
         } catch {
             return InstallAgentOutcome(exitCode: 1, standardError: "Error: \(error.localizedDescription)")
         }
-        return InstallAgentOutcome(exitCode: 0, standardOutput: """
-            Wrote \(paths.plist).
+        var text = """
+            Wrote \(paths.plist) and \(paths.bundle).
             Start it: launchctl bootstrap gui/$(id -u) \(paths.plist)
             Stop it:  launchctl bootout gui/$(id -u)/\(label)
             The token is in \(paths.tokenFile); give it to your MCP client as the header
             Authorization: Bearer <token>.
             The agent serves http://\(NetworkHTTPServer.loopbackHost):\(config.port)\(MCPHTTPEndpoint.path) \
             and logs to \(paths.log).
-            """)
+            \(grantText)
+            """
+        if replacesAdHoc { text += "\n" + adHocResetText }
+        return InstallAgentOutcome(exitCode: 0, standardOutput: text)
     }
 
-    /// The absolute path this process was started from, with symlinks kept, so
-    /// a Homebrew path (`/opt/homebrew/bin/mirroir-mcp`) still names the
-    /// binary after an upgrade moves the file it points to.
+    /// How the agent gets its grants, and why an upgrade keeps them.
+    static var grantText: String {
+        """
+        The bundle is signed with the certificate "\(ServeSigningIdentity.commonName)" in your login \
+        keychain; the first time, macOS asks whether codesign may use it: choose Always Allow. \
+        Turn on "\(ServeAppBundle.displayName)" in System Settings > Privacy & Security > Accessibility \
+        and Screen Recording. macOS asks the first time the agent needs them, or lists it switched off. \
+        The grants follow the certificate, not the build: after upgrading mirroir-mcp, run \
+        install-agent again, then: launchctl kickstart -k gui/$(id -u)/\(label)
+        """
+    }
+
+    /// The one-time step for a bundle an older install-agent signed ad hoc:
+    /// its grants are pinned to that build, and turning the switch off and on
+    /// keeps the old pin, so the entries must go before the new ones can be made.
+    static var adHocResetText: String {
+        """
+        The bundle this replaced was signed for its build only, and its grants stay tied to that build. \
+        Remove them once: tccutil reset All \(ServeAppBundle.identifier), then restart the agent and \
+        turn "\(ServeAppBundle.displayName)" on again in both panes.
+        """
+    }
+
+    /// The absolute path this process was started from, with symlinks kept.
+    /// `install` resolves it to find the install channel and the file it copies.
     static func invokedExecutablePath() -> String {
         var size = UInt32(MAXPATHLEN)
         var buffer = [CChar](repeating: 0, count: Int(size))

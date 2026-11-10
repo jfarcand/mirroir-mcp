@@ -19,31 +19,16 @@ struct DetectedAlert: Sendable {
 /// Recognizes permission prompts, rating dialogs, tracking consent, and similar modal dialogs.
 enum AlertDetector {
 
-    /// Button texts that indicate an alert dialog, in dismiss priority order (most conservative first).
-    static let dismissPriority: [(text: String, priority: Int)] = [
-        ("Don't Allow", 0),
-        ("Ask App Not to Track", 1),
-        ("Not Now", 2),
-        ("Cancel", 3),
-        ("Dismiss", 4),
-        ("No Thanks", 5),
-        ("Later", 6),
-        ("Close", 7),
-        ("OK", 8),
-        ("Allow", 9),
-    ]
+    /// Button texts that indicate an alert dialog, in dismiss priority order
+    /// (most conservative first): `## Alert Dismiss` in `system-phrases.md`,
+    /// whose file order is the priority.
+    static var dismissPriority: [(text: String, priority: Int)] {
+        SystemPhrases.live.phrases(.alertDismiss).enumerated().map { ($0.element, $0.offset) }
+    }
 
-    /// Title patterns that strongly indicate an alert dialog.
-    static let titlePatterns: [String] = [
-        "would like to",
-        "wants to access",
-        "would like to send",
-        "would like to use",
-        "allow tracking",
-        "rate",
-        "enjoying",
-        "allow.*to track",
-    ]
+    /// Title patterns that strongly indicate an alert dialog: `## Alert Title`
+    /// in `system-phrases.md`, `.*` standing for any text.
+    static var titlePatterns: [String] { SystemPhrases.live.phrases(.alertTitle) }
 
     /// Maximum element count for a screen to be considered an alert.
     /// Real alerts are small overlays with few elements; normal screens have many more.
@@ -70,10 +55,11 @@ enum AlertDetector {
 
         // Find matching dismiss buttons with their priorities
         var matches: [(element: TapPoint, priority: Int)] = []
+        let buttons = dismissPriority
         for element in elements {
-            let lowered = element.text.lowercased()
-            for (buttonText, priority) in dismissPriority {
-                if lowered == buttonText.lowercased() {
+            let lowered = SystemPhrases.fold(element.text)
+            for (buttonText, priority) in buttons {
+                if lowered == buttonText {
                     matches.append((element: element, priority: priority))
                     break
                 }
@@ -81,9 +67,10 @@ enum AlertDetector {
         }
 
         // Check title patterns
+        let titles = titlePatterns
         let hasTitlePattern = elements.contains { element in
-            let lowered = element.text.lowercased()
-            return titlePatterns.contains { pattern in
+            let lowered = SystemPhrases.fold(element.text)
+            return titles.contains { pattern in
                 lowered.contains(pattern) || matchesRegexLike(text: lowered, pattern: pattern)
             }
         }

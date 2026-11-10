@@ -10,19 +10,35 @@ import XCTest
 final class InstallAgentCommandTests: XCTestCase {
 
     private var directory = ""
+    /// A real executable to copy: an install copies the binary into the bundle.
+    private var binary = ""
 
     override func setUpWithError() throws {
         directory = NSTemporaryDirectory() + "install-agent-" + UUID().uuidString
-        try FileManager.default.createDirectory(atPath: directory, withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(atPath: directory + "/bin", withIntermediateDirectories: true)
+        binary = directory + "/bin/mirroir-mcp"
+        try FileManager.default.copyItem(atPath: "/usr/bin/true", toPath: binary)
+    }
+
+    /// Signing is stubbed except where a test checks the real signature.
+    private let signed: (String) -> String? = { _ in nil }
+
+    private func install(port: UInt16 = 8765, printOnly: Bool = false,
+                         paths: InstallAgentPaths? = nil,
+                         replacingAdHoc: Bool = false) -> InstallAgentOutcome {
+        InstallAgentCommand.install(config: InstallAgentConfig(port: port, printOnly: printOnly),
+                                    paths: paths ?? self.paths(), sign: signed,
+                                    isAdHocSigned: { _ in replacingAdHoc })
     }
 
     override func tearDownWithError() throws {
         try FileManager.default.removeItem(atPath: directory)
     }
 
-    private func paths(executable: String = "/opt/homebrew/bin/mirroir-mcp") -> InstallAgentPaths {
+    private func paths(executable: String? = nil) -> InstallAgentPaths {
         InstallAgentPaths(
-            executable: executable, plist: directory + "/LaunchAgents/agent.plist",
+            executable: executable ?? binary, bundle: directory + "/config/mirroir serve.app",
+            plist: directory + "/LaunchAgents/agent.plist",
             tokenFile: directory + "/config/serve-token", log: directory + "/config/serve.log")
     }
 
@@ -32,19 +48,36 @@ final class InstallAgentCommandTests: XCTestCase {
     }
 
     func testThePlistRunsServeInTheGUISession() throws {
-        let outcome = InstallAgentCommand.install(
-            config: InstallAgentConfig(port: 9100, printOnly: false), paths: paths())
+        let outcome = install(port: 9100)
         XCTAssertEqual(outcome.exitCode, 0, outcome.standardError)
 
         let plist = try decode(try Data(contentsOf: URL(fileURLWithPath: paths().plist)))
         XCTAssertEqual(plist["Label"] as? String, "dev.mirroir.serve")
         XCTAssertEqual(plist["ProgramArguments"] as? [String],
-                       ["/opt/homebrew/bin/mirroir-mcp", "serve", "--port", "9100"])
+                       [paths().bundle + "/Contents/MacOS/mirroir serve", "serve", "--port", "9100"])
         XCTAssertEqual(plist["RunAtLoad"] as? Bool, true)
         XCTAssertEqual((plist["KeepAlive"] as? [String: Bool])?["SuccessfulExit"], false)
         XCTAssertEqual(plist["LimitLoadToSessionType"] as? String, "Aqua")
         XCTAssertEqual(plist["ProcessType"] as? String, "Interactive")
         XCTAssertEqual(plist["StandardErrorPath"] as? String, paths().log)
+    }
+
+    /// Grants follow the certificate, so the output says an upgrade keeps them.
+    func testTheOutputNamesTheCertificateAndTheGrants() {
+        let outcome = install()
+        XCTAssertEqual(outcome.exitCode, 0, outcome.standardError)
+        XCTAssertTrue(outcome.standardOutput.contains("\"mirroir serve local signing\""), outcome.standardOutput)
+        XCTAssertTrue(outcome.standardOutput.contains("Always Allow"))
+        XCTAssertTrue(outcome.standardOutput.contains("launchctl kickstart -k gui/$(id -u)/dev.mirroir.serve"))
+        XCTAssertFalse(outcome.standardOutput.contains("tccutil"), "nothing to reset on a first install")
+    }
+
+    /// Grants given to an ad-hoc bundle stay pinned to its build hash, and
+    /// toggling the switch keeps the pin (measured on macOS 26.5): they must be reset.
+    func testReplacingAnAdHocBundleSaysToResetItsGrants() {
+        let outcome = install(replacingAdHoc: true)
+        XCTAssertEqual(outcome.exitCode, 0, outcome.standardError)
+        XCTAssertTrue(outcome.standardOutput.contains("tccutil reset All dev.mirroir.serve"), outcome.standardOutput)
     }
 
     /// The arguments the agent runs must be ones `serve` accepts.
@@ -56,8 +89,7 @@ final class InstallAgentCommandTests: XCTestCase {
     }
 
     func testThePlistNeverHoldsTheToken() throws {
-        let outcome = InstallAgentCommand.install(
-            config: InstallAgentConfig(port: 8765, printOnly: false), paths: paths())
+        let outcome = install()
         XCTAssertEqual(outcome.exitCode, 0, outcome.standardError)
         let token = try ServeToken.load(path: paths().tokenFile)
         let plist = try String(contentsOfFile: paths().plist, encoding: .utf8)
@@ -67,10 +99,9 @@ final class InstallAgentCommandTests: XCTestCase {
     }
 
     func testAnExistingTokenIsKept() throws {
-        let config = InstallAgentConfig(port: 8765, printOnly: false)
-        XCTAssertEqual(InstallAgentCommand.install(config: config, paths: paths()).exitCode, 0)
+        XCTAssertEqual(install().exitCode, 0)
         let first = try ServeToken.load(path: paths().tokenFile)
-        XCTAssertEqual(InstallAgentCommand.install(config: config, paths: paths()).exitCode, 0)
+        XCTAssertEqual(install().exitCode, 0)
         XCTAssertEqual(try ServeToken.load(path: paths().tokenFile), first)
     }
 
@@ -80,8 +111,7 @@ final class InstallAgentCommandTests: XCTestCase {
         try Data("short".utf8).write(to: URL(fileURLWithPath: paths().tokenFile))
         try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: paths().tokenFile)
 
-        let outcome = InstallAgentCommand.install(
-            config: InstallAgentConfig(port: 8765, printOnly: false), paths: paths())
+        let outcome = install()
         XCTAssertEqual(outcome.exitCode, 1)
         XCTAssertTrue(outcome.standardError.contains("holds fewer than 32 characters"), outcome.standardError)
         XCTAssertFalse(FileManager.default.fileExists(atPath: paths().plist),
@@ -90,8 +120,7 @@ final class InstallAgentCommandTests: XCTestCase {
 
     func testAnNpxCopyIsRefused() {
         let npx = paths(executable: "/Users/someone/.npm/_npx/abc123/node_modules/mirroir-mcp/bin/mirroir-mcp")
-        let outcome = InstallAgentCommand.install(
-            config: InstallAgentConfig(port: 8765, printOnly: false), paths: npx)
+        let outcome = install(paths: npx)
         XCTAssertEqual(outcome.exitCode, 1)
         XCTAssertEqual(outcome.standardError,
                        "This copy runs from the npx cache, whose path changes. Install with Homebrew first: "
@@ -101,12 +130,11 @@ final class InstallAgentCommandTests: XCTestCase {
     }
 
     func testPrintWritesNothing() throws {
-        let outcome = InstallAgentCommand.install(
-            config: InstallAgentConfig(port: 8765, printOnly: true), paths: paths())
+        let outcome = install(printOnly: true)
         XCTAssertEqual(outcome.exitCode, 0)
         let plist = try decode(Data(outcome.standardOutput.utf8))
         XCTAssertEqual(plist["Label"] as? String, InstallAgentCommand.label)
-        XCTAssertEqual(try FileManager.default.contentsOfDirectory(atPath: directory), [])
+        XCTAssertEqual(try FileManager.default.contentsOfDirectory(atPath: directory), ["bin"])
     }
 
     func testArguments() throws {

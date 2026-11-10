@@ -21,18 +21,19 @@ enum SpotlightDetector {
     /// The heading above Spotlight's top result. A query with no installed app,
     /// file or message behind it has none (measured on an XR, iOS 26: "Keynote",
     /// not installed, lists a web suggestion and an App Store row under
-    /// "Suggestions").
-    static let topHitHeadings: [String] = ["Top Hit", "Meilleur résultat"]
+    /// "Suggestions"). Pattern data: `## Spotlight Top Hit` in `system-phrases.md`.
+    static var topHitHeadings: [String] { SystemPhrases.live.phrases(.spotlightTopHit) }
 
     /// What the search field adds after the query when Return opens an app
     /// ("Notes — Ouvrir"); on any other top result it adds that result's title.
-    static let openWords: [String] = ["Open", "Ouvrir", "Abrir", "Öffnen"]
+    /// Pattern data: `## Spotlight Open` in `system-phrases.md`.
+    static var openWords: [String] { SystemPhrases.live.phrases(.spotlightOpen) }
 
     /// Whether Spotlight holds a query: its top-hit heading shows. The idle page
     /// (Siri suggestions) holds none, and typing reaches it.
     static func holdsQuery(elements: [TapPoint]) -> Bool {
         elements.contains { el in
-            topHitHeadings.contains { el.text.lowercased().contains($0.lowercased()) }
+            topHitHeadings.contains { SystemPhrases.fold(el.text).contains($0) }
         }
     }
 
@@ -51,24 +52,21 @@ enum SpotlightDetector {
     private static func fieldSaysOpen(_ element: TapPoint) -> Bool {
         let parts = element.text.split(whereSeparator: { "-–—".contains($0) })
         guard parts.count >= 2, let last = parts.last else { return false }
-        let word = last.trimmingCharacters(in: .whitespaces).lowercased()
-        return openWords.contains { $0.lowercased() == word }
+        let word = SystemPhrases.fold(last.trimmingCharacters(in: .whitespaces))
+        return openWords.contains(word)
     }
 
-    /// Text patterns that indicate Spotlight search overlay is still visible.
-    /// Covers English, French, Spanish, and German locales.
-    static let indicators: [String] = topHitHeadings + [
-        "Search in App", "Rechercher dans l'app",
-        "Rechercher dans les apps",
-        "Siri Suggestions", "Suggestions de Siri",
-        "Siri-Vorschläge", "Sugerencias de Siri",
-    ]
+    /// Text that indicates Spotlight search overlay is still visible: the
+    /// top-hit headings and `## Spotlight Overlay` in `system-phrases.md`.
+    static var indicators: [String] {
+        topHitHeadings + SystemPhrases.live.phrases(.spotlightOverlay)
+    }
 
     /// Check if the current screen shows Spotlight search overlay.
     static func isSpotlightVisible(elements: [TapPoint]) -> Bool {
         elements.contains { el in
-            let lower = el.text.lowercased()
-            return indicators.contains { lower.contains($0.lowercased()) }
+            let lower = SystemPhrases.fold(el.text)
+            return indicators.contains { lower.contains($0) }
         }
     }
 
@@ -104,14 +102,15 @@ enum SpotlightDetector {
 
     /// Labels of the home screen's search pill, which OCR reads as "Q Rechercher".
     /// Seeing it after a launch means the home screen is still showing.
-    static let homeSearchPillLabels: [String] = ["search", "rechercher", "buscar", "suchen"]
+    /// Pattern data: `## Home Search Pill` in `system-phrases.md`.
+    static var homeSearchPillLabels: [String] { SystemPhrases.live.phrases(.homeSearchPill) }
 
     /// Whether the home screen's search pill is showing, i.e. no app is in front.
     static func isHomeScreenVisible(elements: [TapPoint], windowHeight: Double) -> Bool {
         let bandTop = windowHeight * searchFieldBandStart
         return elements.contains { el in
             guard el.tapY >= bandTop, let field = searchFieldText(el.text) else { return false }
-            return homeSearchPillLabels.contains(field.lowercased())
+            return homeSearchPillLabels.contains(SystemPhrases.fold(field))
         }
     }
 

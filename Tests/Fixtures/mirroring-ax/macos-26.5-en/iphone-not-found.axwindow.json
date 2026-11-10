@@ -1,0 +1,63 @@
+{
+  "localization" : "en",
+  "macOSVersion" : "26.5 (25F71)",
+  "mirroringVersion" : "1.6 (98.5)",
+  "move" : "reconnectIPhone",
+  "name" : "iphone-not-found",
+  "state" : "paused",
+  "strings" : {
+
+  },
+  "version" : 1,
+  "window" : {
+    "frame" : [
+      [
+        1280,
+        138
+      ],
+      [
+        430,
+        942
+      ]
+    ],
+    "hostingView" : {
+      "children" : [
+        {
+          "children" : [
+
+          ],
+          "label" : "iPhoneOff",
+          "role" : "AXImage"
+        },
+        {
+          "children" : [
+
+          ],
+          "label" : "iPhone Not Found",
+          "role" : "AXStaticText"
+        },
+        {
+          "children" : [
+
+          ],
+          "label" : "Ensure “iPhone” is near your Mac, powered on, recently unlocked, with Bluetooth and Wi‑Fi enabled.",
+          "role" : "AXStaticText"
+        },
+        {
+          "children" : [
+
+          ],
+          "label" : "Try Again",
+          "role" : "AXButton"
+        }
+      ],
+      "role" : "AXGroup",
+      "subrole" : "AXHostingView"
+    },
+    "isWindow" : true,
+    "sheets" : [
+
+    ],
+    "title" : "iPhone Mirroring"
+  }
+}

@@ -17,7 +17,7 @@ import HelperLib
 ///
 /// Usage: create, call `start()`, run CFRunLoop, call `stop()` to retrieve the steps.
 final class EventRecorder {
-    private let bridge: MirroringBridging
+    private let bridge: MenuActionCapable
     private let describer: ScreenDescribing
     private(set) var steps: [RecordedStep] = []
 
@@ -42,7 +42,7 @@ final class EventRecorder {
     private var eventTap: CFMachPort?
     private var runLoopSource: CFRunLoopSource?
 
-    init(bridge: MirroringBridging, describer: ScreenDescribing) {
+    init(bridge: MenuActionCapable, describer: ScreenDescribing) {
         self.bridge = bridge
         self.describer = describer
     }
