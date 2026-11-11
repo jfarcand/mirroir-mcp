@@ -10,6 +10,20 @@ const binDir = __dirname;
 const pkgDir = path.dirname(binDir);
 const binary = path.join(binDir, "mirroir-mcp-native");
 const installScript = path.join(pkgDir, "install-cmd.js");
+const binaryInstaller = path.join(pkgDir, "install.js");
+
+// npm 12 runs no install script it was not told to allow, so `npx mirroir-mcp`
+// can arrive without the native binary that postinstall downloads. Download it
+// on first run instead. The installer's output goes to stderr: stdout is the
+// MCP channel the client reads.
+if (!fs.existsSync(binary) && fs.existsSync(binaryInstaller)) {
+  try {
+    execFileSync(process.execPath, [binaryInstaller], { stdio: ["ignore", 2, 2] });
+  } catch (e) {
+    console.error("mirroir-mcp could not download its binary. See https://github.com/jfarcand/mirroir-mcp for manual install.");
+    process.exit(1);
+  }
+}
 
 // Handle "install" subcommand — interactive MCP client configuration
 if (process.argv[2] === "install") {
@@ -31,6 +45,6 @@ try {
   execFileSync(binary, process.argv.slice(2), { stdio: "inherit" });
 } catch (e) {
   if (e.status != null) process.exit(e.status);
-  console.error("mirroir-mcp binary not found. Run: npm rebuild mirroir-mcp");
+  console.error("mirroir-mcp binary not found at " + binary + ". See https://github.com/jfarcand/mirroir-mcp for manual install.");
   process.exit(1);
 }

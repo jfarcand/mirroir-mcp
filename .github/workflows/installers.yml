@@ -321,6 +321,33 @@ jobs:
           print('MCP initialize (npx wrapper): OK')
           "
 
+      # npm 12 skips postinstall unless allowed, so the wrapper must fetch the
+      # binary on first run. The real install.js downloads the release asset,
+      # which does not exist yet on a version-bump commit: a stand-in installer
+      # copies the binary just built and prints to stdout, as install.js does.
+      - name: First run without postinstall fetches the binary, stdout stays MCP-only
+        run: |
+          PKG="$RUNNER_TEMP/npx-no-postinstall"
+          mkdir -p "$PKG/bin"
+          cp npm/bin/mirroir-mcp "$PKG/bin/mirroir-mcp"
+          cat > "$PKG/install.js" <<EOF
+          const fs = require("fs");
+          console.log("stand-in installer ran");
+          fs.copyFileSync("$GITHUB_WORKSPACE/.build/release/mirroir-mcp", __dirname + "/bin/mirroir-mcp-native");
+          fs.chmodSync(__dirname + "/bin/mirroir-mcp-native", 0o755);
+          EOF
+          echo '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}' \
+            | node "$PKG/bin/mirroir-mcp" 2> "$RUNNER_TEMP/first-run.err" > "$RUNNER_TEMP/first-run.out"
+          grep -q "stand-in installer ran" "$RUNNER_TEMP/first-run.err" \
+            || { echo "the installer did not run, or wrote to stdout"; cat "$RUNNER_TEMP/first-run.out"; exit 1; }
+          python3 -c "
+          import json
+          lines = open('$RUNNER_TEMP/first-run.out').read().splitlines()
+          assert len(lines) == 1, f'stdout must hold only the MCP reply, got {lines}'
+          assert json.loads(lines[0])['result']['serverInfo']['name'] == 'mirroir-mcp'
+          print('First run without postinstall: OK')
+          "
+
       - name: Agent skill installs for Claude Code and Codex (clean HOME)
         run: |
           CLEAN_HOME=$(mktemp -d)
