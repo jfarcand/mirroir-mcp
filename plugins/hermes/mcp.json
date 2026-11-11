@@ -6,7 +6,7 @@
       "command": "npx",
       "args": [
         "-y",
-        "mirroir-mcp@0.46.0"
+        "mirroir-mcp@0.46.1"
       ]
     }
   }
