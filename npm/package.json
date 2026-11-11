@@ -1,6 +1,6 @@
 {
   "name": "mirroir-mcp",
-  "version": "0.45.0",
+  "version": "0.46.0",
   "description": "MCP server that drives a real, stock iPhone (and macOS apps) through macOS iPhone Mirroring — no Developer Mode, Xcode or WebDriverAgent. AI-authored skills with LLM-free replay, from any MCP client.",
   "mcpName": "io.github.jfarcand/mirroir-mcp",
   "license": "Apache-2.0",
