@@ -9,7 +9,37 @@ on:
         type: string
 
 jobs:
+  # FakeMirroring's integration suite, on the macOS the Build workflow proves
+  # it on. On the hosted macOS 26 runner (a virtual machine, macOS 26.7) typed
+  # text does not reach FakeMirroring (carnet#65), so the suite gates the
+  # release from here while the release itself builds with the macOS 26 SDK.
+  integration:
+    runs-on: macos-15
+    timeout-minutes: 60
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: ./.github/actions/setup-embacle
+
+      - name: Clone skills repo
+        run: |
+          git clone https://github.com/jfarcand/mirroir-skills.git ../mirroir-skills
+          mkdir -p .mirroir-mcp
+          ln -s "$(cd ../mirroir-skills && pwd)" .mirroir-mcp/skills
+
+      - name: Build release
+        run: swift build -c release
+
+      - uses: ./.github/actions/setup-fake-mirroring
+      - name: Integration tests (FakeMirroring)
+        env:
+          MIRROIR_BUNDLE_ID: com.jfarcand.FakeMirroring
+        run: swift test --filter IntegrationTests
+
   release:
+    needs: integration
     # The macOS 26 SDK carries SpeechAnalyzer, which `listen` needs: a binary
     # built with an older SDK compiles it out. The deployment target stays
     # macOS 14, so the binary still runs there, with listen refusing.
@@ -108,12 +138,6 @@ jobs:
       - name: Run tests (Swift Testing)
         timeout-minutes: 5
         run: scripts/unit-tests.sh swift-testing
-
-      - uses: ./.github/actions/setup-fake-mirroring
-      - name: Integration tests (FakeMirroring)
-        env:
-          MIRROIR_BUNDLE_ID: com.jfarcand.FakeMirroring
-        run: swift test --filter IntegrationTests
 
       - name: Commit version bump
         env:
