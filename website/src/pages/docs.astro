@@ -8,6 +8,11 @@ import { resolve } from "node:path";
 const serverJson = JSON.parse(readFileSync(resolve(process.cwd(), "../server.json"), "utf-8"));
 const version = serverJson.version;
 
+const installAgentSnippet = `mirroir-mcp install-agent
+launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/dev.mirroir.serve.plist`;
+const forwardSnippet = `ssh -N -L 8765:127.0.0.1:8765 you@your-mac
+claude mcp add --transport http mirroir http://127.0.0.1:8765/mcp \\
+  --header "Authorization: Bearer <contents of ~/.mirroir-mcp/serve-token on the Mac>"`;
 const runnerCargoCmd = "cargo install mirroir-run";
 const runnerBrewCmd = "brew install jfarcand/tap/mirroir-run";
 const maestroCmd = "mirroir-run import maestro flows/*.yaml -o .mirroir/apps/shop/scenarios --app com.example.shop=Shop";
@@ -27,6 +32,7 @@ const actionSnippet = `- uses: jfarcand/mirroir-mcp/actions/setup-mirroir-run@ma
     <p class="subtitle">The MCP tools your agent gets, and the <code>mirroir-run</code> commands that replay scenarios.</p>
     <ul class="page-toc">
       <li><a href="#tools">Tools</a></li>
+      <li><a href="#serve">Serve</a></li>
       <li><a href="#mirroir-run">mirroir-run</a></li>
       <li><a href="#more">More docs</a></li>
     </ul>
@@ -36,7 +42,7 @@ const actionSnippet = `- uses: jfarcand/mirroir-mcp/actions/setup-mirroir-run@ma
   <!-- What it does -->
   <section id="tools">
     <h2>What mirroir-mcp can do</h2>
-    <p>41 tools exposed as an MCP server.</p>
+    <p>42 tools exposed as an MCP server.</p>
 
     <div class="tool-grid">
       <div class="tool-category cat-touch">
@@ -66,6 +72,7 @@ const actionSnippet = `- uses: jfarcand/mirroir-mcp/actions/setup-mirroir-run@ma
         <ul>
           <li><code>screenshot</code> <span>Capture screen as PNG</span></li>
           <li><code>describe_screen</code> <span>OCR or LLM vision with tap coordinates</span></li>
+          <li><code>listen</code> <span>Hear what the phone plays, transcribed on the Mac</span></li>
           <li><code>classify_screen</code> <span>Group screen elements into UI components with an AI model</span></li>
           <li><code>start_recording</code> <span>Begin video recording</span></li>
           <li><code>stop_recording</code> <span>End recording, get file path</span></li>
@@ -85,7 +92,7 @@ const actionSnippet = `- uses: jfarcand/mirroir-mcp/actions/setup-mirroir-run@ma
           <li><code>press_app_switcher</code> <span>Show recent apps</span></li>
           <li><code>press_back</code> <span>Go back via the OCR-detected back chevron</span></li>
           <li><code>spotlight</code> <span>Open Spotlight search</span></li>
-          <li><code>scroll_to</code> <span>Scroll until element visible via OCR</span></li>
+          <li><code>scroll_to</code> <span>Scroll toward the content you name until its text shows, or the end is reached</span></li>
           <li><code>reset_app</code> <span>Force-quit app via App Switcher</span></li>
           <li><code>set_network</code> <span>Toggle airplane, Wi-Fi, cellular</span></li>
           <li><code>measure</code> <span>Time screen transitions</span></li>
@@ -101,6 +108,28 @@ const actionSnippet = `- uses: jfarcand/mirroir-mcp/actions/setup-mirroir-run@ma
         </ul>
       </div>
     </div>
+
+    <h3 class="compare-title">Listening</h3>
+    <p>
+      <code>listen</code> records only the sound iPhone Mirroring plays, through ScreenCaptureKit and the Screen &amp; System Audio Recording grant mirroir already needs, and macOS's own SpeechAnalyzer transcribes it on the Mac. The audio never leaves the Mac and its temporary file is deleted; the reply holds the words only. Measured on an iPhone XR: 15 seconds of a spoken French recipe reel came back nearly word for word, also with the Mac muted, and silence is reported as silence. It does not say who spoke, sung lyrics come out approximate, and it needs macOS 26. It ships since 0.47.0.
+    </p>
+    <p>
+      In 0.46.0, <code>scroll_to</code>'s <code>direction</code> names where the content is: <code>"down"</code> shows what is below the screen, so the finger moves up. Skills that passed the finger's direction must swap it, and compiled skills must be compiled again. Every parameter: <a href="https://github.com/jfarcand/mirroir-mcp/blob/main/docs/tools.md" rel="noopener noreferrer"><code>docs/tools.md</code></a>.
+    </p>
+  </section>
+
+  <!-- Serve: an agent on another machine -->
+  <section id="serve">
+    <h2>Drive the phone from an agent on another machine</h2>
+    <p>
+      By default mirroir-mcp talks to one MCP client over standard input and output and opens no network port. <code>mirroir-mcp serve</code> speaks MCP over HTTP instead, on 127.0.0.1 only, behind a bearer token, with browsers refused and the same <code>permissions.json</code>. <code>install-agent</code> keeps it running as a LaunchAgent from its own app bundle, "mirroir serve", signed with a certificate kept in your login keychain, so its Accessibility and Screen Recording grants survive upgrades. It needs the Homebrew install.
+    </p>
+    <pre class="snippet"><code>{installAgentSnippet}</code></pre>
+    <p>From the other machine, forward the port and point the client at the forward:</p>
+    <pre class="snippet"><code>{forwardSnippet}</code></pre>
+    <p>
+      Whoever holds the token controls the phone, within what <code>permissions.json</code> allows. Read <a href="https://github.com/jfarcand/mirroir-mcp/blob/main/docs/security.md" rel="noopener noreferrer">Security</a> first; options, grants and removal are in <a href="https://github.com/jfarcand/mirroir-mcp/blob/main/docs/cli.md#serve" rel="noopener noreferrer"><code>docs/cli.md</code></a>.
+    </p>
   </section>
 
   <!-- mirroir-run: cross-platform replay -->

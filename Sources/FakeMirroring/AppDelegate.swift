@@ -12,6 +12,8 @@ import HelperLib
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
     private var window: NSWindow?
+    /// Plays speech on request, so integration tests have real sound to `listen` to.
+    private var speaker: FakeSpeaker?
     let registry = AppRegistry()
 
     func applicationDidFinishLaunching(_ notification: Notification) {
@@ -49,6 +51,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         loadAppPacks()
         buildMenuBar()
+        speaker = FakeSpeaker()
 
         // Default to Settings foreground at startup so integration tests that
         // expect a populated screen at boot work without an explicit launch.

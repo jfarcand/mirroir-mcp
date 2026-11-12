@@ -1,6 +1,6 @@
 # mirroir-mcp
 
-> Give your AI eyes, hands, and a real iPhone. An MCP server that lets any AI agent see the screen, tap what it needs, and figure the rest out — through macOS iPhone Mirroring. Also supports macOS windows. 41 tools, any MCP client (Claude Code, Cursor, Copilot, ChatGPT, Codex). Written in Swift. Apache 2.0 licensed.
+> Give your AI eyes, hands, and a real iPhone. An MCP server that lets any AI agent see the screen, tap what it needs, and figure the rest out — through macOS iPhone Mirroring. Also supports macOS windows. 42 tools, any MCP client (Claude Code, Cursor, Copilot, ChatGPT, Codex). Written in Swift. Apache 2.0 licensed.
 
 ## Overview
 
@@ -224,7 +224,7 @@ Drift is measured against `.harness/last-green.json`, what the previous PASS run
 
 **Fail-closed by default.** Without configuration, only read-only tools are exposed. Mutating tools are hidden entirely from the MCP client.
 
-The read-only allow-list (`PermissionPolicy.readonlyTools`) is exactly 13 tools: `screenshot`, `describe_screen`, `start_recording`, `stop_recording`, `get_orientation`, `status`, `check_health`, `list_targets`, `list_skills`, `get_skill`, `calibrate_component`, `classify_screen`, `get_notes`. Every other tool — including `press_back` — is mutating and permission-gated.
+The read-only allow-list (`PermissionPolicy.readonlyTools`) is exactly 14 tools: `screenshot`, `describe_screen`, `start_recording`, `stop_recording`, `get_orientation`, `status`, `check_health`, `list_targets`, `list_skills`, `get_skill`, `calibrate_component`, `classify_screen`, `get_notes`, `listen`. Every other tool — including `press_back` — is mutating and permission-gated.
 
 Opt-in via `~/.mirroir-mcp/permissions.json`:
 ```json
@@ -348,7 +348,7 @@ Multi-target configuration via `targets.json` for controlling multiple windows s
 
 - [README](README.md) — Installation, examples, quick start
 - [Onboarding](docs/onboarding.md) — Setup written for the agent: prerequisites, install, doctor, read-only proof
-- [Tools Reference](docs/tools.md) — All 41 tools with parameters
+- [Tools Reference](docs/tools.md) — All 42 tools with parameters
 - [Security](docs/security.md) — Threat model, kill switch, recommendations
 - [Permissions](docs/permissions.md) — Fail-closed permission model
 - [Component Detection](docs/components.md) — Component definitions, calibration, detection pipeline

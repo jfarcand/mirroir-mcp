@@ -207,7 +207,7 @@ if echo "$DEFAULT_TOOLS" | python3 -c "
 import sys, json
 obj = json.loads(sys.stdin.readline())
 tools = [t['name'] for t in obj['result']['tools']]
-expected_readonly = {'screenshot','start_recording','stop_recording','get_orientation','status','check_health','describe_screen','list_skills','get_skill','list_targets','calibrate_component','classify_screen','get_notes'}
+expected_readonly = {'screenshot','start_recording','stop_recording','get_orientation','status','check_health','describe_screen','list_skills','get_skill','list_targets','calibrate_component','classify_screen','get_notes','listen'}
 assert set(tools) == expected_readonly, f'A config granting nothing must expose only readonly tools.\nExpected: {expected_readonly}\nGot: {set(tools)}\nExtra: {set(tools) - expected_readonly}\nMissing: {expected_readonly - set(tools)}'
 print('OK')
 " 2>&1 | grep -q "OK"; then

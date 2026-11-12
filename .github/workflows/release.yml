@@ -10,7 +10,10 @@ on:
 
 jobs:
   release:
-    runs-on: macos-15
+    # The macOS 26 SDK carries SpeechAnalyzer, which `listen` needs: a binary
+    # built with an older SDK compiles it out. The deployment target stays
+    # macOS 14, so the binary still runs there, with listen refusing.
+    runs-on: macos-26
     permissions:
       contents: write
     steps:

@@ -31,6 +31,7 @@ extension MirroirMCP {
         registerNetworkTools(server: server, registry: registry)
         registerTargetTools(server: server, registry: registry)
         registerNotesTools(server: server)
+        registerListenTools(server: server, registry: registry)
         registerCompilationTools(server: server, registry: registry, session: compilationSession)
         registerGenerateSkillTools(server: server, registry: registry, policy: policy)
         registerComponentTools(server: server, registry: registry)

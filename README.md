@@ -24,7 +24,9 @@
 </p>
 <p align="center"><em>A real run on a real iPhone, sped up: the agent reads the ETA in Waze, then posts it in Slack.</em></p>
 
-No Developer Mode, no Xcode, no WebDriverAgent, no jailbreak. mirroir-mcp works through macOS iPhone Mirroring, so it reaches any app on your phone, including App Store apps you could never build. It works from any MCP client, with [41 tools](docs/tools.md).
+No Developer Mode, no Xcode, no WebDriverAgent, no jailbreak. mirroir-mcp works through macOS iPhone Mirroring, so it reaches any app on your phone, including App Store apps you could never build. It works from any MCP client, with [42 tools](docs/tools.md).
+
+It uses the apps already signed in on your phone: no connector, no OAuth, no password handed to anyone.
 
 ## Quick start
 
@@ -41,7 +43,7 @@ npx -y mirroir-mcp install    # or: brew tap jfarcand/tap && brew install mirroi
 npx -y mirroir-mcp doctor     # names anything left to fix
 ```
 
-OpenClaw, Claude Desktop, Cursor, VS Code and the other clients: [Install](docs/install.md).
+OpenClaw, Hermes Agent, Claude Desktop, Cursor, VS Code and the other clients: [Install](docs/install.md).
 
 Then ask for something:
 
@@ -62,6 +64,9 @@ Start recording, open Instagram, scroll the feed and open my profile, stop recor
 
 - **Nothing to install on the phone.** The iPhone stays stock: no signing, no provisioning profile, no on-device agent. If iPhone Mirroring shows it, mirroir can drive it.
 - **Your Mac stays yours.** Taps, typing and swipes reach the mirror without bringing it to the front, so you can keep working. Drags and two-finger gestures bring it forward for a moment, then hand your app back.
+- **It hears the phone, too.** [`listen`](docs/tools.md#listening) turns what the phone plays, a reel's narration or a voice message, into text. It records only iPhone Mirroring's sound, and macOS transcribes it on the Mac: the audio never leaves it. Needs macOS 26; since 0.47.0.
+- **An agent on another machine.** [`mirroir-mcp serve`](docs/cli.md#serve) speaks MCP over HTTP on 127.0.0.1 only, behind a bearer token; reach it through an SSH port forward. `install-agent` keeps it running as a LaunchAgent from its own signed "mirroir serve" bundle, so its grants survive upgrades.
+- **Agents keep notes.** `save_note` keeps one line per lesson per app, and `get_notes` gives it to the next session.
 - **Explore once, replay without an LLM.** `generate_skill` explores an app and writes [SKILL.md](docs/skills-and-ci.md#skills) files. A compiled skill replays from the CLI with no AI in the loop (`mirroir test`), so CI runs are deterministic and cost no tokens.
 - **One test across phone, web and backend.** [`mirroir-run`](docs/mirroir-run.md) is our companion test runner, a separate binary. One YAML scenario can drive the iPhone, a browser, HTTP endpoints and subprocesses, then compare what the page and the phone showed. See [Web and iOS in one scenario](docs/web-and-ios.md).
 - **Drift fails loudly.** `mirroir-run` has a third verdict beside pass and fail: `DRIFT`, exit code **65**, when every assertion held but the output moved past its baseline. Your CI lane decides whether drift blocks a merge.
@@ -92,10 +97,10 @@ phone-harness is the closest tool here: it also drives a stock iPhone through iP
 
 Giving an AI access to your phone demands defense in depth, so mirroir-mcp is **fail-closed**.
 
-- **Read-only until you say otherwise.** Without a config file, only the 13 read-only tools are exposed. Every tool that changes something stays hidden from the client until you allow it in [`permissions.json`](docs/permissions.md).
+- **Read-only until you say otherwise.** Without a config file, only the 14 read-only tools are exposed. Every tool that changes something stays hidden from the client until you allow it in [`permissions.json`](docs/permissions.md).
 - **Sensitive apps can be blocked.** `blockedApps` keeps the AI out of apps like Wallet or Banking, even when other tools are allowed.
 - **Passwords stay yours.** mirroir never presses a sheet that asks for a password or Touch ID, and it tells agents to ask you before sending, buying, deleting or changing a setting.
-- **No root, no daemon, no telemetry.** It runs as your user with Screen Recording and Accessibility. The one network call it makes by default is a once-a-day version check against npm (`updateCheck: false` turns it off). What your agent reads from the screen goes to whichever model your client uses.
+- **No root, no telemetry, no daemon unless you install one.** It runs as your user with Screen Recording and Accessibility, and lives and dies with your MCP client; only the opt-in [`serve` agent](docs/security.md) keeps running, on loopback, behind a token. The one network call it makes by default is a once-a-day version check against npm (`updateCheck: false` turns it off). What your agent reads from the screen goes to whichever model your client uses.
 - **Kill switch.** Quit iPhone Mirroring, unlock the iPhone, lock the Mac's screen, or quit your MCP client: each stops all input at once, and nothing reopens the app for the agent.
 
 See [Security](docs/security.md) for the full threat model.
@@ -106,12 +111,12 @@ See [Security](docs/security.md) for the full threat model.
 |---|---|
 | [Install](docs/install.md) | Every install path, per-client setup, updating, uninstalling |
 | [Onboarding](docs/onboarding.md) | Setup written for the agent: prerequisites, install, doctor, a read-only proof, and an optional first errand |
-| [Tools Reference](docs/tools.md) | All 41 tools, parameters, and input workflows |
+| [Tools Reference](docs/tools.md) | All 42 tools, parameters, and input workflows |
 | [How mirroir sees the screen](docs/screen-intelligence.md) | The observe, reason, act loop; OCR, icon detection, AI vision |
 | [Skills, exploration and CI](docs/skills-and-ci.md) | APP.md, skills, `generate_skill`, `mirroir test`, compiled replay, AI diagnosis, patterns |
 | [`mirroir-run`](docs/mirroir-run.md) | Replay across iPhone, web, HTTP and subprocesses; GitHub Actions; Maestro import |
 | [Games](docs/games.md) | Shell and scene, the `scene:` step, game controls |
-| [CLI Tools](docs/cli.md) | Recorder, doctor, keyboard layout |
+| [CLI Tools](docs/cli.md) | Recorder, doctor, keyboard layout, `serve` over HTTP |
 | [Configuration](docs/configuration.md) | All settings: screen intelligence, input timing, exploration, AI providers |
 | [FAQ](docs/faq.md) | Security, focus stealing, keyboard layouts, embacle/vision mode |
 | [Security](docs/security.md) | Threat model, kill switch, and recommendations |

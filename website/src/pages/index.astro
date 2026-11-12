@@ -16,6 +16,7 @@ const curlCmd = '/bin/bash -c "$(curl -fsSL https://mirroir.dev/get-mirroir.sh)"
 const npxCmd = "npx -y mirroir-mcp install";
 const brewCmd = "brew tap jfarcand/tap && brew install mirroir-mcp";
 const pluginCmd = "claude plugin marketplace add jfarcand/mirroir-mcp && claude plugin install mirroir@mirroir";
+const hermesCmd = "hermes plugins install jfarcand/mirroir-mcp/plugins/hermes --enable";
 const agentFlow = `● you: "open Weather and tell me if it rains tomorrow"
 │
 ● describe_screen → "Weather" at (71, 149)
@@ -259,7 +260,7 @@ const skillsJson = JSON.stringify(skills).replace(/</g, "\\u003c");
       Let your agent use your real iPhone, then replay what it did without an LLM.
     </p>
     <p class="subtitle">
-      iPhone automation for AI agents: drive a real, stock iPhone from any MCP client, with <strong>no Developer Mode, no Xcode, no WebDriverAgent and no jailbreak</strong>. It works through macOS iPhone Mirroring, so it reaches any app on your phone, including App Store apps you could never build.
+      iPhone automation for AI agents: drive a real, stock iPhone from any MCP client, with <strong>no Developer Mode, no Xcode, no WebDriverAgent and no jailbreak</strong>. It works through macOS iPhone Mirroring, so it reaches any app on your phone, including App Store apps you could never build. It uses the apps already signed in on your phone: no connector, no OAuth, no password handed to anyone.
     </p>
     <div class="hero-cta">
       <a class="btn-primary" href="#install">Install</a>
@@ -450,6 +451,13 @@ const skillsJson = JSON.stringify(skills).replace(/</g, "\\u003c");
       <button class="copy-btn" data-copy={pluginCmd}>Copy</button>
     </div>
     <p class="alt-install">
+      or as a <a href="https://github.com/NousResearch/hermes-agent" rel="noopener noreferrer">Hermes Agent</a> plugin (Hermes 0.21.6 or later), which asks before every call that can change the phone:
+    </p>
+    <div class="install-block install-block-alt">
+      <code><span class="prompt">$</span> {hermesCmd}</code>
+      <button class="copy-btn" data-copy={hermesCmd}>Copy</button>
+    </div>
+    <p class="alt-install">
       or, for Claude Desktop, download <code>mirroir-mcp.mcpb</code> from the <a href="https://github.com/jfarcand/mirroir-mcp/releases/latest" rel="noopener noreferrer">latest release</a> (v0.43.0 and later) and double-click it.
     </p>
   </section>
@@ -512,6 +520,10 @@ const skillsJson = JSON.stringify(skills).replace(/</g, "\\u003c");
     <h2>Why mirroir</h2>
     <div class="example-cards">
       <div class="example-card">
+        <p class="example-prompt">Your apps, already signed in</p>
+        <p class="example-steps">mirroir uses the apps already signed in on your phone: no connector, no OAuth, no password handed to anyone. If you can open it on the phone, your agent can use it.</p>
+      </div>
+      <div class="example-card">
         <p class="example-prompt">Nothing to install on the phone</p>
         <p class="example-steps">The iPhone stays stock: no signing, no provisioning profile, no on-device agent. If iPhone Mirroring shows it, mirroir can drive it.</p>
       </div>
@@ -534,6 +546,18 @@ const skillsJson = JSON.stringify(skills).replace(/</g, "\\u003c");
       <div class="example-card">
         <p class="example-prompt">It plays games, too</p>
         <p class="example-steps">A <code>scene:</code> step plays a turn-based or tap-driven game, frame by frame, under a hard budget. <a href="#games">See how</a>.</p>
+      </div>
+      <div class="example-card">
+        <p class="example-prompt">It hears the phone, too</p>
+        <p class="example-steps"><code>listen</code> turns what the phone plays, a reel's narration or a voice message, into text. Only iPhone Mirroring's sound is recorded, and macOS transcribes it on the Mac: the audio never leaves it. Needs macOS 26; since 0.47.0.</p>
+      </div>
+      <div class="example-card">
+        <p class="example-prompt">An agent on another machine</p>
+        <p class="example-steps"><code>mirroir-mcp serve</code> speaks MCP over HTTP on 127.0.0.1 only, behind a bearer token; reach it through an SSH port forward. <code>install-agent</code> runs it as a LaunchAgent from its own signed "mirroir serve" app, so its grants survive upgrades. <a href={`${import.meta.env.BASE_URL}docs/#serve`}>Set it up</a>.</p>
+      </div>
+      <div class="example-card">
+        <p class="example-prompt">Agents keep notes</p>
+        <p class="example-steps"><code>save_note</code> keeps one line per lesson per app, and <code>get_notes</code> hands it to the next session, so it starts with what the last one learned.</p>
       </div>
     </div>
 
@@ -575,7 +599,7 @@ const skillsJson = JSON.stringify(skills).replace(/</g, "\\u003c");
     <div class="security-grid">
       <div class="security-layer">
         <h3>Tool permissions</h3>
-        <p>Without a config file, only the 13 read-only tools (<code>screenshot</code>, <code>describe_screen</code>, <code>status</code>, <code>list_skills</code>, &hellip;) are exposed. Mutating tools are hidden from the MCP client entirely &mdash; it never sees them.</p>
+        <p>Without a config file, only the 14 read-only tools (<code>screenshot</code>, <code>describe_screen</code>, <code>status</code>, <code>list_skills</code>, &hellip;) are exposed. Mutating tools are hidden from the MCP client entirely &mdash; it never sees them.</p>
       </div>
       <div class="security-layer">
         <h3>App blocking</h3>
@@ -583,7 +607,7 @@ const skillsJson = JSON.stringify(skills).replace(/</g, "\\u003c");
       </div>
       <div class="security-layer">
         <h3>No root, no daemon</h3>
-        <p>Runs as your user with Screen Recording and Accessibility permissions. No daemons, no kernel extensions, no root privileges.</p>
+        <p>Runs as your user with Screen Recording and Accessibility permissions, and lives and dies with your MCP client. No kernel extensions, no root privileges; the only thing that keeps running is the <code>serve</code> agent, if you install it.</p>
       </div>
     </div>
 
@@ -861,7 +885,7 @@ const skillsJson = JSON.stringify(skills).replace(/</g, "\\u003c");
   <section>
     <h2>What mirroir-mcp can do</h2>
     <p>
-      41 tools exposed as an MCP server: touch, typing, screen reading, navigation and skills.
+      42 tools exposed as an MCP server: touch, typing, screen reading, navigation and skills.
       <a href={`${import.meta.env.BASE_URL}docs/#tools`}>See every tool</a>.
     </p>
   </section>
@@ -872,7 +896,7 @@ const skillsJson = JSON.stringify(skills).replace(/</g, "\\u003c");
     <div class="faq-list">
       <details>
         <summary>Is this safe? Can the AI access my banking apps?</summary>
-        <p>Without a config file, only read-only tools are exposed. Mutating tools require explicit opt-in. Use <code>blockedApps</code> in <code>permissions.json</code> to deny access to sensitive apps. Unlocking the iPhone, locking the Mac's screen, or quitting your MCP client stops all input at once.</p>
+        <p>Without a config file, only read-only tools are exposed. Mutating tools require explicit opt-in. Use <code>blockedApps</code> in <code>permissions.json</code> to deny access to sensitive apps. Quitting iPhone Mirroring, unlocking the iPhone, locking the Mac's screen, or quitting your MCP client stops all input at once.</p>
       </details>
       <details>
         <summary>Will it take over my Mac while it works?</summary>
@@ -888,7 +912,11 @@ const skillsJson = JSON.stringify(skills).replace(/</g, "\\u003c");
       </details>
       <details>
         <summary>Does it need any kernel extensions or root access?</summary>
-        <p>No. It runs as your user with Screen Recording and Accessibility permissions. No kernel extensions, no root privileges, no helper daemons.</p>
+        <p>No. It runs as your user with Screen Recording and Accessibility permissions. No kernel extensions, no root privileges, and no helper daemon unless you install the opt-in <code>serve</code> agent yourself.</p>
+      </details>
+      <details>
+        <summary>Does my phone's audio leave my Mac?</summary>
+        <p>No. <code>listen</code> records only iPhone Mirroring's sound, through the Screen &amp; System Audio Recording grant mirroir already has, and macOS's own speech recognizer transcribes it on the Mac. The temporary audio file is deleted once read; your agent gets the words only. Screenshots are a different matter: what your agent sees goes to whichever model runs it.</p>
       </details>
       <details>
         <summary>Can it control macOS apps too, not just iPhone?</summary>

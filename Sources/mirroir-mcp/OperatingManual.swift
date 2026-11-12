@@ -142,6 +142,9 @@ enum OperatingManual {
         - `screenshot` is for what text cannot tell: images, colors, layout. Its reply states \
         the image's pixel size. To tap something only the image shows, give `tap` its position \
         in the image as `x` and `y` with `image_size`.
+        - What is said rather than written (a reel's narration, a voice message): start it \
+        playing, then `listen`, passing the iPhone's language as `language` (for example \
+        `fr-CA`). It returns the words heard; silence means nothing played.
 
         ## Acting
 

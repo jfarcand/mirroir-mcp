@@ -104,6 +104,7 @@ public struct PermissionPolicy: Sendable {
         "calibrate_component",
         "classify_screen",
         "get_notes",
+        "listen",
     ]
 
     /// Tools that mutate iPhone state and require explicit permission.

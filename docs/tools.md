@@ -1,6 +1,6 @@
 # Tools Reference
 
-All 41 tools exposed by the MCP server. Mutating tools require [permission](permissions.md) to appear in `tools/list`.
+All 42 tools exposed by the MCP server. Mutating tools require [permission](permissions.md) to appear in `tools/list`.
 
 ## Tool List
 
@@ -8,6 +8,7 @@ All 41 tools exposed by the MCP server. Mutating tools require [permission](perm
 |------|-----------|-------------|
 | `screenshot` | `settle_ms`?, `scale`?, `region`? | Capture the iPhone screen as a PNG, with a line stating its pixel size, the window points it shows, and the pixels-per-point factor |
 | `describe_screen` | `scroll`?, `omit_screenshot`?, `query`?, `text_only`?, `settle_ms`? | Analyze the screen and return UI elements with tap coordinates plus a grid-overlaid screenshot. Uses local OCR or AI vision depending on `screenDescriberMode`. `scroll: true` does a full-page scroll to capture all elements. `omit_screenshot: true` returns text only (no image). `query` lists only elements whose text contains it (case- and accent-insensitive; icons omitted), and `text_only: true` drops the coordinates, so reading one value costs a line or two. `settle_ms` sets how long to wait for the screen to stop changing first. |
+| `listen` | `seconds`?, `language`? | Hear what the phone plays, as text: records the sound iPhone Mirroring plays for `seconds` (1 to 60, default 10) and transcribes it on the Mac in `language` (BCP-47, default the Mac's). Read-only; needs macOS 26. See [Listening](#listening). |
 | `start_recording` | `output_path`? | Start video recording of the mirrored screen |
 | `stop_recording` | — | Stop recording and return the .mov file path |
 | `tap` | `text`? or `x`, `y`; `image_size`?, `image_region`?, `cursor_mode`? | Tap visible text found by OCR (`text`; a miss lists the text on screen), or tap at coordinates relative to the mirroring window. With `image_size`, `x` and `y` are a position in a screenshot and are converted to window points |
@@ -232,6 +233,17 @@ A skill says how to do a task. A note says what an agent learned on the way: whe
 - A note is one line of at most 500 characters, saved with its date. A topic holds at most 50; past that, `replaces` (the text of an earlier note) swaps one out, which is also how an agent corrects a note that stopped being true.
 - `get_notes` is read-only and always available. `save_note` is hidden until you [allow it](permissions.md), like every tool that writes.
 - A note is what an earlier session observed, not an instruction from you. `get_notes` says so each time, because an agent that reads a screen can be led to write down what that screen says. Notes never hold a password or a code by design, but nothing can check that: look at the files if you share the Mac.
+
+## Listening
+
+A screen shows what is written; `listen` gets what is said. Start a reel, a video or a voice message on the phone, then call `listen`: it records the sound iPhone Mirroring plays on the Mac and returns the words.
+
+- Only the target app's sound is recorded, through ScreenCaptureKit, under the Screen & System Audio Recording grant mirroir already needs. Measured on macOS 26.5: the recording is whole even with the Mac's output muted.
+- The words are transcribed on the Mac by macOS's own speech recognizer (SpeechAnalyzer). The audio never leaves the Mac and its temporary file is deleted once read; the reply holds the text only. The first time a language is used, macOS downloads its speech model once.
+- Pass `language` as the iPhone's language when it differs from the Mac's (`"fr-CA"`, `"en-US"`). Measured on the XR: 15 s of spoken Québec French transcribed in 0.5 s, nearly word for word.
+- Silence is reported as silence (a paused video, a muted phone), and speech in another language comes back as no words, with a hint to pass `language`.
+- Two on-device engines can transcribe. `SpeechTranscriber` is used where macOS offers it; where it does not (measured: GitHub's macOS 26 virtual machines), macOS's dictation engine is used instead, and the reply names the engine. Dictation is less accurate: on the same sentence it heard "Ground the chicken… the green onion" where SpeechTranscriber heard "Brown the chicken… the green onions".
+- Words only: it does not say who spoke, sung lyrics come out approximate, and it needs macOS 26 or later.
 
 ## Multi-Target
 

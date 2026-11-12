@@ -703,7 +703,7 @@ jobs:
           lines = sys.stdin.readlines()
           obj = json.loads(lines[1])
           tools = [t['name'] for t in obj['result']['tools']]
-          expected = {'run_steps','screenshot','start_recording','stop_recording','tap','swipe','drag','type_text','press_key','long_press','double_tap','touch','pinch','rotate','hold_keys','shake','launch_app','open_url','press_home','press_app_switcher','press_back','spotlight','get_orientation','status','check_health','describe_screen','list_skills','get_skill','scroll_to','reset_app','measure','set_network','list_targets','switch_target','record_step','save_compiled','generate_skill','calibrate_component','classify_screen','get_notes','save_note'}
+          expected = {'run_steps','screenshot','start_recording','stop_recording','tap','swipe','drag','type_text','press_key','long_press','double_tap','touch','pinch','rotate','hold_keys','shake','launch_app','open_url','press_home','press_app_switcher','press_back','spotlight','get_orientation','status','check_health','describe_screen','list_skills','get_skill','scroll_to','reset_app','measure','set_network','list_targets','switch_target','record_step','save_compiled','generate_skill','calibrate_component','classify_screen','get_notes','save_note','listen'}
           assert set(tools) == expected, f'Expected: {expected}\nGot: {set(tools)}\nMissing: {expected - set(tools)}\nExtra: {set(tools) - expected}'
           print(f'tools/list: {len(tools)} tools registered')
           "
@@ -757,7 +757,7 @@ jobs:
           lines = sys.stdin.readlines()
           obj = json.loads(lines[1])
           tools = [t['name'] for t in obj['result']['tools']]
-          expected_readonly = {'screenshot','start_recording','stop_recording','get_orientation','status','check_health','describe_screen','list_skills','get_skill','list_targets','calibrate_component','classify_screen','get_notes'}
+          expected_readonly = {'screenshot','start_recording','stop_recording','get_orientation','status','check_health','describe_screen','list_skills','get_skill','list_targets','calibrate_component','classify_screen','get_notes','listen'}
           assert set(tools) == expected_readonly, f'Fail-closed should show only readonly tools.\nExpected: {expected_readonly}\nGot: {set(tools)}\nExtra: {set(tools) - expected_readonly}\nMissing: {expected_readonly - set(tools)}'
           print(f'Fail-closed default: {len(tools)} readonly tools (OK)')
           "

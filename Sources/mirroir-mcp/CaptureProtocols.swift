@@ -1,8 +1,8 @@
 // Copyright 2026 jfarcand@apache.org
 // Licensed under the Apache License, Version 2.0
 //
-// ABOUTME: System-boundary protocols for what the target shows: screenshot capture, window images, recording,
-// ABOUTME: text recognition and the screen describers built on it.
+// ABOUTME: System-boundary protocols for what the target shows and plays: screenshot capture, window images,
+// ABOUTME: recording, an app's audio, on-device speech-to-text, text recognition and the screen describers.
 
 import AppKit
 import CoreGraphics
@@ -53,6 +53,45 @@ protocol WindowImageProviding: Sendable {
 protocol ScreenRecording: Sendable {
     func startRecording(outputPath: String?) -> String?
     func stopRecording() -> (filePath: String?, error: String?)
+}
+
+/// What one audio capture of an app produced.
+enum AudioCaptureReply: Sendable, Equatable {
+    /// The app's audio was written to the file; `peak` is the loudest sample
+    /// (0 to about 1), so a silent capture can be told from a quiet one.
+    case recorded(peak: Float)
+    /// The app is not in the shareable content (not running, or not capturable).
+    case appNotShareable
+    /// The capture API reported an error (no Screen Recording grant, ...).
+    case failed(String)
+}
+
+/// Abstracts capture of the sound one app plays (ScreenCaptureKit in
+/// production): only that app's audio, whatever else the Mac plays, and
+/// whether or not the Mac's output is muted.
+protocol AppAudioCapturing: Sendable {
+    /// Record `seconds` of the audio of the app with process `pid` into `file`.
+    func captureAudio(pid: pid_t, seconds: Double, to file: URL) -> AudioCaptureReply
+}
+
+/// What one transcription produced.
+enum TranscriptionReply: Sendable, Equatable {
+    /// The words heard, in order (empty when nothing was said), the language
+    /// they were read in and the on-device engine that read them.
+    case text(String, language: String, engine: String)
+    /// No on-device model exists for the language asked.
+    case unsupportedLanguage(String)
+    /// This macOS has no on-device transcriber.
+    case unavailable(String)
+    /// The transcriber failed.
+    case failed(String)
+}
+
+/// Abstracts speech-to-text that runs on the Mac (SpeechAnalyzer in
+/// production): the audio never leaves the machine.
+protocol SpeechTranscribing: Sendable {
+    /// Transcribe the speech in `file`, spoken in `language` (BCP-47, e.g. "fr-CA").
+    func transcribe(file: URL, language: String) -> TranscriptionReply
 }
 
 /// Abstracts raw text recognition from a screenshot image.
@@ -148,6 +187,10 @@ extension ScreenDescribing {
 extension ScreenCapture: ScreenCapturing {}
 
 extension ScreenRecorder: ScreenRecording {}
+
+extension ScreenCaptureKitAudio: AppAudioCapturing {}
+
+extension OnDeviceTranscriber: SpeechTranscribing {}
 
 extension AppleVisionTextRecognizer: TextRecognizing {}
 
