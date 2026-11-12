@@ -2,7 +2,7 @@
   "manifest_version": "0.3",
   "name": "mirroir-mcp",
   "display_name": "mirroir",
-  "version": "0.46.1",
+  "version": "0.47.0",
   "description": "Drive a stock iPhone via iPhone Mirroring: no Developer Mode, Xcode or WDA. LLM-free skill replay.",
   "long_description": "mirroir-mcp drives a real iPhone through the macOS iPhone Mirroring window. describe_screen returns OCR'd text with tap coordinates; tap, swipe, drag, type_text, launch_app and open_url act on the device; generate_skill explores an app and authors replayable skills. The bundle carries the native Apple Silicon server binary, so it starts without Node or a network fetch. Requires macOS 15+ on Apple Silicon, a paired iPhone in iPhone Mirroring, and the Screen Recording and Accessibility permissions for the host app.",
   "author": {
