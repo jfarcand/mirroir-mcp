@@ -263,7 +263,8 @@ const skillsJson = JSON.stringify(skills).replace(/</g, "\\u003c");
       iPhone automation for AI agents: drive a real, stock iPhone from any MCP client, with <strong>no Developer Mode, no Xcode, no WebDriverAgent and no jailbreak</strong>. It works through macOS iPhone Mirroring, so it reaches any app on your phone, including App Store apps you could never build. It uses the apps already signed in on your phone: no connector, no OAuth, no password handed to anyone.
     </p>
     <div class="hero-cta">
-      <a class="btn-primary" href="#install">Install</a>
+      <a class="btn-primary" href="#demo">Watch the demo</a>
+      <a class="btn-secondary" href="#install">Install</a>
       <a class="btn-secondary" href="https://github.com/jfarcand/mirroir-mcp" rel="noopener noreferrer">View on GitHub</a>
     </div>
     <p class="hero-requirements">
@@ -274,13 +275,20 @@ const skillsJson = JSON.stringify(skills).replace(/</g, "\\u003c");
 
   <main>
   <!-- Demo Videos -->
-  <section class="demo-section">
+  <section class="demo-section" id="demo">
     <h2>Real runs on a real iPhone</h2>
     <div class="carousel demo-carousel">
       <div class="carousel-track">
         <div class="carousel-slide demo-slide">
+          <h3>Recipe reel to grocery list</h3>
+          <video class="demo-wide" loop muted playsinline preload="metadata" tabindex="0" poster={`${import.meta.env.BASE_URL}recipe-grocery-list.poster.jpg`} aria-label="The console and a real iPhone side by side: the agent opens a saved Instagram recipe reel, listens to it, then writes a ten-item grocery list in Reminders">
+            <source src={`${import.meta.env.BASE_URL}recipe-grocery-list.mp4`} type="video/mp4" />
+          </video>
+          <p class="demo-caption">A saved recipe reel becomes a grocery list in Reminders. The agent listens to the video and reads its frames. Sped up.</p>
+        </div>
+        <div class="carousel-slide demo-slide">
           <h3>Cross-app errand</h3>
-          <video class="demo-wide" loop muted playsinline preload="metadata" tabindex="0" poster={`${import.meta.env.BASE_URL}video2-waze-slack.poster.jpg`} aria-label="An AI agent reads the commute time in Waze on a real iPhone, then posts it in Slack">
+          <video class="demo-wide" loop muted playsinline preload="none" tabindex="0" poster={`${import.meta.env.BASE_URL}video2-waze-slack.poster.jpg`} aria-label="An AI agent reads the commute time in Waze on a real iPhone, then posts it in Slack">
             <source src={`${import.meta.env.BASE_URL}video2-waze-slack.mp4`} type="video/mp4" />
           </video>
           <p class="demo-caption">Sped up. The agent reads the ETA in Waze, then posts it in Slack.</p>

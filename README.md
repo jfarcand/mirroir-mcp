@@ -14,15 +14,16 @@
 
 <p align="center">
   <a href="https://mirroir.dev/?utm_source=github&utm_medium=readme&utm_campaign=header">Website</a> ·
+  <a href="https://mirroir.dev/?utm_source=github&utm_medium=readme&utm_campaign=header#demo">Demos</a> ·
   <a href="docs/onboarding.md">Set up with your agent</a> ·
   <a href="docs/tools.md">Tools</a> ·
   <a href="https://discord.gg/u8ug9QCSqF">Discord</a>
 </p>
 
 <p align="center">
-  <img src="website/public/video2-waze-slack.gif" alt="An agent reads the commute time in Waze on a real iPhone, then posts it in a Slack channel" width="720" />
+  <img src="website/public/recipe-grocery-list.gif" alt="The console and a real iPhone side by side: the agent opens a saved Instagram recipe reel, listens to it, then writes a ten-item grocery list in Reminders" width="720" />
 </p>
-<p align="center"><em>A real run on a real iPhone, sped up: the agent reads the ETA in Waze, then posts it in Slack.</em></p>
+<p align="center"><em>A saved recipe reel becomes a grocery list in Reminders. The agent listens to the video and reads its frames. A real iPhone, sped up.</em></p>
 
 No Developer Mode, no Xcode, no WebDriverAgent, no jailbreak. mirroir-mcp works through macOS iPhone Mirroring, so it reaches any app on your phone, including App Store apps you could never build. It works from any MCP client, with [42 tools](docs/tools.md).
 
