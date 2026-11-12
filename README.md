@@ -10,7 +10,7 @@
 [![macOS 15+](https://img.shields.io/badge/macOS-15%2B-black?logo=apple)](https://support.apple.com/en-us/120421)
 [![Discord](https://img.shields.io/discord/1481795325953048627?logo=discord&label=Discord)](https://discord.gg/u8ug9QCSqF)
 
-### Let your agent use your real iPhone, then replay what it did without an LLM.
+### Let your agent use your real iPhone: errands across your apps, automations, even games.
 
 <p align="center">
   <a href="https://mirroir.dev/?utm_source=github&utm_medium=readme&utm_campaign=header">Website</a> ·
@@ -21,13 +21,24 @@
 </p>
 
 <p align="center">
-  <img src="website/public/recipe-grocery-list.gif" alt="The console and a real iPhone side by side: the agent opens a saved Instagram recipe reel, listens to it, then writes a ten-item grocery list in Reminders" width="720" />
+  <img src="website/public/recipe-grocery-list.gif" alt="The Claude app and a real iPhone side by side: the agent opens a saved Instagram recipe reel, listens to it, then writes an eleven-item grocery list in Reminders" width="720" />
 </p>
 <p align="center"><em>A saved recipe reel becomes a grocery list in Reminders. The agent listens to the video and reads its frames. A real iPhone, sped up.</em></p>
 
 No Developer Mode, no Xcode, no WebDriverAgent, no jailbreak. mirroir-mcp works through macOS iPhone Mirroring, so it reaches any app on your phone, including App Store apps you could never build. It works from any MCP client, with [42 tools](docs/tools.md).
 
 It uses the apps already signed in on your phone: no connector, no OAuth, no password handed to anyone.
+
+## What people build
+
+- **A saved recipe reel becomes a grocery list.** The agent opens the reel, reads its frames with `describe_screen`, hears the narration with [`listen`](docs/tools.md#listening), then types the ingredients into Reminders. That is the run in the GIF above.
+- **Errands across apps.** Read the commute time in Waze, then post it in Slack: the agent carries what one app shows into another. [Watch the demo](https://mirroir.dev/?utm_source=github&utm_medium=readme&utm_campaign=body#demo). The same errand as a skill (Waze to Messages) is in [Skills, exploration and CI](docs/skills-and-ci.md#skills).
+- **Games.** A [`scene:` step](docs/skills-marketplace.md#scenes) plays a turn-based or tap-driven game, frame by frame, under a hard frame, token and time budget; a run that runs out of budget is inconclusive (exit 66), never a silent pass. [`touch`](docs/tools.md#games-and-multi-touch) holds a finger for virtual joysticks, `hold_keys` drives games that take keyboard and mouse, and `pinch` and `rotate` zoom and rotate. iPhone Mirroring exposes a single pointer, so twin-stick games stay out of reach. See [Games](docs/games.md).
+
+<p align="center">
+  <img src="website/public/chess-vs-maximum.gif" alt="The console and a real iPhone side by side during a full chess game: each move is logged as it is played, ending in checkmate against the Maximum bot on Chess.com" width="720" />
+</p>
+<p align="center"><em>A real game on a real iPhone: the model reads the board, Stockfish picks the moves, mirroir plays them against Chess.com's strongest bot. The opening runs at 2.5×, the middle game at 45×, the finish at 2×.</em></p>
 
 ## Quick start
 
@@ -61,22 +72,27 @@ test@example.com / password123. Screenshot after each step.
 Start recording, open Instagram, scroll the feed and open my profile, stop recording.
 ```
 
+## Build your own agent
+
+- **Any MCP client.** Claude Code, Codex, Cursor, VS Code, Claude Desktop and the others connect to the same [42 tools](docs/tools.md). It also installs as a Claude Code plugin, an OpenClaw skill from ClawHub, or a Hermes Agent plugin that asks before every call that can change the phone: see [Install](docs/install.md).
+- **Proven steps in one call.** Once a sequence has worked, [`run_steps`](docs/tools.md#tool-list) replays it in one call (`"tap: <text on screen>"`, `"type: calculator"`, `"wait_for: Get"`). Every step is checked against the permission policy before the first runs, and the run stops at the first failure.
+- **Skills.** Capture a workflow you repeat as a [SKILL.md](docs/skills-and-ci.md#skills): numbered steps the AI follows, matched on screen text, not coordinates. `generate_skill` explores an app and writes them for you. Ready-made skills live in [mirroir-skills](https://github.com/jfarcand/mirroir-skills); the format is in [Skills Marketplace](docs/skills-marketplace.md).
+- **Agents keep notes.** `save_note` keeps one line per lesson per app, and `get_notes` gives it to the next session.
+- **An agent on another machine.** [`mirroir-mcp serve`](docs/cli.md#serve) speaks MCP over HTTP on 127.0.0.1 only, behind a bearer token; reach it through an SSH port forward. `install-agent` keeps it running as a LaunchAgent from its own signed "mirroir serve" bundle, so its grants survive upgrades.
+
 ## Why mirroir
 
 - **Nothing to install on the phone.** The iPhone stays stock: no signing, no provisioning profile, no on-device agent. If iPhone Mirroring shows it, mirroir can drive it.
 - **Your Mac stays yours.** Taps, typing and swipes reach the mirror without bringing it to the front, so you can keep working. Drags and two-finger gestures bring it forward for a moment, then hand your app back.
 - **It hears the phone, too.** [`listen`](docs/tools.md#listening) turns what the phone plays, a reel's narration or a voice message, into text. It records only iPhone Mirroring's sound, and macOS transcribes it on the Mac: the audio never leaves it. Needs macOS 26; since 0.47.0.
-- **An agent on another machine.** [`mirroir-mcp serve`](docs/cli.md#serve) speaks MCP over HTTP on 127.0.0.1 only, behind a bearer token; reach it through an SSH port forward. `install-agent` keeps it running as a LaunchAgent from its own signed "mirroir serve" bundle, so its grants survive upgrades.
-- **Agents keep notes.** `save_note` keeps one line per lesson per app, and `get_notes` gives it to the next session.
+
+## Testing and CI
+
+The run an agent makes once can become a test that runs without it.
+
 - **Explore once, replay without an LLM.** `generate_skill` explores an app and writes [SKILL.md](docs/skills-and-ci.md#skills) files. A compiled skill replays from the CLI with no AI in the loop (`mirroir test`), so CI runs are deterministic and cost no tokens.
 - **One test across phone, web and backend.** [`mirroir-run`](docs/mirroir-run.md) is our companion test runner, a separate binary. One YAML scenario can drive the iPhone, a browser, HTTP endpoints and subprocesses, then compare what the page and the phone showed. See [Web and iOS in one scenario](docs/web-and-ios.md).
 - **Drift fails loudly.** `mirroir-run` has a third verdict beside pass and fail: `DRIFT`, exit code **65**, when every assertion held but the output moved past its baseline. Your CI lane decides whether drift blocks a merge.
-- **It plays games, too.** A `scene:` step plays a turn-based or tap-driven game, frame by frame, under a hard budget. See [Games](docs/games.md).
-
-  <p align="center">
-    <img src="website/public/chess-vs-maximum.gif" alt="The console and a real iPhone side by side during a full chess game: each move is logged as it is played, ending in checkmate against the Maximum bot on Chess.com" width="720" />
-  </p>
-  <p align="center"><em>A real game on a real iPhone: the model reads the board, Stockfish picks the moves, mirroir plays them against Chess.com's strongest bot. The opening runs at 2.5×, the middle game at 45×, the finish at 2×.</em></p>
 
 ### How it compares
 

@@ -1,0 +1,140 @@
+---
+// ABOUTME: The landing page's "Testing and CI" sections: exploration to CI, APP.md maps and mirroir-run.
+// ABOUTME: Rendered by pages/index.astro after the agent-building and games sections.
+import { Code } from "astro:components";
+
+const appMdExample = `---
+app: Santé
+archetype: dashboard
+obstacle_mode: auto
+---
+
+## Structure
+Dashboard with 4 tabs: Résumé, Partage, Parcourir, Profil.
+
+## Résumé Tab
+- Summary cards for health metrics that drill down to charts
+- Cards often show "Aucune donnée" on test devices
+
+## Obstacles
+- Health Access permission → tap "Autoriser"
+- Notification permission → tap "Ne pas autoriser"
+
+## Skip
+- Supprimer les données de Santé
+- Réinitialiser`;
+---
+
+<!-- From exploration to CI -->
+<section id="testing">
+  <h2>Testing and CI</h2>
+  <p>
+    The same tools that run your agent also test your app. When you need repeatable tests, mirroir takes you from a first exploration to CI. Point it at an app: it explores the screens it can reach, breadth-first, then writes a bundle of SKILL.md files. Pair it with an <code>APP.md</code> map for guided exploration. Edit the skills, test them from the CLI, diagnose failures with <code>--agent</code>.
+    <a href="https://github.com/jfarcand/mirroir-mcp/blob/main/docs/skills-and-ci.md" rel="noopener noreferrer">Skills, exploration and CI</a>.
+  </p>
+
+  <div class="pipeline-grid">
+    <div class="pipeline-step">
+      <div class="pipeline-icon">1</div>
+      <h3>Generate</h3>
+      <p>A single <code>generate_skill(action: "explore")</code> call explores each screen breadth-first, replays paths to reach child screens, and builds a navigation graph of what it reached. Pass <code>explorer: "dfs"</code> for depth-first instead.</p>
+      <div class="pipeline-cmd">
+        <code>generate_skill(action: "explore", app_name: "Weather")</code>
+      </div>
+    </div>
+    <div class="pipeline-step">
+      <div class="pipeline-icon">2</div>
+      <h3>Write</h3>
+      <p>Edit the generated skill or author one from scratch &mdash; numbered steps, no coordinates.</p>
+      <div class="pipeline-cmd">
+        <code>vim login.md</code>
+      </div>
+    </div>
+    <div class="pipeline-step">
+      <div class="pipeline-icon">3</div>
+      <h3>Run</h3>
+      <p>The AI reads the skill via <code>get_skill</code>, executes each step with MCP tools, records each one with <code>record_step</code>, and saves the coordinates with <code>save_compiled</code>.</p>
+      <div class="pipeline-cmd">
+        <code>get_skill &rarr; record_step &rarr; save_compiled</code>
+      </div>
+    </div>
+    <div class="pipeline-step">
+      <div class="pipeline-icon">4</div>
+      <h3>Test</h3>
+      <p>Replay without AI from recorded coordinates &mdash; and every step is still checked: a button that moved is found, one that is gone fails the run.</p>
+      <div class="pipeline-cmd">
+        <code>mirroir test login</code>
+      </div>
+    </div>
+    <div class="pipeline-step">
+      <div class="pipeline-icon">5</div>
+      <h3>Diagnose</h3>
+      <p>When a step fails, <code>--agent</code> compares expected vs. actual OCR and tells you the root cause and fix.</p>
+      <div class="pipeline-cmd">
+        <code>mirroir test --agent claude-sonnet-5-5 login</code>
+      </div>
+    </div>
+  </div>
+
+  <p>
+    Agent diagnosis runs in two tiers: deterministic OCR analysis first (free, no API key), then optionally an AI model for richer analysis.
+    Supports <a href="https://github.com/jfarcand/mirroir-mcp/blob/main/docs/skills-and-ci.md#ai-assisted-diagnosis" rel="noopener noreferrer">Anthropic, OpenAI, local Ollama, embacle, and CLI agents</a>.
+  </p>
+</section>
+
+<!-- Describe your app -->
+<section>
+  <h2>Describe your app with APP.md</h2>
+  <p>
+    mirroir can explore any iOS app blindly &mdash; but it works best when you tell it what to expect. Drop an <code>APP.md</code> file in <code>~/.mirroir-mcp/skills/</code> (or the community <a href="https://github.com/jfarcand/mirroir-skills/tree/main/patterns/apps" rel="noopener noreferrer">patterns/apps</a> folder) and mirroir gets a map before it starts.
+  </p>
+
+  <div class="appmd-grid">
+    <div class="appmd-code">
+      <Code code={appMdExample} lang="markdown" theme="github-dark" />
+    </div>
+    <div class="appmd-features">
+      <div class="appmd-feature">
+        <h3>Archetype</h3>
+        <p><code>dashboard</code>, <code>social-feed</code>, <code>settings-list</code>, and more &mdash; tells mirroir how the app navigates so exploration uses the right strategy.</p>
+      </div>
+      <div class="appmd-feature">
+        <h3>Structure &amp; tabs</h3>
+        <p>Tab names become priority targets when component detection misses non-standard UIs. Section descriptions flow into AI context for generated skills.</p>
+      </div>
+      <div class="appmd-feature">
+        <h3>Obstacles</h3>
+        <p>Permission prompts, onboarding sheets, rating dialogs &mdash; declared once, dismissed automatically every time they appear.</p>
+      </div>
+      <div class="appmd-feature">
+        <h3>Skip list</h3>
+        <p>Destructive actions like &ldquo;Delete account&rdquo; or &ldquo;Reset&rdquo; are never tapped during autonomous exploration.</p>
+      </div>
+    </div>
+  </div>
+
+  <p class="appmd-hint">
+    Three levels of patterns work together &mdash; <strong>elements</strong> (what rows look like), <strong>screens</strong> (what the page layout means), and <strong>apps</strong> (what the developer knows). 30 seconds of writing saves minutes of blind exploration.
+  </p>
+</section>
+
+<!-- mirroir-run: cross-platform replay -->
+<section id="mirroir-run">
+  <h2>Replay anywhere with <code>mirroir-run</code></h2>
+  <p>
+    <strong>mirroir-run</strong> replays the same scenarios beyond the iPhone: web pages through Playwright (Chromium, Firefox, WebKit), processes and HTTP natively, and iOS blocks through <code>mirroir-mcp</code>. One YAML file can drive a browser and a phone and check that they show the same thing &mdash; and its web, process, and HTTP steps run on Linux CI.
+  </p>
+  <div class="example-cards">
+    <div class="example-card">
+      <p class="example-prompt">Drift fails loudly</p>
+      <p class="example-steps"><code>mirroir-run</code> has a third verdict beside pass and fail: <code>DRIFT</code>, exit code 65, when every assertion held but the output moved past its baseline.</p>
+    </div>
+    <div class="example-card">
+      <p class="example-prompt">One scenario, many surfaces</p>
+      <p class="example-steps">A single scenario can drive the iPhone, a browser (Playwright), HTTP endpoints and subprocesses, then compare what the page and the phone showed.</p>
+    </div>
+  </div>
+  <p>
+    <a href={`${import.meta.env.BASE_URL}docs/#mirroir-run`}>Commands, install, GitHub Actions and Maestro import</a>
+  </p>
+</section>

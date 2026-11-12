@@ -2,6 +2,7 @@
 import Layout from "../layouts/Layout.astro";
 import { Code } from "astro:components";
 import "../styles/global.css";
+import TestingSection from "../components/TestingSection.astro";
 import { readFileSync, existsSync } from "node:fs";
 import { resolve } from "node:path";
 
@@ -30,27 +31,6 @@ const permissionsCode = `{
   "deny": [],
   "blockedApps": ["Wallet", "Banking"]
 }`;
-
-const appMdExample = `---
-app: Santé
-archetype: dashboard
-obstacle_mode: auto
----
-
-## Structure
-Dashboard with 4 tabs: Résumé, Partage, Parcourir, Profil.
-
-## Résumé Tab
-- Summary cards for health metrics that drill down to charts
-- Cards often show "Aucune donnée" on test devices
-
-## Obstacles
-- Health Access permission → tap "Autoriser"
-- Notification permission → tap "Ne pas autoriser"
-
-## Skip
-- Supprimer les données de Santé
-- Réinitialiser`;
 
 const skillExpo = `---
 version: 1
@@ -249,7 +229,7 @@ const skillsJson = JSON.stringify(skills).replace(/</g, "\\u003c");
 
 <Layout
   title="mirroir-mcp: real iPhone automation for AI agents over MCP"
-  description="Let your AI agent use your real iPhone over MCP, with no Developer Mode, Xcode or WebDriverAgent. Automate any app, then replay the flow in CI without an LLM."
+  description="Let your AI agent use your real iPhone over MCP, with no Developer Mode, Xcode or WebDriverAgent. Build agents and automations across any app, play games, then replay a flow without an LLM."
   softwareVersion={version}
 >
   <!-- Hero -->
@@ -257,10 +237,10 @@ const skillsJson = JSON.stringify(skills).replace(/</g, "\\u003c");
     <img src={`${import.meta.env.BASE_URL}mirroir-wordmark.svg`} alt="mirroir-mcp logo" class="logo" width="80" height="100" />
     <h1>mirroir-mcp</h1>
     <p class="tagline">
-      Let your agent use your real iPhone, then replay what it did without an LLM.
+      Let your agent use your real iPhone: errands across your apps, automations, even games.
     </p>
     <p class="subtitle">
-      iPhone automation for AI agents: drive a real, stock iPhone from any MCP client, with <strong>no Developer Mode, no Xcode, no WebDriverAgent and no jailbreak</strong>. It works through macOS iPhone Mirroring, so it reaches any app on your phone, including App Store apps you could never build. It uses the apps already signed in on your phone: no connector, no OAuth, no password handed to anyone.
+      Build agents on a real, stock iPhone from any MCP client, with <strong>no Developer Mode, no Xcode, no WebDriverAgent and no jailbreak</strong>. It works through macOS iPhone Mirroring, so it reaches any app on your phone, including App Store apps you could never build. It uses the apps already signed in on your phone: no connector, no OAuth, no password handed to anyone. Once a flow works, it replays without an LLM.
     </p>
     <div class="hero-cta">
       <a class="btn-primary" href="#demo">Watch the demo</a>
@@ -281,17 +261,10 @@ const skillsJson = JSON.stringify(skills).replace(/</g, "\\u003c");
       <div class="carousel-track">
         <div class="carousel-slide demo-slide">
           <h3>Recipe reel to grocery list</h3>
-          <video class="demo-wide" loop muted playsinline preload="metadata" tabindex="0" poster={`${import.meta.env.BASE_URL}recipe-grocery-list.poster.jpg`} aria-label="The console and a real iPhone side by side: the agent opens a saved Instagram recipe reel, listens to it, then writes a ten-item grocery list in Reminders">
+          <video class="demo-wide" loop muted playsinline preload="metadata" tabindex="0" poster={`${import.meta.env.BASE_URL}recipe-grocery-list.poster.jpg`} aria-label="The Claude app and a real iPhone side by side: the agent opens a saved Instagram recipe reel, listens to it, then writes an eleven-item grocery list in Reminders">
             <source src={`${import.meta.env.BASE_URL}recipe-grocery-list.mp4`} type="video/mp4" />
           </video>
           <p class="demo-caption">A saved recipe reel becomes a grocery list in Reminders. The agent listens to the video and reads its frames. Sped up.</p>
-        </div>
-        <div class="carousel-slide demo-slide">
-          <h3>Cross-app errand</h3>
-          <video class="demo-wide" loop muted playsinline preload="none" tabindex="0" poster={`${import.meta.env.BASE_URL}video2-waze-slack.poster.jpg`} aria-label="An AI agent reads the commute time in Waze on a real iPhone, then posts it in Slack">
-            <source src={`${import.meta.env.BASE_URL}video2-waze-slack.mp4`} type="video/mp4" />
-          </video>
-          <p class="demo-caption">Sped up. The agent reads the ETA in Waze, then posts it in Slack.</p>
         </div>
         <div class="carousel-slide demo-slide">
           <h3>Chess against the strongest bot</h3>
@@ -299,6 +272,13 @@ const skillsJson = JSON.stringify(skills).replace(/</g, "\\u003c");
             <source src={`${import.meta.env.BASE_URL}chess-vs-maximum.mp4`} type="video/mp4" />
           </video>
           <p class="demo-caption">A vision model reads the board, Stockfish picks the moves, and mirroir plays them against Chess.com's Maximum bot. The opening runs at 2.5&times;, the middle game at 45&times;, the finish at 2&times;.</p>
+        </div>
+        <div class="carousel-slide demo-slide">
+          <h3>Cross-app errand</h3>
+          <video class="demo-wide" loop muted playsinline preload="none" tabindex="0" poster={`${import.meta.env.BASE_URL}video2-waze-slack.poster.jpg`} aria-label="An AI agent reads the commute time in Waze on a real iPhone, then posts it in Slack">
+            <source src={`${import.meta.env.BASE_URL}video2-waze-slack.mp4`} type="video/mp4" />
+          </video>
+          <p class="demo-caption">Sped up. The agent reads the ETA in Waze, then posts it in Slack.</p>
         </div>
         <div class="carousel-slide demo-slide">
           <h3>Login flow</h3>
@@ -470,6 +450,41 @@ const skillsJson = JSON.stringify(skills).replace(/</g, "\\u003c");
     </p>
   </section>
 
+  <!-- Build agents -->
+  <section id="build">
+    <h2>Build agents on a real iPhone</h2>
+    <p>
+      mirroir-mcp gives your agent 42 tools over MCP: touch, typing, screen reading, navigation, listening and skills. Your agent decides what to do; mirroir sees the phone and acts on it.
+      <a href={`${import.meta.env.BASE_URL}docs/#tools`}>See every tool</a>.
+    </p>
+    <div class="example-cards">
+      <div class="example-card">
+        <p class="example-prompt">Proven steps in one call</p>
+        <p class="example-steps">Once a sequence has worked, <code>run_steps</code> runs it again in one call: <code>"tap: Search"</code>, <code>"type: calculator"</code>, <code>"wait_for: Get"</code>. Every step is checked against the permission policy before the first runs, and the run stops at the first failure.</p>
+      </div>
+      <div class="example-card">
+        <p class="example-prompt">It hears the phone, too</p>
+        <p class="example-steps"><code>listen</code> turns what the phone plays, a reel's narration or a voice message, into text. Only iPhone Mirroring's sound is recorded, and macOS transcribes it on the Mac: the audio never leaves it. Needs macOS 26; since 0.47.0.</p>
+      </div>
+      <div class="example-card">
+        <p class="example-prompt">Agents keep notes</p>
+        <p class="example-steps"><code>save_note</code> keeps one line per lesson per app, and <code>get_notes</code> hands it to the next session, so it starts with what the last one learned.</p>
+      </div>
+      <div class="example-card">
+        <p class="example-prompt">Flows become skills</p>
+        <p class="example-steps">A flow you repeat becomes a SKILL.md: numbered steps your agent follows, found by text on screen, not coordinates. <a href="#skills">Skills</a>.</p>
+      </div>
+      <div class="example-card">
+        <p class="example-prompt">Plugins for your agent</p>
+        <p class="example-steps">Install it as a Claude Code plugin, a Hermes Agent plugin or a Claude Desktop extension, or add it to any other MCP client. <a href="#install">Install</a>.</p>
+      </div>
+      <div class="example-card">
+        <p class="example-prompt">An agent on another machine</p>
+        <p class="example-steps"><code>mirroir-mcp serve</code> speaks MCP over HTTP on 127.0.0.1 only, behind a bearer token; reach it through an SSH port forward. <code>install-agent</code> runs it as a LaunchAgent from its own signed "mirroir serve" app, so its grants survive upgrades. <a href={`${import.meta.env.BASE_URL}docs/#serve`}>Set it up</a>.</p>
+      </div>
+    </div>
+  </section>
+
   <!-- Just tell your AI -->
   <section>
     <h2>Ask your agent</h2>
@@ -521,110 +536,6 @@ const skillsJson = JSON.stringify(skills).replace(/</g, "\\u003c");
     <div class="agent-walkthrough">
       You say <em>"send Alice a message."</em> The AI screenshots the phone, reads the screen via OCR, taps Messages, finds Alice's conversation, types your message, and hits Send.
     </div>
-  </section>
-
-  <!-- Why mirroir -->
-  <section id="why">
-    <h2>Why mirroir</h2>
-    <div class="example-cards">
-      <div class="example-card">
-        <p class="example-prompt">Your apps, already signed in</p>
-        <p class="example-steps">mirroir uses the apps already signed in on your phone: no connector, no OAuth, no password handed to anyone. If you can open it on the phone, your agent can use it.</p>
-      </div>
-      <div class="example-card">
-        <p class="example-prompt">Nothing to install on the phone</p>
-        <p class="example-steps">The iPhone stays stock: no signing, no provisioning profile, no on-device agent. If iPhone Mirroring shows it, mirroir can drive it.</p>
-      </div>
-      <div class="example-card">
-        <p class="example-prompt">Your Mac stays yours</p>
-        <p class="example-steps">Taps, typing and swipes reach the mirror without bringing it to the front, so you can keep working. Drags and two-finger gestures bring it forward for a moment, then hand your app back.</p>
-      </div>
-      <div class="example-card">
-        <p class="example-prompt">Explore once, replay without an LLM</p>
-        <p class="example-steps"><code>generate_skill</code> explores an app and writes SKILL.md files. A compiled skill replays from the CLI with no AI in the loop, so CI runs are deterministic and cost no tokens.</p>
-      </div>
-      <div class="example-card">
-        <p class="example-prompt">Drift fails loudly</p>
-        <p class="example-steps"><code>mirroir-run</code> has a third verdict beside pass and fail: <code>DRIFT</code>, exit code 65, when every assertion held but the output moved past its baseline.</p>
-      </div>
-      <div class="example-card">
-        <p class="example-prompt">One scenario, many surfaces</p>
-        <p class="example-steps">A single scenario can drive the iPhone, a browser (Playwright), HTTP endpoints and subprocesses, then compare what the page and the phone showed.</p>
-      </div>
-      <div class="example-card">
-        <p class="example-prompt">It plays games, too</p>
-        <p class="example-steps">A <code>scene:</code> step plays a turn-based or tap-driven game, frame by frame, under a hard budget. <a href="#games">See how</a>.</p>
-      </div>
-      <div class="example-card">
-        <p class="example-prompt">It hears the phone, too</p>
-        <p class="example-steps"><code>listen</code> turns what the phone plays, a reel's narration or a voice message, into text. Only iPhone Mirroring's sound is recorded, and macOS transcribes it on the Mac: the audio never leaves it. Needs macOS 26; since 0.47.0.</p>
-      </div>
-      <div class="example-card">
-        <p class="example-prompt">An agent on another machine</p>
-        <p class="example-steps"><code>mirroir-mcp serve</code> speaks MCP over HTTP on 127.0.0.1 only, behind a bearer token; reach it through an SSH port forward. <code>install-agent</code> runs it as a LaunchAgent from its own signed "mirroir serve" app, so its grants survive upgrades. <a href={`${import.meta.env.BASE_URL}docs/#serve`}>Set it up</a>.</p>
-      </div>
-      <div class="example-card">
-        <p class="example-prompt">Agents keep notes</p>
-        <p class="example-steps"><code>save_note</code> keeps one line per lesson per app, and <code>get_notes</code> hands it to the next session, so it starts with what the last one learned.</p>
-      </div>
-    </div>
-
-    <h3 class="compare-title">How it compares</h3>
-    <div class="compare-wrap">
-      <table class="compare-table">
-        <thead>
-          <tr>
-            <th></th>
-            <th>mirroir</th>
-            <th><a href="https://github.com/phone-harness/phone-harness" rel="noopener noreferrer">phone-harness</a></th>
-            <th><a href="https://github.com/mobile-next/mobile-mcp" rel="noopener noreferrer">mobile-mcp</a></th>
-            <th><a href="https://github.com/appium/appium" rel="noopener noreferrer">Appium</a></th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr><th>Physical iPhone, no Developer Mode or signing</th><td>Yes &mdash; stock phone via iPhone Mirroring</td><td>Yes &mdash; stock phone via iPhone Mirroring</td><td>USB-connected, trusted device</td><td>No &mdash; WebDriverAgent via Xcode, Developer Mode</td></tr>
-          <tr><th>App Store apps you can't build</th><td>Yes</td><td>Yes</td><td>Yes</td><td>Yes, on a provisioned device</td></tr>
-          <tr><th>Your own iPhone from any MCP client</th><td>Yes</td><td>No &mdash; its MCP server is cloud-only; local phones use its CLI</td><td>Yes</td><td>Through the separate <a href="https://github.com/appium/appium-mcp" rel="noopener noreferrer">appium-mcp</a></td></tr>
-          <tr><th>Replay without an LLM</th><td>Yes &mdash; compiled skills</td><td>Python scripts you write; no recorder or compiled replay</td><td>No &mdash; the agent drives every run</td><td>Yes &mdash; test code</td></tr>
-          <tr><th>Distinct drift verdict</th><td>Yes &mdash; <code>DRIFT</code>, exit 65</td><td>No</td><td>No</td><td>No</td></tr>
-          <tr><th>One scenario across iPhone + web + HTTP</th><td>Yes &mdash; <code>mirroir-run</code></td><td>No</td><td>No</td><td>Via your own test code</td></tr>
-          <tr><th>Android</th><td>No</td><td>Yes</td><td>Yes</td><td>Yes</td></tr>
-          <tr><th>iOS Simulator</th><td>No</td><td>No</td><td>Yes</td><td>Yes</td></tr>
-          <tr><th>Hosted cloud phones</th><td>No</td><td>Yes &mdash; Phone Harness Cloud</td><td>Yes &mdash; Mobile Next Cloud</td><td>Via third-party device clouds</td></tr>
-        </tbody>
-      </table>
-    </div>
-    <p>phone-harness is the closest tool here: it also drives a stock iPhone through iPhone Mirroring, and it adds Android and hosted phones, which mirroir doesn't have. mobile-mcp and Appium cover Android and simulators too. mirroir goes further after the agent's first run: that run becomes a replay that needs no LLM, and a test that tells you when the output moves.</p>
-  </section>
-
-  <!-- Security -->
-  <section>
-    <h2>Safety</h2>
-    <p>
-      Giving an AI access to your phone demands defense in depth, so mirroir-mcp is fail-closed.
-    </p>
-
-    <div class="security-grid">
-      <div class="security-layer">
-        <h3>Tool permissions</h3>
-        <p>Without a config file, only the 14 read-only tools (<code>screenshot</code>, <code>describe_screen</code>, <code>status</code>, <code>list_skills</code>, &hellip;) are exposed. Mutating tools are hidden from the MCP client entirely &mdash; it never sees them.</p>
-      </div>
-      <div class="security-layer">
-        <h3>App blocking</h3>
-        <p><code>blockedApps</code> in <code>permissions.json</code> prevents the AI from interacting with sensitive apps like Wallet or Banking &mdash; even if mutating tools are allowed.</p>
-      </div>
-      <div class="security-layer">
-        <h3>No root, no daemon</h3>
-        <p>Runs as your user with Screen Recording and Accessibility permissions, and lives and dies with your MCP client. No kernel extensions, no root privileges; the only thing that keeps running is the <code>serve</code> agent, if you install it.</p>
-      </div>
-    </div>
-
-    <Code code={permissionsCode} lang="json" theme="github-dark" />
-
-    <p>
-      Drop this in <code>~/.mirroir-mcp/permissions.json</code> to control
-      exactly which tools your AI agent can use. Quit iPhone Mirroring, unlock the iPhone or lock the Mac to stop all input instantly.
-    </p>
   </section>
 
   <!-- Skills -->
@@ -772,112 +683,9 @@ const skillsJson = JSON.stringify(skills).replace(/</g, "\\u003c");
     </script>
   </section>
 
-  <!-- From exploration to CI -->
-  <section>
-    <h2>From exploration to CI</h2>
-    <p>
-      When you need repeatable tests, mirroir takes you from a first exploration to CI. Point it at an app: it explores the screens it can reach, breadth-first, then writes a bundle of SKILL.md files. Pair it with an <code>APP.md</code> map for guided exploration. Edit the skills, test them from the CLI, diagnose failures with <code>--agent</code>.
-    </p>
-
-    <div class="pipeline-grid">
-      <div class="pipeline-step">
-        <div class="pipeline-icon">1</div>
-        <h3>Generate</h3>
-        <p>A single <code>generate_skill(action: "explore")</code> call explores each screen breadth-first, replays paths to reach child screens, and builds a navigation graph of what it reached. Pass <code>explorer: "dfs"</code> for depth-first instead.</p>
-        <div class="pipeline-cmd">
-          <code>generate_skill(action: "explore", app_name: "Weather")</code>
-        </div>
-      </div>
-      <div class="pipeline-step">
-        <div class="pipeline-icon">2</div>
-        <h3>Write</h3>
-        <p>Edit the generated skill or author one from scratch &mdash; numbered steps, no coordinates.</p>
-        <div class="pipeline-cmd">
-          <code>vim login.md</code>
-        </div>
-      </div>
-      <div class="pipeline-step">
-        <div class="pipeline-icon">3</div>
-        <h3>Run</h3>
-        <p>The AI reads the skill via <code>get_skill</code>, executes each step with MCP tools, records each one with <code>record_step</code>, and saves the coordinates with <code>save_compiled</code>.</p>
-        <div class="pipeline-cmd">
-          <code>get_skill &rarr; record_step &rarr; save_compiled</code>
-        </div>
-      </div>
-      <div class="pipeline-step">
-        <div class="pipeline-icon">4</div>
-        <h3>Test</h3>
-        <p>Replay without AI from recorded coordinates &mdash; and every step is still checked: a button that moved is found, one that is gone fails the run.</p>
-        <div class="pipeline-cmd">
-          <code>mirroir test login</code>
-        </div>
-      </div>
-      <div class="pipeline-step">
-        <div class="pipeline-icon">5</div>
-        <h3>Diagnose</h3>
-        <p>When a step fails, <code>--agent</code> compares expected vs. actual OCR and tells you the root cause and fix.</p>
-        <div class="pipeline-cmd">
-          <code>mirroir test --agent claude-sonnet-5-5 login</code>
-        </div>
-      </div>
-    </div>
-
-    <p>
-      Agent diagnosis runs in two tiers: deterministic OCR analysis first (free, no API key), then optionally an AI model for richer analysis.
-      Supports <a href="https://github.com/jfarcand/mirroir-mcp#ai-assisted-diagnosis" rel="noopener noreferrer">Anthropic, OpenAI, local Ollama, embacle, and CLI agents</a>.
-    </p>
-  </section>
-
-  <!-- Describe your app -->
-  <section>
-    <h2>Describe your app with APP.md</h2>
-    <p>
-      mirroir can explore any iOS app blindly &mdash; but it works best when you tell it what to expect. Drop an <code>APP.md</code> file in <code>~/.mirroir-mcp/skills/</code> (or the community <a href="https://github.com/jfarcand/mirroir-skills/tree/main/patterns/apps" rel="noopener noreferrer">patterns/apps</a> folder) and mirroir gets a map before it starts.
-    </p>
-
-    <div class="appmd-grid">
-      <div class="appmd-code">
-        <Code code={appMdExample} lang="markdown" theme="github-dark" />
-      </div>
-      <div class="appmd-features">
-        <div class="appmd-feature">
-          <h3>Archetype</h3>
-          <p><code>dashboard</code>, <code>social-feed</code>, <code>settings-list</code>, and more &mdash; tells mirroir how the app navigates so exploration uses the right strategy.</p>
-        </div>
-        <div class="appmd-feature">
-          <h3>Structure &amp; tabs</h3>
-          <p>Tab names become priority targets when component detection misses non-standard UIs. Section descriptions flow into AI context for generated skills.</p>
-        </div>
-        <div class="appmd-feature">
-          <h3>Obstacles</h3>
-          <p>Permission prompts, onboarding sheets, rating dialogs &mdash; declared once, dismissed automatically every time they appear.</p>
-        </div>
-        <div class="appmd-feature">
-          <h3>Skip list</h3>
-          <p>Destructive actions like &ldquo;Delete account&rdquo; or &ldquo;Reset&rdquo; are never tapped during autonomous exploration.</p>
-        </div>
-      </div>
-    </div>
-
-    <p class="appmd-hint">
-      Three levels of patterns work together &mdash; <strong>elements</strong> (what rows look like), <strong>screens</strong> (what the page layout means), and <strong>apps</strong> (what the developer knows). 30 seconds of writing saves minutes of blind exploration.
-    </p>
-  </section>
-
-  <!-- mirroir-run: cross-platform replay -->
-  <section id="mirroir-run">
-    <h2>Replay anywhere with <code>mirroir-run</code></h2>
-    <p>
-      <strong>mirroir-run</strong> replays the same scenarios beyond the iPhone: web pages through Playwright (Chromium, Firefox, WebKit), processes and HTTP natively, and iOS blocks through <code>mirroir-mcp</code>. One YAML file can drive a browser and a phone and check that they show the same thing &mdash; and its web, process, and HTTP steps run on Linux CI.
-    </p>
-    <p>
-      <a href={`${import.meta.env.BASE_URL}docs/#mirroir-run`}>Commands, install, GitHub Actions and Maestro import</a>
-    </p>
-  </section>
-
   <!-- Games -->
   <section id="games">
-    <h2>It plays games, too</h2>
+    <h2>Games</h2>
     <p>
       A <a href="https://github.com/jfarcand/mirroir-mcp/blob/main/docs/games.md" rel="noopener noreferrer"><code>scene:</code> step</a> plays a turn-based or tap-driven game, frame by frame, until the game is won or lost or its budget of frames, tokens or time runs out. A run that exhausts its budget is inconclusive (exit 66), never a silent pass.
     </p>
@@ -885,18 +693,94 @@ const skillsJson = JSON.stringify(skills).replace(/</g, "\\u003c");
       The chess game above is one of these runs. A vision model reads the board, Stockfish picks each move, and mirroir plays it on a stock iPhone. It beat Chess.com's Maximum bot (3200) in 65 frames and about 166,000 tokens.
     </p>
     <p>
-      Menus, shops and win screens are ordinary UI that skills already drive. iPhone Mirroring exposes a single pointer, so twin-stick and twitch games stay out of reach.
+      Menus, shops and win screens are ordinary UI that skills already drive. For the playfield, <code>touch</code> holds a finger across calls for virtual joysticks and press-and-hold, <code>hold_keys</code> holds keys for games that take keyboard and mouse controls, like Roblox, and <code>pinch</code> and <code>rotate</code> drive two-finger zoom and rotation. iPhone Mirroring exposes a single pointer, so twin-stick and twitch games stay out of reach.
+    </p>
+    <p>
+      <a href="https://github.com/jfarcand/mirroir-mcp/blob/main/docs/games.md" rel="noopener noreferrer">Read the games guide</a>
     </p>
   </section>
 
-  <!-- What it does -->
+  <!-- Why mirroir -->
+  <section id="why">
+    <h2>Why mirroir</h2>
+    <div class="example-cards">
+      <div class="example-card">
+        <p class="example-prompt">Your apps, already signed in</p>
+        <p class="example-steps">mirroir uses the apps already signed in on your phone: no connector, no OAuth, no password handed to anyone. If you can open it on the phone, your agent can use it.</p>
+      </div>
+      <div class="example-card">
+        <p class="example-prompt">Nothing to install on the phone</p>
+        <p class="example-steps">The iPhone stays stock: no signing, no provisioning profile, no on-device agent. If iPhone Mirroring shows it, mirroir can drive it.</p>
+      </div>
+      <div class="example-card">
+        <p class="example-prompt">Your Mac stays yours</p>
+        <p class="example-steps">Taps, typing and swipes reach the mirror without bringing it to the front, so you can keep working. Drags and two-finger gestures bring it forward for a moment, then hand your app back.</p>
+      </div>
+      <div class="example-card">
+        <p class="example-prompt">Explore once, replay without an LLM</p>
+        <p class="example-steps"><code>generate_skill</code> explores an app and writes SKILL.md files. A compiled skill replays from the CLI with no AI in the loop, so CI runs are deterministic and cost no tokens.</p>
+      </div>
+    </div>
+
+    <h3 class="compare-title">How it compares</h3>
+    <div class="compare-wrap">
+      <table class="compare-table">
+        <thead>
+          <tr>
+            <th></th>
+            <th>mirroir</th>
+            <th><a href="https://github.com/phone-harness/phone-harness" rel="noopener noreferrer">phone-harness</a></th>
+            <th><a href="https://github.com/mobile-next/mobile-mcp" rel="noopener noreferrer">mobile-mcp</a></th>
+            <th><a href="https://github.com/appium/appium" rel="noopener noreferrer">Appium</a></th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><th>Physical iPhone, no Developer Mode or signing</th><td>Yes &mdash; stock phone via iPhone Mirroring</td><td>Yes &mdash; stock phone via iPhone Mirroring</td><td>USB-connected, trusted device</td><td>No &mdash; WebDriverAgent via Xcode, Developer Mode</td></tr>
+          <tr><th>App Store apps you can't build</th><td>Yes</td><td>Yes</td><td>Yes</td><td>Yes, on a provisioned device</td></tr>
+          <tr><th>Your own iPhone from any MCP client</th><td>Yes</td><td>No &mdash; its MCP server is cloud-only; local phones use its CLI</td><td>Yes</td><td>Through the separate <a href="https://github.com/appium/appium-mcp" rel="noopener noreferrer">appium-mcp</a></td></tr>
+          <tr><th>Replay without an LLM</th><td>Yes &mdash; compiled skills</td><td>Python scripts you write; no recorder or compiled replay</td><td>No &mdash; the agent drives every run</td><td>Yes &mdash; test code</td></tr>
+          <tr><th>Distinct drift verdict</th><td>Yes &mdash; <code>DRIFT</code>, exit 65</td><td>No</td><td>No</td><td>No</td></tr>
+          <tr><th>One scenario across iPhone + web + HTTP</th><td>Yes &mdash; <code>mirroir-run</code></td><td>No</td><td>No</td><td>Via your own test code</td></tr>
+          <tr><th>Android</th><td>No</td><td>Yes</td><td>Yes</td><td>Yes</td></tr>
+          <tr><th>iOS Simulator</th><td>No</td><td>No</td><td>Yes</td><td>Yes</td></tr>
+          <tr><th>Hosted cloud phones</th><td>No</td><td>Yes &mdash; Phone Harness Cloud</td><td>Yes &mdash; Mobile Next Cloud</td><td>Via third-party device clouds</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p>phone-harness is the closest tool here: it also drives a stock iPhone through iPhone Mirroring, and it adds Android and hosted phones, which mirroir doesn't have. mobile-mcp and Appium cover Android and simulators too. mirroir goes further after the agent's first run: that run becomes a replay that needs no LLM, and a test that tells you when the output moves.</p>
+  </section>
+
+  <!-- Security -->
   <section>
-    <h2>What mirroir-mcp can do</h2>
+    <h2>Safety</h2>
     <p>
-      42 tools exposed as an MCP server: touch, typing, screen reading, navigation and skills.
-      <a href={`${import.meta.env.BASE_URL}docs/#tools`}>See every tool</a>.
+      Giving an AI access to your phone demands defense in depth, so mirroir-mcp is fail-closed.
+    </p>
+
+    <div class="security-grid">
+      <div class="security-layer">
+        <h3>Tool permissions</h3>
+        <p>Without a config file, only the 14 read-only tools (<code>screenshot</code>, <code>describe_screen</code>, <code>status</code>, <code>list_skills</code>, &hellip;) are exposed. Mutating tools are hidden from the MCP client entirely &mdash; it never sees them.</p>
+      </div>
+      <div class="security-layer">
+        <h3>App blocking</h3>
+        <p><code>blockedApps</code> in <code>permissions.json</code> prevents the AI from interacting with sensitive apps like Wallet or Banking &mdash; even if mutating tools are allowed.</p>
+      </div>
+      <div class="security-layer">
+        <h3>No root, no daemon</h3>
+        <p>Runs as your user with Screen Recording and Accessibility permissions, and lives and dies with your MCP client. No kernel extensions, no root privileges; the only thing that keeps running is the <code>serve</code> agent, if you install it.</p>
+      </div>
+    </div>
+
+    <Code code={permissionsCode} lang="json" theme="github-dark" />
+
+    <p>
+      Drop this in <code>~/.mirroir-mcp/permissions.json</code> to control
+      exactly which tools your AI agent can use. Quit iPhone Mirroring, unlock the iPhone or lock the Mac to stop all input instantly.
     </p>
   </section>
+
+  <TestingSection />
 
   <!-- FAQ -->
   <section>
