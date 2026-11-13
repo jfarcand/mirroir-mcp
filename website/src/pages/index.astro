@@ -1,5 +1,5 @@
 ---
-// ABOUTME: The mirroir.dev landing page: hero, demo videos, install, what it does, safety and a short FAQ.
+// ABOUTME: The mirroir.dev landing page: hero, demo videos, install, the three modes, safety and a short FAQ.
 // ABOUTME: Reference material (install options, tools, skills, testing, comparison) lives on pages/docs.astro.
 import Layout from "../layouts/Layout.astro";
 import "../styles/global.css";
@@ -32,7 +32,7 @@ const docs = `${import.meta.env.BASE_URL}docs/`;
       Let your agent use your real iPhone.
     </p>
     <p class="subtitle">
-      Any app, from any MCP client. <strong>No Developer Mode, no connector, no password handed to anyone.</strong>
+      A personal agent, a game player, and automation that replays without an LLM. <strong>No Developer Mode, no connector, no password handed to anyone.</strong>
     </p>
     <div class="hero-cta">
       <a class="btn-primary" href="#demo">Watch the demo</a>
@@ -204,6 +204,28 @@ const docs = `${import.meta.env.BASE_URL}docs/`;
     <span>Like mirroir-mcp? <strong>Star us on GitHub</strong> &#9733;</span>
   </a>
 
+  <!-- Three modes -->
+  <section id="why">
+    <h2>Three ways to use it</h2>
+    <div class="example-cards">
+      <div class="example-card">
+        <p class="example-prompt">Your personal agent</p>
+        <p class="example-steps">Errands across the apps already signed in on your phone. It reads the screen and listens: a saved recipe reel becomes a grocery list. No connector, no password handed to anyone.</p>
+        <p class="example-steps"><a href="https://github.com/jfarcand/mirroir-mcp#what-people-build" rel="noopener noreferrer">Details on GitHub</a></p>
+      </div>
+      <div class="example-card">
+        <p class="example-prompt">Games</p>
+        <p class="example-steps">It plays turn-based and tap-driven games, frame by frame, under a budget. It beat Chess.com's strongest bot.</p>
+        <p class="example-steps"><a href="https://github.com/jfarcand/mirroir-mcp/blob/main/docs/games.md" rel="noopener noreferrer">Details on GitHub</a></p>
+      </div>
+      <div class="example-card">
+        <p class="example-prompt">Automation</p>
+        <p class="example-steps">A flow that worked becomes a skill that replays without an LLM. <code>mirroir-run</code> runs it in CI with the web and your API, and flags drift.</p>
+        <p class="example-steps"><a href="https://github.com/jfarcand/mirroir-mcp#testing-and-ci" rel="noopener noreferrer">Details on GitHub</a></p>
+      </div>
+    </div>
+  </section>
+
   <!-- Install -->
   <section id="install">
     <h2>Install <span class="version-badge">v{version}</span></h2>
@@ -224,38 +246,6 @@ const docs = `${import.meta.env.BASE_URL}docs/`;
     <p class="alt-install">
       Claude Code plugin, Hermes Agent, Claude Desktop: <a href={`${docs}#install`}>every install option</a>.
     </p>
-  </section>
-
-  <!-- What it does -->
-  <section id="why">
-    <h2>What it does</h2>
-    <div class="example-cards">
-      <div class="example-card">
-        <p class="example-prompt">Your apps, already signed in</p>
-        <p class="example-steps">No connector, no OAuth, no password handed to anyone.</p>
-      </div>
-      <div class="example-card">
-        <p class="example-prompt">Nothing on the phone</p>
-        <p class="example-steps">A stock iPhone. No Xcode, no jailbreak.</p>
-      </div>
-      <div class="example-card">
-        <p class="example-prompt">It listens</p>
-        <p class="example-steps">A reel or a voice message becomes text, transcribed on the Mac.</p>
-      </div>
-      <div class="example-card">
-        <p class="example-prompt">Replays without an LLM</p>
-        <p class="example-steps">A flow that worked becomes a skill. <a href={`${docs}#skills`}>Skills</a></p>
-      </div>
-      <div class="example-card">
-        <p class="example-prompt">Plays games</p>
-        <p class="example-steps">It beat Chess.com's strongest bot. <a href="https://github.com/jfarcand/mirroir-mcp/blob/main/docs/games.md" rel="noopener noreferrer">Games</a></p>
-      </div>
-      <div class="example-card">
-        <p class="example-prompt">Tests your app</p>
-        <p class="example-steps">Explore, replay in CI, fail on drift. <a href={`${docs}#testing`}>Testing</a></p>
-      </div>
-    </div>
-    <p><a href={`${docs}#tools`}>All 42 tools</a> &middot; <a href={`${docs}#compare`}>How it compares</a></p>
   </section>
 
   <!-- Safety -->
