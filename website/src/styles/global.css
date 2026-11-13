@@ -968,6 +968,26 @@ section > p {
   max-width: 720px;
 }
 
+.demo-expand {
+  display: block;
+  margin: 0.6rem auto 0;
+  padding: 0.35rem 0.9rem;
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--color-muted);
+  font: inherit;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s;
+}
+
+.demo-expand:hover,
+.demo-expand:focus-visible {
+  border-color: var(--color-accent);
+  color: var(--color-accent);
+}
+
 .demo-caption {
   max-width: 720px;
   margin: 0.6rem auto 0;

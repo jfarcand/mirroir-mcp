@@ -261,7 +261,7 @@ const skillsJson = JSON.stringify(skills).replace(/</g, "\\u003c");
       <div class="carousel-track">
         <div class="carousel-slide demo-slide">
           <h3>Recipe reel to grocery list</h3>
-          <video class="demo-wide" loop muted playsinline preload="metadata" tabindex="0" poster={`${import.meta.env.BASE_URL}recipe-grocery-list.poster.jpg`} aria-label="The Claude app and a real iPhone side by side: the agent opens a saved Instagram recipe reel, listens to it, then writes an eleven-item grocery list in Reminders">
+          <video class="demo-wide" loop muted playsinline preload="metadata" tabindex="0" data-full={`${import.meta.env.BASE_URL}recipe-grocery-list.full.mp4`} data-full-label="Watch the full run (45 s)" poster={`${import.meta.env.BASE_URL}recipe-grocery-list.poster.jpg`} aria-label="The Claude app and a real iPhone side by side: the agent opens a saved Instagram recipe reel, listens to it, then writes an eleven-item grocery list in Reminders">
             <source src={`${import.meta.env.BASE_URL}recipe-grocery-list.mp4`} type="video/mp4" />
           </video>
           <p class="demo-caption">A saved recipe reel becomes a grocery list in Reminders. The agent listens to the video and reads its frames. Sped up.</p>
@@ -294,7 +294,7 @@ const skillsJson = JSON.stringify(skills).replace(/</g, "\\u003c");
     </div>
     <div class="demo-lightbox" id="demo-lightbox" role="dialog" aria-label="Video lightbox" aria-modal="true">
       <button class="lightbox-close" aria-label="Close lightbox">&times;</button>
-      <video loop muted playsinline id="demo-lightbox-video"></video>
+      <video loop muted playsinline controls id="demo-lightbox-video"></video>
     </div>
     <script>
       // A demo plays only while at least this share of it is on screen, so the
@@ -351,8 +351,17 @@ const skillsJson = JSON.stringify(skills).replace(/</g, "\\u003c");
       }
 
       demoVideos.forEach((vid) => {
-        const open = () => openLightbox(vid.querySelector("source")!.src, vid);
+        // Enlarged, a demo plays its full-length cut when it has one (data-full),
+        // otherwise the same loop shown in the carousel.
+        const src = vid.dataset.full ?? vid.querySelector("source")!.src;
+        const open = () => openLightbox(src, vid);
         vid.addEventListener("click", open);
+        const expand = document.createElement("button");
+        expand.type = "button";
+        expand.className = "demo-expand";
+        expand.textContent = `${vid.dataset.fullLabel ?? "Enlarge"} ⤢`;
+        expand.addEventListener("click", () => openLightbox(src, expand));
+        vid.insertAdjacentElement("afterend", expand);
         // The video is the lightbox's only trigger, so it answers the keyboard too.
         vid.addEventListener("keydown", (e) => {
           if (e.key === "Enter" || e.key === " ") {
