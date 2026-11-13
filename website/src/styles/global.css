@@ -499,7 +499,10 @@ section > p {
 
 .carousel-track {
   display: flex;
+  align-items: flex-start;
   overflow-x: auto;
+  overflow-y: hidden;
+  transition: height 0.3s ease;
   scroll-snap-type: x mandatory;
   scroll-behavior: smooth;
   -webkit-overflow-scrolling: touch;

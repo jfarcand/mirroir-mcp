@@ -869,7 +869,14 @@ const skillsJson = JSON.stringify(skills).replace(/</g, "\\u003c");
         updateUI();
       }
 
+      // The track takes the height of the slide on screen, so a short slide
+      // does not keep the empty space a taller one needs.
+      function fitHeight() {
+        track.style.height = `${slides[currentIndex].offsetHeight}px`;
+      }
+
       function updateUI() {
+        fitHeight();
         prevBtn.disabled = currentIndex === 0;
         nextBtn.disabled = currentIndex === slides.length - 1;
         dotsContainer.querySelectorAll(".carousel-dot").forEach((dot, i) => {
@@ -895,6 +902,10 @@ const skillsJson = JSON.stringify(skills).replace(/</g, "\\u003c");
         { root: track, threshold: 0.6 }
       );
       slides.forEach((slide) => observer.observe(slide));
+
+      // Posters and videos load after the first layout and change a slide's height.
+      const resizer = new ResizeObserver(fitHeight);
+      slides.forEach((slide) => resizer.observe(slide));
 
       updateUI();
     });
