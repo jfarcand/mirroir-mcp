@@ -2,6 +2,7 @@
 // ABOUTME: The mirroir.dev landing page: hero, demo videos, install, the three modes, safety and a short FAQ.
 // ABOUTME: Reference material (install options, tools, skills, testing, comparison) lives on pages/docs.astro.
 import Layout from "../layouts/Layout.astro";
+import { Code } from "astro:components";
 import "../styles/global.css";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
@@ -18,6 +19,17 @@ const curlCmd = '/bin/bash -c "$(curl -fsSL https://mirroir.dev/get-mirroir.sh)"
 const brewCmd = "brew tap jfarcand/tap && brew install mirroir-mcp";
 const setupPrompt = "Set up mirroir-mcp so you can drive my iPhone: follow https://github.com/jfarcand/mirroir-mcp/blob/main/docs/onboarding.md step by step, and finish by reading back what my iPhone screen shows.";
 const docs = `${import.meta.env.BASE_URL}docs/`;
+const skillTimer = `---
+name: Set Timer
+app: Clock
+---
+
+## Steps
+
+1. Launch **Clock**
+2. Tap "Timer"
+3. Tap "Start"
+4. Verify "Pause" is visible`;
 ---
 
 <Layout
@@ -225,6 +237,9 @@ const docs = `${import.meta.env.BASE_URL}docs/`;
         <p class="example-steps"><a href="https://github.com/jfarcand/mirroir-mcp#testing-and-ci" rel="noopener noreferrer">Details on GitHub</a></p>
       </div>
     </div>
+    <h3 class="compare-title">A skill is a short Markdown file</h3>
+    <Code code={skillTimer} lang="markdown" theme="github-dark" />
+    <p class="alt-install">Steps match text on screen, not coordinates. Once compiled, <code>mirroir test</code> replays it without an LLM. <a href="https://github.com/jfarcand/mirroir-skills/blob/main/skills/apps/clock/set-timer.md" rel="noopener noreferrer">The full skill</a> &middot; <a href={`${docs}#skills`}>More skills</a></p>
   </section>
 
   <!-- Install -->
