@@ -773,10 +773,26 @@ section > p {
   line-height: 1.55;
 }
 
-/* Example cards — "Just tell your AI" */
+/* Short safety list on the landing page */
+.short-list {
+  list-style: none;
+  padding: 0;
+  margin: 1rem 0;
+}
+
+.short-list li {
+  margin: 0.4rem 0;
+  color: var(--color-muted);
+}
+
+.short-list strong {
+  color: var(--color-text);
+}
+
+/* Example cards */
 .example-cards {
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
   gap: 1rem;
   margin: 1.5rem 0;
 }

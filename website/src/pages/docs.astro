@@ -1,12 +1,213 @@
 ---
 import Layout from "../layouts/Layout.astro";
+import { Code } from "astro:components";
+import TestingSection from "../components/TestingSection.astro";
 import "../styles/global.css";
-import { readFileSync } from "node:fs";
+import { readFileSync, existsSync } from "node:fs";
 import { resolve } from "node:path";
 
 // Build-time data files resolve from the project root (process.cwd() is the website/ dir).
 const serverJson = JSON.parse(readFileSync(resolve(process.cwd(), "../server.json"), "utf-8"));
 const version = serverJson.version;
+
+const setupPrompt = "Set up mirroir-mcp so you can drive my iPhone: follow https://github.com/jfarcand/mirroir-mcp/blob/main/docs/onboarding.md step by step, and finish by reading back what my iPhone screen shows.";
+const brewCmd = "brew tap jfarcand/tap && brew install mirroir-mcp";
+const npxCmd = "npx -y mirroir-mcp install";
+const curlCmd = '/bin/bash -c "$(curl -fsSL https://mirroir.dev/get-mirroir.sh)"';
+const pluginCmd = "claude plugin marketplace add jfarcand/mirroir-mcp && claude plugin install mirroir@mirroir";
+const hermesCmd = "hermes plugins install jfarcand/mirroir-mcp/plugins/hermes --enable";
+const skillExpo = `---
+version: 1
+name: Expo Go Signup + Onboarding
+app: Expo Go
+tags: ["expo", "signup", "onboarding"]
+---
+
+Sign up, handle error or success, then swipe through onboarding.
+
+## Steps
+
+1. Launch **Expo Go**
+2. Wait for "LoginDemo" to appear
+3. Tap "LoginDemo"
+4. Tap "Sign Up"
+5. Tap "Email"
+6. Type "\${TEST_EMAIL}"
+7. Tap "Password"
+8. Type "\${TEST_PASSWORD}"
+9. Tap "Create Account"
+10. If "already exists" is visible:
+    - Tap "Sign In Instead"
+    - Tap "Email"
+    - Type "\${TEST_EMAIL}"
+    - Tap "Password"
+    - Type "\${TEST_PASSWORD}"
+    - Tap "Sign In"
+11. Otherwise:
+    - Wait for "Welcome" to appear
+12. Verify "Welcome" is visible
+13. Screenshot: "authenticated"
+14. Repeat until "Get Started" is visible (max 5 iterations):
+    - Swipe left
+    - Screenshot: "onboarding"
+15. Tap "Get Started"
+16. Verify "Dashboard" is visible
+17. Screenshot: "complete"`;
+
+const skillWaze = `---
+version: 1
+name: Commute ETA Notification
+app: Waze, Messages
+tags: ["waze", "messages", "cross-app", "commute"]
+---
+
+Get ETA from Waze, text it via iMessage.
+
+## Steps
+
+1. Launch **Waze**
+2. Wait for "Where to?" to appear
+3. Tap "Where to?"
+4. Tap "\${DESTINATION:-Work}"
+5. Tap "Go"
+6. Wait for "min" to appear
+7. Remember: Read the commute ETA.
+8. Press Home
+9. Launch **Messages**
+10. Tap "New Message"
+11. Tap "To:"
+12. Type "\${RECIPIENT}"
+13. Tap "\${RECIPIENT}"
+14. Tap "iMessage"
+15. Type "On my way! ETA {eta}"
+16. Press **Return**
+17. Screenshot: "message_sent"`;
+
+const skillSpotify = `---
+version: 1
+name: Play a Song
+app: Spotify (macOS)
+tags: ["spotify", "macos", "music", "multi-target"]
+---
+
+Search for a song on the Spotify macOS app and play it.
+
+## Steps
+
+1. Switch to target "spotify"
+2. Tap "Search"
+3. Wait for "What do you want to listen to?" to appear
+4. Type "\${SONG:-Bohemian Rhapsody}"
+5. Wait for "\${SONG:-Bohemian Rhapsody}" to appear
+6. Tap "\${SONG:-Bohemian Rhapsody}"
+7. Verify "Playing" is visible
+8. Screenshot: "now_playing"`;
+
+const skillsRepo = "jfarcand/mirroir-skills";
+const skillsBase = `https://github.com/${skillsRepo}`;
+const rawBase = `https://raw.githubusercontent.com/${skillsRepo}/main`;
+
+interface Skill {
+  name: string;
+  description: string;
+  app: string;
+  path: string;
+  category: string;
+  url: string;
+  rawUrl: string;
+}
+
+// Read pre-generated skills index from filesystem (produced by scripts/generate-skills-index.mjs).
+// Falls back to GitHub API if the file doesn't exist, and to an empty list on error.
+const indexPath = resolve(process.cwd(), "src/data/skills-index.json");
+let skills: Skill[] = [];
+let skillsAvailable = false;
+
+if (existsSync(indexPath)) {
+  try {
+    skills = JSON.parse(readFileSync(indexPath, "utf-8"));
+    skillsAvailable = skills.length > 0;
+  } catch {
+    // Corrupted file — continue with empty list
+  }
+}
+
+if (!skillsAvailable) {
+  // Fallback: fetch from GitHub API at build time (rate-limited)
+  const ghHeaders: Record<string, string> = {
+    Accept: "application/vnd.github.v3+json",
+  };
+  const ghToken = import.meta.env.GITHUB_TOKEN ?? process.env.GITHUB_TOKEN;
+  if (ghToken) {
+    ghHeaders.Authorization = `Bearer ${ghToken}`;
+  }
+
+  try {
+    const treeRes = await fetch(
+      `https://api.github.com/repos/${skillsRepo}/git/trees/main?recursive=1`,
+      { headers: ghHeaders }
+    );
+    const tree = await treeRes.json();
+    // Canonical corpus: Agent-Skills SKILL.md files under skills/. Excludes
+    // legacy *.yaml, archetypes/, and .github/ CI workflows.
+    const skillFiles = (tree.tree ?? []).filter(
+      (f: { path: string }) => f.path.startsWith("skills/") && f.path.endsWith(".md")
+    );
+
+    function frontmatterField(content: string, key: string): string {
+      const fm = content.match(/^---\n([\s\S]*?)\n---/);
+      const block = fm ? fm[1] : content;
+      const m = block.match(new RegExp(`^${key}:\\s*(.+)$`, "m"));
+      return m ? m[1].trim() : "";
+    }
+
+    function descriptionField(content: string): string {
+      const body = content.replace(/^---\n[\s\S]*?\n---\n?/, "");
+      const para: string[] = [];
+      for (const line of body.split("\n")) {
+        const trimmed = line.trim();
+        if (trimmed === "") {
+          if (para.length > 0) break;
+          continue;
+        }
+        if (trimmed.startsWith("#")) break;
+        para.push(trimmed);
+      }
+      return para.join(" ");
+    }
+
+    const fetches = skillFiles.map(async (f: { path: string }) => {
+      const res = await fetch(
+        `https://api.github.com/repos/${skillsRepo}/contents/${f.path}`,
+        { headers: ghHeaders }
+      );
+      const data = await res.json();
+      // Decode base64 as UTF-8 (atob yields latin1 → mojibake on accents).
+      const content = Buffer.from(data.content, "base64").toString("utf-8");
+      const parts = f.path.split("/");
+      // Drop the leading `skills/` segment from the displayed category.
+      const category = parts.slice(1, -1).join("/");
+      return {
+        name: frontmatterField(content, "name") || f.path,
+        description: descriptionField(content),
+        app: frontmatterField(content, "app"),
+        path: f.path,
+        category,
+        url: `${skillsBase}/blob/main/${f.path}`,
+        rawUrl: `${rawBase}/${f.path}`,
+      };
+    });
+    skills = await Promise.all(fetches);
+    skillsAvailable = skills.length > 0;
+  } catch {
+    // Build continues with empty list if GitHub API is unreachable
+  }
+}
+
+// A <script> element holds raw text, so the JSON goes in unescaped (set:html):
+// HTML entities would reach JSON.parse literally. Escaping "<" keeps a skill
+// description containing "</script>" from closing the element early.
+const skillsJson = JSON.stringify(skills).replace(/</g, "\\u003c");
 
 const installAgentSnippet = `mirroir-mcp install-agent
 launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/dev.mirroir.serve.plist`;
@@ -29,9 +230,13 @@ const actionSnippet = `- uses: jfarcand/mirroir-mcp/actions/setup-mirroir-run@ma
 >
   <header class="page-header">
     <h1>Reference</h1>
-    <p class="subtitle">The MCP tools your agent gets, and the <code>mirroir-run</code> commands that replay scenarios.</p>
+    <p class="subtitle">Every install option, the MCP tools your agent gets, skills, testing, and the <code>mirroir-run</code> commands that replay scenarios.</p>
     <ul class="page-toc">
+      <li><a href="#install">Install</a></li>
       <li><a href="#tools">Tools</a></li>
+      <li><a href="#skills">Skills</a></li>
+      <li><a href="#testing">Testing</a></li>
+      <li><a href="#compare">Compare</a></li>
       <li><a href="#serve">Serve</a></li>
       <li><a href="#mirroir-run">mirroir-run</a></li>
       <li><a href="#more">More docs</a></li>
@@ -39,6 +244,52 @@ const actionSnippet = `- uses: jfarcand/mirroir-mcp/actions/setup-mirroir-run@ma
   </header>
 
   <main>
+  <!-- Install -->
+  <section id="install">
+    <h2>Install <span class="version-badge">v{version}</span></h2>
+    <p class="alt-install">The fastest path: paste this into your coding agent (Claude Code, Codex, Cursor, &hellip;) and let it do the setup.</p>
+    <div class="install-block">
+      <code>{setupPrompt}</code>
+      <button class="copy-btn" data-copy={setupPrompt}>Copy</button>
+    </div>
+    <p class="alt-install">Or install it yourself:</p>
+    <div class="install-block">
+      <code><span class="prompt">$</span> {brewCmd}</code>
+      <button class="copy-btn" data-copy={brewCmd}>Copy</button>
+    </div>
+    <p class="alt-install">
+      or via <a href="https://www.npmjs.com/package/mirroir-mcp" rel="noopener noreferrer">npx</a>:
+    </p>
+    <div class="install-block install-block-alt">
+      <code><span class="prompt">$</span> {npxCmd}</code>
+      <button class="copy-btn" data-copy={npxCmd}>Copy</button>
+    </div>
+    <p class="alt-install">
+      or via <a href="https://mirroir.dev/get-mirroir.sh" rel="noopener noreferrer">shell script</a>:
+    </p>
+    <div class="install-block install-block-alt">
+      <code><span class="prompt">$</span> {curlCmd}</code>
+      <button class="copy-btn" data-copy={curlCmd}>Copy</button>
+    </div>
+    <p class="alt-install">
+      or as a <a href="https://docs.claude.com/en/docs/claude-code/plugins" rel="noopener noreferrer">Claude Code plugin</a>:
+    </p>
+    <div class="install-block install-block-alt">
+      <code><span class="prompt">$</span> {pluginCmd}</code>
+      <button class="copy-btn" data-copy={pluginCmd}>Copy</button>
+    </div>
+    <p class="alt-install">
+      or as a <a href="https://github.com/NousResearch/hermes-agent" rel="noopener noreferrer">Hermes Agent</a> plugin (Hermes 0.21.6 or later), which asks before every call that can change the phone:
+    </p>
+    <div class="install-block install-block-alt">
+      <code><span class="prompt">$</span> {hermesCmd}</code>
+      <button class="copy-btn" data-copy={hermesCmd}>Copy</button>
+    </div>
+    <p class="alt-install">
+      or, for Claude Desktop, download <code>mirroir-mcp.mcpb</code> from the <a href="https://github.com/jfarcand/mirroir-mcp/releases/latest" rel="noopener noreferrer">latest release</a> (v0.43.0 and later) and double-click it.
+    </p>
+  </section>
+
   <!-- What it does -->
   <section id="tools">
     <h2>What mirroir-mcp can do</h2>
@@ -130,6 +381,170 @@ const actionSnippet = `- uses: jfarcand/mirroir-mcp/actions/setup-mirroir-run@ma
     <p>
       Whoever holds the token controls the phone, within what <code>permissions.json</code> allows. Read <a href="https://github.com/jfarcand/mirroir-mcp/blob/main/docs/security.md" rel="noopener noreferrer">Security</a> first; options, grants and removal are in <a href="https://github.com/jfarcand/mirroir-mcp/blob/main/docs/cli.md#serve" rel="noopener noreferrer"><code>docs/cli.md</code></a>.
     </p>
+  </section>
+
+  <!-- Skills -->
+  <section id="skills">
+    <h2>Repeatable flows: Skills</h2>
+    <p>
+      When you find yourself repeating the same agent workflow, capture it as a skill. Skills are SKILL.md files &mdash; numbered steps the AI follows, adapting to layout changes and unexpected dialogs.
+      Steps like <code>Tap "Email"</code> use OCR, not coordinates.
+      Share them on the <a href="https://github.com/jfarcand/mirroir-skills" rel="noopener noreferrer">community repository</a>.
+    </p>
+
+    <h3 class="compare-title">Branching + looping</h3>
+    <Code code={skillExpo} lang="markdown" theme="github-dark" />
+    <h3 class="compare-title">Cross-app workflow</h3>
+    <Code code={skillWaze} lang="markdown" theme="github-dark" />
+    <h3 class="compare-title">macOS window (experimental)</h3>
+    <Code code={skillSpotify} lang="markdown" theme="github-dark" />
+
+    <h3 class="compare-title">Community skill library</h3>
+    <p>
+      The <a href="https://github.com/jfarcand/mirroir-skills" rel="noopener noreferrer">mirroir-skills</a> repository
+      is an open collection of ready-made SKILL.md files &mdash; login flows, cross-app workflows, settings automation, and more.
+      <code>$&#123;VAR&#125;</code> placeholders resolve from environment variables, so the same skill works across accounts and devices.
+    </p>
+    <p>
+      Install the full library as a Claude Code plugin<sup>*</sup>:
+    </p>
+    <div class="install-block install-block-alt">
+      <code><span class="prompt">$</span> claude plugin marketplace add jfarcand/mirroir-mcp &amp;&amp; claude plugin install skills@mirroir</code>
+      <button class="copy-btn" data-copy="claude plugin marketplace add jfarcand/mirroir-mcp &amp;&amp; claude plugin install skills@mirroir">Copy</button>
+    </div>
+    <p class="install-hint">
+      <sup>*</sup> Also supported by GitHub Copilot.
+    </p>
+    <div class="skill-search-wrap">
+      <input
+        type="text"
+        id="skill-q"
+        placeholder="Search skills... (e.g. login, slack, calendar)"
+        autocomplete="off"
+      />
+      <ul id="skill-results"></ul>
+    </div>
+    <script id="skill-data" type="application/json" set:html={skillsJson} />
+    <script define:vars={{ skillsAvailable }}>
+      const skills = JSON.parse(
+        document.getElementById("skill-data").textContent ?? "[]"
+      );
+      const indexAvailable = skillsAvailable;
+      const input = document.getElementById("skill-q");
+      const results = document.getElementById("skill-results");
+
+      function clearResults() {
+        while (results.firstChild) {
+          results.removeChild(results.firstChild);
+        }
+      }
+
+      function showStatus(message) {
+        clearResults();
+        const li = document.createElement("li");
+        li.className = "skill-status";
+        li.textContent = message;
+        results.appendChild(li);
+      }
+
+      function render(matches) {
+        clearResults();
+        if (!indexAvailable) {
+          showStatus("Skill index unavailable — try again later.");
+          return;
+        }
+        if (!matches.length) {
+          showStatus("No matching skills.");
+          return;
+        }
+        for (const s of matches) {
+          const li = document.createElement("li");
+
+          const row = document.createElement("div");
+          row.className = "skill-row";
+
+          const nameLink = document.createElement("a");
+          nameLink.href = s.url;
+          nameLink.target = "_blank";
+          nameLink.rel = "noopener noreferrer";
+          nameLink.textContent = s.name;
+          row.appendChild(nameLink);
+
+          const appBadge = document.createElement("span");
+          appBadge.className = "skill-app";
+          appBadge.textContent = s.app;
+          row.appendChild(appBadge);
+
+          const dlLink = document.createElement("a");
+          dlLink.className = "skill-dl";
+          dlLink.href = s.rawUrl;
+          dlLink.download = "";
+          dlLink.title = "Download skill";
+          dlLink.textContent = "\u2193";
+          dlLink.rel = "noopener noreferrer";
+          row.appendChild(dlLink);
+
+          li.appendChild(row);
+
+          if (s.description) {
+            const desc = document.createElement("span");
+            desc.className = "skill-desc";
+            desc.textContent = s.description;
+            li.appendChild(desc);
+          }
+
+          results.appendChild(li);
+        }
+      }
+
+      input.addEventListener("input", () => {
+        const q = input.value.toLowerCase().trim();
+        if (!q) {
+          clearResults();
+          return;
+        }
+        const matches = skills.filter(
+          (s) =>
+            s.name.toLowerCase().includes(q) ||
+            s.description.toLowerCase().includes(q) ||
+            s.app.toLowerCase().includes(q) ||
+            s.category.toLowerCase().includes(q)
+        );
+        render(matches);
+      });
+    </script>
+  </section>
+
+  <TestingSection />
+
+  <!-- How it compares -->
+  <section id="compare">
+    <h2>How it compares</h2>
+    <div class="compare-wrap">
+      <table class="compare-table">
+        <thead>
+          <tr>
+            <th></th>
+            <th>mirroir</th>
+            <th><a href="https://github.com/phone-harness/phone-harness" rel="noopener noreferrer">phone-harness</a></th>
+            <th><a href="https://github.com/mobile-next/mobile-mcp" rel="noopener noreferrer">mobile-mcp</a></th>
+            <th><a href="https://github.com/appium/appium" rel="noopener noreferrer">Appium</a></th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><th>Physical iPhone, no Developer Mode or signing</th><td>Yes &mdash; stock phone via iPhone Mirroring</td><td>Yes &mdash; stock phone via iPhone Mirroring</td><td>USB-connected, trusted device</td><td>No &mdash; WebDriverAgent via Xcode, Developer Mode</td></tr>
+          <tr><th>App Store apps you can't build</th><td>Yes</td><td>Yes</td><td>Yes</td><td>Yes, on a provisioned device</td></tr>
+          <tr><th>Your own iPhone from any MCP client</th><td>Yes</td><td>No &mdash; its MCP server is cloud-only; local phones use its CLI</td><td>Yes</td><td>Through the separate <a href="https://github.com/appium/appium-mcp" rel="noopener noreferrer">appium-mcp</a></td></tr>
+          <tr><th>Replay without an LLM</th><td>Yes &mdash; compiled skills</td><td>Python scripts you write; no recorder or compiled replay</td><td>No &mdash; the agent drives every run</td><td>Yes &mdash; test code</td></tr>
+          <tr><th>Distinct drift verdict</th><td>Yes &mdash; <code>DRIFT</code>, exit 65</td><td>No</td><td>No</td><td>No</td></tr>
+          <tr><th>One scenario across iPhone + web + HTTP</th><td>Yes &mdash; <code>mirroir-run</code></td><td>No</td><td>No</td><td>Via your own test code</td></tr>
+          <tr><th>Android</th><td>No</td><td>Yes</td><td>Yes</td><td>Yes</td></tr>
+          <tr><th>iOS Simulator</th><td>No</td><td>No</td><td>Yes</td><td>Yes</td></tr>
+          <tr><th>Hosted cloud phones</th><td>No</td><td>Yes &mdash; Phone Harness Cloud</td><td>Yes &mdash; Mobile Next Cloud</td><td>Via third-party device clouds</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p>phone-harness is the closest tool here: it also drives a stock iPhone through iPhone Mirroring, and it adds Android and hosted phones, which mirroir doesn't have. mobile-mcp and Appium cover Android and simulators too. mirroir goes further after the agent's first run: that run becomes a replay that needs no LLM, and a test that tells you when the output moves.</p>
   </section>
 
   <!-- mirroir-run: cross-platform replay -->

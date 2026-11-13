@@ -1,6 +1,6 @@
 ---
-// ABOUTME: The landing page's "Testing and CI" sections: exploration to CI, APP.md maps and mirroir-run.
-// ABOUTME: Rendered by pages/index.astro after the agent-building and games sections.
+// ABOUTME: The reference page's "Testing and CI" sections: exploration to CI and APP.md maps.
+// ABOUTME: Rendered by pages/docs.astro between the skills and the comparison sections.
 import { Code } from "astro:components";
 
 const appMdExample = `---
@@ -115,26 +115,5 @@ Dashboard with 4 tabs: Résumé, Partage, Parcourir, Profil.
 
   <p class="appmd-hint">
     Three levels of patterns work together &mdash; <strong>elements</strong> (what rows look like), <strong>screens</strong> (what the page layout means), and <strong>apps</strong> (what the developer knows). 30 seconds of writing saves minutes of blind exploration.
-  </p>
-</section>
-
-<!-- mirroir-run: cross-platform replay -->
-<section id="mirroir-run">
-  <h2>Replay anywhere with <code>mirroir-run</code></h2>
-  <p>
-    <strong>mirroir-run</strong> replays the same scenarios beyond the iPhone: web pages through Playwright (Chromium, Firefox, WebKit), processes and HTTP natively, and iOS blocks through <code>mirroir-mcp</code>. One YAML file can drive a browser and a phone and check that they show the same thing &mdash; and its web, process, and HTTP steps run on Linux CI.
-  </p>
-  <div class="example-cards">
-    <div class="example-card">
-      <p class="example-prompt">Drift fails loudly</p>
-      <p class="example-steps"><code>mirroir-run</code> has a third verdict beside pass and fail: <code>DRIFT</code>, exit code 65, when every assertion held but the output moved past its baseline.</p>
-    </div>
-    <div class="example-card">
-      <p class="example-prompt">One scenario, many surfaces</p>
-      <p class="example-steps">A single scenario can drive the iPhone, a browser (Playwright), HTTP endpoints and subprocesses, then compare what the page and the phone showed.</p>
-    </div>
-  </div>
-  <p>
-    <a href={`${import.meta.env.BASE_URL}docs/#mirroir-run`}>Commands, install, GitHub Actions and Maestro import</a>
   </p>
 </section>
