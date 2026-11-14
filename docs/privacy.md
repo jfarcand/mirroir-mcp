@@ -20,7 +20,7 @@ When your AI client calls its tools, mirroir takes screenshots of the iPhone Mir
 These stay on your Mac until you delete them:
 
 - settings, permissions, the update-check result and any models, in `~/.mirroir-mcp`
-- a debug log, at `~/.mirroir-mcp/debug.log`
+- a debug log, at `~/.mirroir-mcp/debug.log` (and the previous one at `~/.mirroir-mcp/debug.log.1` once it passed 10 MB)
 - skills you generate or save, which can contain text read from your screen
 - screen recordings you start, in the file the tool reports
 

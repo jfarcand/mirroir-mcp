@@ -70,6 +70,35 @@ final class LaunchAppConfirmationTests: XCTestCase {
         XCTAssertTrue(SpotlightDetector.isHomeScreenVisible(elements: elements, windowHeight: height))
     }
 
+    /// iOS 27 layout (410x898, field at the top, carnet#69). Synthesized from
+    /// the measured shape of the bottom field ("Q <query>"), moved to the top:
+    /// no top-field OCR capture of that phone exists.
+    func testEchoInATopSearchFieldIsDetected() {
+        let elements = [point("Meilleur résultat", y: 190), point("Q Maps", y: 92)]
+        XCTAssertTrue(SpotlightDetector.isQueryEchoedInSearchField(elements: elements, query: "Maps", windowHeight: height))
+    }
+
+    func testAnEchoMidScreenIsNeitherLayout() {
+        let elements = [point("Q Maps", y: 450)]
+        XCTAssertFalse(SpotlightDetector.isQueryEchoedInSearchField(elements: elements, query: "Maps", windowHeight: height))
+    }
+
+    func testATopFieldStillLaunchedIsReportedAsSpotlightStillOpen() {
+        let stuck = screen([point("Q Maps", y: 92)])
+        let result = outcome([stuck], name: "Maps")
+        XCTAssertTrue(result.isError)
+        XCTAssertTrue(text(result).contains("Spotlight is still open"))
+    }
+
+    /// An app that opens on a search field at its top (Settings: "Q Rechercher")
+    /// is not the Home Screen: the pill is looked for at the bottom only.
+    func testAnAppsTopSearchFieldIsNotTheHomeScreen() {
+        let elements = [point("Réglages", y: 60), point("Q Rechercher", y: 120), point("Wi-Fi", y: 400)]
+        XCTAssertFalse(SpotlightDetector.isHomeScreenVisible(elements: elements, windowHeight: height))
+        let result = outcome([screen(elements)], name: "Réglages")
+        XCTAssertFalse(result.isError, text(result))
+    }
+
     func testSingleGlyphNeverCountsAsEcho() {
         let elements = [point("Q", y: 830)]
         XCTAssertFalse(SpotlightDetector.isQueryEchoedInSearchField(elements: elements, query: "Maps", windowHeight: height))
@@ -80,7 +109,7 @@ final class LaunchAppConfirmationTests: XCTestCase {
     func testSpotlightGoneReportsLaunched() {
         let result = outcome([screen([point("Rue de la Seve", y: 500)])], name: "Waze")
         XCTAssertFalse(result.isError)
-        XCTAssertEqual(text(result), "Launched 'Waze' via Spotlight")
+        XCTAssertEqual(text(result), "Launched 'Waze'")
     }
 
     func testSpotlightStuckWithEchoReportsError() {
@@ -101,7 +130,7 @@ final class LaunchAppConfirmationTests: XCTestCase {
         let clock = screen([point("Horloges", y: 150), point("Horloges", y: 892), point("Alarmes", y: 892)])
         let result = outcome([clock], name: "Horloge")
         XCTAssertFalse(result.isError)
-        XCTAssertEqual(text(result), "Launched 'Horloge' via Spotlight")
+        XCTAssertEqual(text(result), "Launched 'Horloge'")
     }
 
     func testStillOnHomeScreenReportsError() {

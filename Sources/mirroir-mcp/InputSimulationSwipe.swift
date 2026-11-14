@@ -18,11 +18,12 @@ extension InputSimulation {
         defer { handback.finish(targetPID: targetPID) }
         let prep = preparePointingInput(tag: "swipe", x: fromX, y: fromY,
                                         byWindow: windowPoster?.canStampEvents == true)
-        guard var info = prep.info else { return prep.error ?? "Unknown error" }
+        guard let prepInfo = prep.info else { return prep.error ?? "Unknown error" }
 
-        if let boundsError = validateBounds(x: toX, y: toY, info: info, tag: "swipe") {
-            return boundsError
-        }
+        let bounded = windowContaining(
+            points: [CGPoint(x: fromX, y: fromY), CGPoint(x: toX, y: toY)],
+            info: prepInfo, tag: "swipe")
+        guard var info = bounded.info else { return bounded.error ?? "Unknown error" }
 
         if let poster = prep.windowPoster {
             return swipeByWindow(poster, in: info, fromX: fromX, fromY: fromY,

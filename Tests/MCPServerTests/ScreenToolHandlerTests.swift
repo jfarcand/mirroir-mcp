@@ -274,21 +274,30 @@ final class ScreenToolHandlerTests: XCTestCase {
     // MARK: - stop_recording
 
     func testStopRecordingSuccess() {
-        recorder.stopResult = ("/tmp/recording.mov", nil)
+        recorder.stopResult = RecordingStop(filePath: "/tmp/recording.mov", error: nil)
         let response = callTool("stop_recording")
         XCTAssertFalse(isError(response))
         XCTAssertEqual(extractText(response), "Recording saved to: /tmp/recording.mov")
     }
 
     func testStopRecordingError() {
-        recorder.stopResult = (nil, "No recording in progress")
+        recorder.stopResult = RecordingStop(filePath: nil, error: "No recording in progress")
         let response = callTool("stop_recording")
         XCTAssertTrue(isError(response))
         XCTAssertEqual(extractText(response), "No recording in progress")
     }
 
+    func testStopRecordingSaysARecordingEndedOnItsOwn() {
+        recorder.stopResult = RecordingStop(filePath: "/tmp/r.mov", error: nil,
+                                            endedEarly: "the recording had already ended on its own")
+        let response = callTool("stop_recording")
+        XCTAssertFalse(isError(response))
+        XCTAssertEqual(extractText(response), "Recording saved to: /tmp/r.mov. Note: the recording had "
+                       + "already ended on its own, so the video stops there.")
+    }
+
     func testStopRecordingNoFile() {
-        recorder.stopResult = (nil, nil)
+        recorder.stopResult = RecordingStop(filePath: nil, error: nil)
         let response = callTool("stop_recording")
         XCTAssertTrue(isError(response))
         let text = extractText(response)

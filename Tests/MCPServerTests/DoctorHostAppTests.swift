@@ -2,7 +2,7 @@
 // Licensed under the Apache License, Version 2.0
 //
 // ABOUTME: Tests doctor's permission hints (the host app that holds the grant, the pane link, the restart rule)
-// ABOUTME: and its screen-read verdicts; process chains are fixed paths, the screen is a describe result.
+// ABOUTME: and its screen-read verdicts; responsible processes are fixed paths, the screen is a describe result.
 
 import CoreGraphics
 import HelperLib
@@ -13,60 +13,73 @@ final class DoctorHostAppTests: XCTestCase {
 
     // MARK: - HostApp
 
-    func testATerminalSessionIsGrantedThroughTheTerminal() {
-        // Measured on this Mac: mirroir-mcp ← zsh ← claude ← zsh ← login ← iTermServer ← iTerm2.
-        let chain = ["/opt/homebrew/bin/mirroir-mcp", "/bin/zsh",
-                     "/Users/a/.local/share/claude/versions/2.1.317", "/bin/zsh", "/usr/bin/login",
-                     "/Users/a/Library/Application Support/iTerm2/iTermServer-3.7.3",
-                     "/Applications/iTerm.app/Contents/MacOS/iTerm2"]
-        XCTAssertEqual(HostApp.bundlePath(chain: chain), "/Applications/iTerm.app")
-        XCTAssertEqual(HostApp.displayName(bundlePath: "/Applications/iTerm.app"), "iTerm")
+    /// Measured: an npx server started from an iTerm shell is answered for by iTerm.
+    func testAnAppThatAnswersForTheServerHoldsTheGrant() {
+        let grantee = HostApp.grantee(responsiblePath: "/Applications/iTerm.app/Contents/MacOS/iTerm2",
+                                      isSelf: false)
+        XCTAssertEqual(grantee, .app(name: "iTerm"))
     }
 
     func testANestedHelperResolvesToTheAppThatShipsIt() {
-        let chain = ["/opt/homebrew/bin/mirroir-mcp",
-                     "/Applications/Claude.app/Contents/Frameworks/Claude Helper.app/Contents/MacOS/Claude Helper",
-                     "/Applications/Claude.app/Contents/MacOS/Claude"]
-        XCTAssertEqual(HostApp.bundlePath(chain: chain), "/Applications/Claude.app")
+        let helper = "/Applications/Claude.app/Contents/Frameworks/Claude Helper.app/Contents/MacOS/Claude Helper"
+        XCTAssertEqual(HostApp.bundlePath(executable: helper), "/Applications/Claude.app")
+        XCTAssertEqual(HostApp.grantee(responsiblePath: helper, isSelf: false), .app(name: "Claude"))
     }
 
-    func testTheOutermostAppWinsOverAnInnerOne() {
-        // VS Code's integrated terminal under the VS Code app.
-        let chain = ["/opt/homebrew/bin/mirroir-mcp", "/bin/zsh",
-                     "/Applications/Visual Studio Code.app/Contents/Frameworks/Code Helper.app/Contents/MacOS/Code Helper",
-                     "/Applications/Visual Studio Code.app/Contents/MacOS/Electron"]
-        XCTAssertEqual(HostApp.bundlePath(chain: chain).map(HostApp.displayName(bundlePath:)),
-                       "Visual Studio Code")
+    /// Measured: Claude starts its servers through a disclaiming helper, so
+    /// each server answers for itself and the panes list the binary.
+    func testABareServerThatAnswersForItselfIsNamedByItsBinary() {
+        let grantee = HostApp.grantee(responsiblePath: "/opt/homebrew/bin/mirroir-mcp", isSelf: true)
+        XCTAssertEqual(grantee, .server(name: "mirroir-mcp"))
     }
 
-    func testNoAppAmongTheAncestorsNamesNone() {
-        XCTAssertNil(HostApp.bundlePath(chain: ["/opt/homebrew/bin/mirroir-mcp", "/usr/sbin/sshd"]))
+    func testTheExtensionServerIsNamedByItsBundle() {
+        let path = "/Users/u/Library/Application Support/Claude/Claude Extensions/mirroir-mcp/server/"
+            + "mirroir-mcp.app/Contents/MacOS/mirroir-mcp"
+        XCTAssertEqual(HostApp.grantee(responsiblePath: path, isSelf: true), .server(name: "mirroir-mcp"))
+    }
+
+    func testAResponsibleProcessOutsideAnyAppNamesNone() {
+        XCTAssertNil(HostApp.grantee(responsiblePath: "/usr/sbin/sshd", isSelf: false))
+    }
+
+    /// The running test process answers to some process; the private call resolves.
+    func testTheResponsibilityCallResolvesForThisProcess() {
+        XCTAssertNotNil(HostApp.responsiblePID(of: getpid()))
     }
 
     // MARK: - PermissionGuidance
 
     func testScreenRecordingNamesTheAppThePaneAndTheRestart() {
-        let hint = PermissionGuidance.hint(.screenRecording, hostApp: "iTerm")
+        let hint = PermissionGuidance.hint(.screenRecording, grantee: .app(name: "iTerm"))
         XCTAssertEqual(hint, "Open System Settings > Privacy & Security > Screen Recording "
             + "(open \"x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture\") "
-            + "and turn on \"iTerm\". Then quit and reopen iTerm: Screen Recording takes effect "
+            + "and turn on \"iTerm\". Then quit and reopen \"iTerm\": Screen Recording takes effect "
             + "only after a restart.")
     }
 
     /// Under launchd the serve agent's own bundle holds the grants, and it
     /// restarts through launchctl, not by quitting an app.
     func testTheServeAgentIsNamedAndRestartedThroughLaunchctl() {
-        let chain = ["/Users/u/.mirroir-mcp/mirroir serve.app/Contents/MacOS/mirroir serve"]
-        let host = HostApp.bundlePath(chain: chain).map { HostApp.displayName(bundlePath: $0) }
-        XCTAssertEqual(host, ServeAppBundle.displayName)
-        let hint = PermissionGuidance.hint(.screenRecording, hostApp: host)
+        let path = "/Users/u/.mirroir-mcp/mirroir serve.app/Contents/MacOS/mirroir serve"
+        let grantee = HostApp.grantee(responsiblePath: path, isSelf: true)
+        XCTAssertEqual(grantee, .serveAgent)
+        let hint = PermissionGuidance.hint(.screenRecording, grantee: grantee)
         XCTAssertTrue(hint.contains("turn on \"mirroir serve\""), hint)
         XCTAssertTrue(hint.contains("launchctl kickstart -k gui/$(id -u)/dev.mirroir.serve"), hint)
         XCTAssertFalse(hint.contains("quit and reopen"), hint)
     }
 
+    func testAServerThatAnswersForItselfIsTurnedOnAndRestartedWithItsClient() {
+        let hint = PermissionGuidance.hint(.screenRecording, grantee: .server(name: "mirroir-mcp"))
+        XCTAssertTrue(hint.contains("turn on \"mirroir-mcp\""), hint)
+        XCTAssertTrue(hint.contains("add it with the + button"), hint)
+        XCTAssertTrue(hint.contains("quit and reopen the app that started mirroir-mcp"), hint)
+        XCTAssertFalse(hint.contains("\"Claude\""), hint)
+    }
+
     func testAccessibilityNeedsNoRestartAndAnUnknownHostIsDescribed() {
-        let hint = PermissionGuidance.hint(.accessibility, hostApp: nil)
+        let hint = PermissionGuidance.hint(.accessibility, grantee: nil)
         XCTAssertTrue(hint.contains("Privacy_Accessibility"), hint)
         XCTAssertTrue(hint.contains("the app that runs mirroir-mcp"), hint)
         XCTAssertFalse(hint.contains("restart"), hint)
@@ -84,28 +97,28 @@ final class DoctorHostAppTests: XCTestCase {
     }
 
     func testAReadableScreenPassesWithItsSizeAndBoxCount() {
-        let check = DoctorCaptureCheck.verdict(screen(["Météo", "Montréal"]), windowSize: size, hostApp: "iTerm")
+        let check = DoctorCaptureCheck.verdict(screen(["Météo", "Montréal"]), windowSize: size, grantee: .app(name: "iTerm"))
         XCTAssertEqual(check.status, .passed)
         XCTAssertEqual(check.detail, "capture ok 410x898, OCR 2 boxes")
         XCTAssertNil(check.fixHint)
     }
 
     func testNoFrameMeansTheGrantNeedsARestart() {
-        let check = DoctorCaptureCheck.verdict(nil, windowSize: size, hostApp: "iTerm")
+        let check = DoctorCaptureCheck.verdict(nil, windowSize: size, grantee: .app(name: "iTerm"))
         XCTAssertEqual(check.status, .failed)
         XCTAssertTrue(check.fixHint?.contains("quit and reopen \"iTerm\"") ?? false, check.fixHint ?? "")
     }
 
     func testABlankFrameFailsAndAnEmptyScreenOnlyWarns() {
         XCTAssertEqual(DoctorCaptureCheck.verdict(screen([], blank: true), windowSize: size,
-                                                  hostApp: nil).status, .failed)
-        XCTAssertEqual(DoctorCaptureCheck.verdict(screen([]), windowSize: size, hostApp: nil).status,
+                                                  grantee: nil).status, .failed)
+        XCTAssertEqual(DoctorCaptureCheck.verdict(screen([]), windowSize: size, grantee: nil).status,
                        .warned)
     }
 
     func testABrokenRecognizerIsNotReportedAsAnEmptyScreen() {
         let check = DoctorCaptureCheck.verdict(screen([], failure: "Vision request failed"),
-                                               windowSize: size, hostApp: nil)
+                                               windowSize: size, grantee: nil)
         XCTAssertEqual(check.status, .failed)
         XCTAssertTrue(check.detail.contains("OCR failed: Vision request failed"), check.detail)
     }

@@ -142,7 +142,7 @@ enum InlineStepRunner {
         switch step {
         case .launch: return "launch_app"
         case .tap: return "tap"
-        case .type: return "type_text"
+        case .type, .clearField: return "type_text"
         case .pressKey: return "press_key"
         case .swipe: return "swipe"
         case .waitFor, .assertVisible, .assertNotVisible: return "describe_screen"

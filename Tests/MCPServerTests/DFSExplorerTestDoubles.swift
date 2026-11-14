@@ -117,6 +117,7 @@ final class MockExplorerInput: InputProviding, @unchecked Sendable {
         return nil
     }
     func openURL(_ url: String) -> String? { nil }
+    func ensureConnected(tag: String) -> String? { nil }
     func touch(_ command: TouchCommand) -> Result<TouchOutcome, TouchSessionError> {
         .failure(.rejected("MockExplorerInput does not hold touches"))
     }

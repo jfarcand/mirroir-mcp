@@ -8,7 +8,9 @@ import Foundation
 import HelperLib
 
 /// Matches a text label against OCR-detected TapPoint elements.
-/// Match priority: exact → case-insensitive → diacritic-insensitive → substring (case-insensitive).
+/// Match priority: exact → case-insensitive → diacritic-insensitive → substring
+/// (case-insensitive) → substring ignoring case and accents, the way
+/// describe_screen's query matches.
 enum ElementMatcher {
 
     /// Result of a match attempt, including which strategy succeeded.
@@ -35,26 +37,29 @@ enum ElementMatcher {
         guard !label.isEmpty, !elements.isEmpty else { return nil }
 
         let lowerLabel = label.lowercased()
-        let foldedLabel = label.folding(options: [.diacriticInsensitive, .caseInsensitive],
-                                         locale: nil)
+        let foldedLabel = fold(label)
         // Reverse substring requires the element text to cover at least half the
         // label length (minimum 3 characters) to avoid false matches on short OCR fragments.
         let minReverseLength = max(3, lowerLabel.count / 2)
 
         // Priority order: exact → case-insensitive → diacritic-insensitive ("Résumé"
         // matches "Resume") → substring (label contained in element text) → reverse
-        // substring (element text contained in label).
+        // substring (element text contained in label) → both substrings again with
+        // accents folded: OCR drops or adds an accent on a line that holds more
+        // than the label ("Epicerie 3" for a row "Épicerie" with its count).
         let tiers: [(MatchStrategy, (TapPoint) -> Bool)] = [
             (.exact, { $0.text == label }),
             (.caseInsensitive, { $0.text.lowercased() == lowerLabel }),
-            (.diacriticInsensitive, {
-                $0.text.folding(options: [.diacriticInsensitive, .caseInsensitive],
-                                locale: nil) == foldedLabel
-            }),
+            (.diacriticInsensitive, { fold($0.text) == foldedLabel }),
             (.substring, { $0.text.lowercased().contains(lowerLabel) }),
             (.substring, {
                 let lower = $0.text.lowercased()
                 return lower.count >= minReverseLength && lowerLabel.contains(lower)
+            }),
+            (.substring, { fold($0.text).contains(foldedLabel) }),
+            (.substring, {
+                let folded = fold($0.text)
+                return folded.count >= minReverseLength && foldedLabel.contains(folded)
             }),
         ]
         for (strategy, matches) in tiers {
@@ -67,6 +72,11 @@ enum ElementMatcher {
             return MatchResult(element: nearest, strategy: strategy)
         }
         return nil
+    }
+
+    /// `text` without case or accents, as the diacritic-insensitive tier compares.
+    private static func fold(_ text: String) -> String {
+        text.folding(options: [.diacriticInsensitive, .caseInsensitive], locale: nil)
     }
 
     private static func distanceSquared(_ element: TapPoint, _ anchor: (x: Double, y: Double)) -> Double {

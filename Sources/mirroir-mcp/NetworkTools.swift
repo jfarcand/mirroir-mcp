@@ -2,7 +2,7 @@
 // Licensed under the Apache License, Version 2.0
 //
 // ABOUTME: Registers the set_network MCP tool for toggling network settings on iPhone.
-// ABOUTME: Navigates to iOS Settings to toggle Airplane, Wi-Fi, or Cellular modes.
+// ABOUTME: Parses the mode and delegates the Settings procedure to NetworkToggle.
 
 import Foundation
 import HelperLib
@@ -26,11 +26,7 @@ extension MirroirMCP {
                 "properties": .object([
                     "mode": .object([
                         "type": .string("string"),
-                        "enum": .array([
-                            .string("airplane_on"), .string("airplane_off"),
-                            .string("wifi_on"), .string("wifi_off"),
-                            .string("cellular_on"), .string("cellular_off"),
-                        ]),
+                        "enum": .array(NetworkToggle.Mode.names.map { .string($0) }),
                         "description": .string(
                             "Network mode to set: airplane_on/off, wifi_on/off, cellular_on/off"),
                     ])
@@ -43,61 +39,17 @@ extension MirroirMCP {
                 guard let menuBridge = ctx.bridge as? (any MenuActionCapable) else {
                     return .error("Target '\(ctx.name)' does not support set_network")
                 }
-                let input = ctx.input
-                let describer = ctx.ocrDescriber
-
                 guard let mode = args["mode"]?.asString() else {
                     return .error("Missing required parameter: mode (string)")
                 }
 
-                let validModes = ["airplane_on", "airplane_off", "wifi_on", "wifi_off",
-                                  "cellular_on", "cellular_off"]
-                guard validModes.contains(mode) else {
-                    return .error(
-                        "Unknown mode: \(mode). Use: \(validModes.joined(separator: ", "))")
+                switch NetworkToggle.toggle(
+                    mode: mode, input: ctx.input, describer: ctx.ocrDescriber,
+                    menuBridge: menuBridge, settleUs: EnvConfig.toolSettlingDelayUs
+                ) {
+                case .success(let message): return .text(message)
+                case .failure(let error): return .error(error.message)
                 }
-
-                // Launch Settings
-                if let error = input.launchApp(name: "Settings") {
-                    return .error("Failed to launch Settings: \(error)")
-                }
-                usleep(EnvConfig.settingsLoadUs)  // Wait for Settings to load
-
-                let targetLabel: String
-                switch mode {
-                case "airplane_on", "airplane_off":
-                    targetLabel = "Airplane"
-                case "wifi_on", "wifi_off":
-                    targetLabel = "Wi-Fi"
-                case "cellular_on", "cellular_off":
-                    targetLabel = "Cellular"
-                default:
-                    targetLabel = ""
-                }
-
-                // Find and tap the setting row
-                guard let describeResult = describer.describe() else {
-                    _ = menuBridge.triggerMenuAction(menu: "View", item: "Home Screen")
-                    return .error("Failed to capture Settings screen")
-                }
-
-                guard let match = ElementMatcher.findMatch(label: targetLabel,
-                                                             in: describeResult.elements) else {
-                    _ = menuBridge.triggerMenuAction(menu: "View", item: "Home Screen")
-                    return .error("'\(targetLabel)' not found in Settings")
-                }
-
-                if let error = input.tap(x: match.element.tapX, y: match.element.tapY) {
-                    _ = menuBridge.triggerMenuAction(menu: "View", item: "Home Screen")
-                    return .error("Failed to tap \(targetLabel): \(error)")
-                }
-
-                usleep(EnvConfig.toolSettlingDelayUs)
-
-                // Return to home screen
-                _ = menuBridge.triggerMenuAction(menu: "View", item: "Home Screen")
-
-                return .text("Toggled \(mode)")
             }
         ))
     }

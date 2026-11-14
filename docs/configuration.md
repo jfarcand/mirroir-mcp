@@ -53,6 +53,7 @@ Env-var names are derived from the camelCase key by inserting `_` before every u
 | `dragModeHoldUs` | `150000` | Initial hold before drag movement for iOS drag recognition (microseconds) |
 | `focusSettleUs` | `200000` | Delay after focus click for keyboard focus to settle (microseconds) |
 | `deadKeyDelayUs` | `30000` | Delay between dead-key trigger and base character for accented input (microseconds) |
+| `windowGeometryRecheckUs` | `250000` | When a tap, swipe or drag point falls outside the window size just read, the window is read twice more, this long apart, before refusing: a window caught mid-animation (Mission Control, a hot corner, a move) reads at a passing size. The call goes ahead only when both reads agree and the point fits; reads that disagree are refused as a window being moved or resized (microseconds) |
 | `defaultDragDurationMs` | `1000` | Default drag gesture duration in milliseconds |
 | `defaultLongPressDurationMs` | `500` | Default long press duration in milliseconds |
 | `defaultSwipeDurationMs` | `300` | Default swipe duration in milliseconds |
@@ -74,6 +75,14 @@ Env-var names are derived from the camelCase key by inserting `_` before every u
 | `scrollDedupStrategy` | `"exact"` | Dedup strategy for scroll-collected elements: `"exact"`, `"levenshtein"`, `"proximity"` |
 | `scrollDedupLevenshteinMax` | `3` | Maximum Levenshtein edit distance for fuzzy text dedup (used by `"levenshtein"` strategy) |
 | `scrollDedupProximityPt` | `15.0` | Maximum Euclidean distance in points for coordinate proximity dedup (used by `"proximity"` strategy) |
+
+## Listen
+
+| Setting | Default | Description |
+|---------|---------|-------------|
+| `listenSilencePeak` | `0.01` | Loudest sample (0 to about 1, here about -40 dBFS) that `listen` still takes as silence |
+| `listenSilentStartSeconds` | `4.0` | Seconds of silence from the start after which `listen` stops and replies that nothing is playing (a muted or paused video) |
+| `listenTrailingSilenceSeconds` | `3.0` | Seconds of silence after sound after which `listen` stops and transcribes what it heard: the sound has ended |
 
 ## Exploration
 
@@ -99,6 +108,11 @@ Env-var names are derived from the camelCase key by inserting `_` before every u
 | Setting | Default | Env Var | Description |
 |---------|---------|---------|-------------|
 | `mirroringBundleID` | `"com.apple.ScreenContinuity"` | `MIRROIR_BUNDLE_ID` | Bundle ID of the window to target. Override to point at a stand-in app (e.g. FakeMirroring) for local/CI runs |
+| `keepDisplayAwake` | `true` | `MIRROIR_KEEP_DISPLAY_AWAKE` | Keep the Mac's display awake (the assertion `caffeinate -d` holds: no display sleep, no screen saver) while a tool call, a `test`, `compile` or `record` run, or a screen recording is active. Synthetic input does not reset the idle timer, so without it the screen saver covers the mirror mid-run. Nothing is held between tool calls (run `caffeinate -d` for a run of many short calls), and a lock you trigger still wins |
+| `debugLogging` | `false` | `MIRROIR_DEBUG` | Verbose logging, as `--debug` turns on. The Claude extension's **Debug logging** option sets the variable |
+| `grantPollUs` | `2000000` | `MIRROIR_GRANT_POLL_US` | How often `mirroir doctor --fix` starts a new process to see whether a permission is on |
+| `grantWaitUs` | `300000000` | `MIRROIR_GRANT_WAIT_US` | How long `mirroir doctor --fix` waits for each permission before moving on |
+| `debugLogMaxBytes` | `10485760` | `MIRROIR_DEBUG_LOG_MAX_BYTES` | Size of `~/.mirroir-mcp/debug.log`, in bytes, past which a starting server moves it to `debug.log.1`. The log is never truncated |
 | `updateCheck` | `true` | `MIRROIR_UPDATE_CHECK` | Ask the npm registry, at most once a day (two-second timeout, answer cached in `~/.mirroir-mcp/update-check.json`), whether a newer mirroir-mcp is published; `status`, `check_health` and `mirroir doctor` then say so. Nothing else is sent. `false` turns it off |
 | `cursorFreeInput` | `false` | `MIRROIR_CURSOR_FREE` | Post mouse events directly to the target PID via `postToPid` instead of global HID posting. Works for regular macOS apps (e.g. FakeMirroring) for local integration tests without cursor interference, but NOT for iPhone Mirroring — per-process injection does not register taps there |
 

@@ -112,6 +112,33 @@ final class StepExecutorTests: XCTestCase {
         XCTAssertEqual(result.status, .failed)
     }
 
+    // MARK: - Clear Field
+
+    func testClearFieldSelectsAllThenDeletes() {
+        let step = SkillParser.parseStep("clear_field")
+        guard case .clearField = step else {
+            return XCTFail("clear_field parsed as \(String(describing: step))")
+        }
+        let result = executor.execute(step: .clearField, stepIndex: 0, skillName: "test")
+        XCTAssertEqual(result.status, .passed)
+        XCTAssertEqual(input.pressKeyCalls, ["command+a", "delete"])
+    }
+
+    func testClearFieldFailsWhenTheKeyIsNotDelivered() {
+        input.pressKeyResult = TypeResult(success: false, error: "key dropped")
+        let result = executor.execute(step: .clearField, stepIndex: 0, skillName: "test")
+        XCTAssertEqual(result.status, .failed)
+        XCTAssertEqual(input.pressKeyCalls, ["command+a"], "nothing deleted after a failed select-all")
+    }
+
+    func testClearFieldRoundTripsThroughItsCompiledTypeKey() {
+        let rebuilt = SkillParser.parseStep(key: SkillStep.clearField.typeKey, rawValue: "")
+        guard case .clearField = rebuilt else {
+            return XCTFail("compiled clear_field rebuilt as \(rebuilt)")
+        }
+        XCTAssertNil(SkillStep.clearField.replayValue)
+    }
+
     // MARK: - Press Key
 
     func testPressKeySuccess() {
@@ -283,7 +310,7 @@ final class StepExecutorTests: XCTestCase {
             bridge: bridge, input: input,
             capture: capture, describer: describer, recorder: StubRecorder())
         let androidCtx = TargetContext(
-            name: "android", targetType: "generic-window", bundleID: nil,
+            name: "android", targetType: "macos-app", bundleID: nil,
             bridge: bridge2, input: input2,
             capture: capture2, describer: describer2, recorder: StubRecorder())
         let registry = TargetRegistry(

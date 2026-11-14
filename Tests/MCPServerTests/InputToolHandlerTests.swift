@@ -135,6 +135,22 @@ final class InputToolHandlerTests: XCTestCase {
         let response = callTool("type_text", args: ["text": .string("hello")])
         XCTAssertFalse(isError(response))
         XCTAssertEqual(extractText(response), "Typed 5 characters")
+        XCTAssertEqual(input.keyboardLog, ["type:hello"], "no clear unless asked")
+    }
+
+    func testTypeTextClearEmptiesTheFieldBeforeTyping() {
+        let response = callTool("type_text", args: ["text": .string("Burger"), "clear": .bool(true)])
+        XCTAssertFalse(isError(response))
+        XCTAssertEqual(extractText(response), "Cleared the field, then typed 6 characters")
+        XCTAssertEqual(input.keyboardLog, ["key:command+a", "key:delete", "type:Burger"])
+    }
+
+    func testTypeTextClearThatFailsTypesNothing() {
+        input.pressKeyResultByKey["delete"] = TypeResult(success: false, error: "key dropped")
+        let response = callTool("type_text", args: ["text": .string("Burger"), "clear": .bool(true)])
+        XCTAssertTrue(isError(response))
+        XCTAssertEqual(extractText(response), "Could not delete the field's text (Delete): key dropped")
+        XCTAssertTrue(input.typeCalls.isEmpty)
     }
 
     // MARK: - press_key

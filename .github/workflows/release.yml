@@ -58,8 +58,8 @@ jobs:
           fi
           if [ "$DISPATCH_REF" != "refs/heads/$DEFAULT_BRANCH" ]; then
             echo "::error::Release must be dispatched from '$DEFAULT_BRANCH', but this run is on '$DISPATCH_REF'"
-            echo "The version bump is committed with 'git push origin \$DEFAULT_BRANCH', which only"
-            echo "resolves when the checkout is that branch. Re-run this workflow from \$DEFAULT_BRANCH."
+            echo "The version bump is committed on the checkout and later put on \$DEFAULT_BRANCH,"
+            echo "which only fits when the checkout is that branch. Re-run this workflow from \$DEFAULT_BRANCH."
             exit 1
           fi
           echo "Dispatched from '$DEFAULT_BRANCH' - proceeding."
@@ -139,7 +139,12 @@ jobs:
         timeout-minutes: 5
         run: scripts/unit-tests.sh swift-testing
 
-      - name: Commit version bump
+      # The bump commit carries the plugin's npx pin (mirroir-mcp@<version>), and
+      # a plugin installed from main resolves that pin on npm. So the commit is
+      # pushed as the release tag only; push-version-to-main puts it on main once
+      # npm serves the version. Version and pin change in this one commit, so
+      # server.json and plugin.json agree on every commit main ever holds.
+      - name: Commit version bump and tag it
         env:
           VERSION: ${{ github.event.inputs.version }}
         run: |
@@ -150,17 +155,7 @@ jobs:
             mcpb/manifest.json plugins/mirroir/.claude-plugin/plugin.json \
             plugins/hermes/plugin.json plugins/hermes/mcp.json
           git commit -m "chore: bump version to $VERSION"
-          git push origin main
-
-      - name: Create tag via API
-        env:
-          VERSION: ${{ github.event.inputs.version }}
-          GH_TOKEN: ${{ secrets.RELEASE_PAT }}
-        run: |
-          SHA=$(git rev-parse HEAD)
-          gh api repos/${{ github.repository }}/git/refs \
-            -f ref="refs/tags/v$VERSION" \
-            -f sha="$SHA"
+          git push origin "HEAD:refs/tags/v$VERSION"
 
       - name: Create tarball and checksum
         run: |
@@ -374,7 +369,8 @@ jobs:
 
       # npm accepts a publish before the version is readable from the registry
       # ("Your package is being processed"). publish-mcp-registry validates the
-      # version against npm, so this job must not succeed until npm serves it.
+      # version against npm, and push-version-to-main puts the plugin's pin on
+      # main, so this job must not succeed until npm serves it.
       - name: Wait for npm to serve the published version
         env:
           VERSION: ${{ github.event.inputs.version }}
@@ -390,6 +386,36 @@ jobs:
           done
           echo "::error::npm never served mirroir-mcp@$VERSION within 10 minutes"
           exit 1
+
+  # The bump commit reaches main only after publish-npm has seen npm serve the
+  # version, so main never pins a mirroir-mcp@<version> that npm cannot resolve.
+  # When main moved during the release, the tag is merged rather than
+  # fast-forwarded, which keeps the tag in main's history for the next
+  # release's changelog range.
+  push-version-to-main:
+    needs: [release, publish-npm]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          token: ${{ secrets.RELEASE_PAT }}
+          fetch-depth: 0
+
+      - name: Put the version bump on the default branch
+        env:
+          VERSION: ${{ github.event.inputs.version }}
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git fetch origin "refs/tags/v$VERSION:refs/tags/v$VERSION"
+          if ! git merge --ff-only "v$VERSION"; then
+            git merge --no-ff -m "chore: bump version to $VERSION" "v$VERSION"
+          fi
+          git push origin "HEAD:$DEFAULT_BRANCH"
 
   # Publish server.json to the official MCP Registry. Runs after publish-npm so
   # the npm package referenced in server.json already exists when the registry

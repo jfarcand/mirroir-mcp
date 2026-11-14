@@ -70,9 +70,25 @@ enum SpotlightDetector {
         }
     }
 
-    /// Fraction of the window height below which Spotlight's search field sits.
-    /// iOS keeps the field docked at the bottom in both orientations.
-    static let searchFieldBandStart = 0.8
+    /// The fractions of the window height where Spotlight's search field can sit.
+    /// iOS 26 docks it at the bottom (an XR, 430x942: y 872 of 942, and an
+    /// iOS 27 phone on 2026-11-04: y 829 of 898); iOS 27 was also seen with it
+    /// at the top (2026-11-12, 410x898). The field is taken in either band, so
+    /// the layout on screen decides, not the iOS version.
+    static let searchFieldBands: [ClosedRange<Double>] = [0.0 ... 0.2, 0.8 ... 1.0]
+
+    /// Fraction of the window height below which the Home Screen's search pill
+    /// sits. Only the bottom: an app opening on a search field at its top
+    /// ("Q Rechercher" in Settings) must not read as the Home Screen.
+    static let homeSearchPillBandStart = 0.8
+
+    /// Whether `y` lies in one of Spotlight's search-field bands of a window
+    /// `windowHeight` points tall.
+    static func isInSearchFieldBand(_ y: Double, windowHeight: Double) -> Bool {
+        searchFieldBands.contains { band in
+            (band.lowerBound * windowHeight ... band.upperBound * windowHeight).contains(y)
+        }
+    }
 
     /// Shortest normalized text treated as an echo of the query, so single
     /// OCR glyphs never count.
@@ -82,8 +98,9 @@ enum SpotlightDetector {
     ///
     /// When Spotlight finds nothing, it shows no "Top Hit" label — only a blurred
     /// background and the search field, which OCR reads with the magnifier glyph
-    /// first ("Q Maps"). The glyph is required: an app's own bottom text (a
-    /// "Horloges" tab after launching Horloge) must not count. OCR may truncate
+    /// first ("Q Maps"), at the bottom or the top of the screen (`searchFieldBands`).
+    /// The glyph is required: an app's own bottom text (a "Horloges" tab after
+    /// launching Horloge) must not count. OCR may truncate
     /// the text, so the field's text and the query only need to be prefixes of
     /// one another once normalized.
     static func isQueryEchoedInSearchField(
@@ -91,9 +108,9 @@ enum SpotlightDetector {
     ) -> Bool {
         let target = normalize(query)
         guard target.count >= minEchoLength else { return false }
-        let bandTop = windowHeight * searchFieldBandStart
         return elements.contains { el in
-            guard el.tapY >= bandTop, let field = searchFieldText(el.text) else { return false }
+            guard isInSearchFieldBand(el.tapY, windowHeight: windowHeight),
+                  let field = searchFieldText(el.text) else { return false }
             let text = normalize(field)
             guard text.count >= minEchoLength else { return false }
             return target.hasPrefix(text) || text.hasPrefix(target)
@@ -107,7 +124,7 @@ enum SpotlightDetector {
 
     /// Whether the home screen's search pill is showing, i.e. no app is in front.
     static func isHomeScreenVisible(elements: [TapPoint], windowHeight: Double) -> Bool {
-        let bandTop = windowHeight * searchFieldBandStart
+        let bandTop = windowHeight * homeSearchPillBandStart
         return elements.contains { el in
             guard el.tapY >= bandTop, let field = searchFieldText(el.text) else { return false }
             return homeSearchPillLabels.contains(SystemPhrases.fold(field))

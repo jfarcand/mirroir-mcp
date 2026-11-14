@@ -49,7 +49,7 @@ extension MirroirMCP {
                     "type": .object([
                         "type": .string("string"),
                         "description": .string(
-                            "Step type (tap, wait_for, launch, type, press_key, swipe, " +
+                            "Step type (tap, wait_for, launch, type, clear_field, press_key, swipe, " +
                             "scroll_to, assert_visible, assert_not_visible, home, open_url, " +
                             "shake, reset_app, set_network, screenshot, long_press, drag, " +
                             "target, measure)"),
@@ -64,7 +64,8 @@ extension MirroirMCP {
                             "network mode, `\"Element\" duration: 1000` for long_press, " +
                             "`{ from: \"A\", to: \"B\" }` for drag, `{ kind: ios, app: \"Notes\" }` " +
                             "for target, `{ tap: \"Login\", until: \"Dashboard\", max: 5, " +
-                            "name: \"login_time\" }` for measure. Omit for home and shake. " +
+                            "name: \"login_time\" }` for measure. Omit for home, shake and clear_field " +
+                            "(record type_text with clear=true as clear_field, then type). " +
                             "save_compiled stores a value the skill takes from `${VAR}` as that " +
                             "placeholder, so secrets stay out of the compiled file."),
                     ]),
@@ -353,7 +354,7 @@ extension MirroirMCP {
             let direction = scrollDirection ?? ScrollDirection.down.rawValue
             return .scrollSequence(count: count, direction: direction)
 
-        case "launch", "type", "press_key", "swipe", "home", "open_url",
+        case "launch", "type", SkillParser.clearFieldKey, "press_key", "swipe", "home", "open_url",
              "shake", "reset_app", "set_network", "screenshot", "target", "switch_target",
              "long_press", "drag":
             return .passthrough()

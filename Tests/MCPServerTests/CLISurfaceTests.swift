@@ -25,7 +25,7 @@ final class CLISurfaceTests: XCTestCase {
     func testSubcommandNamesAreUniqueAndComplete() {
         XCTAssertEqual(CLIDispatch.subcommands.map(\.name),
                        ["test", "record", "compile", "migrate", "doctor", "update", "skill", "configure",
-                        "ax-capture", "serve", "install-agent"])
+                        "ax-capture", "serve", "install-agent", "bundle-app"])
     }
 
     func testEverySubcommandAnswersHelp() {

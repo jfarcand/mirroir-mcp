@@ -8,9 +8,9 @@ All 42 tools exposed by the MCP server. Mutating tools require [permission](perm
 |------|-----------|-------------|
 | `screenshot` | `settle_ms`?, `scale`?, `region`? | Capture the iPhone screen as a PNG, with a line stating its pixel size, the window points it shows, and the pixels-per-point factor |
 | `describe_screen` | `scroll`?, `omit_screenshot`?, `query`?, `text_only`?, `settle_ms`? | Analyze the screen and return UI elements with tap coordinates plus a grid-overlaid screenshot. Uses local OCR or AI vision depending on `screenDescriberMode`. `scroll: true` does a full-page scroll to capture all elements. `omit_screenshot: true` returns text only (no image). `query` lists only elements whose text contains it (case- and accent-insensitive; icons omitted), and `text_only: true` drops the coordinates, so reading one value costs a line or two. `settle_ms` sets how long to wait for the screen to stop changing first. |
-| `listen` | `seconds`?, `language`? | Hear what the phone plays, as text: records the sound iPhone Mirroring plays for `seconds` (1 to 60, default 10) and transcribes it on the Mac in `language` (BCP-47, default the Mac's). Read-only; needs macOS 26. See [Listening](#listening). |
+| `listen` | `seconds`?, `language`? | Hear what the phone plays, as text: records the sound iPhone Mirroring plays for up to `seconds` (1 to 60, default 10; it stops early when nothing plays from the start or once the sound has ended) and transcribes it on the Mac in `language` (BCP-47, default the Mac's). Read-only; needs macOS 26. See [Listening](#listening). |
 | `start_recording` | `output_path`? | Start video recording of the mirrored screen |
-| `stop_recording` | — | Stop recording and return the .mov file path |
+| `stop_recording` | — | Stop recording and return the .mov file path. A recording that already ended on its own (display sleep can end it) still returns its file, with a note that the video stops early; `start_recording` refuses to start another until that file is collected |
 | `tap` | `text`? or `x`, `y`; `image_size`?, `image_region`?, `cursor_mode`? | Tap visible text found by OCR (`text`; a miss lists the text on screen), or tap at coordinates relative to the mirroring window. With `image_size`, `x` and `y` are a position in a screenshot and are converted to window points |
 | `double_tap` | `x`, `y`, `cursor_mode`? | Two rapid taps for zoom/text selection |
 | `long_press` | `x`, `y`, `duration_ms`?, `cursor_mode`? | Hold tap for context menus (default 500ms) |
@@ -20,14 +20,14 @@ All 42 tools exposed by the MCP server. Mutating tools require [permission](perm
 | `pinch` | `x`, `y`, `scale`, `duration_ms`? | Two-finger pinch centred at (x, y): `scale` > 1 spreads the fingers (zoom in), < 1 pinches them (zoom out); the spread ends at exactly `scale` times its start (0.1-10, 100-5000ms, default 500ms). Reaches iOS as a UIKit two-finger gesture (Maps, Photos); games that read raw touches may ignore it. Needs a Mac with a built-in trackpad or a Magic Trackpad; refused while a touch is held |
 | `rotate` | `x`, `y`, `degrees`, `duration_ms`? | Two-finger rotation centred at (x, y) by `degrees`: positive counter-clockwise, negative clockwise (non-zero, up to 360 either way, 100-5000ms, default 500ms). Same delivery and trackpad requirement as `pinch` |
 | `hold_keys` | `keys`, `duration_ms`?, `drag`? | Hold 1-6 keys for `duration_ms` (100-10000ms, default 1000ms), then release everything in reverse order. Keys are single unshifted characters (`w`), modifiers (`shift`, `command`, `option`, `control`), or named keys (`space`, `up`, ...). Plain keys re-post key-down every 50ms like a held physical key; modifiers are held without repeating. Optional `drag` `{from_x, from_y, to_x, to_y, button: left\|right}` holds that mouse button across the same duration. For games that switch to mouse/keyboard controls (e.g. Roblox: `w` walks while a right drag turns the camera); touch-only games ignore keys. Refused while a touch is held or when the mirroring window is not the frontmost app; stops early and releases everything if focus leaves it mid-hold |
-| `type_text` | `text` | Type text — activates iPhone Mirroring and sends keystrokes. Characters with no key are pasted one run at a time and each paste is confirmed by OCR; one not seen (or unreadable, like emoji) returns an error ([limitations](limitations.md#clipboard-paste-is-confirmed-by-ocr)) |
+| `type_text` | `text`, `clear` | Type text — adds to what the field holds; `clear: true` empties the focused field first (Cmd+A, then Delete; clear only a field you just focused, since with none focused Cmd+A acts on whatever the app selects) — activates iPhone Mirroring and sends keystrokes. Characters with no key are pasted one run at a time and each paste is confirmed by OCR; one not seen (or unreadable, like emoji) returns an error ([limitations](limitations.md#clipboard-paste-is-confirmed-by-ocr)) |
 | `press_key` | `key`, `modifiers`? | Send a special key (return, escape, tab, delete, space, arrows) with optional modifiers (command, shift, option, control) |
 | `shake` | — | Trigger shake gesture (Ctrl+Cmd+Z) for undo/dev menus |
-| `launch_app` | `name` | Open app by name via Spotlight search; presses Return only when the top result is an app, so a missing app fails instead of opening a web or App Store result; fails without pressing Return when the typed name never appears on screen |
+| `launch_app` | `name` | Open app by name via Spotlight search; opens the top result only when it is an app (tapping its tile, or Return when no tile is read), so a missing app fails instead of opening a web or App Store result. When Spotlight never shows the typed name (on iOS 26 it can take typing only once per iPhone Mirroring session), it closes Spotlight and taps the Home Screen icon labeled exactly `name` on the page Home shows (no page is turned); apps on other pages, in folders, the Dock or only the App Library are not found that way |
 | `open_url` | `url` | Open URL in Safari |
-| `press_home` | — | Go to home screen |
+| `press_home` | — | Go to home screen. Like `press_app_switcher` and `spotlight`, it frees a paused session first and fails when the session is still paused, since iPhone Mirroring's menu answers without the iPhone receiving anything |
 | `press_app_switcher` | — | Open app switcher |
-| `press_back` | — | Navigate back by OCR-tapping the `<` back chevron, with a canonical-position fallback |
+| `press_back` | — | Navigate back by OCR-tapping the `<` back chevron, with a canonical-position fallback; on a macOS app target it presses Cmd+[. The reply names which was done and whether the screen changed; a press that left the screen unchanged is an error |
 | `spotlight` | — | Open Spotlight search |
 | `scroll_to` | `label`, `direction`?, `at`?, `max_scrolls`? | Scroll until a text element becomes visible via OCR; reports why it stopped when the text never shows |
 | `reset_app` | `name` | Force-quit an app via the App Switcher |
@@ -37,7 +37,7 @@ All 42 tools exposed by the MCP server. Mutating tools require [permission](perm
 | `get_orientation` | — | Report portrait/landscape and window dimensions |
 | `status` | — | Connection state, window geometry, and device readiness |
 | `check_health` | — | Comprehensive setup diagnostic: mirroring, accessibility, screen capture |
-| `list_skills` | — | List available skills (SKILL.md and YAML) from project-local and global config dirs |
+| `list_skills` | — | List available skills (SKILL.md and YAML) from project-local and global config dirs. A file is listed when it names `name` and `app` (a SKILL.md in its front matter; a YAML skill with steps too), so READMEs, `APP.md` files and patterns in the same tree are not; a YAML skill with the same name and app as a SKILL.md is listed once, as the SKILL.md |
 | `get_skill` | `name` | Read a skill file (SKILL.md or YAML) with ${VAR} env substitution. Appends compilation status. |
 | `generate_skill` | `action`, `app_name`?, `goal`?, `goals`?, `arrived_via`?, `action_type`?, `max_depth`?, `max_screens`?, `max_time`?, `strategy`?, `fresh`?, `seed`?, `skip_calibration`?, `explorer`?, `emit`?, `output_dir`? | Generate a SKILL.md by exploring an app. Session-based: start → capture → finish. `action: "explore"` runs autonomous exploration — `explorer: "bfs"` (default) or `"dfs"`. `fresh: false` resumes a persisted navigation graph; `seed` makes exploration ordering deterministic. `emit: true` (on `finish` / `explore`) also writes a runnable iOS leg into the consumer repo's `.mirroir/apps/<app>/` — see [Web and iOS in one scenario](web-and-ios.md); `output_dir` names the repo root when the server is not running from it. `save_compiled` and `mirroir record` write the same tree. |
 | `list_targets` | — | List all configured automation targets with status, window size, and the tools each one lacks |
@@ -149,7 +149,7 @@ emitted `.ios.yaml` flow opens with. Tunable via `appSwitcherCardXFraction`, `ap
 
 ## Set Network
 
-`set_network` toggles network settings on the iPhone by navigating the Settings app. After toggling, it returns to the home screen.
+`set_network` toggles network settings on the iPhone by navigating the Settings app. After toggling, it returns to the home screen. It finds the row by its label, read from the Settings Row sections of [`system-phrases.md`](../Sources/mirroir-mcp/Resources/system-phrases.md), which list the English labels (Airplane, Wi-Fi, Cellular); on a phone in another language, add the row's label there.
 
 Supported modes: `airplane_on`, `airplane_off`, `wifi_on`, `wifi_off`, `cellular_on`, `cellular_off`.
 
@@ -239,8 +239,9 @@ A skill says how to do a task. A note says what an agent learned on the way: whe
 A screen shows what is written; `listen` gets what is said. Start a reel, a video or a voice message on the phone, then call `listen`: it records the sound iPhone Mirroring plays on the Mac and returns the words.
 
 - Only the target app's sound is recorded, through ScreenCaptureKit, under the Screen & System Audio Recording grant mirroir already needs. Measured on macOS 26.5: the recording is whole even with the Mac's output muted.
-- The words are transcribed on the Mac by macOS's own speech recognizer (SpeechAnalyzer). The audio never leaves the Mac and its temporary file is deleted once read; the reply holds the text only. The first time a language is used, macOS downloads its speech model once.
+- The words are transcribed on the Mac by macOS's own speech recognizer (SpeechAnalyzer). The audio never leaves the Mac and its temporary file is deleted once read; the reply holds the text only. The first time a language is used, macOS downloads its speech model once; a model already installed is used as it is.
 - Pass `language` as the iPhone's language when it differs from the Mac's (`"fr-CA"`, `"en-US"`). Measured on the XR: 15 s of spoken Québec French transcribed in 0.5 s, nearly word for word.
+- `seconds` is the longest it listens. It stops early in two cases: nothing plays during the first 4 s (`listenSilentStartSeconds`), and it then replies that nothing is playing (a muted or paused video) without transcribing; or sound played and then 3 s of silence followed it (`listenTrailingSilenceSeconds`), and it transcribes what it heard and says how long it recorded. Loudness alone decides, so a reel whose music never pauses is recorded for the whole `seconds`, even when it loops.
 - Silence is reported as silence (a paused video, a muted phone), and speech in another language comes back as no words, with a hint to pass `language`.
 - Two on-device engines can transcribe. `SpeechTranscriber` is used where macOS offers it; where it does not (measured: GitHub's macOS 26 virtual machines), macOS's dictation engine is used instead, and the reply names the engine. Dictation is less accurate: on the same sentence it heard "Ground the chicken… the green onion" where SpeechTranscriber heard "Brown the chicken… the green onions".
 - Words only: it does not say who spoke, sung lyrics come out approximate, and it needs macOS 26 or later.
@@ -296,6 +297,7 @@ Steps are intents — the AI maps each to the appropriate MCP tool calls:
 | `launch` | calls `launch_app` |
 | `tap: "Label"` | calls `describe_screen` to find element, then `tap` |
 | `type` | calls `type_text` |
+| `clear_field` | calls `type_text` with `clear: true`, or Cmd+A then Delete in `mirroir test` and `run_steps` |
 | `swipe: "up"` | calls `swipe` with appropriate coordinates |
 | `long_press: "Label"` | calls `describe_screen` to find element, then `long_press` |
 | `drag: { from, to }` | calls `describe_screen` to find elements, then `drag` between them |

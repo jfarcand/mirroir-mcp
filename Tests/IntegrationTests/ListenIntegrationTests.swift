@@ -34,9 +34,10 @@ final class ListenIntegrationTests: XCTestCase {
         let file = FileManager.default.temporaryDirectory.appendingPathComponent("listen-\(UUID().uuidString).caf")
         defer { try? FileManager.default.removeItem(at: file) }
         speak()
-        let reply = ScreenCaptureKitAudio().captureAudio(pid: pid, seconds: 4, to: file)
-        guard case .recorded(let peak) = reply else { return XCTFail("expected a recording, got \(reply)") }
-        XCTAssertGreaterThan(peak, AudioListener.silencePeak, "FakeMirroring's speech was not heard")
+        let reply = ScreenCaptureKitAudio().captureAudio(
+            pid: pid, seconds: 4, stopRule: .fromSettings, to: file)
+        guard case .recorded(let peak, _, _) = reply else { return XCTFail("expected a recording, got \(reply)") }
+        XCTAssertGreaterThan(peak, ListenStopRule.fromSettings.silencePeak, "FakeMirroring's speech was not heard")
     }
 
     func testListenHearsTheWordsTheAppSpeaks() {

@@ -49,17 +49,29 @@ protocol WindowImageProviding: Sendable {
         windowID: CGWindowID, reply: @escaping @Sendable (WindowImageReply) -> Void)
 }
 
+/// What stopping a recording produced.
+struct RecordingStop: Equatable, Sendable {
+    /// The saved video, when there is one.
+    let filePath: String?
+    /// Why no video can be returned.
+    let error: String?
+    /// Set when the recorder had already stopped on its own before it was
+    /// asked to: what ended it. The file holds the video up to that point.
+    var endedEarly: String? = nil
+}
+
 /// Abstracts video recording of the mirroring window.
 protocol ScreenRecording: Sendable {
     func startRecording(outputPath: String?) -> String?
-    func stopRecording() -> (filePath: String?, error: String?)
+    func stopRecording() -> RecordingStop
 }
 
 /// What one audio capture of an app produced.
 enum AudioCaptureReply: Sendable, Equatable {
     /// The app's audio was written to the file; `peak` is the loudest sample
-    /// (0 to about 1), so a silent capture can be told from a quiet one.
-    case recorded(peak: Float)
+    /// (0 to about 1), so a silent capture can be told from a quiet one,
+    /// `seconds` how much was recorded and `end` why the recording stopped.
+    case recorded(peak: Float, seconds: Double, end: RecordingEnd)
     /// The app is not in the shareable content (not running, or not capturable).
     case appNotShareable
     /// The capture API reported an error (no Screen Recording grant, ...).
@@ -70,8 +82,9 @@ enum AudioCaptureReply: Sendable, Equatable {
 /// production): only that app's audio, whatever else the Mac plays, and
 /// whether or not the Mac's output is muted.
 protocol AppAudioCapturing: Sendable {
-    /// Record `seconds` of the audio of the app with process `pid` into `file`.
-    func captureAudio(pid: pid_t, seconds: Double, to file: URL) -> AudioCaptureReply
+    /// Record up to `seconds` of the audio of the app with process `pid` into
+    /// `file`, stopping earlier when `stopRule` says what plays is silent or over.
+    func captureAudio(pid: pid_t, seconds: Double, stopRule: ListenStopRule, to file: URL) -> AudioCaptureReply
 }
 
 /// What one transcription produced.

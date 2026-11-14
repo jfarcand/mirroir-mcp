@@ -1,7 +1,7 @@
 // Copyright 2026 jfarcand@apache.org
 // Licensed under the Apache License, Version 2.0
 //
-// ABOUTME: Records the sound one app plays, and only that app, with a ScreenCaptureKit audio stream.
+// ABOUTME: Records the sound one app plays, and only that app, with a ScreenCaptureKit audio stream, stopping early on silence.
 // ABOUTME: Measured on macOS 26.5: iPhone Mirroring's audio arrives whole even with the Mac's output muted.
 
 import AVFoundation
@@ -23,11 +23,15 @@ struct ScreenCaptureKitAudio: Sendable {
     /// Extra time allowed past the requested length for the stream to start and stop.
     static let overhead: TimeInterval = 10
 
-    func captureAudio(pid: pid_t, seconds: Double, to file: URL) -> AudioCaptureReply {
+    /// How often the recording checks whether its stop rule has ended it, in
+    /// nanoseconds: a tenth of a second, short next to any silence it waits for.
+    static let stopCheckNanoseconds: UInt64 = 100_000_000
+
+    func captureAudio(pid: pid_t, seconds: Double, stopRule: ListenStopRule, to file: URL) -> AudioCaptureReply {
         let done = DispatchSemaphore(value: 0)
         let box = ReplyBox()
         Task.detached {
-            box.set(await Self.record(pid: pid, seconds: seconds, to: file))
+            box.set(await Self.record(pid: pid, seconds: seconds, stopRule: stopRule, to: file))
             done.signal()
         }
         guard done.wait(timeout: .now() + seconds + Self.overhead) == .success else {
@@ -36,7 +40,9 @@ struct ScreenCaptureKitAudio: Sendable {
         return box.value ?? .failed("the audio stream gave no answer")
     }
 
-    private static func record(pid: pid_t, seconds: Double, to file: URL) async -> AudioCaptureReply {
+    private static func record(
+        pid: pid_t, seconds: Double, stopRule: ListenStopRule, to file: URL
+    ) async -> AudioCaptureReply {
         let content: SCShareableContent
         do {
             content = try await SCShareableContent.excludingDesktopWindows(false, onScreenWindowsOnly: false)
@@ -57,12 +63,15 @@ struct ScreenCaptureKitAudio: Sendable {
         config.height = 2
         config.minimumFrameInterval = CMTime(value: 1, timescale: 1)
 
-        let sink = AudioFileSink(file: file)
+        let sink = AudioFileSink(file: file, stopRule: stopRule)
         let stream = SCStream(filter: filter, configuration: config, delegate: sink)
         do {
             try stream.addStreamOutput(sink, type: .audio, sampleHandlerQueue: sink.queue)
             try await stream.startCapture()
-            try await Task.sleep(nanoseconds: UInt64(seconds * 1_000_000_000))
+            let deadline = ContinuousClock.now + .seconds(seconds)
+            while ContinuousClock.now < deadline, !sink.hasEnded {
+                try await Task.sleep(nanoseconds: stopCheckNanoseconds)
+            }
             try await stream.stopCapture()
         } catch {
             return .failed("the audio stream failed: \(error.localizedDescription)")
@@ -71,21 +80,29 @@ struct ScreenCaptureKitAudio: Sendable {
     }
 }
 
-/// Writes the audio buffers of one stream to a file and keeps the loudest sample.
+/// Writes the audio buffers of one stream to a file and feeds each buffer's
+/// loudest sample to a `ListenStopTracker`. Buffers after the tracker has ended
+/// the recording are dropped.
 private final class AudioFileSink: NSObject, SCStreamOutput, SCStreamDelegate, @unchecked Sendable {
     let queue = DispatchQueue(label: "mirroir.listen.audio")
     private let url: URL
     private var file: AVAudioFile?
-    private var peak: Float = 0
+    private var tracker: ListenStopTracker
+    private var end: RecordingEnd?
     private var failure: String?
 
-    init(file: URL) {
+    init(file: URL, stopRule: ListenStopRule) {
         self.url = file
+        self.tracker = ListenStopTracker(rule: stopRule)
     }
+
+    /// Whether the stop rule has ended the recording.
+    var hasEnded: Bool { queue.sync { end != nil } }
 
     func stream(_ stream: SCStream, didOutputSampleBuffer sampleBuffer: CMSampleBuffer,
                 of type: SCStreamOutputType) {
-        guard type == .audio, failure == nil, let description = sampleBuffer.formatDescription else { return }
+        guard type == .audio, failure == nil, end == nil,
+              let description = sampleBuffer.formatDescription else { return }
         let format = AVAudioFormat(cmAudioFormatDescription: description)
         let frames = AVAudioFrameCount(sampleBuffer.numSamples)
         guard frames > 0, let buffer = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: frames) else { return }
@@ -93,9 +110,10 @@ private final class AudioFileSink: NSObject, SCStreamOutput, SCStreamDelegate, @
         guard CMSampleBufferCopyPCMDataIntoAudioBufferList(
             sampleBuffer, at: 0, frameCount: Int32(frames), into: buffer.mutableAudioBufferList) == noErr
         else { return }
+        var bufferPeak: Float = 0
         if let channels = buffer.floatChannelData {
             for channel in 0..<Int(format.channelCount) {
-                for index in 0..<Int(frames) { peak = max(peak, abs(channels[channel][index])) }
+                for index in 0..<Int(frames) { bufferPeak = max(bufferPeak, abs(channels[channel][index])) }
             }
         }
         do {
@@ -104,6 +122,7 @@ private final class AudioFileSink: NSObject, SCStreamOutput, SCStreamDelegate, @
         } catch {
             failure = "the audio could not be written: \(error.localizedDescription)"
         }
+        end = tracker.add(bufferPeak: bufferPeak, seconds: Double(frames) / format.sampleRate)
     }
 
     func stream(_ stream: SCStream, didStopWithError error: any Error) {
@@ -115,7 +134,7 @@ private final class AudioFileSink: NSObject, SCStreamOutput, SCStreamDelegate, @
         queue.sync {
             file = nil
             if let failure { return .failed(failure) }
-            return .recorded(peak: peak)
+            return .recorded(peak: tracker.peak, seconds: tracker.recorded, end: end ?? .fullLength)
         }
     }
 }

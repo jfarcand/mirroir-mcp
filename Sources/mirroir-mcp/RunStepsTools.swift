@@ -22,7 +22,8 @@ extension MirroirMCP {
                 (found by OCR, so read it from describe_screen first: it is in the iPhone's \
                 language), "tap: @324,113" \
                 (a point from describe_screen, for controls with no readable text), \
-                "type: calculator", "press_key: return", \
+                "type: calculator", "clear_field" (empties the focused field before \
+                a type), "press_key: return", \
                 "wait_for: Get", "assert_visible: Results", "swipe: up", \
                 "scroll_to: Privacy", "home". Every step must be allowed by the \
                 permission policy, or nothing runs. The run stops at the first \

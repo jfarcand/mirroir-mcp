@@ -146,32 +146,37 @@ enum ExplorerUtilities {
     ///   - elements: OCR elements from the current screen (avoids redundant OCR call).
     ///   - input: Input provider for tap actions.
     ///   - windowSize: Window size for fallback position calculation.
-    /// - Returns: Always `true` (canonical position fallback guarantees a tap).
+    /// - Returns: which of the two was tapped, and the input layer's refusal
+    ///   when the tap was not sent.
     @discardableResult
     static func tapBackButton(
         elements: [TapPoint],
         input: InputProviding,
         windowSize: CGSize,
         fallback: BackButtonFallback = defaultBackButtonFallback
-    ) -> Bool {
+    ) -> BackOutcome {
+        let point = backPoint(elements: elements, windowSize: windowSize, fallback: fallback)
+        let error = input.tap(x: point.x, y: point.y)
+        usleep(EnvConfig.stepSettlingDelayMs * 1000)
+        let action: BackOutcome.Action = point.chevron
+            ? .chevron(x: point.x, y: point.y) : .fallbackPoint(x: point.x, y: point.y)
+        return BackOutcome(action: action, error: error)
+    }
+
+    /// Where the back tap goes: the OCR-detected "<" chevron in the top zone,
+    /// else the target's fallback point, since OCR sometimes misses the
+    /// chevron while the back button sits at a predictable position.
+    static func backPoint(elements: [TapPoint], windowSize: CGSize,
+                          fallback: BackButtonFallback) -> (x: Double, y: Double, chevron: Bool) {
         let topZone = windowSize.height * NavigationHintDetector.topZoneFraction
         if let backButton = elements.first(where: { element in
             let trimmed = element.text.trimmingCharacters(in: .whitespaces)
             return NavigationHintDetector.backChevronPatterns.contains(trimmed)
                 && element.tapY <= topZone
         }) {
-            _ = input.tap(x: backButton.tapX, y: backButton.tapY)
-            usleep(EnvConfig.stepSettlingDelayMs * 1000)
-            return true
+            return (backButton.tapX, backButton.tapY, true)
         }
-
-        // OCR sometimes fails to detect the "<" chevron, but the back button is
-        // at a predictable position. Tap the target-provided fallback.
-        let fallbackX = windowSize.width * fallback.xFraction
-        let fallbackY = windowSize.height * fallback.yFraction
-        _ = input.tap(x: fallbackX, y: fallbackY)
-        usleep(EnvConfig.stepSettlingDelayMs * 1000)
-        return true
+        return (windowSize.width * fallback.xFraction, windowSize.height * fallback.yFraction, false)
     }
 
     // MARK: - Combined Navigate Back

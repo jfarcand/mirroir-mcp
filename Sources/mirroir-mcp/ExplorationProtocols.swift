@@ -255,12 +255,45 @@ protocol AIAgentProviding {
     func diagnose(payload: DiagnosticPayload) -> AIDiagnosis?
 }
 
+/// What a backtracker did to go back one screen.
+struct BackOutcome: Equatable, Sendable {
+    /// The back action, as it was sent.
+    enum Action: Equatable, Sendable {
+        /// Tapped the "<" chevron OCR found, at window coordinates.
+        case chevron(x: Double, y: Double)
+        /// OCR found no chevron: tapped the target's fallback point.
+        case fallbackPoint(x: Double, y: Double)
+        /// Pressed a keyboard shortcut, such as "Cmd+[".
+        case shortcut(String)
+    }
+
+    let action: Action
+    /// Why the input layer refused the action; nil when it was sent.
+    let error: String?
+
+    /// Whether the back action was sent.
+    var issued: Bool { error == nil }
+
+    /// The action in words, for a tool's reply.
+    var description: String {
+        switch action {
+        case .chevron(let x, let y):
+            return "tapped the \"<\" back chevron at (\(Int(x.rounded())), \(Int(y.rounded())))"
+        case .fallbackPoint(let x, let y):
+            return "OCR found no \"<\" chevron, so tapped the usual back-button point "
+                + "(\(Int(x.rounded())), \(Int(y.rounded())))"
+        case .shortcut(let keys):
+            return "pressed \(keys)"
+        }
+    }
+}
+
 /// Returns-to-previous-screen strategy. Varies per target: iPhone Mirroring must
-/// OCR-detect a back chevron and tap it (iOS apps ignore keyboard shortcuts),
+/// OCR-detect a back chevron and tap it (iOS apps do not implement Cmd+[),
 /// while native macOS apps can use Cmd+[ or similar keybindings.
 protocol Backtracking: Sendable {
-    /// Attempt to navigate one screen back. Returns true if a back action was
-    /// issued (the caller verifies arrival separately via OCR).
+    /// Attempt to navigate one screen back. Returns what was sent, and whether
+    /// it was (the caller verifies arrival separately via OCR).
     ///
     /// - Parameters:
     ///   - elements: Current screen OCR elements (used by OCR-based backtrackers
@@ -271,12 +304,13 @@ protocol Backtracking: Sendable {
     ///   - fallback: Canonical back-button position as fractions of window
     ///     width and height. Orientation-sensitive for iPhone Mirroring;
     ///     ignored by keyboard-shortcut backtrackers.
+    @discardableResult
     func tapBack(
         elements: [TapPoint],
         input: any InputProviding,
         windowSize: CGSize,
         fallback: BackButtonFallback
-    ) -> Bool
+    ) -> BackOutcome
 }
 
 /// App lifecycle operations that vary per target: launch, force-quit before explore,

@@ -101,6 +101,12 @@ final class FocusObservingInput: InputProviding, @unchecked Sendable {
         observe(.openURL) { wrapped.openURL(url) }
     }
 
+    /// Freeing a paused session clicks the window's own control, not the
+    /// app's content, so it is not observed as a focus-moving action.
+    func ensureConnected(tag: String) -> String? {
+        wrapped.ensureConnected(tag: tag)
+    }
+
     func touch(_ command: TouchCommand) -> Result<TouchOutcome, TouchSessionError> {
         observe(.touch) { wrapped.touch(command) }
     }

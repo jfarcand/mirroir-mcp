@@ -17,12 +17,10 @@ enum TargetKind {
     typealias Builder = @Sendable (_ config: TargetConfig?, _ name: String) -> TargetContext
 
     /// All registered target builders. Keys are the config-type strings accepted
-    /// in `targets.json`. A single target may register multiple aliases (e.g.
-    /// macOS-app has the canonical "macos-app" plus legacy "generic-window").
+    /// in `targets.json`.
     static let builders: [String: Builder] = [
         IPhoneMirroringTarget.configTypeName: IPhoneMirroringTarget.build,
         MacOSAppTarget.configTypeName: MacOSAppTarget.build,
-        MacOSAppTarget.legacyConfigTypeName: MacOSAppTarget.build,
     ]
 
     /// Profile lookup by config-type string. Used by `StrategyDetector` and
@@ -32,14 +30,24 @@ enum TargetKind {
     static let profiles: [String: TargetProfile] = [
         IPhoneMirroringTarget.configTypeName: IPhoneMirroringTarget.profile,
         MacOSAppTarget.configTypeName: MacOSAppTarget.profile,
-        MacOSAppTarget.legacyConfigTypeName: MacOSAppTarget.profile,
     ]
 
-    /// Look up a profile by legacy config-type string. Returns the macOS-app
+    /// Look up a profile by config-type string. Returns the macOS-app
     /// profile for unknown values so call sites can treat the result as
     /// non-optional.
     static func profile(for configType: String) -> TargetProfile {
         profiles[configType] ?? MacOSAppTarget.profile
+    }
+
+    /// Why a `targets.json` entry of `type` is skipped, and the line to change.
+    /// A Mac app's entry once named its type "generic-window"; that entry now
+    /// reads "macos-app" with every other field unchanged.
+    static func unknownTypeMessage(type: String, name: String) -> String {
+        let accepted = builders.keys.sorted().map { "'\($0)'" }.joined(separator: " or ")
+        let change = type == "generic-window"
+            ? "Change its \"type\" to \"\(MacOSAppTarget.configTypeName)\" in targets.json"
+            : "Set its \"type\" to \(accepted) in targets.json"
+        return "target '\(name)' is skipped: its type '\(type)' is unknown. \(change), then restart mirroir-mcp."
     }
 
     /// Build a `TargetContext` from a parsed `TargetConfig`, or `nil` if the

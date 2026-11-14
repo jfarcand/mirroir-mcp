@@ -2,20 +2,17 @@
 // Licensed under the Apache License, Version 2.0
 //
 // ABOUTME: Self-contained target module for native macOS apps (Telegram, Claude Desktop, Chrome, etc.).
-// ABOUTME: Owns its profile, legacy config-type strings, and TargetContext builder using GenericWindowBridge.
+// ABOUTME: Owns its profile, config-type string, and TargetContext builder using GenericWindowBridge.
 
 import Foundation
 import HelperLib
 
 /// Self-contained bundle for native macOS app targets. Declares its config-type
-/// names (current "macos-app" and legacy "generic-window"), its profile constant,
-/// and the `build` factory used by the TargetKind registry.
+/// name ("macos-app"), its profile constant, and the `build` factory used by the
+/// TargetKind registry.
 enum MacOSAppTarget {
-    /// Canonical config-type string for new `targets.json` entries.
+    /// Config-type string for a macOS app entry in `targets.json`.
     static let configTypeName = "macos-app"
-    /// Legacy config-type string kept for backward compatibility with existing
-    /// `targets.json` files that predate the self-contained target restructure.
-    static let legacyConfigTypeName = "generic-window"
 
     /// Layout zones for a macOS-app target. Desktop windows have no mobile-style
     /// safe zone; the entire window is tappable. Orientation-invariant.

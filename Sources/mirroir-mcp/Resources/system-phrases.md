@@ -97,3 +97,25 @@ between two parts.
 - rate
 - enjoying
 - allow.*to track
+
+## Settings Airplane Row
+
+The label of the Settings row `set_network` taps for `airplane_on` and
+`airplane_off`, a fragment of it. The three Settings Row sections list a
+row's label as it reads on a phone in each language; the first one on screen
+is tapped.
+
+- airplane
+
+## Settings Wi-Fi Row
+
+The label of the Settings row `set_network` taps for `wifi_on` and `wifi_off`.
+
+- wi-fi
+
+## Settings Cellular Row
+
+The label of the Settings row `set_network` taps for `cellular_on` and
+`cellular_off`.
+
+- cellular

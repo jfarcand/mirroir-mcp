@@ -59,7 +59,8 @@ public enum NavigationHintDetector {
     ///     from icon detection. Counted as tab-bar evidence for icon-only bars.
     ///   - windowHeight: Height of the mirroring window in points.
     ///   - isMobile: When true, emits tap-based hints (for iPhone Mirroring).
-    ///     When false, emits keyboard shortcut hints (for desktop targets).
+    ///     When false, emits keyboard shortcut hints (for desktop targets) and
+    ///     no tab-bar hint, since a desktop window has no iOS tab bar.
     /// - Returns: Array of hint strings describing navigation alternatives
     ///   for detected navigation elements.
     public static func detect(
@@ -96,6 +97,10 @@ public enum NavigationHintDetector {
                 )
             }
         }
+
+        // A tab bar is iOS chrome: on a desktop window the bottom band is the
+        // app's own content (Calculator's last row of keys), not a section bar.
+        guard isMobile else { return hints }
 
         // Tab-bar presence: three or more short labels and/or detected icon
         // points clustered in the tab-bar band indicate a tab bar. Icon-only

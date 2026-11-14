@@ -43,7 +43,7 @@ sudo rm -f "/usr/local/bin/mirroir-helper"
 sudo rm -f "/Library/LaunchDaemons/$PLIST_NAME.plist"
 sudo rm -f "/var/run/mirroir-helper.sock"
 sudo rm -f "/var/log/mirroir-helper.log"
-rm -f "$HOME/.mirroir-mcp/debug.log"
+rm -f "$HOME/.mirroir-mcp/debug.log" "$HOME/.mirroir-mcp/debug.log.1"
 
 # Clean up pre-rename artifacts
 sudo rm -f "/usr/local/bin/iphone-mirroir-mcp"
@@ -59,7 +59,10 @@ echo "Legacy artifacts removed."
 echo ""
 echo "--- Agent skill ---"
 
-for skill_dir in "$HOME/.claude/skills/mirroir" "${CODEX_HOME:-$HOME/.codex}/skills/mirroir"; do
+# The three directories `mirroir-mcp skill --install` writes: Claude Code, Codex, OpenClaw.
+for skill_dir in "$HOME/.claude/skills/mirroir" \
+                 "${CODEX_HOME:-$HOME/.codex}/skills/mirroir" \
+                 "${OPENCLAW_STATE_DIR:-$HOME/.openclaw}/skills/mirroir"; do
     # Only the manual mirroir wrote: its heading identifies it.
     if grep -q "^# Driving an iPhone with mirroir" "$skill_dir/SKILL.md" 2>/dev/null; then
         rm -rf "$skill_dir"

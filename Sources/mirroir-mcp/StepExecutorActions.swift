@@ -138,64 +138,17 @@ extension StepExecutor {
                               durationSeconds: elapsed(startTime))
         }
 
-        let validModes = ["airplane_on", "airplane_off", "wifi_on", "wifi_off",
-                          "cellular_on", "cellular_off"]
-        guard validModes.contains(mode) else {
-            return StepResult(step: step, status: .failed,
-                              message: "Unknown mode: \(mode). Use: \(validModes.joined(separator: ", "))",
+        switch NetworkToggle.toggle(
+            mode: mode, input: input, describer: describer,
+            menuBridge: menuBridge, settleUs: UInt32(config.settlingDelayMs * 1000)
+        ) {
+        case .success(let message):
+            return StepResult(step: step, status: .passed, message: message,
+                              durationSeconds: elapsed(startTime))
+        case .failure(let error):
+            return StepResult(step: step, status: .failed, message: error.message,
                               durationSeconds: elapsed(startTime))
         }
-
-        // Launch Settings
-        if let error = input.launchApp(name: "Settings") {
-            return StepResult(step: step, status: .failed,
-                              message: "Failed to launch Settings: \(error)",
-                              durationSeconds: elapsed(startTime))
-        }
-        usleep(EnvConfig.settingsLoadUs)  // Wait for Settings to load
-
-        let targetLabel: String
-        switch mode {
-        case "airplane_on", "airplane_off":
-            targetLabel = "Airplane"
-        case "wifi_on", "wifi_off":
-            targetLabel = "Wi-Fi"
-        case "cellular_on", "cellular_off":
-            targetLabel = "Cellular"
-        default:
-            targetLabel = ""
-        }
-
-        // Find and tap the setting row
-        guard let describeResult = describer.describe() else {
-            _ = menuBridge.triggerMenuAction(menu: "View", item: "Home Screen")
-            return StepResult(step: step, status: .failed,
-                              message: "Failed to capture Settings screen",
-                              durationSeconds: elapsed(startTime))
-        }
-
-        guard let match = ElementMatcher.findMatch(label: targetLabel,
-                                                     in: describeResult.elements) else {
-            _ = menuBridge.triggerMenuAction(menu: "View", item: "Home Screen")
-            return StepResult(step: step, status: .failed,
-                              message: "\"\(targetLabel)\" not found in Settings",
-                              durationSeconds: elapsed(startTime))
-        }
-
-        if let error = input.tap(x: match.element.tapX, y: match.element.tapY) {
-            _ = menuBridge.triggerMenuAction(menu: "View", item: "Home Screen")
-            return StepResult(step: step, status: .failed,
-                              message: "Failed to tap \(targetLabel): \(error)",
-                              durationSeconds: elapsed(startTime))
-        }
-
-        usleep(config.settlingDelayMs * 1000)
-
-        _ = menuBridge.triggerMenuAction(menu: "View", item: "Home Screen")
-
-        return StepResult(step: step, status: .passed,
-                          message: "Toggled \(mode)",
-                          durationSeconds: elapsed(startTime))
     }
 
     // MARK: - measure

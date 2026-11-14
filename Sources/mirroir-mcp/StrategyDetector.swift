@@ -25,7 +25,7 @@ enum StrategyDetector {
     /// Detect the exploration strategy based on available context.
     ///
     /// - Parameters:
-    ///   - targetType: The target type string (e.g. "iphone-mirroring", "generic-window").
+    ///   - targetType: The target type string (e.g. "iphone-mirroring", "macos-app").
     ///   - appName: The display name of the app being explored.
     ///   - explicitStrategy: Optional explicit override from the user.
     /// - Returns: The detected strategy choice.

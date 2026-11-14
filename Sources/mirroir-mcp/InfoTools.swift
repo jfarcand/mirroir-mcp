@@ -120,7 +120,7 @@ extension MirroirMCP {
                     checks.append("[ok] Screen capture working (\(captureMs) ms)")
                 } else {
                     checks.append("[FAIL] Screen capture failed — "
-                        + PermissionGuidance.hint(.screenRecording, hostApp: HostApp.current))
+                        + PermissionGuidance.hint(.screenRecording, grantee: HostApp.current))
                     allOk = false
                 }
 

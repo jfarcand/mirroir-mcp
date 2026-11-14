@@ -19,11 +19,14 @@ extension MirroirMCP {
             description: """
                 Launch an app on the mirrored iPhone by name using Spotlight search. \
                 Opens Spotlight, types the app name, confirms by OCR that the name \
-                appeared, and presses Return only when the top result is an app; with no \
-                app behind the name (not installed) it fails without pressing Return, and if the name \
-                never shows (a stale Spotlight query or lost keystrokes) it fails \
-                without pressing Return. The app name should match the display name shown \
-                on the iPhone home screen.
+                appeared, and opens the top result only when it is an app, tapping its \
+                tile; with no app behind the name (not installed) it fails without \
+                opening anything. If Spotlight never shows the typed name (on iOS 26 \
+                it can take typing only once per iPhone Mirroring session), it closes \
+                Spotlight and opens the app from the Home Screen icon whose label is \
+                exactly the name on the page Home shows; other pages, folders, the Dock \
+                and the App Library are not searched. The app name should match the display \
+                name shown on the iPhone home screen.
                 """,
             inputSchema: [
                 "type": .string("object"),
@@ -100,7 +103,9 @@ extension MirroirMCP {
             name: "press_home",
             description: """
                 Press the Home button on the mirrored iPhone, returning to the home screen. \
-                Equivalent to swiping up from the bottom on a Face ID device.
+                Equivalent to swiping up from the bottom on a Face ID device. Home is \
+                pressed again when it brings back Spotlight (iOS does after an app \
+                opened from it) or leaves the screen unchanged.
                 """,
             inputSchema: [
                 "type": .string("object"),
@@ -109,15 +114,11 @@ extension MirroirMCP {
             handler: { args in
                 let (ctx, err) = registry.resolveForTool(args, requiring: .pressHome)
                 guard let ctx else { return err! }
-                guard let menuBridge = ctx.bridge as? (any MenuActionCapable) else {
-                    return .error("Target '\(ctx.name)' does not support press_home")
+                if let error = MirroringMenuCommand.pressHome(
+                    bridge: ctx.bridge, input: ctx.input, describer: ctx.describer) {
+                    return .error(error)
                 }
-
-                if menuBridge.triggerMenuAction(menu: "View", item: "Home Screen") {
-                    return .text("Pressed Home — navigated to home screen")
-                } else {
-                    return .error("Failed to press Home. Is '\(ctx.name)' running?")
-                }
+                return .text("Pressed Home — navigated to home screen")
             }
         ))
 
@@ -135,28 +136,24 @@ extension MirroirMCP {
             handler: { args in
                 let (ctx, err) = registry.resolveForTool(args, requiring: .pressAppSwitcher)
                 guard let ctx else { return err! }
-                guard let menuBridge = ctx.bridge as? (any MenuActionCapable) else {
-                    return .error("Target '\(ctx.name)' does not support press_app_switcher")
+                if let error = MirroringMenuCommand.appSwitcher.press(bridge: ctx.bridge, input: ctx.input) {
+                    return .error(error)
                 }
-
-                if menuBridge.triggerMenuAction(menu: "View", item: "App Switcher") {
-                    return .text("Opened App Switcher")
-                } else {
-                    return .error("Failed to open App Switcher. Is '\(ctx.name)' running?")
-                }
+                return .text("Opened App Switcher")
             }
         ))
 
-        // press_back — tap the OCR-detected "<" back chevron, with profile fallback
+        // press_back — go back one screen with the target's backtracker
         server.registerTool(MCPToolDefinition(
             name: "press_back",
             description: """
-                Navigate back one screen on the mirrored iPhone by tapping the \
-                "<" back chevron in the top navigation bar. Uses OCR to locate \
-                the chevron and falls back to the canonical back-button position \
-                if OCR misses it. This is the only reliable back-navigation \
-                method for iPhone Mirroring — Mac keyboard shortcuts (Cmd+[) do \
-                NOT pass through to iOS apps.
+                Navigate back one screen. On the mirrored iPhone it taps the "<" \
+                back chevron OCR finds in the top navigation bar, or the usual \
+                back-button point when OCR finds none; iOS apps do not implement \
+                Cmd+[ (the key arrives and nothing handles it), so a tap is the \
+                way back. On a macOS app target it presses Cmd+[. The reply says \
+                which was done and whether the screen changed; a press that left \
+                the screen unchanged is an error.
                 """,
             inputSchema: [
                 "type": .string("object"),
@@ -165,35 +162,7 @@ extension MirroirMCP {
             handler: { args in
                 let (ctx, err) = registry.resolveForTool(args)
                 guard let ctx else { return err! }
-                let bridge = ctx.bridge
-
-                guard bridge.findProcess() != nil else {
-                    return .error("Target '\(ctx.name)' is not running")
-                }
-                if bridge.getState() == .paused {
-                    if let menuBridge = bridge as? (any MenuActionCapable) {
-                        _ = menuBridge.pressResume()
-                        usleep(EnvConfig.resumeFromPausedUs)
-                    }
-                }
-
-                guard let result = ctx.ocrDescriber.describe() else {
-                    return .error(ScreenReadFailure.message(
-                        "Failed to capture/analyze screen.", targetName: ctx.name,
-                        state: ctx.bridge.getState()))
-                }
-                guard let info = bridge.getWindowInfo() else {
-                    return .error("Cannot determine window size for '\(ctx.name)'")
-                }
-
-                let zones = ctx.profile.layoutZones(bridge.getOrientation())
-                ExplorerUtilities.tapBackButton(
-                    elements: result.elements,
-                    input: ctx.input,
-                    windowSize: info.size,
-                    fallback: zones.backButtonFallback
-                )
-                return .text("Pressed back (OCR chevron or canonical fallback)")
+                return BackNavigation.pressBack(ctx)
             }
         ))
 
@@ -211,15 +180,10 @@ extension MirroirMCP {
             handler: { args in
                 let (ctx, err) = registry.resolveForTool(args, requiring: .spotlight)
                 guard let ctx else { return err! }
-                guard let menuBridge = ctx.bridge as? (any MenuActionCapable) else {
-                    return .error("Target '\(ctx.name)' does not support spotlight")
+                if let error = MirroringMenuCommand.spotlight.press(bridge: ctx.bridge, input: ctx.input) {
+                    return .error(error)
                 }
-
-                if menuBridge.triggerMenuAction(menu: "View", item: "Spotlight") {
-                    return .text("Opened Spotlight search")
-                } else {
-                    return .error("Failed to open Spotlight. Is '\(ctx.name)' running?")
-                }
+                return .text("Opened Spotlight search")
             }
         ))
     }

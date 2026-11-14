@@ -10,14 +10,15 @@ import HelperLib
 
 /// Tap the "<" back chevron detected in the top navigation bar, falling back to
 /// a canonical position in the top-left corner. Used by iPhone Mirroring because
-/// iOS apps do not receive Mac keyboard shortcuts through the Mirroring bridge.
+/// iOS apps do not implement Cmd+[: the key arrives and nothing handles it.
 struct OCRChevronBacktracker: Backtracking {
+    @discardableResult
     func tapBack(
         elements: [TapPoint],
         input: any InputProviding,
         windowSize: CGSize,
         fallback: BackButtonFallback
-    ) -> Bool {
+    ) -> BackOutcome {
         ExplorerUtilities.tapBackButton(
             elements: elements, input: input,
             windowSize: windowSize, fallback: fallback
@@ -41,14 +42,21 @@ struct KeyboardShortcutBacktracker: Backtracking {
     /// Alternative: Escape — dismisses modals, often serves as back in simple apps.
     static let escape = KeyboardShortcutBacktracker(keyName: "escape", modifiers: [])
 
+    /// The shortcut as people write it: "Cmd+[", "escape".
+    var displayName: String {
+        let names = ["command": "Cmd", "shift": "Shift", "option": "Option", "control": "Ctrl"]
+        return (modifiers.map { names[$0] ?? $0 } + [keyName]).joined(separator: "+")
+    }
+
+    @discardableResult
     func tapBack(
         elements: [TapPoint],
         input: any InputProviding,
         windowSize: CGSize,
         fallback: BackButtonFallback
-    ) -> Bool {
+    ) -> BackOutcome {
         let result = input.pressKey(keyName: keyName, modifiers: modifiers)
         usleep(EnvConfig.stepSettlingDelayMs * 1000)
-        return result.error == nil
+        return BackOutcome(action: .shortcut(displayName), error: result.error)
     }
 }

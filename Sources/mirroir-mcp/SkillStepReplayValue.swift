@@ -55,7 +55,7 @@ extension SkillStep {
             return "{ " + parts.joined(separator: ", ") + " }"
         case .launch, .tap, .type, .swipe, .assertVisible, .assertNotVisible, .screenshot,
              .openURL, .resetApp, .setNetwork, .scrollTo, .waitFor, .longPress, .pressKey,
-             .home, .shake, .skipped, .invalid:
+             .home, .shake, .clearField, .skipped, .invalid:
             // Plain values return above; these have none.
             return nil
         case .scene:
@@ -79,7 +79,7 @@ extension SkillStep {
             return ([key] + modifiers).joined(separator: "+")
         case .waitFor(let label, _), .longPress(let label, _):
             return label
-        case .drag, .switchTarget, .measure, .scene, .home, .shake, .skipped, .invalid:
+        case .drag, .switchTarget, .measure, .scene, .home, .shake, .clearField, .skipped, .invalid:
             return nil
         }
     }
@@ -124,7 +124,7 @@ extension SkillStep {
                             until: transform(until), maxSeconds: maxSeconds)
         case .pressKey(let key, let modifiers):
             return .pressKey(keyName: transform(key), modifiers: modifiers)
-        case .home, .shake, .switchTarget, .scene, .skipped, .invalid:
+        case .home, .shake, .clearField, .switchTarget, .scene, .skipped, .invalid:
             return self
         }
     }

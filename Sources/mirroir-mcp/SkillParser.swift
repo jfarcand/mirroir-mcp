@@ -39,6 +39,9 @@ enum SkillStep {
     case launch(appName: String)
     case tap(label: String)
     case type(text: String)
+    /// Empty the focused text field (Cmd+A, then Delete), for a `type` into a
+    /// field that is already filled.
+    case clearField
     case pressKey(keyName: String, modifiers: [String])
     case swipe(direction: String)
     case waitFor(label: String, timeoutSeconds: Int?)
@@ -70,6 +73,7 @@ enum SkillStep {
         case .launch: return "launch"
         case .tap: return "tap"
         case .type: return "type"
+        case .clearField: return SkillParser.clearFieldKey
         case .pressKey: return "press_key"
         case .swipe: return "swipe"
         case .waitFor: return "wait_for"
@@ -113,6 +117,7 @@ enum SkillStep {
         case .assertNotVisible(let label): return label
         case .screenshot(let label): return label
         case .home: return nil
+        case .clearField: return nil
         case .openURL(let url): return url
         case .shake: return nil
         case .scrollTo(let label, _, _): return label
@@ -142,6 +147,7 @@ enum SkillStep {
         case .assertNotVisible(let label): return "assert_not_visible: \"\(label)\""
         case .screenshot(let label): return "screenshot: \"\(label)\""
         case .home: return "home"
+        case .clearField: return SkillParser.clearFieldKey
         case .openURL(let url): return "open_url: \"\(url)\""
         case .shake: return "shake"
         case .scrollTo(let label, _, _): return "scroll_to: \"\(label)\""
@@ -193,6 +199,8 @@ enum SkillParser {
     /// The `kind:` value of a scene skill: model-interpreted, played only by a
     /// `scene:` step, never compiled.
     static let gameKind = "game"
+    /// The step that empties the focused text field: a bare `clear_field`.
+    static let clearFieldKey = "clear_field"
 
     /// Whether `content`'s header declares `kind: game`.
     static func isGame(content: String) -> Bool {
@@ -293,6 +301,9 @@ enum SkillParser {
         if trimmed == "shake" {
             return .shake
         }
+        if trimmed == clearFieldKey {
+            return .clearField
+        }
 
         // Parse "key: value" format. A bare word that is not a known keyword
         // is not an action this runner can perform.
@@ -343,6 +354,8 @@ enum SkillParser {
             return .openURL(url: value)
         case "shake":
             return .shake
+        case clearFieldKey:
+            return .clearField
         case "scroll_to":
             return .scrollTo(label: value, direction: .down, maxScrolls: EnvConfig.defaultScrollMaxAttempts)
         case "reset_app":

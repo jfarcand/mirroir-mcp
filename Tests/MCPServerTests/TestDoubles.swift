@@ -158,11 +158,23 @@ final class StubInput: InputProviding, @unchecked Sendable {
         shakeCalls += 1
         return shakeResult
     }
+    /// Every typeText() and pressKey() call in order, as "type:<text>" and
+    /// "key:<modifiers+>key", for checking what reaches the keyboard first.
+    var keyboardLog: [String] = []
+    /// A key's own result, answered instead of `pressKeyResult` for that key.
+    var pressKeyResultByKey: [String: TypeResult] = [:]
     func typeText(_ text: String) -> TypeResult {
         typeCalls.append(text)
+        keyboardLog.append("type:\(text)")
         return typeTextResult
     }
-    func pressKey(keyName: String, modifiers: [String]) -> TypeResult { pressKeyResult }
+    func pressKey(keyName: String, modifiers: [String]) -> TypeResult {
+        keyboardLog.append("key:" + (modifiers + [keyName]).joined(separator: "+"))
+        return pressKeyResultByKey[keyName] ?? pressKeyResult
+    }
+    /// What `ensureConnected` answers: nil for a connected target, else the refusal.
+    var ensureConnectedResult: String?
+    func ensureConnected(tag: String) -> String? { ensureConnectedResult }
     func launchApp(name: String) -> String? {
         launchAppCalls.append(name)
         return launchAppResult
@@ -238,13 +250,13 @@ final class StubCapture: ScreenCapturing, @unchecked Sendable {
 
 final class StubRecorder: ScreenRecording, @unchecked Sendable {
     var startResult: String?
-    var stopResult: (filePath: String?, error: String?) = ("/tmp/test.mov", nil)
+    var stopResult = RecordingStop(filePath: "/tmp/test.mov", error: nil)
 
     func startRecording(outputPath: String?) -> String? {
         startResult
     }
 
-    func stopRecording() -> (filePath: String?, error: String?) {
+    func stopRecording() -> RecordingStop {
         stopResult
     }
 }
@@ -338,9 +350,13 @@ final class StubDescriber: ScreenDescribing, @unchecked Sendable {
     /// Settle window of the most recent describe call (nil = describer default).
     private(set) var lastSettleTimeoutUs: UInt32?
 
+    /// Settle window of every describe call, in call order.
+    private(set) var settleTimeouts: [UInt32?] = []
+
     func describe(settleTimeoutUs: UInt32?) -> ScreenDescriber.DescribeResult? {
         describeCallCount += 1
         lastSettleTimeoutUs = settleTimeoutUs
+        settleTimeouts.append(settleTimeoutUs)
         if !describeResults.isEmpty {
             let result = describeResults[min(describeIndex, describeResults.count - 1)]
             describeIndex += 1

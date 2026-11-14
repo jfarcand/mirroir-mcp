@@ -11,11 +11,11 @@ import HelperLib
 /// Records the request and answers a fixed capture reply. Stands in for
 /// ScreenCaptureKit, whose real behavior ScreenCaptureKitAudioTests measures.
 final class StubAudioCapturer: AppAudioCapturing, @unchecked Sendable {
-    var reply: AudioCaptureReply = .recorded(peak: 0.5)
-    private(set) var requests: [(pid: pid_t, seconds: Double, file: URL)] = []
+    var reply: AudioCaptureReply = .recorded(peak: 0.5, seconds: 10, end: .fullLength)
+    private(set) var requests: [(pid: pid_t, seconds: Double, stopRule: ListenStopRule, file: URL)] = []
 
-    func captureAudio(pid: pid_t, seconds: Double, to file: URL) -> AudioCaptureReply {
-        requests.append((pid, seconds, file))
+    func captureAudio(pid: pid_t, seconds: Double, stopRule: ListenStopRule, to file: URL) -> AudioCaptureReply {
+        requests.append((pid, seconds, stopRule, file))
         if case .recorded = reply { FileManager.default.createFile(atPath: file.path, contents: Data([0])) }
         return reply
     }
@@ -70,11 +70,42 @@ final class AudioListenerTests: XCTestCase {
     }
 
     func testSilenceIsReportedAndNotTranscribed() {
-        capturer.reply = .recorded(peak: 0.001)
+        capturer.reply = .recorded(peak: 0.001, seconds: 3.4, end: .fullLength)
         let outcome = listen()
         XCTAssertFalse(outcome.isError)
         XCTAssertTrue(outcome.text.hasPrefix("Nothing played during the 10 s"), outcome.text)
         XCTAssertTrue(transcriber.languages.isEmpty)
+    }
+
+    /// carnet#67: a muted reel was recorded for its whole 48 s.
+    func testASilentStartStopsEarlyAndSaysNothingIsPlaying() {
+        capturer.reply = .recorded(peak: 0.002, seconds: 4.1, end: .silentStart)
+        let outcome = listen(seconds: 48)
+        XCTAssertFalse(outcome.isError)
+        XCTAssertTrue(outcome.text.hasPrefix("Nothing is playing: 4.1 s of silence from the start"), outcome.text)
+        XCTAssertTrue(outcome.text.contains("muted"), outcome.text)
+        XCTAssertTrue(transcriber.languages.isEmpty, "silence is not transcribed")
+    }
+
+    /// carnet#67: a 33 s reel was recorded for 61 s.
+    func testSpeechThatEndedIsTranscribedForTheLengthRecorded() {
+        capturer.reply = .recorded(peak: 0.8, seconds: 36.04, end: .soundEnded)
+        let rule = ListenStopRule(silencePeak: 0.01, silentStart: 4, trailingSilence: 3)
+        let outcome = AudioListener.listen(bridge: StubBridge(), seconds: 60, language: "fr-CA",
+                                           capturer: capturer, transcriber: transcriber,
+                                           fallbackLanguage: "en-US", stopRule: rule)
+        XCTAssertFalse(outcome.isError)
+        XCTAssertTrue(outcome.text.hasPrefix("Heard during the 36 s (stopped after 3 s of silence: the sound "
+            + "had ended), transcribed on this Mac in fr-CA"), outcome.text)
+        XCTAssertEqual(capturer.requests.first?.stopRule, rule, "the capture stops on the rule given")
+    }
+
+    func testTheStopRuleComesFromSettings() {
+        _ = listen()
+        XCTAssertEqual(capturer.requests.first?.stopRule, ListenStopRule(
+            silencePeak: Float(TimingConstants.listenSilencePeak),
+            silentStart: TimingConstants.listenSilentStartSeconds,
+            trailingSilence: TimingConstants.listenTrailingSilenceSeconds))
     }
 
     func testSoundWithoutWordsSuggestsTheLanguage() {
@@ -108,7 +139,7 @@ final class AudioListenerTests: XCTestCase {
         capturer.reply = .failed("no grant")
         XCTAssertEqual(listen().text, "Listening failed: no grant.")
 
-        capturer.reply = .recorded(peak: 0.4)
+        capturer.reply = .recorded(peak: 0.4, seconds: 10, end: .fullLength)
         transcriber.reply = .unsupportedLanguage("xx-YY")
         XCTAssertTrue(listen(language: "xx-YY").text.hasPrefix("No on-device speech model exists for 'xx-YY'"))
         transcriber.reply = .unavailable("listening needs macOS 26 or later")

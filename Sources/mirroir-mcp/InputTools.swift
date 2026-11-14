@@ -219,7 +219,11 @@ extension MirroirMCP {
                 scripts are confirmed only when ocrLanguages includes them. \
                 Typed text is read back from the screen: when iOS autocorrect \
                 rewrote it, the call still succeeds and the result says the \
-                screen does not show what was typed.
+                screen does not show what was typed. Typing adds to what the \
+                field already holds; pass clear=true to empty a pre-filled \
+                field first (Cmd+A, then Delete). Clear only a text field you \
+                just focused: with no field focused, Cmd+A acts on whatever \
+                the app selects.
                 """,
             inputSchema: [
                 "type": .string("object"),
@@ -227,7 +231,12 @@ extension MirroirMCP {
                     "text": .object([
                         "type": .string("string"),
                         "description": .string("The text to type"),
-                    ])
+                    ]),
+                    "clear": .object([
+                        "type": .string("boolean"),
+                        "description": .string(
+                            "Empty the focused field first (Cmd+A, then Delete). Default false."),
+                    ]),
                 ]),
                 "required": .array([.string("text")]),
             ],
@@ -240,11 +249,15 @@ extension MirroirMCP {
                     return .error("Missing required parameter: text (string)")
                 }
 
-                let result = input.typeText(text)
+                let clear = args["clear"]?.asBool() ?? false
+
+                let result = FieldClearing.type(text, clearFirst: clear, using: input)
                 guard result.success else {
                     return .error(result.error ?? "Failed to type text")
                 }
-                let typed = "Typed \(text.count) characters"
+                let typed = clear
+                    ? "Cleared the field, then typed \(text.count) characters"
+                    : "Typed \(text.count) characters"
                 return .text(result.notice.map { "\(typed)\n\n\($0)" } ?? typed)
             }
         ))

@@ -46,7 +46,7 @@ run "sudo rm -f /usr/local/bin/mirroir-helper"
 run "sudo rm -f /Library/LaunchDaemons/com.jfarcand.mirroir-helper.plist"
 run "sudo rm -f /var/run/mirroir-helper.sock"
 run "sudo rm -f /var/log/mirroir-helper.log"
-run "rm -f '$HOME/.mirroir-mcp/debug.log'"
+run "rm -f '$HOME/.mirroir-mcp/debug.log' '$HOME/.mirroir-mcp/debug.log.1'"
 
 # Clean up pre-rename artifacts
 run "sudo rm -f /usr/local/bin/iphone-mirroir-mcp"

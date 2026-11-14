@@ -16,17 +16,16 @@ enum DoctorCaptureCheck {
     static let name = "Screen read"
 
     /// Capture the mirror and OCR it, read-only: nothing is tapped or typed.
-    static func run(hostApp: String?) -> DoctorCheck {
+    static func run(grantee: HostApp.Grantee?) -> DoctorCheck {
         let target = IPhoneMirroringTarget.build(config: nil)
         let size = target.bridge.getWindowInfo()?.size
-        return verdict(target.ocrDescriber.describe(settleTimeoutUs: 0), windowSize: size, hostApp: hostApp)
+        return verdict(target.ocrDescriber.describe(settleTimeoutUs: 0), windowSize: size, grantee: grantee)
     }
 
     /// The check for what one describe of the mirror returned.
     static func verdict(_ result: ScreenDescriber.DescribeResult?, windowSize: CGSize?,
-                        hostApp: String?) -> DoctorCheck {
-        let restart = "quit and reopen \(hostApp.map { "\"\($0)\"" } ?? "the app that runs mirroir-mcp"): "
-            + "a Screen Recording grant takes effect only after a restart."
+                        grantee: HostApp.Grantee?) -> DoctorCheck {
+        let restart = PermissionGuidance.restart(grantee) + ": a Screen Recording grant takes effect only after a restart."
         let dimensions = windowSize.map { "\(Int($0.width))x\(Int($0.height))" } ?? "unknown size"
         guard let result else {
             return DoctorCheck(name: name, status: .failed, detail: "no frame captured",

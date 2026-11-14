@@ -312,7 +312,8 @@ extension MirroirMCP {
             name: "start_recording",
             description: """
                 Start recording a video of the mirrored iPhone screen. \
-                Records the iPhone Mirroring window as a .mov file. \
+                Records the iPhone Mirroring window as a .mov file, keeping the \
+                Mac's display awake until it stops. \
                 Use stop_recording to end the recording and get the file path. \
                 Requires Screen Recording permission in System Preferences.
                 """,
@@ -346,7 +347,9 @@ extension MirroirMCP {
             description: """
                 Stop the current video recording and return the file path. \
                 Must be called after start_recording. Returns the path to \
-                the recorded .mov file.
+                the recorded .mov file. If the recording had already ended on \
+                its own (display sleep can end it), it still returns the file \
+                and says the video stops early.
                 """,
             inputSchema: [
                 "type": .string("object"),
@@ -363,6 +366,9 @@ extension MirroirMCP {
                 }
                 guard let path = result.filePath else {
                     return .error("Recording stopped but no file was produced")
+                }
+                if let endedEarly = result.endedEarly {
+                    return .text("Recording saved to: \(path). Note: \(endedEarly), so the video stops there.")
                 }
                 return .text("Recording saved to: \(path)")
             }

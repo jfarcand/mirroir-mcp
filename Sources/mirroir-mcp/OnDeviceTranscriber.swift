@@ -111,17 +111,13 @@ struct OnDeviceTranscriber: Sendable {
         }
     }
 
-    /// Install the module's model when needed, run the file through it, and
-    /// join what `results` yields.
+    /// Install the module's model when it is not installed yet, run the file
+    /// through it, and join what `results` yields.
     @available(macOS 26.0, *)
     private static func analyze<Results: AsyncSequence & Sendable>(
         file: URL, locale: Locale, module: any SpeechModule, results: Results
     ) async throws -> String where Results.Element == String {
-        try await reserve(locale)
-        if let install = try await AssetInventory.assetInstallationRequest(supporting: [module]) {
-            DebugLog.log("listen", "installing the on-device speech model for \(locale.identifier(.bcp47))")
-            try await install.downloadAndInstall()
-        }
+        try await installIfNeeded(module, locale: locale)
         let analyzer = SpeechAnalyzer(modules: [module])
         let audio = try AVAudioFile(forReading: file)
         let collect = Task { () throws -> [String] in
@@ -135,6 +131,21 @@ struct OnDeviceTranscriber: Sendable {
             try await analyzer.finalizeAndFinishThroughEndOfInput()
         }
         return try await collect.value.joined().trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    /// Reserve and install `module`'s model for `locale`, unless it is already
+    /// installed: then nothing is reserved or requested. Measured 2026-11-12
+    /// from the XR's listen calls: asked without this check, every call logged
+    /// an install for fr-CA.
+    @available(macOS 26.0, *)
+    private static func installIfNeeded(_ module: any SpeechModule, locale: Locale) async throws {
+        let tag = locale.identifier(.bcp47)
+        guard await AssetInventory.status(forModules: [module]) != .installed else { return }
+        try await reserve(locale)
+        if let install = try await AssetInventory.assetInstallationRequest(supporting: [module]) {
+            DebugLog.log("listen", "installing the on-device speech model for \(tag)")
+            try await install.downloadAndInstall()
+        }
     }
 
     /// Reserve `locale`'s speech model for this app. macOS downloads a model

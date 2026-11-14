@@ -14,6 +14,13 @@ public enum TimingConstants {
     /// Delay after Space switch for macOS to settle (microseconds).
     public static let spaceSwitchSettleUs: UInt32 = 300_000
 
+    /// Wait before each of the two re-reads of the target window taken when a
+    /// pointing call's point falls outside the window it first read
+    /// (microseconds). Mission Control, a hot corner or a window move shows
+    /// the window at a passing size for a moment; the two reads must agree
+    /// before the call goes ahead.
+    public static let windowGeometryRecheckUs: UInt32 = 250_000
+
     /// How long to poll for the target to reach the front after raising it (microseconds).
     public static let activationConfirmTimeoutUs: UInt32 = 1_000_000
     /// How long to wait for a notification banner over the target to clear (microseconds).

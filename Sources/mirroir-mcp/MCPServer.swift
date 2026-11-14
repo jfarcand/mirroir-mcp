@@ -362,7 +362,8 @@ final class MCPServer: Sendable {
         let context = MCPToolCallContext(
             inputResponses: Self.inputResponses(in: request),
             requestState: Self.requestState(in: request))
-        let toolResult = tool.handler(arguments, context)
+        // Synthetic input does not reset the idle timer: keep the screen saver off the mirror.
+        let toolResult = DisplayAwake.shared.during("mirroir-mcp \(toolName)") { tool.handler(arguments, context) }
 
         if !toolResult.inputRequests.isEmpty || toolResult.requestState != nil {
             return inputRequiredResponse(request, toolResult: toolResult, modern: modern)

@@ -69,6 +69,8 @@ enum MigrateStepFormatter {
             return "Open URL: \(value)"
         case "shake":
             return "Shake the device"
+        case SkillParser.clearFieldKey:
+            return "Clear the text field"
         case "scroll_to":
             return "Scroll until \"\(value)\" is visible"
         case "reset_app":

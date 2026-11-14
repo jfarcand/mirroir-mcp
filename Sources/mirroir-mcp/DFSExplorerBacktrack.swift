@@ -25,7 +25,7 @@ extension DFSExplorer {
             elements: elements, input: input,
             windowSize: windowSize,
             fallback: currentLayoutZones.backButtonFallback
-        )
+        ).issued
     }
 
     // MARK: - Backtrack with Verification

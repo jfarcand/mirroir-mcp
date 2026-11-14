@@ -13,8 +13,8 @@ import os
 /// `ctx.backtracker.tapBack(...)`) without threading through a separate type.
 struct TargetContext: Target, Sendable {
     let name: String
-    /// Stable legacy identifier ("iphone-mirroring" / "generic-window") kept for
-    /// config-file compatibility and telemetry. All runtime behavior should query
+    /// Config-type string from `targets.json` ("iphone-mirroring" / "macos-app"),
+    /// kept for telemetry and display. All runtime behavior should query
     /// `profile.*` instead of comparing this string.
     let targetType: String
     let bundleID: String?

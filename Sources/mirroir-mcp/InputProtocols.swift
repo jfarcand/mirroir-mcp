@@ -23,6 +23,11 @@ protocol InputProviding: Sendable {
     func pressKey(keyName: String, modifiers: [String]) -> TypeResult
     func launchApp(name: String) -> String?
     func openURL(_ url: String) -> String?
+    /// Make sure the target accepts input: launch it when it is not running and
+    /// free a paused session (iPhone Mirroring's Resume, OK or Try Again).
+    /// Returns nil when it is connected, else the refusal to report, which
+    /// quotes what the window says and names the next move.
+    func ensureConnected(tag: String) -> String?
     /// Drive the single persistent touch contact that spans calls (begin,
     /// move, end, cancel). While it is held, every other pointing operation
     /// refuses. Coordinates are window-relative, like `tap`.

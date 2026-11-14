@@ -75,7 +75,7 @@ final class DescriberRoutingTests: XCTestCase {
 
         try call(server, "press_back", [:])
 
-        XCTAssertEqual(ocr.describeCallCount, 1)
+        XCTAssertEqual(ocr.describeCallCount, 2, "the screen is read before and after the back tap")
         XCTAssertEqual(client.describeCallCount, 0, "press_back must not use the vision describer")
     }
 

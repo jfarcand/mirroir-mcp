@@ -34,6 +34,12 @@ struct SystemPhrases: Sendable, Equatable {
         case alertDismiss = "Alert Dismiss"
         /// Fragments of a system alert's title, `.*` standing for any text.
         case alertTitle = "Alert Title"
+        /// The Settings row set_network taps for Airplane Mode.
+        case settingsAirplaneRow = "Settings Airplane Row"
+        /// The Settings row set_network taps for Wi-Fi.
+        case settingsWiFiRow = "Settings Wi-Fi Row"
+        /// The Settings row set_network taps for Cellular.
+        case settingsCellularRow = "Settings Cellular Row"
     }
 
     /// Each section's bullets, folded with `fold`, in file order.

@@ -107,6 +107,10 @@ public enum EnvConfig {
         readUInt32("spaceSwitchSettleUs", default: TimingConstants.spaceSwitchSettleUs)
     }
 
+    public static var windowGeometryRecheckUs: UInt32 {
+        readUInt32("windowGeometryRecheckUs", default: TimingConstants.windowGeometryRecheckUs)
+    }
+
     public static var activationConfirmTimeoutUs: UInt32 {
         readUInt32("activationConfirmTimeoutUs", default: TimingConstants.activationConfirmTimeoutUs)
     }
@@ -163,6 +167,20 @@ public enum EnvConfig {
 
     public static var postHeartbeatSettleUs: UInt32 {
         readUInt32("postHeartbeatSettleUs", default: TimingConstants.postHeartbeatSettleUs)
+    }
+
+    // MARK: - Listen
+
+    public static var listenSilencePeak: Double {
+        readDouble("listenSilencePeak", default: TimingConstants.listenSilencePeak)
+    }
+
+    public static var listenSilentStartSeconds: Double {
+        readDouble("listenSilentStartSeconds", default: TimingConstants.listenSilentStartSeconds)
+    }
+
+    public static var listenTrailingSilenceSeconds: Double {
+        readDouble("listenTrailingSilenceSeconds", default: TimingConstants.listenTrailingSilenceSeconds)
     }
 
     // MARK: - CGEvent Keyboard
@@ -331,9 +349,15 @@ public enum EnvConfig {
         // JSON numbers: 0 = false, non-zero = true
         if let value = settings[key] as? Int { return value != 0 }
         if let str = env[envVar ?? envVarName(key)] {
-            return ["true", "1", "yes"].contains(str.lowercased())
+            return isTrue(str)
         }
         return fallback
+    }
+
+    /// Whether an environment value reads as on: `true`, `1` or `yes`, in any
+    /// case. Anything else, an unsubstituted `${...}` placeholder included, is off.
+    public static func isTrue(_ value: String) -> Bool {
+        ["true", "1", "yes"].contains(value.lowercased())
     }
 
     static func readDouble(_ key: String, default fallback: Double) -> Double {

@@ -81,7 +81,8 @@ final class OnDeviceTranscriberTests: XCTestCase {
 
     func testAProcessThatIsNotRunningIsNotShareable() {
         let reply = ScreenCaptureKitAudio().captureAudio(
-            pid: pid_t(Int32.max), seconds: 1, to: directory.appendingPathComponent("none.caf"))
+            pid: pid_t(Int32.max), seconds: 1, stopRule: .fromSettings,
+            to: directory.appendingPathComponent("none.caf"))
         XCTAssertEqual(reply, .appNotShareable)
     }
 

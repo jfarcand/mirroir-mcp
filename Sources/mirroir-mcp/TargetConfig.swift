@@ -9,7 +9,7 @@ import HelperLib
 
 /// Configuration for a single automation target read from targets.json.
 struct TargetConfig: Codable, Sendable {
-    /// Target type: "iphone-mirroring" or "generic-window".
+    /// Target type: "iphone-mirroring" or "macos-app".
     let type: String
     /// macOS bundle identifier for the target app.
     let bundleID: String?

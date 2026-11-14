@@ -22,7 +22,9 @@ extension MirroirMCP {
             description: """
                 Hear what the phone is playing right now, as text: a reel's or \
                 video's narration, a voice message, a spoken recipe. Records the \
-                sound iPhone Mirroring plays for `seconds`, then transcribes it on \
+                sound iPhone Mirroring plays for up to `seconds`, stopping early \
+                when nothing plays from the start (a muted video) or once the sound \
+                has ended, then transcribes it on \
                 this Mac; the audio never leaves it and is deleted after. Start the \
                 video or message first, and pass `language` as the iPhone's language \
                 when it is not the Mac's ("fr-CA", "en-US"). Words only: it does not \

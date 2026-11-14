@@ -356,7 +356,7 @@ enum CompileCommand {
             return .passthrough()
 
         // Steps with no screen lookup to pre-resolve: they replay live
-        case .launch, .type, .pressKey, .swipe, .home, .openURL, .shake,
+        case .launch, .type, .clearField, .pressKey, .swipe, .home, .openURL, .shake,
              .resetApp, .setNetwork, .screenshot, .switchTarget:
             return .passthrough()
         }

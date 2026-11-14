@@ -5,12 +5,12 @@
       "type": "iphone-mirroring"
     },
     "android": {
-      "type": "generic-window",
+      "type": "macos-app",
       "process_name": "qemu-system-aarch64",
       "window_title_contains": "Android Emulator"
     },
     "claude": {
-      "type": "generic-window",
+      "type": "macos-app",
       "bundle_id": "com.anthropic.claudefordesktop",
       "window_title_contains": "Claude"
     }

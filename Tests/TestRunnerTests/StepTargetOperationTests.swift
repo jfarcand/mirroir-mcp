@@ -65,6 +65,21 @@ final class StepTargetOperationTests: XCTestCase {
         XCTAssertEqual(macInput.launchAppCalls, [])
     }
 
+    /// carnet#45: a skill's `home` step fails when the iPhone did not receive it.
+    func testAHomeStepOnAPausedSessionFails() throws {
+        let executor = try executor(on: "iphone")
+        phoneInput.ensureConnectedResult = "Target 'iphone' is paused"
+        let refused = executor.execute(step: .home, stepIndex: 0, skillName: "t")
+        XCTAssertEqual(refused.status, .failed)
+        XCTAssertEqual(refused.message, "Target 'iphone' is paused")
+        XCTAssertTrue(phoneBridge.menuActionCalls.isEmpty)
+
+        phoneInput.ensureConnectedResult = nil
+        let pressed = executor.execute(step: .home, stepIndex: 1, skillName: "t")
+        XCTAssertEqual(pressed.status, .passed)
+        XCTAssertEqual(phoneBridge.menuActionCalls.map(\.item), ["Home Screen"])
+    }
+
     func testAStepEveryTargetHasStillRuns() throws {
         let executor = try executor(on: "telegram")
         let tap = executor.execute(step: .tap(label: "@10,20"), stepIndex: 0, skillName: "t")

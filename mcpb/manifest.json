@@ -4,7 +4,7 @@
   "display_name": "mirroir",
   "version": "0.47.0",
   "description": "Drive a stock iPhone via iPhone Mirroring: no Developer Mode, Xcode or WDA. LLM-free skill replay.",
-  "long_description": "mirroir-mcp drives a real iPhone through the macOS iPhone Mirroring window. describe_screen returns OCR'd text with tap coordinates; tap, swipe, drag, type_text, launch_app and open_url act on the device; generate_skill explores an app and authors replayable skills. The bundle carries the native Apple Silicon server binary, so it starts without Node or a network fetch. Requires macOS 15+ on Apple Silicon, a paired iPhone in iPhone Mirroring, and the Screen Recording and Accessibility permissions for the host app.",
+  "long_description": "mirroir-mcp drives a real iPhone through the macOS iPhone Mirroring window. describe_screen returns OCR'd text with tap coordinates; tap, swipe, drag, type_text, launch_app and open_url act on the device; generate_skill explores an app and authors replayable skills. The bundle carries the native Apple Silicon server inside a small app, mirroir-mcp.app, so it starts without Node or a network fetch. Requires macOS 15+ on Apple Silicon and a paired iPhone in iPhone Mirroring. Claude starts the server as its own process, so macOS asks for Screen Recording and Accessibility for \"mirroir-mcp\" (the robot icon), not for Claude: turn it on in System Settings > Privacy & Security, then quit and reopen Claude. The bundle is signed ad hoc, so macOS may ask again after an extension update.",
   "author": {
     "name": "Jean-Francois Arcand",
     "url": "https://github.com/jfarcand"
@@ -17,14 +17,26 @@
   "documentation": "https://github.com/jfarcand/mirroir-mcp#readme",
   "support": "https://github.com/jfarcand/mirroir-mcp/issues",
   "license": "Apache-2.0",
+  "icon": "icon.png",
   "keywords": ["iphone", "ios", "iphone-mirroring", "mobile-testing", "automation"],
   "server": {
     "type": "binary",
-    "entry_point": "server/mirroir-mcp",
+    "entry_point": "server/mirroir-mcp.app/Contents/MacOS/mirroir-mcp",
     "mcp_config": {
-      "command": "${__dirname}/server/mirroir-mcp",
+      "command": "${__dirname}/server/mirroir-mcp.app/Contents/MacOS/mirroir-mcp",
       "args": [],
-      "env": {}
+      "env": {
+        "MIRROIR_DEBUG": "${user_config.debug_logging}"
+      }
+    }
+  },
+  "user_config": {
+    "debug_logging": {
+      "type": "boolean",
+      "title": "Debug logging",
+      "description": "Log every tool call to ~/.mirroir-mcp/debug.log (each line names the process that wrote it). Turn on when reporting a problem.",
+      "default": false,
+      "required": false
     }
   },
   "tools_generated": true,

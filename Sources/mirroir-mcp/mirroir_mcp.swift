@@ -17,7 +17,8 @@ struct MirroirMCP {
 
         // Parse CLI flags. `--debug` is global: the server and every
         // subcommand honor it, so it is removed before a subcommand parses.
-        DebugLog.enabled = CommandLine.arguments.contains(CLIDispatch.debugOption)
+        // MIRROIR_DEBUG turns it on for a host that cannot add arguments.
+        DebugLog.enabled = DebugLog.isRequested(arguments: CommandLine.arguments)
 
         // A subcommand, the usage text or a refusal ends the process here: only
         // a command line that asks for the server goes on to start it.
@@ -58,10 +59,10 @@ struct MirroirMCP {
     /// the requests: the permission policy, the log, the agent runtime, the
     /// targets, the tools, and the release of held input on every way out.
     static func startServer(skipPermissions: Bool, transport: MCPTransport) -> MCPServer {
-        DebugLog.reset()
+        DebugLog.start()
         DebugLog.persist("startup", "version: \(GitVersion.commitHash)")
         if DebugLog.enabled {
-            DebugLog.persist("startup", "Debug logging enabled (--debug)")
+            DebugLog.persist("startup", "Debug logging enabled (--debug or MIRROIR_DEBUG)")
         }
         let config = PermissionPolicy.loadConfig()
         let policy = PermissionPolicy(skipPermissions: skipPermissions, config: config)
@@ -151,8 +152,9 @@ struct MirroirMCP {
 
         for (name, config) in configs {
             guard let ctx = TargetKind.build(config: config, name: name) else {
-                DebugLog.log("TargetRegistry",
-                    "Unknown target type '\(config.type)' for '\(name)' — skipped")
+                let message = TargetKind.unknownTypeMessage(type: config.type, name: name)
+                DebugLog.persist("TargetRegistry", message)
+                fputs("mirroir-mcp: \(message)\n", stderr)
                 continue
             }
             targets[name] = ctx

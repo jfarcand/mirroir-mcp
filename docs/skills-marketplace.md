@@ -49,6 +49,8 @@ cp my-skill.md .mirroir-mcp/skills/
 
 Project-local skills with the same filename override global ones. When both a `.md` and `.yaml` file exist with the same stem name, the `.md` file takes precedence.
 
+`list_skills` lists only skills: a SKILL.md whose front matter names `name` and `app`, or a YAML file naming `name` and `app` with at least one step. Other Markdown in the tree (README, `APP.md`, `patterns/`) is not listed, and a YAML skill with the same name and app as a SKILL.md (the copies under `legacy/`) is listed once, as the SKILL.md.
+
 ## Skill Format
 
 Skills can be written in SKILL.md (recommended) or YAML (legacy). Both formats support the same fields and step types.
@@ -138,7 +140,8 @@ Each step is a single key-value pair in the `steps` list. The AI interprets each
 |-----------|-------|---------------|-------------|
 | `launch` | App name (string) | `launch_app` | Open an app via Spotlight search |
 | `tap` | Element text (string) | `describe_screen` + `tap` | Find element by OCR text match, tap its coordinates |
-| `type` | Text to type (string) | `type_text` | Type text into the currently focused field |
+| `type` | Text to type (string) | `type_text` | Type text into the currently focused field; it adds to what the field holds |
+| `clear_field` | none (bare step) | `type_text` (`clear: true`) | Empty the focused field (Cmd+A, then Delete) before a `type` into a pre-filled field |
 | `press_key` | Key name (string) | `press_key` | Press a special key (return, escape, tab, etc.) with optional modifiers |
 | `swipe` | Direction (string) | `swipe` | Swipe in a direction (up, down, left, right) |
 | `wait_for` | Element text (string) | `describe_screen` (poll) | Wait until text appears on screen (retry with describe_screen) |

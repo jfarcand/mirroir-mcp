@@ -165,6 +165,8 @@ final class StepExecutor {
             result = executeTap(label: label, startTime: startTime)
         case .type(let text):
             result = executeType(text: text, startTime: startTime)
+        case .clearField:
+            result = executeClearField(startTime: startTime)
         case .pressKey(let keyName, let modifiers):
             result = executePressKey(keyName: keyName, modifiers: modifiers,
                                      startTime: startTime)
@@ -438,19 +440,18 @@ final class StepExecutor {
 
     private func executeHome(startTime: CFAbsoluteTime) -> StepResult {
         let step = SkillStep.home
-        guard let menuBridge = bridge as? (any MenuActionCapable) else {
-            return StepResult(step: step, status: .failed,
-                              message: "Target '\(bridge.targetName)' does not support the home button",
-                              durationSeconds: elapsed(startTime))
-        }
-        let success = menuBridge.triggerMenuAction(menu: "View", item: "Home Screen")
-        if !success {
-            return StepResult(step: step, status: .failed,
-                              message: "Failed to trigger Home Screen menu action",
+        if let error = MirroringMenuCommand.pressHome(bridge: bridge, input: input, describer: describer) {
+            return StepResult(step: step, status: .failed, message: error,
                               durationSeconds: elapsed(startTime))
         }
         return StepResult(step: step, status: .passed, message: nil,
                           durationSeconds: elapsed(startTime))
+    }
+
+    private func executeClearField(startTime: CFAbsoluteTime) -> StepResult {
+        let result = FieldClearing.clear(using: input)
+        return StepResult(step: .clearField, status: result.success ? .passed : .failed,
+                          message: result.error, durationSeconds: elapsed(startTime))
     }
 
     private func executeOpenURL(url: String, startTime: CFAbsoluteTime) -> StepResult {

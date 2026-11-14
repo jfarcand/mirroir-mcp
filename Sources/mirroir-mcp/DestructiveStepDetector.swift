@@ -130,7 +130,7 @@ enum DestructiveStepDetector {
         case .measure(_, let action, _, _):
             return consequentialText(of: action)
         // Observation, navigation, and device-level steps carry no target text.
-        case .launch, .pressKey, .swipe, .waitFor, .assertVisible, .assertNotVisible,
+        case .launch, .clearField, .pressKey, .swipe, .waitFor, .assertVisible, .assertNotVisible,
              .screenshot, .home, .shake, .scrollTo, .resetApp, .setNetwork,
              .switchTarget, .skipped, .invalid:
             return nil

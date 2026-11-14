@@ -82,10 +82,11 @@ After an app is launched from Spotlight, iOS can reopen Spotlight still showing 
 
 - It waits for Spotlight to appear, and opens it once more if a Home transition closed it.
 - When Spotlight holds a query and shows the app as a tile (its name with an app icon above it), it taps that tile instead of typing, then confirms Spotlight closed.
-- Otherwise it types the name. If the name never appears, it looks for the app's tile once more before failing without pressing Return.
-- It presses Return only when Spotlight's top result is an app: the "Top Hit" heading shows and either the search field reads "*name* — Open" or the result is a tile. An app that is not installed has no top hit, only web suggestions and App Store rows, so the call fails and says so instead of opening one of them.
+- Otherwise it types the name. If the name never appears, it looks for the app's tile once more, then goes to the Home Screen route below, without pressing Return.
+- It opens the top result only when that result is an app: the "Top Hit" heading shows and either the search field reads "*name* — Open" or the result is a tile. It taps the tile when it reads one, and presses Return only when it does not. An app that is not installed has no top hit, only web suggestions and App Store rows, so the call fails and says so instead of opening one of them.
+- When Spotlight never shows the typed name (on iOS 26, Spotlight in an iPhone Mirroring session can take typing only once, while apps still take it), it presses View > Home Screen, which closes Spotlight, and taps the Home Screen icon labeled exactly with the name on the page Home shows. It never turns a page: a touch drag across the icon grid can pick up an icon and rearrange the Home Screen. Apps on another page, in a folder, in the Dock or only in the App Library are not searched; the call then fails, says so, and leaves the phone on the Home Screen.
 
-A held query for a *different* app still fails the launch. Recover by quitting and relaunching iPhone Mirroring.
+A held query for a *different* app takes the same Home Screen route.
 
 ## Web and iOS Scenarios
 

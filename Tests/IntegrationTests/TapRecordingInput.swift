@@ -61,6 +61,7 @@ final class TapRecordingInput: InputProviding, @unchecked Sendable {
         base.pressKey(keyName: keyName, modifiers: modifiers)
     }
     func launchApp(name: String) -> String? { base.launchApp(name: name) }
+    func ensureConnected(tag: String) -> String? { base.ensureConnected(tag: tag) }
     func openURL(_ url: String) -> String? { base.openURL(url) }
     func touch(_ command: TouchCommand) -> Result<TouchOutcome, TouchSessionError> {
         base.touch(command)

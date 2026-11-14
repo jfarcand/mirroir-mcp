@@ -44,7 +44,13 @@ Verify your setup:
 ```bash
 mirroir doctor
 mirroir doctor --json    # machine-readable output
+mirroir doctor --fix     # walk through each missing permission
+mirroir doctor --grants  # check only the two permissions
 ```
+
+Each permission hint names what macOS checks the grant against: the process it holds *responsible* for the server. A terminal or an editor answers for what it starts, so a server started from iTerm needs iTerm turned on. Claude starts its servers through a helper that disclaims responsibility, so each one answers for itself and the pane lists **mirroir-mcp** (the Claude extension's `mirroir-mcp.app`, or the bare binary); `check_health` run inside that client names it. The serve agent answers for itself as "mirroir serve".
+
+`--fix` takes the missing grants one at a time, Accessibility first: it says which app to turn on, opens the pane in System Settings, and waits (up to `grantWaitUs`, five minutes) until a newly started `mirroir-mcp doctor --grants` sees the switch on, because a running process keeps its old Screen Recording answer until it restarts. It then says which app to quit and reopen. Run from a terminal, it checks the terminal's grants.
 
 ### Configure
 

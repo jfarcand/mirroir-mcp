@@ -182,4 +182,19 @@ struct NavigationHintDetectorTests {
             "Multi-word band text is content, not tab-bar evidence")
     }
 
+    @Test("desktop window's bottom row is not a tab bar")
+    func desktopBottomRowIsNotATabBar() {
+        // Calculator's last row of keys sits where an iOS tab bar would.
+        let elements = [
+            makeTapPoint("0", x: 60, y: 860),
+            makeTapPoint(",", x: 180, y: 860),
+            makeTapPoint("=", x: 240, y: 860),
+        ]
+        let icons = [TapPoint(text: "", tapX: 120, tapY: 860, confidence: 1.0)]
+        let hints = NavigationHintDetector.detect(
+            elements: elements, iconPoints: icons,
+            windowHeight: windowHeight, isMobile: false)
+        #expect(hints.isEmpty, "A tab bar is iOS chrome; a Mac window gets no tab-bar hint")
+    }
+
 }

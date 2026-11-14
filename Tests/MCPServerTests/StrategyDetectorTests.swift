@@ -13,7 +13,7 @@ final class StrategyDetectorTests: XCTestCase {
 
     func testExplicitOverrideMobile() {
         let result = StrategyDetector.detect(
-            targetType: "generic-window",
+            targetType: "macos-app",
             appName: "Reddit", explicitStrategy: "mobile")
         XCTAssertEqual(result, .mobile,
             "Explicit 'mobile' should override all other signals")
@@ -45,7 +45,7 @@ final class StrategyDetectorTests: XCTestCase {
 
     func testGenericWindowDetectsDesktop() {
         let result = StrategyDetector.detect(
-            targetType: "generic-window",
+            targetType: "macos-app",
             appName: "Finder")
         XCTAssertEqual(result, .desktop)
     }

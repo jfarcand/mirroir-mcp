@@ -28,6 +28,7 @@ extension EnvConfig {
             ("App Switching", [
                 ("statusBarTapY", "\(statusBarTapY)"),
                 ("spaceSwitchSettleUs", "\(spaceSwitchSettleUs)"),
+                ("windowGeometryRecheckUs", "\(windowGeometryRecheckUs)"),
                 ("activationConfirmTimeoutUs", "\(activationConfirmTimeoutUs)"),
                 ("overlayClearTimeoutUs", "\(overlayClearTimeoutUs)"),
                 ("spotlightAppearanceUs", "\(spotlightAppearanceUs)"),
@@ -44,6 +45,18 @@ extension EnvConfig {
                 ("launchConnectTimeoutUs", "\(launchConnectTimeoutUs)"),
                 ("launchConnectPollUs", "\(launchConnectPollUs)"),
                 ("postHeartbeatSettleUs", "\(postHeartbeatSettleUs)"),
+            ]),
+            ("Server Process", [
+                ("debugLogging", "\(debugLogging)"),
+                ("debugLogMaxBytes", "\(debugLogMaxBytes)"),
+                ("keepDisplayAwake", "\(keepDisplayAwake)"),
+                ("grantPollUs", "\(grantPollUs)"),
+                ("grantWaitUs", "\(grantWaitUs)"),
+            ]),
+            ("Listen", [
+                ("listenSilencePeak", "\(listenSilencePeak)"),
+                ("listenSilentStartSeconds", "\(listenSilentStartSeconds)"),
+                ("listenTrailingSilenceSeconds", "\(listenTrailingSilenceSeconds)"),
             ]),
             ("Keyboard", [
                 ("deadKeyDelayUs", "\(deadKeyDelayUs)"),

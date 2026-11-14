@@ -21,7 +21,7 @@ final class TargetRegistryTests: XCTestCase {
             bridge: iphoneBridge, input: StubInput(),
             capture: StubCapture(), describer: StubDescriber(), recorder: StubRecorder())
         let androidCtx = TargetContext(
-            name: "android", targetType: "generic-window", bundleID: nil,
+            name: "android", targetType: "macos-app", bundleID: nil,
             bridge: androidBridge, input: StubInput(),
             capture: StubCapture(), describer: StubDescriber(), recorder: StubRecorder())
 

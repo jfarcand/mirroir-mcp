@@ -75,6 +75,13 @@ final class ScrollSeekerTests: XCTestCase {
         XCTAssertTrue(input.swipeCalls.isEmpty)
     }
 
+    /// carnet#72: an "Épicerie" row OCR'd without its accent and with its count.
+    func testALabelOnScreenIsFoundWhateverItsAccents() {
+        describer.describeResults = [read(["Mes listes", "Epicerie 3"])]
+        XCTAssertEqual(seek("Épicerie"), .alreadyVisible)
+        XCTAssertTrue(input.swipeCalls.isEmpty)
+    }
+
     func testOneUnchangedReadIsNotTheEnd() {
         describer.describeResults = [read(["A"]), read(["A"]), read(["A", "Target"])]
         XCTAssertEqual(seek(), .found(scrolls: 2))

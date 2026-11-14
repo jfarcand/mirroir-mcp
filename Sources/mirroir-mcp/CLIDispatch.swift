@@ -45,17 +45,19 @@ enum CLIDispatch {
             name: "test", summary: "Run skills against iPhone Mirroring and report each verdict",
             usage: { TestRunner.usage },
             validate: { _ = try TestRunner.parseArguments($0) },
-            run: TestRunner.run(arguments:)),
+            run: { args in DisplayAwake.shared.during("mirroir-mcp test") { TestRunner.run(arguments: args) } }),
         CLISubcommand(
             name: "record", summary: "Record a walk on the iPhone as a replayable scenario",
             usage: { RecordCommand.usage },
             validate: { _ = try RecordCommand.parseArguments($0) },
-            run: RecordCommand.run(arguments:)),
+            run: { args in DisplayAwake.shared.during("mirroir-mcp record") { RecordCommand.run(arguments: args) } }),
         CLISubcommand(
             name: "compile", summary: "Run skills on the device and save their compiled replay",
             usage: { CompileCommand.usage },
             validate: { _ = try CompileCommand.parseArguments($0) },
-            run: CompileCommand.run(arguments:)),
+            run: { args in
+                DisplayAwake.shared.during("mirroir-mcp compile") { CompileCommand.run(arguments: args) }
+            }),
         CLISubcommand(
             name: "migrate", summary: "Convert YAML skills to SKILL.md",
             usage: { MigrateCommand.usage },
@@ -99,6 +101,12 @@ enum CLIDispatch {
             usage: { InstallAgentCommand.usage },
             validate: { _ = try InstallAgentCommand.parseArguments($0) },
             run: InstallAgentCommand.run(arguments:)),
+        CLISubcommand(
+            name: BundleAppCommand.commandName,
+            summary: "Package this binary as mirroir-mcp.app (builds the Claude extension)",
+            usage: { BundleAppCommand.usage },
+            validate: { _ = try BundleAppCommand.parseArguments($0) },
+            run: BundleAppCommand.run(arguments:)),
     ]
 
     /// Where a command line goes.

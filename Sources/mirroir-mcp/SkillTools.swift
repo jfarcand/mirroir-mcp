@@ -19,8 +19,9 @@ extension MirroirMCP {
             description: """
                 List all available test skills from both project-local and global \
                 config directories. Returns skill names and descriptions extracted \
-                from YAML files in <cwd>/.mirroir-mcp/skills/ and \
-                ~/.mirroir-mcp/skills/. Project-local skills with the \
+                from SKILL.md and YAML skills in <cwd>/.mirroir-mcp/skills/ and \
+                ~/.mirroir-mcp/skills/. Only skills are listed: other Markdown \
+                (READMEs, APP.md, patterns) is left out. Project-local skills with the \
                 same filename override global ones.
                 """,
             inputSchema: [
@@ -130,28 +131,37 @@ extension MirroirMCP {
     }
 
     /// Recursively scan skill directories and return metadata for each skill file found.
-    /// Supports both .yaml and .md (SKILL.md) formats. When both exist with the same stem,
-    /// the .md file takes precedence. Project-local files override global files with the same
-    /// relative path.
-    static func discoverSkills() -> [SkillInfo] {
-        let dirs = PermissionPolicy.skillDirs
+    /// Supports both .yaml and .md (SKILL.md) formats. Only files that are skills count
+    /// (`SkillFileClassifier`): READMEs, APP.md files and pattern data are left out. When
+    /// both formats exist with the same stem, or a YAML skill has the same name and app
+    /// as a SKILL.md, the .md file takes precedence. Project-local files override global
+    /// files with the same relative path.
+    static func discoverSkills(in dirs: [String] = PermissionPolicy.skillDirs) -> [SkillInfo] {
         var seenStems = Set<String>()
-        var results: [SkillInfo] = []
+        var candidates: [(info: SkillInfo, identity: SkillFileClassifier.Identity, isMd: Bool)] = []
 
         for dir in dirs {
             let source = dir.hasPrefix(PermissionPolicy.globalConfigDir) ? "global" : "local"
             for relPath in findSkillFiles(in: dir) {
                 let stem = skillStem(relPath)
                 if seenStems.contains(stem) { continue }
-                seenStems.insert(stem)
 
                 let filePath = dir + "/" + relPath
+                let isMd = relPath.hasSuffix(".md")
+                guard let content = try? String(contentsOfFile: filePath, encoding: .utf8),
+                      let identity = SkillFileClassifier.identity(content: content, isMarkdown: isMd)
+                else { continue }
+                seenStems.insert(stem)
+
                 let info = extractSkillHeader(from: filePath, source: source)
-                results.append(info)
+                candidates.append((info, identity, isMd))
             }
         }
 
-        return results
+        let markdownSkills = Set(candidates.filter(\.isMd).map(\.identity))
+        return candidates
+            .filter { $0.isMd || !markdownSkills.contains($0.identity) }
+            .map(\.info)
     }
 
     /// Recursively find all skill files (.md and .yaml) under a directory.

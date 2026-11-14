@@ -24,7 +24,7 @@ mirroir-mcp/
 │   │   ├── InputProtocols.swift     # DI protocols for input (InputProviding, ...)
 │   │   ├── CaptureProtocols.swift   # DI protocols for capture, OCR and describers (ScreenCapturing, ...)
 │   │   ├── Protocols.swift          # DI protocols for outside services (vision model, scene picker, HTTP)
-│   │   ├── DebugLog.swift           # Debug logging to stderr + ~/.mirroir-mcp/debug.log
+│   │   ├── DebugLog.swift           # Debug logging to stderr + ~/.mirroir-mcp/debug.log (append-only, pid-tagged)
 │   │   │
 │   │   │── # ── Tool Registration (one file per category, thin handlers) ──
 │   │   ├── ScreenTools.swift        # screenshot, describe_screen, recording

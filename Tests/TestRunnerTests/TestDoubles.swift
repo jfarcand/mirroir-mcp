@@ -96,7 +96,15 @@ final class StubInput: InputProviding, @unchecked Sendable {
         return shakeResult
     }
     func typeText(_ text: String) -> TypeResult { typeTextResult }
-    func pressKey(keyName: String, modifiers: [String]) -> TypeResult { pressKeyResult }
+    /// Every pressKey() call as "<modifiers+>key", in order.
+    var pressKeyCalls: [String] = []
+    func pressKey(keyName: String, modifiers: [String]) -> TypeResult {
+        pressKeyCalls.append((modifiers + [keyName]).joined(separator: "+"))
+        return pressKeyResult
+    }
+    /// What `ensureConnected` answers: nil for a connected target, else the refusal.
+    var ensureConnectedResult: String?
+    func ensureConnected(tag: String) -> String? { ensureConnectedResult }
     func launchApp(name: String) -> String? {
         launchAppCalls.append(name)
         return launchAppResult
@@ -166,13 +174,13 @@ final class StubDescriber: ScreenDescribing, @unchecked Sendable {
 
 final class StubRecorder: ScreenRecording, @unchecked Sendable {
     var startResult: String?
-    var stopResult: (filePath: String?, error: String?) = ("/tmp/test.mov", nil)
+    var stopResult = RecordingStop(filePath: "/tmp/test.mov", error: nil)
 
     func startRecording(outputPath: String?) -> String? {
         startResult
     }
 
-    func stopRecording() -> (filePath: String?, error: String?) {
+    func stopRecording() -> RecordingStop {
         stopResult
     }
 }

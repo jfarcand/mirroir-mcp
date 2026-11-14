@@ -12,7 +12,9 @@ The flag works on every subcommand too (`mirroir-mcp --debug record …`,
 `mirroir-mcp --debug test …`): their launch, tap and `reset_app` steps are then
 logged the same way, appended to the log.
 
-Logs are written to both stderr and `~/.mirroir-mcp/debug.log`. Logged events include permission checks, tap coordinates, focus state, and window geometry. With `--debug` active, the existing log is preserved across restarts (a `--- restart <time> ---` separator is appended) so prior-session diagnostics survive. Without `--debug`, the log is truncated in place on each startup.
+Logs are written to both stderr and `~/.mirroir-mcp/debug.log`. Logged events include permission checks, tap coordinates, focus state, and window geometry. Several servers can share the file (a client often starts two, and a debug server may run beside them), so it is append-only: every line names the process that wrote it (`[tag HH:mm:ss.SSS pid 1234]`), each start appends a `--- pid <n> started <time> ---` marker, and no process ever truncates it. A process that starts while the log is larger than `debugLogMaxBytes` (10 MB) moves it to `~/.mirroir-mcp/debug.log.1` first. To follow one server, filter on its pid: `grep "pid 1234]" ~/.mirroir-mcp/debug.log`.
+
+`MIRROIR_DEBUG=1` (or `"debugLogging": true` in `settings.json`) turns on verbose logging where you cannot add `--debug`. In the Claude extension, turn on **Debug logging** in the extension's settings; it sets `MIRROIR_DEBUG`. Then quit and reopen Claude.
 
 Even without `--debug`, the server always writes startup information to `~/.mirroir-mcp/debug.log` — permission mode, denied tools, and hidden tools. Check this file first when debugging permission issues.
 
@@ -65,6 +67,8 @@ The script uses `fswatch` to monitor `Sources/` for `.swift` file changes, rebui
 **iPhone Mirroring is not running** — If it was not running when the server started, the first input call starts it in the background (the app you are using stays in front) and waits up to 20 seconds for the session to connect, pressing Resume or Connect when the session shows them. If it was running and you quit it, nothing reopens it: `status` and every input say so, and you open it again yourself. Quitting it is a kill switch. A session that needs you (the iPhone in use, a Mac prompt) is reported instead of waited on.
 
 **Taps don't register** — Run `mirroir doctor` to check prerequisites. Verify that iPhone Mirroring is connected (not showing "Connect to your iPhone" screen) and that Accessibility permissions are granted in System Settings > Privacy & Security > Accessibility.
+
+**"A window of loginwindow covers ..." mid-run** — the Mac's screen saver or display sleep started. Taps and swipes mirroir sends do not count as activity for the idle timer, so mirroir keeps the display awake while a tool call, a `test`/`compile`/`record` run or a recording is active (`keepDisplayAwake`, on by default; `pmset -g assertions` lists it as `mirroir-mcp <tool>`). Between two tool calls nothing is held, so a run made of many short calls is covered only while each call lasts; whether the screen saver can start in the gap between two calls has not been measured. If it does, run `caffeinate -d` beside the session. A lock you trigger always wins.
 
 **"Mirroring paused" screenshots** — Input tools, and the `test`, `compile` and `record` commands, press the window's own Resume, OK or Try Again control once; `screenshot` and `describe_screen` never press anything, so they show the interruption as it is. When the session stays blocked, the refusal quotes what the window says and names the next move: lock the iPhone ("iPhone in Use", timed out), turn on the Mac's Wi-Fi or Bluetooth, wait while it connects, or approve or cancel a Mac Touch ID or password prompt. A password is never typed for you. `status` and `mirroir doctor` report the same guidance.
 

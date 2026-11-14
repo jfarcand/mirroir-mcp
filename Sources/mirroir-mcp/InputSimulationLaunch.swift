@@ -2,7 +2,7 @@
 // Licensed under the Apache License, Version 2.0
 //
 // ABOUTME: Starts iPhone Mirroring in the background when an input call finds it not running, and launches apps through Spotlight.
-// ABOUTME: The user's front app keeps the focus; a launch presses Return only when Spotlight's top result is an app.
+// ABOUTME: A launch taps the app's top-hit tile (Return when there is none); a name Spotlight never shows goes to the Home Screen.
 
 import Foundation
 import HelperLib
@@ -47,7 +47,10 @@ extension InputSimulation {
     }
 
     /// Launch an app by name using Spotlight search.
-    /// Opens Spotlight, types the app name, waits for results, and presses Return.
+    /// Opens Spotlight, types the app name, waits for results, and taps the top
+    /// hit's tile when it is the app (Return when the top hit is an app with no
+    /// tile read). When the typed name never shows, the app is opened from its
+    /// Home Screen icon instead (see `launchFromHomeScreen`).
     /// Returns nil on success, or an error message on failure.
     func launchApp(name: String) -> String? {
         if let stateError = ensureConnected(tag: "launchApp") {
@@ -56,8 +59,10 @@ extension InputSimulation {
         DebugLog.log("launchApp", "launching '\(name)'")
 
         // Step 1: Open Spotlight via menu action (requires MenuActionCapable). The
-        // screen before it is kept to tell when Spotlight has opened.
-        let beforeOpen = pasteVerifier?.describe(settleTimeoutUs: 0)?.elements ?? []
+        // screen before it is kept to tell when Spotlight has opened. It is read
+        // settled: a frame caught mid-transition (right after press_home) must not
+        // decide that Spotlight is already open, which skips the menu item.
+        let beforeOpen = pasteVerifier?.describe(settleTimeoutUs: EnvConfig.frameSettleTimeoutUs)?.elements ?? []
         let openFailure = "Failed to open Spotlight. Is target '\(bridge.targetName)' running?"
         guard let menuBridge = bridge as? (any MenuActionCapable) else {
             DebugLog.log("launchApp", "ERROR: failed to open Spotlight")
@@ -113,22 +118,26 @@ extension InputSimulation {
                let tile = SpotlightAppTile.label(for: name, in: screen.elements) {
                 return openTile(tile, name: name, spotlight: screen.elements)
             }
-            DebugLog.log("launchApp", "ERROR: '\(name)' never appeared in Spotlight")
-            return "Typed '\(name)' into Spotlight but it never appeared on screen, so " +
-                "Return was not pressed. Keystrokes are probably not reaching the iPhone, "
-                + "which only quitting and reopening iPhone Mirroring on the Mac clears. "
-                + AgentInstruction.waitForUser
+            DebugLog.log("launchApp", "'\(name)' never appeared in Spotlight; trying its Home Screen icon")
+            guard let homeFailure = launchFromHomeScreen(name: name) else { return nil }
+            return Self.spotlightIgnoredTyping(name: name, homeFailure: homeFailure)
         }
 
-        // Step 3: Press Return to launch the top result, once that result is an
-        // app. Without one, Return opens a web suggestion or an App Store page.
-        guard returnWillOpenApp() else {
+        // Step 3: Open the top result, once that result is an app. Without one,
+        // Return opens a web suggestion or an App Store page.
+        guard let results = appTopHitScreen() else {
             DebugLog.log("launchApp", "ERROR: no app is Spotlight's top result for '\(name)'")
             // The menu item toggles it: leave the iPhone as it was, not on this query.
             _ = menuBridge.triggerMenuAction(menu: "View", item: "Spotlight")
             return "Spotlight lists no app as its top result for '\(name)', so Return was not "
                 + "pressed: pressing it would open a web suggestion or an App Store page. The app "
                 + "may not be installed, or its name on this iPhone may differ."
+        }
+        // The app's own tile is tapped: in a session where Spotlight stops
+        // taking typing (iOS 26, carnet#60), Return does nothing either.
+        if let tile = SpotlightAppTile.label(for: name, in: results),
+           SpotlightAppTile.isInTopHitRow(tile, in: results) {
+            return openTile(tile, name: name, spotlight: results)
         }
         let keyResult = pressKey(keyName: "return")
         guard keyResult.success else {
@@ -191,9 +200,10 @@ extension InputSimulation {
             "'\(name)' did not launch."
     }
 
-    /// Whether Spotlight's top result is an app, polling for up to
-    /// `pasteVerifyTimeoutUs`, because results fill in after the typed text shows.
-    private func returnWillOpenApp() -> Bool {
+    /// The Spotlight screen once its top result is an app, polling for up to
+    /// `pasteVerifyTimeoutUs`, because results fill in after the typed text
+    /// shows. Nil when no app becomes the top result.
+    private func appTopHitScreen() -> [TapPoint]? {
         let poll = max(1, EnvConfig.pasteVerifyPollUs)
         let attempts = max(1, Int(EnvConfig.pasteVerifyTimeoutUs / poll))
         for attempt in 0 ..< attempts {
@@ -201,10 +211,19 @@ extension InputSimulation {
             if let screen = pasteVerifier?.describe(settleTimeoutUs: 0),
                screen.ocrFailure == nil,
                SpotlightDetector.returnOpensApp(elements: screen.elements) {
-                return true
+                return screen.elements
             }
         }
-        return false
+        return nil
+    }
+
+    /// The error when Spotlight never showed the typed `name` and its Home
+    /// Screen icon did not open it either.
+    static func spotlightIgnoredTyping(name: String, homeFailure: String) -> String {
+        "Spotlight did not show '\(name)' after it was typed, so Return was not pressed. On iOS 26, "
+            + "Spotlight in an iPhone Mirroring session can take typing only once; apps still take "
+            + "typing and taps still work. Opening it from its Home Screen icon failed too: \(homeFailure). "
+            + "Find the app with describe_screen (in a folder, or by swiping to the App Library) and tap it."
     }
 
     /// Whether `name` shows up on screen more often than in `before`, polling

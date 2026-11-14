@@ -249,13 +249,14 @@ final class InputSimulation: Sendable {
             return (nil, false, stateError, nil)
         }
 
-        guard var info = bridge.getWindowInfo() else {
+        guard let firstRead = bridge.getWindowInfo() else {
             DebugLog.log(tag, "ERROR: window not found")
             return (nil, false, "Target '\(bridge.targetName)' window not found", nil)
         }
 
-        if let boundsError = validateBounds(x: x, y: y, info: info, tag: tag) {
-            return (nil, false, boundsError, nil)
+        let bounded = windowContaining(x: x, y: y, info: firstRead, tag: tag)
+        guard var info = bounded.info else {
+            return (nil, false, bounded.error, nil)
         }
 
         logWindowState(tag, info)
@@ -323,23 +324,6 @@ final class InputSimulation: Sendable {
     func restoreCursor(_ savedPosition: CGPoint?) {
         guard let pos = savedPosition else { return }
         CGWarpMouseCursorPosition(pos)
-    }
-
-    /// Validate that coordinates fall within the iPhone Mirroring window bounds.
-    /// Returns nil if valid, or a descriptive error message if out of bounds.
-    func validateBounds(x: Double, y: Double, info: WindowInfo, tag: String) -> String? {
-        let w = Double(info.size.width)
-        let h = Double(info.size.height)
-        // Written as a refusal of anything not inside, so a value that is not
-        // a number at all is refused too; and printed without converting to
-        // Int, which traps on a value no integer holds.
-        if !(x >= 0 && x <= w && y >= 0 && y <= h) {
-            let whole = ScreenshotGeometry.whole
-            let msg = "Coordinates (\(whole(x)), \(whole(y))) are outside the '\(bridge.targetName)' window (\(whole(w))x\(whole(h))). x must be 0-\(whole(w)), y must be 0-\(whole(h))."
-            DebugLog.log(tag, "REJECTED: \(msg)")
-            return msg
-        }
-        return nil
     }
 
     /// Log window info and frontmost app state for any coordinate-based operation.
@@ -435,11 +419,12 @@ final class InputSimulation: Sendable {
         let handback = beginFrontHandback()
         defer { handback.finish(targetPID: targetPID) }
         let prep = preparePointingInput(tag: "drag", x: fromX, y: fromY)
-        guard let info = prep.info else { return prep.error ?? "Unknown error" }
+        guard let prepInfo = prep.info else { return prep.error ?? "Unknown error" }
 
-        if let boundsError = validateBounds(x: toX, y: toY, info: info, tag: "drag") {
-            return boundsError
-        }
+        let bounded = windowContaining(
+            points: [CGPoint(x: fromX, y: fromY), CGPoint(x: toX, y: toY)],
+            info: prepInfo, tag: "drag")
+        guard let info = bounded.info else { return bounded.error ?? "Unknown error" }
 
         let saved = saveCursor(mode: override)
         defer { restoreCursor(saved) }

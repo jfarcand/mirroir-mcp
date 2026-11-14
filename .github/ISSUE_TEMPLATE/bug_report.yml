@@ -94,7 +94,7 @@ body:
     attributes:
       label: Debug log
       description: |
-        Start the server with `--debug`, reproduce, then paste the matching lines of `~/.mirroir-mcp/debug.log`.
+        Start the server with `--debug` (or `MIRROIR_DEBUG=1`; in the Claude extension, turn on its "Debug logging" option and reopen Claude), reproduce, then paste the matching lines of `~/.mirroir-mcp/debug.log`. Several servers can share the file: each line names its process (`pid 1234]`), so paste the lines of the server that failed.
       render: text
     validations:
       required: false
