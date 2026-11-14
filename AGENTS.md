@@ -211,8 +211,9 @@ no `panic!()`. Test functions returning Result have worked in Rust since the
 
 ### File Conventions
 
-- Every `.rs` file starts with a **two-line `// ABOUTME:` header** (same as
-  Swift files in `Sources/`).
+- Every `.rs` file starts with the Async-IO Apache 2.0 license block, then a
+  **two-line `// ABOUTME:` header** (same as Swift files in `Sources/`; see
+  CONTRIBUTING.md for the exact block).
 - Max **500 lines** per file (enforced by the limitation-register gates for
   every scanned language). Past 400 lines, extract a focused helper module.
 - No `#![allow(...)]` at crate root. Allows are inline at the smallest scope
@@ -407,7 +408,8 @@ When creating a new type or file, walk this checklist in order:
 - When modifying code, match the style and formatting of surrounding code, even if it differs from standard style guides. Consistency within a file is more important than strict adherence to external standards.
 - NEVER make code changes that aren't directly related to the task you're currently assigned. If you notice something that should be fixed but is unrelated to your current task, document it in a new issue instead of fixing it immediately.
 - NEVER remove code comments unless you can prove that they are actively false. Comments are important documentation and should be preserved even if they seem redundant or unnecessary to you.
-- All code files should start with a brief 2 line comment explaining what the file does. Each line of the comment should start with the string "ABOUTME: " to make it easy to grep for.
+- Every Swift and Rust file opens with the Async-IO Apache 2.0 license block, the same block Atmosphere uses: `/*`, ` * Copyright 2026 Async-IO.org`, the Apache 2.0 notice, ` */`. Copy it from any existing file or from CONTRIBUTING.md ("File Headers"). mirroir is developed by Async-IO (https://async-io.live); never write a personal name or email as the copyright holder. The pre-commit hook rejects a staged Swift or Rust file without it (Package.swift excepted, since `swift-tools-version` must be its first line).
+- All code files should start with a brief 2 line comment explaining what the file does, right after the license block. Each line of the comment should start with the string "ABOUTME: " to make it easy to grep for.
 - When writing comments, avoid referring to temporal context about refactors or recent changes. Comments should be evergreen and describe the code as it is, not how it evolved or was recently changed.
 - When fixing a bug, a compile error or any other issue, don't throw the existing implementation away and rewrite it; get explicit permission first.
 - NEVER name things as 'improved' or 'new' or 'enhanced', etc. Code naming should be evergreen. What is new today will be "old" someday.
@@ -592,7 +594,7 @@ Mocks are permitted ONLY in test code for:
 3. **Documentation Review:**
    - All public APIs documented
    - README updated if functionality changed
-   - File headers (ABOUTME) present and accurate
+   - File headers (Async-IO license block, then ABOUTME) present and accurate
 
 4. **Architecture Review:**
    - Error handling follows proper patterns throughout

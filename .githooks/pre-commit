@@ -4,16 +4,16 @@
 
 set -e
 
-# Check that Swift source files have Apache 2.0 license headers
+# Check that Swift and Rust source files open with the Async-IO Apache 2.0 license block
 check_license_headers() {
     local missing_headers=""
 
-    # Get staged Swift files (added or modified)
-    local swift_files=$(git diff --cached --name-only --diff-filter=ACM | grep -E '\.swift$' | grep -v 'Package.swift' || true)
+    # Get staged Swift and Rust files (added or modified)
+    local source_files=$(git diff --cached --name-only --diff-filter=ACM | grep -E '\.(swift|rs)$' | grep -v 'Package.swift' || true)
 
-    for file in $swift_files; do
+    for file in $source_files; do
         if [ -f "$file" ]; then
-            if ! head -1 "$file" | grep -q "// Copyright.*jfarcand@apache.org"; then
+            if ! sed -n '2p' "$file" | grep -q "^ \* Copyright .*Async-IO.org"; then
                 missing_headers="$missing_headers\n  - $file"
             fi
         fi
@@ -23,9 +23,12 @@ check_license_headers() {
         echo "ERROR: Commit blocked - Missing Apache 2.0 license headers:"
         echo -e "$missing_headers"
         echo ""
-        echo "All Swift files must start with:"
-        echo "  // Copyright 2026 jfarcand@apache.org"
-        echo "  // Licensed under the Apache License, Version 2.0"
+        echo "All Swift and Rust files must start with the Async-IO license block:"
+        echo "  /*"
+        echo "   * Copyright 2026 Async-IO.org"
+        echo "   *"
+        echo "   * Licensed under the Apache License, Version 2.0 (the \"License\"); ..."
+        echo "   */"
         return 1
     fi
     return 0
@@ -40,8 +43,8 @@ check_aboutme_headers() {
 
     for file in $swift_files; do
         if [ -f "$file" ]; then
-            # Check first 5 lines for ABOUTME pattern
-            if ! head -5 "$file" | grep -q "ABOUTME:"; then
+            # ABOUTME follows the 15-line license block
+            if ! head -20 "$file" | grep -q "ABOUTME:"; then
                 missing_headers="$missing_headers\n  - $file"
             fi
         fi
@@ -51,7 +54,7 @@ check_aboutme_headers() {
         echo "ERROR: Commit blocked - Missing ABOUTME headers:"
         echo -e "$missing_headers"
         echo ""
-        echo "All Swift source files must start with a 2-line ABOUTME comment. Format:"
+        echo "All Swift source files must have a 2-line ABOUTME comment right after the license block. Format:"
         echo "  // ABOUTME: Brief description of what this file does."
         echo "  // ABOUTME: Additional context about the file's purpose."
         return 1
@@ -59,8 +62,8 @@ check_aboutme_headers() {
     return 0
 }
 
-# Check that staged Rust source files under runner/src have ABOUTME headers.
-# Rust files do NOT require the Apache copyright header — ABOUTME only.
+# Check that staged Rust source files under runner/src have ABOUTME headers
+# on the two lines right after the license block.
 check_rust_aboutme_headers() {
     local missing_headers=""
 
@@ -69,8 +72,9 @@ check_rust_aboutme_headers() {
 
     for file in $rust_files; do
         if [ -f "$file" ]; then
-            # The first TWO lines must each carry an ABOUTME marker.
-            if ! sed -n '1p' "$file" | grep -q "ABOUTME:" || ! sed -n '2p' "$file" | grep -q "ABOUTME:"; then
+            # The two lines after the license block's closing " */" must each carry an ABOUTME marker.
+            local first_line=$(( $(grep -n -m1 '^ \*/$' "$file" | cut -d: -f1) + 1 ))
+            if ! sed -n "${first_line}p" "$file" | grep -q "ABOUTME:" || ! sed -n "$((first_line + 1))p" "$file" | grep -q "ABOUTME:"; then
                 missing_headers="$missing_headers\n  - $file"
             fi
         fi
@@ -80,7 +84,7 @@ check_rust_aboutme_headers() {
         echo "ERROR: Commit blocked - Missing Rust ABOUTME headers:"
         echo -e "$missing_headers"
         echo ""
-        echo "All runner/src Rust files must start with a 2-line ABOUTME comment. Format:"
+        echo "All runner/src Rust files must have a 2-line ABOUTME comment right after the license block. Format:"
         echo "  // ABOUTME: Brief description of what this file does."
         echo "  // ABOUTME: Additional context about the file's purpose."
         return 1

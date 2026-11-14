@@ -1,7 +1,8 @@
 # Individual Contributor License Agreement
 
 Thank you for your interest in contributing to iPhone Mirroir MCP
-("the Project"), owned by Jean-Francois Arcand ("the Maintainer").
+("the Project"), owned by Async-IO.org (https://async-io.live), Jean-Francois Arcand's
+company ("the Maintainer").
 
 By submitting a Contribution to this Project, you accept and agree to
 the following terms and conditions for your present and future
