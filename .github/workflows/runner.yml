@@ -417,6 +417,10 @@ jobs:
         if: runner.os == 'Linux'
         run: |
           curl -fsSL https://ollama.com/install.sh | sh
+          # The install script starts an ollama systemd service on 11434; stop
+          # it so the daemon step's own `ollama serve` binds the port, serves
+          # the cached ~/.ollama models and writes the log this job tails.
+          sudo systemctl disable --now ollama
 
       - name: Install Ollama (macOS)
         if: runner.os == 'macOS'
@@ -446,6 +450,7 @@ jobs:
             sleep 1
           done
           curl -sf http://127.0.0.1:11434/api/version | tee /tmp/ollama-version.json
+          kill -0 "$(cat /tmp/ollama.pid)" || { echo "::error::this step's ollama serve exited"; cat /tmp/ollama.log; exit 1; }
 
       - name: Pull judge model (${{ env.OLLAMA_JUDGE_MODEL }})
         run: |
@@ -525,7 +530,12 @@ jobs:
 
       - name: Install Ollama (Linux)
         if: runner.os == 'Linux'
-        run: curl -fsSL https://ollama.com/install.sh | sh
+        run: |
+          curl -fsSL https://ollama.com/install.sh | sh
+          # The install script starts an ollama systemd service on 11434; stop
+          # it so the daemon step's own `ollama serve` binds the port, serves
+          # the cached ~/.ollama models and writes the log this job tails.
+          sudo systemctl disable --now ollama
 
       - name: Install Ollama (macOS)
         if: runner.os == 'macOS'
@@ -550,6 +560,7 @@ jobs:
             curl -sf http://127.0.0.1:11434/api/version > /dev/null && break
             sleep 1
           done
+          kill -0 "$(cat /tmp/ollama.pid)" || { echo "::error::this step's ollama serve exited"; cat /tmp/ollama.log; exit 1; }
           ollama pull "$OLLAMA_JUDGE_MODEL"
 
       - name: Build release binary
