@@ -27,7 +27,7 @@
 html {
   font-family: var(--font-body);
   color: var(--color-text);
-  background: linear-gradient(180deg, #1a1008 0%, #2e1f0f 40%, #3d2a16 100%);
+  background: #3d2a16 linear-gradient(180deg, #1a1008 0%, #2e1f0f 40%, #3d2a16 100%);
   line-height: 1.6;
   -webkit-font-smoothing: antialiased;
 }
