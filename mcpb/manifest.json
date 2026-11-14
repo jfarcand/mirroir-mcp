@@ -2,7 +2,7 @@
   "manifest_version": "0.3",
   "name": "mirroir-mcp",
   "display_name": "mirroir",
-  "version": "0.47.0",
+  "version": "0.48.0",
   "description": "Drive a stock iPhone via iPhone Mirroring: no Developer Mode, Xcode or WDA. LLM-free skill replay.",
   "long_description": "mirroir-mcp drives a real iPhone through the macOS iPhone Mirroring window. describe_screen returns OCR'd text with tap coordinates; tap, swipe, drag, type_text, launch_app and open_url act on the device; generate_skill explores an app and authors replayable skills. The bundle carries the native Apple Silicon server inside a small app, mirroir-mcp.app, so it starts without Node or a network fetch. Requires macOS 15+ on Apple Silicon and a paired iPhone in iPhone Mirroring. Claude starts the server as its own process, so macOS asks for Screen Recording and Accessibility for \"mirroir-mcp\" (the robot icon), not for Claude: turn it on in System Settings > Privacy & Security, then quit and reopen Claude. The bundle is signed ad hoc, so macOS may ask again after an extension update.",
   "author": {
