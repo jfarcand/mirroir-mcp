@@ -2,7 +2,7 @@
 // Licensed under the Apache License, Version 2.0
 //
 // ABOUTME: Presses one of iPhone Mirroring's View menu commands (Home Screen, App Switcher, Spotlight) honestly.
-// ABOUTME: Fails when the iPhone could not have received it; Home is pressed again when it brings back Spotlight.
+// ABOUTME: Fails when the iPhone could not have received it; Home is pressed again while Spotlight or the old screen shows.
 
 import Foundation
 import HelperLib
@@ -52,6 +52,33 @@ enum MirroringMenuCommand: String, CaseIterable {
         return nil
     }
 
+    /// What pressing Home did.
+    enum HomePress: Equatable {
+        /// Home took effect: the Home Screen shows, the screen changed away
+        /// from what it was, or the screen cannot be read to tell.
+        case reached
+        /// Every press left the screen as it was. Pressing Home on the Home
+        /// Screen changes nothing, and the Home Screen is only recognized by
+        /// its search pill in the languages `system-phrases.md` lists, so this
+        /// is most likely the Home Screen, unconfirmed.
+        case unchanged(presses: Int)
+        /// Home could not be pressed, or Spotlight still shows after it.
+        case failed(String)
+
+        /// The text the tool and the step report for an outcome that is not a failure.
+        var report: String {
+            switch self {
+            case .reached:
+                return "Pressed Home — navigated to home screen"
+            case .unchanged(let presses):
+                return "Pressed Home \(presses) times and the screen did not change, "
+                    + "so it was most likely the Home Screen already. Describe the screen to confirm."
+            case .failed(let error):
+                return error
+            }
+        }
+    }
+
     /// Press Home and confirm it left the screen it was on.
     ///
     /// Two things can keep the Home Screen away after the menu item answers:
@@ -62,32 +89,30 @@ enum MirroringMenuCommand: String, CaseIterable {
     /// and Home is pressed again while the screen shows Spotlight or has not
     /// changed. The Home Screen's search pill ends it at once, so pressing
     /// Home on the Home Screen is one press.
-    ///
-    /// - Returns: nil once Home has taken effect (or the screen cannot be read
-    ///   to tell), else what still shows.
     static func pressHome(bridge: any WindowBridging, input: any InputProviding,
-                          describer: any ScreenDescribing) -> String? {
+                          describer: any ScreenDescribing) -> HomePress {
         let height = Double(bridge.getWindowInfo()?.size.height ?? 0)
         var before = describer.describe(settleTimeoutUs: EnvConfig.frameSettleTimeoutUs)?.elements
-        var stillShowing = ""
+        var spotlightShows = false
         for attempt in 1 ... homePressAttempts {
-            if let error = homeScreen.press(bridge: bridge, input: input) { return error }
+            if let error = homeScreen.press(bridge: bridge, input: input) { return .failed(error) }
             guard let after = describer.describe(settleTimeoutUs: EnvConfig.frameSettleTimeoutUs)?.elements else {
-                return nil
+                return .reached
             }
-            if SpotlightDetector.isHomeScreenVisible(elements: after, windowHeight: height) { return nil }
-            if SpotlightDetector.isSpotlightVisible(elements: after) {
-                stillShowing = "Spotlight still shows"
-            } else if let previous = before, StructuralFingerprint.areEquivalent(previous, after) {
-                stillShowing = "the screen did not change"
-            } else {
-                return nil
+            if SpotlightDetector.isHomeScreenVisible(elements: after, windowHeight: height) { return .reached }
+            spotlightShows = SpotlightDetector.isSpotlightVisible(elements: after)
+            if !spotlightShows {
+                guard let previous = before, StructuralFingerprint.areEquivalent(previous, after) else {
+                    return .reached
+                }
             }
-            DebugLog.log(homeScreen.toolName, "after Home press \(attempt), \(stillShowing)")
+            DebugLog.log(homeScreen.toolName, "after Home press \(attempt), "
+                + (spotlightShows ? "Spotlight still shows" : "the screen did not change"))
             before = after
         }
-        return "Home was pressed \(homePressAttempts) times and \(stillShowing). "
-            + "Describe the screen before the next action."
+        guard spotlightShows else { return .unchanged(presses: homePressAttempts) }
+        return .failed("Home was pressed \(homePressAttempts) times and Spotlight still shows. "
+            + "Describe the screen before the next action.")
     }
 
     /// Home presses made while Home has not taken effect: a dropped press and

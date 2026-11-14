@@ -114,11 +114,10 @@ extension MirroirMCP {
             handler: { args in
                 let (ctx, err) = registry.resolveForTool(args, requiring: .pressHome)
                 guard let ctx else { return err! }
-                if let error = MirroringMenuCommand.pressHome(
-                    bridge: ctx.bridge, input: ctx.input, describer: ctx.describer) {
-                    return .error(error)
-                }
-                return .text("Pressed Home — navigated to home screen")
+                let outcome = MirroringMenuCommand.pressHome(
+                    bridge: ctx.bridge, input: ctx.input, describer: ctx.describer)
+                if case .failed = outcome { return .error(outcome.report) }
+                return .text(outcome.report)
             }
         ))
 

@@ -440,12 +440,18 @@ final class StepExecutor {
 
     private func executeHome(startTime: CFAbsoluteTime) -> StepResult {
         let step = SkillStep.home
-        if let error = MirroringMenuCommand.pressHome(bridge: bridge, input: input, describer: describer) {
+        let outcome = MirroringMenuCommand.pressHome(bridge: bridge, input: input, describer: describer)
+        switch outcome {
+        case .reached:
+            return StepResult(step: step, status: .passed, message: nil,
+                              durationSeconds: elapsed(startTime))
+        case .unchanged:
+            return StepResult(step: step, status: .passed, message: outcome.report,
+                              durationSeconds: elapsed(startTime))
+        case .failed(let error):
             return StepResult(step: step, status: .failed, message: error,
                               durationSeconds: elapsed(startTime))
         }
-        return StepResult(step: step, status: .passed, message: nil,
-                          durationSeconds: elapsed(startTime))
     }
 
     private func executeClearField(startTime: CFAbsoluteTime) -> StepResult {

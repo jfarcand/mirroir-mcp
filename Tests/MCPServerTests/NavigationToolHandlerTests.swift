@@ -253,6 +253,23 @@ final class NavigationToolHandlerTests: XCTestCase {
         XCTAssertEqual(bridge.menuActionCalls.count, 1)
     }
 
+    /// A Home Screen whose pill is in a language `system-phrases.md` does not
+    /// list: Home changes nothing there, which is reported, not failed.
+    func testPressHomeOnAnUnrecognizedHomeScreenReportsTheUnchangedScreen() {
+        useWindow()
+        let italianHome = ScreenDescriber.DescribeResult(elements: [
+            TapPoint(text: "Note", tapX: 166, tapY: 499, confidence: 0.9),
+            TapPoint(text: "Q Cerca", tapX: 215, tapY: 783, confidence: 0.9),
+        ], screenshotBase64: "img")
+        describer.describeResult = italianHome
+        let response = callTool("press_home")
+        XCTAssertFalse(isError(response), extractText(response) ?? "")
+        XCTAssertEqual(extractText(response),
+                       "Pressed Home 3 times and the screen did not change, so it was most likely "
+                       + "the Home Screen already. Describe the screen to confirm.")
+        XCTAssertEqual(bridge.menuActionCalls.count, MirroringMenuCommand.homePressAttempts)
+    }
+
     func testPressHomeWhileSpotlightNeverLeavesIsAnError() {
         useWindow()
         describer.describeResults = [notesApp, spotlightHoldingAQuery]

@@ -213,6 +213,20 @@ final class StepExecutorTests: XCTestCase {
         XCTAssertEqual(result.status, .failed)
     }
 
+    /// A screen Home leaves unchanged (most likely the Home Screen in a
+    /// language whose search pill is not listed) passes, saying so.
+    func testHomeThatLeavesTheScreenUnchangedPassesWithANote() {
+        bridge.menuActionResult = true
+        describer.describeResult = ScreenDescriber.DescribeResult(
+            elements: [TapPoint(text: "Notizen", tapX: 166, tapY: 499, confidence: 0.9)],
+            screenshotBase64: "img")
+        let result = executor.execute(
+            step: .home, stepIndex: 0, skillName: "test")
+        XCTAssertEqual(result.status, .passed)
+        XCTAssertTrue(result.message?.contains("the screen did not change") ?? false,
+                      result.message ?? "")
+    }
+
     // MARK: - Shake
 
     func testShakeSuccess() {
