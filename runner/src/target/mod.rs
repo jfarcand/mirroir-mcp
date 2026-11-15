@@ -19,6 +19,7 @@
 /// Test-only support: a loopback port the OS confirmed is dark.
 #[cfg(test)]
 pub mod dark_port;
+pub mod file_url;
 pub mod http;
 pub mod ios;
 pub mod ios_budget;

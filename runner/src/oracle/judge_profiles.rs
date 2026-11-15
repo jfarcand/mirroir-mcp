@@ -14,17 +14,19 @@
  * the License.
  */
 // ABOUTME: Judge profile registry — built-in profiles plus oracles/profiles.yaml overlay.
-// ABOUTME: Maps a scenario's judge.profile name to an LLM endpoint, model, and timeout.
+// ABOUTME: Maps a scenario's judge.profile name to an LLM endpoint, model, timeout and pinned system prompt.
 
 use std::env;
 use std::fs;
 use std::path::{Path, PathBuf};
 
 use serde::Deserialize;
-use tracing::warn;
+use sha2::{Digest, Sha256};
+use tracing::{info, warn};
 
 use crate::error::{Result, RunnerError};
 use crate::oracle::error::OracleError;
+use crate::oracle::llm_client::ApiTarget;
 use crate::parser::version::{self, ArtifactKind};
 
 /// Profile registry entry — declares how to reach one LLM provider and which
@@ -43,7 +45,84 @@ pub struct JudgeProfile {
     pub api_key_env: Option<String>,
     /// Request timeout in seconds.
     pub timeout_s: u32,
+    /// The wire protocol `base_url` speaks.
+    pub api_target: ApiTarget,
+    /// The system prompt sent before every scoring request, with its pin.
+    pub system_prompt: SystemPrompt,
 }
+
+/// A judge system prompt and the sha256 it is pinned to.
+///
+/// Changing a profile's system prompt changes its scores, so the text is
+/// verified against its pin when the registry loads: a mismatch is a hard
+/// error, never a silently different oracle.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SystemPrompt {
+    /// Where the text came from, for messages: a file path, or the built-in name.
+    pub source: String,
+    /// The prompt text.
+    pub text: String,
+    /// The pinned digest, formatted `sha256:<hex>`.
+    pub pinned: String,
+}
+
+impl SystemPrompt {
+    /// The canonical system prompt every built-in profile uses.
+    #[must_use]
+    pub fn canonical() -> Self {
+        Self {
+            source: CANONICAL_SYSTEM_PROMPT_SOURCE.to_owned(),
+            text: CANONICAL_SYSTEM_PROMPT.to_owned(),
+            pinned: CANONICAL_SYSTEM_PROMPT_SHA256.to_owned(),
+        }
+    }
+
+    /// The digest of the text, formatted `sha256:<hex>`.
+    #[must_use]
+    pub fn digest(&self) -> String {
+        sha256_pin(&self.text)
+    }
+
+    /// Check the text against its pin.
+    ///
+    /// # Errors
+    ///
+    /// [`OracleError::SystemPromptMismatch`] when the text's digest is not the pin.
+    pub fn verify(&self, profile: &str) -> Result<()> {
+        let actual = self.digest();
+        if actual == self.pinned {
+            info!(profile, source = %self.source, pin = %self.pinned, "judge system prompt matches pin");
+            Ok(())
+        } else {
+            Err(OracleError::SystemPromptMismatch {
+                profile: profile.to_owned(),
+                source_name: self.source.clone(),
+                pinned: self.pinned.clone(),
+                actual,
+            }
+            .into())
+        }
+    }
+}
+
+/// Name the canonical system prompt goes by in messages.
+const CANONICAL_SYSTEM_PROMPT_SOURCE: &str = "built-in judge-system.md";
+
+/// The canonical judge system prompt, compiled in.
+const CANONICAL_SYSTEM_PROMPT: &str = include_str!("prompts/judge-system.md");
+
+/// The pin of [`CANONICAL_SYSTEM_PROMPT`]. Editing the prompt fails the load
+/// until this pin is updated with it, on purpose.
+const CANONICAL_SYSTEM_PROMPT_SHA256: &str =
+    "sha256:dad066508492be3b83dc71a602393edcb977c36b431e2d0acb04e547bd1386ad";
+
+/// `sha256:<hex>` of `text`.
+fn sha256_pin(text: &str) -> String {
+    format!("sha256:{}", hex::encode(Sha256::digest(text.as_bytes())))
+}
+
+/// Ollama's native chat endpoint on its default port.
+const OLLAMA_CHAT_URL: &str = "http://127.0.0.1:11434/api/chat";
 
 /// Built-in profiles. Users may override or add profiles via an
 /// `oracles/profiles.yaml` file (see [`JudgeRegistry::load`]).
@@ -57,22 +136,28 @@ pub fn builtin_profiles() -> Vec<JudgeProfile> {
             model: "gpt-4o-mini".to_owned(),
             api_key_env: Some("OPENAI_API_KEY".to_owned()),
             timeout_s: 30,
+            api_target: ApiTarget::OpenAi,
+            system_prompt: SystemPrompt::canonical(),
         },
         // Local, deterministic, free (assumes an Ollama daemon at default port).
         JudgeProfile {
             name: "byte-stable".to_owned(),
-            base_url: "http://127.0.0.1:11434/v1/chat/completions".to_owned(),
+            base_url: OLLAMA_CHAT_URL.to_owned(),
             model: "qwen2.5:0.5b".to_owned(),
             api_key_env: None,
             timeout_s: 60,
+            api_target: ApiTarget::Ollama,
+            system_prompt: SystemPrompt::canonical(),
         },
         // Local, smaller model for quick iteration.
         JudgeProfile {
             name: "cheap-local".to_owned(),
-            base_url: "http://127.0.0.1:11434/v1/chat/completions".to_owned(),
+            base_url: OLLAMA_CHAT_URL.to_owned(),
             model: "qwen2.5:0.5b".to_owned(),
             api_key_env: None,
             timeout_s: 30,
+            api_target: ApiTarget::Ollama,
+            system_prompt: SystemPrompt::canonical(),
         },
     ]
 }
@@ -87,6 +172,15 @@ struct ProfileSpec {
     api_key_env: Option<String>,
     #[serde(default = "default_timeout_s")]
     timeout_s: u32,
+    /// The wire protocol `base_url` speaks; chat completions when omitted.
+    #[serde(default)]
+    api_target: ApiTarget,
+    /// A system prompt file, relative to the `profiles.yaml` that names it.
+    #[serde(default)]
+    system_prompt: Option<PathBuf>,
+    /// The pin of `system_prompt`, formatted `sha256:<hex>`; required with it.
+    #[serde(default)]
+    system_prompt_sha256: Option<String>,
 }
 
 const fn default_timeout_s() -> u32 {
@@ -174,6 +268,9 @@ impl JudgeRegistry {
                 registry.overlay_from_file(&path, Trust::RepoLocal)?;
             }
         }
+        for profile in &registry.profiles {
+            profile.system_prompt.verify(&profile.name)?;
+        }
         Ok(registry)
     }
 
@@ -211,23 +308,35 @@ impl JudgeRegistry {
                 .into()
             },
         )?;
-        for spec in parsed.profiles {
-            self.apply_spec(spec, trust, path);
+        for mut spec in parsed.profiles {
+            let prompt = system_prompt_of(&mut spec, path)?;
+            self.apply_spec(spec, prompt, trust, path);
         }
         Ok(())
     }
 
     /// Apply one overlay profile under its source's [`Trust`] level. `model` and
-    /// `timeout_s` are accepted from any source; `base_url` / `api_key_env` and
-    /// new profiles require [`Trust::Full`].
-    fn apply_spec(&mut self, spec: ProfileSpec, trust: Trust, path: &Path) {
+    /// `timeout_s` and a pinned `system_prompt` are accepted from any source (a
+    /// prompt changes scores, not where prompts and keys go); `base_url` /
+    /// `api_key_env` and new profiles require [`Trust::Full`].
+    fn apply_spec(
+        &mut self,
+        spec: ProfileSpec,
+        prompt: Option<SystemPrompt>,
+        trust: Trust,
+        path: &Path,
+    ) {
         if let Some(existing) = self.profiles.iter_mut().find(|p| p.name == spec.name) {
             existing.model = spec.model;
             existing.timeout_s = spec.timeout_s;
+            if let Some(prompt) = prompt {
+                existing.system_prompt = prompt;
+            }
             match trust {
                 Trust::Full => {
                     existing.base_url = spec.base_url;
                     existing.api_key_env = spec.api_key_env;
+                    existing.api_target = spec.api_target;
                 }
                 Trust::RepoLocal => {
                     if spec.base_url != existing.base_url {
@@ -235,6 +344,13 @@ impl JudgeRegistry {
                             profile = %spec.name,
                             source = %path.display(),
                             "repo-local profiles.yaml may not change base_url; keeping the trusted endpoint"
+                        );
+                    }
+                    if spec.api_target != existing.api_target {
+                        warn!(
+                            profile = %spec.name,
+                            source = %path.display(),
+                            "repo-local profiles.yaml may not change api_target; keeping the trusted protocol"
                         );
                     }
                     if spec.api_key_env != existing.api_key_env {
@@ -254,6 +370,8 @@ impl JudgeRegistry {
                     model: spec.model,
                     api_key_env: spec.api_key_env,
                     timeout_s: spec.timeout_s,
+                    api_target: spec.api_target,
+                    system_prompt: prompt.unwrap_or_else(SystemPrompt::canonical),
                 }),
                 Trust::RepoLocal => warn!(
                     profile = %spec.name,
@@ -282,120 +400,37 @@ impl JudgeRegistry {
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use std::error::Error as StdError;
-    use std::fs;
-    use std::result::Result as StdResult;
-
-    use super::*;
-
-    type TestResult = StdResult<(), Box<dyn StdError>>;
-
-    #[test]
-    fn repo_local_overlay_tunes_model_and_timeout_but_not_endpoint() -> TestResult {
-        let dir = tempfile::tempdir()?;
-        let oracles = dir.path().join("oracles");
-        fs::create_dir_all(&oracles)?;
-        // Repo-local config tries to redirect fast-ci's endpoint + retune it.
-        fs::write(
-            oracles.join("profiles.yaml"),
-            "version: 1\n\
-             profiles:\n\
-             \x20 - name: fast-ci\n\
-             \x20   base_url: https://attacker.test/v1/chat/completions\n\
-             \x20   model: overridden\n\
-             \x20   api_key_env: STOLEN_KEY\n\
-             \x20   timeout_s: 45\n",
-        )?;
-        // No home overlay — only the untrusted repo-local file.
-        let registry = JudgeRegistry::load(None, dir.path())?;
-        let fast_ci = registry.resolve("fast-ci")?;
-        // model + timeout are tuned...
-        if fast_ci.model != "overridden" || fast_ci.timeout_s != 45 {
-            return Err(format!("model/timeout not tuned: {fast_ci:?}").into());
+/// Read the system prompt a profile entry names, relative to `profiles_path`.
+/// The pin is checked when the registry finishes loading.
+fn system_prompt_of(spec: &mut ProfileSpec, profiles_path: &Path) -> Result<Option<SystemPrompt>> {
+    match (spec.system_prompt.take(), spec.system_prompt_sha256.take()) {
+        (None, None) => Ok(None),
+        (Some(file), Some(pinned)) => {
+            let path = profiles_path
+                .parent()
+                .unwrap_or_else(|| Path::new("."))
+                .join(file);
+            let text = fs::read_to_string(&path).map_err(|source| OracleError::ProfilesParse {
+                path: path.clone(),
+                reason: format!("system prompt of profile `{}`: {source}", spec.name),
+            })?;
+            Ok(Some(SystemPrompt {
+                source: path.display().to_string(),
+                text,
+                pinned,
+            }))
         }
-        // ...but the endpoint + credential binding stay at the trusted built-in.
-        if fast_ci.base_url != "https://api.openai.com/v1/chat/completions" {
-            return Err(format!("repo-local redirected base_url: {fast_ci:?}").into());
+        _ => Err(OracleError::ProfilesParse {
+            path: profiles_path.to_path_buf(),
+            reason: format!(
+                "profile `{}` must declare system_prompt and system_prompt_sha256 together",
+                spec.name
+            ),
         }
-        if fast_ci.api_key_env.as_deref() != Some("OPENAI_API_KEY") {
-            return Err(format!("repo-local rebound api_key_env: {fast_ci:?}").into());
-        }
-        Ok(())
-    }
-
-    #[test]
-    fn repo_local_overlay_ignores_new_profiles() -> TestResult {
-        let dir = tempfile::tempdir()?;
-        let oracles = dir.path().join("oracles");
-        fs::create_dir_all(&oracles)?;
-        fs::write(
-            oracles.join("profiles.yaml"),
-            "version: 1\n\
-             profiles:\n\
-             \x20 - name: my-judge\n\
-             \x20   base_url: https://attacker.test/v1/chat/completions\n\
-             \x20   model: my-model\n",
-        )?;
-        let registry = JudgeRegistry::load(None, dir.path())?;
-        // A brand-new repo-local profile is not registered.
-        if registry.resolve("my-judge").is_ok() {
-            return Err("repo-local new profile should be ignored".into());
-        }
-        // Built-ins are untouched.
-        registry.resolve("fast-ci")?;
-        Ok(())
-    }
-
-    #[test]
-    fn home_overlay_may_define_endpoints_and_override_builtins() -> TestResult {
-        let home = tempfile::tempdir()?;
-        let oracles = home.path().join(".mirroir").join("oracles");
-        fs::create_dir_all(&oracles)?;
-        // The trusted home file adds a new endpoint and redirects a built-in.
-        fs::write(
-            oracles.join("profiles.yaml"),
-            "version: 1\n\
-             profiles:\n\
-             \x20 - name: my-judge\n\
-             \x20   base_url: https://example.test/v1/chat/completions\n\
-             \x20   model: my-model\n\
-             \x20   api_key_env: MY_KEY\n\
-             \x20   timeout_s: 45\n\
-             \x20 - name: fast-ci\n\
-             \x20   base_url: https://self-hosted.test/v1/chat/completions\n\
-             \x20   model: overridden\n",
-        )?;
-        let project = tempfile::tempdir()?;
-        let registry = JudgeRegistry::load(Some(home.path()), project.path())?;
-        let custom = registry.resolve("my-judge")?;
-        if custom.base_url != "https://example.test/v1/chat/completions" || custom.timeout_s != 45 {
-            return Err(format!("home profile not loaded: {custom:?}").into());
-        }
-        let fast_ci = registry.resolve("fast-ci")?;
-        if fast_ci.base_url != "https://self-hosted.test/v1/chat/completions" {
-            return Err(format!("home overlay did not redirect builtin: {fast_ci:?}").into());
-        }
-        Ok(())
-    }
-
-    #[test]
-    fn load_without_files_returns_builtins() -> TestResult {
-        let project = tempfile::tempdir()?;
-        let registry = JudgeRegistry::load(None, project.path())?;
-        registry.resolve("fast-ci")?;
-        Ok(())
-    }
-
-    #[test]
-    fn builtin_profiles_includes_fast_ci_byte_stable_cheap_local() {
-        let registry = JudgeRegistry::default();
-        for name in &["fast-ci", "byte-stable", "cheap-local"] {
-            assert!(
-                registry.resolve(name).is_ok(),
-                "missing builtin profile: {name}"
-            );
-        }
+        .into()),
     }
 }
+
+#[cfg(test)]
+#[path = "judge_profiles_tests.rs"]
+mod tests;

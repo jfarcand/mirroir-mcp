@@ -23,5 +23,6 @@ pub mod drift_session;
 pub mod error;
 pub mod judge;
 pub mod judge_profiles;
+pub mod llm_client;
 pub mod screen_drift;
 pub mod thresholds;

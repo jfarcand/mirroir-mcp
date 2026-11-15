@@ -18,12 +18,13 @@
 
 use std::fmt::Write as _;
 
+use crate::compile::error::PlaywrightError;
 use crate::compile::playwright_emit::{emit_steps, js_string_literal};
 use crate::compile::playwright_prelude::{ScenarioSource, emit_prelude};
 use crate::compile::report::CAPTURES_ATTACHMENT;
 use crate::error::Result;
 use crate::parser::scenario::Scenario;
-use crate::parser::step::Browser;
+use crate::parser::step::{Browser, SkillStep};
 use crate::replay_plan::ScenarioPlan;
 
 /// Output of [`compile_scenario`].
@@ -65,6 +66,8 @@ pub struct PlaywrightSpec {
 ///
 /// * [`crate::compile::error::PlaywrightError::Unsupported`] when the scenario
 ///   carries a `measure:` whose `action` has no web equivalent.
+/// * [`PlaywrightError::MultiBrowserCapture`] when the scenario runs in more
+///   than one browser and declares a `judge:`, `cross_surface:` or `measure:`.
 /// * [`crate::compile::error::PlaywrightError::Encode`] if a label, URL, or
 ///   name can't be encoded as a JS string literal.
 /// * [`crate::error::RunnerError::Format`] for `std::fmt::Write` failure
@@ -80,6 +83,7 @@ pub fn compile_scenario(
     } else {
         target.browsers.clone()
     };
+    refuse_multi_browser_captures(scenario, &browsers)?;
 
     let mut body = String::new();
     emit_prelude(source, &mut body)?;
@@ -119,6 +123,38 @@ pub fn compile_scenario(
         spec_ts: body,
         browsers,
     })
+}
+
+/// Refuse a scenario that runs in several browsers and captures a value the
+/// runner evaluates once: `judge`, `cross_surface` and `measure` read one
+/// capture per key, so every browser but the last would go unchecked.
+fn refuse_multi_browser_captures(scenario: &Scenario, browsers: &[Browser]) -> Result<()> {
+    if browsers.len() < 2 {
+        return Ok(());
+    }
+    let capturing = scenario.steps.iter().enumerate().find_map(|(index, step)| {
+        let kind = match step {
+            SkillStep::Judge(_) => "judge",
+            SkillStep::CrossSurface(_) => "cross_surface",
+            SkillStep::Measure(_) => "measure",
+            _ => return None,
+        };
+        Some((index, kind))
+    });
+    let Some((index, step)) = capturing else {
+        return Ok(());
+    };
+    let names: Vec<String> = browsers
+        .iter()
+        .map(|b| format!("{b:?}").to_lowercase())
+        .collect();
+    Err(PlaywrightError::MultiBrowserCapture {
+        scenario: scenario.name.clone(),
+        browsers: names.join(", "),
+        index,
+        step,
+    }
+    .into())
 }
 
 #[cfg(test)]
@@ -436,5 +472,23 @@ steps:
             assert_contains(&spec.spec_ts, expected).map_err(|e| format!("dir={dir}: {e}"))?;
         }
         Ok(())
+    }
+
+    #[test]
+    fn a_multi_browser_scenario_that_captures_is_refused_by_name() -> TestResult {
+        let yaml = r#"
+version: 1
+name: latency-everywhere
+steps:
+  - target: { kind: web, browsers: [chrome, firefox], url: "http://localhost/" }
+  - measure: { name: "first_token_latency", action: "tap:send", until: "streaming-caret", max_seconds: 5 }
+"#;
+        match compile(yaml) {
+            Err(err) => assert_contains(
+                &err.to_string(),
+                "scenario `latency-everywhere` runs in chrome, firefox but step 1 (`measure`)",
+            ),
+            Ok(_) => Err("a two-browser measure must be refused".into()),
+        }
     }
 }

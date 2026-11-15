@@ -16,7 +16,12 @@
 // ABOUTME: Structured errors for HTTP: building the shared TLS config and reqwest client, and an `http:` step.
 // ABOUTME: Converts into RunnerError via #[from]; every variant carries the fields its message needs.
 
+use std::io;
+use std::path::PathBuf;
+
 use thiserror::Error;
+
+use crate::parser::step::HttpMethod;
 
 /// Errors raised building an HTTP client or running an `http:` step.
 #[derive(Debug, Error)]
@@ -75,5 +80,40 @@ pub enum HttpError {
         url: String,
         /// The substring from `expect_body_contains:` that was missing.
         expected: String,
+    },
+
+    /// A `file://` URL in an `http:` step does not name a local path.
+    #[error("`{url}` does not name a local file (a file:// URL needs an empty or localhost host)")]
+    FileUrl {
+        /// The URL from the step.
+        url: String,
+    },
+
+    /// The file a `file://` URL names could not be read (missing, unreadable, not UTF-8).
+    #[error("file `{}` could not be read", path.display())]
+    FileRead {
+        /// The local path the URL names.
+        path: PathBuf,
+        /// Underlying I/O error.
+        #[source]
+        source: io::Error,
+    },
+
+    /// A `file://` step declared `expect_status`; a file has no status code.
+    #[error("`{url}` is a file: drop `expect_status: {expected}`, a file has no status code")]
+    FileStatus {
+        /// The URL from the step.
+        url: String,
+        /// The status the step declared.
+        expected: u16,
+    },
+
+    /// A `file://` step used a verb other than GET.
+    #[error("`{url}` is a file: only GET reads it, not {method:?}")]
+    FileMethod {
+        /// The URL from the step.
+        url: String,
+        /// The verb the step declared.
+        method: HttpMethod,
     },
 }

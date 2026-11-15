@@ -14,17 +14,19 @@
  * the License.
  */
 // ABOUTME: LLM judge oracle — scores response text against expectation using a profile registry.
-// ABOUTME: OpenAI-compatible chat completions API; works with OpenAI, Anthropic-compatible, vLLM, Ollama.
+// ABOUTME: The profile's api_target picks the LlmClient: OpenAI chat completions, Anthropic Messages or Ollama chat.
 
 use std::env;
 use std::time::Duration;
 
-use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use tracing::{debug, info};
 
 use crate::error::Result;
 use crate::oracle::error::OracleError;
+use crate::oracle::llm_client::{
+    AnthropicClient, ApiTarget, Endpoint, LlmClient, OllamaClient, OpenAiClient,
+};
 use crate::parser::step::JudgeArgs;
 use crate::tls;
 
@@ -69,7 +71,7 @@ pub async fn run_judge(
         "running judge"
     );
 
-    let client = tls::client_builder()?
+    let http = tls::client_builder()?
         .timeout(Duration::from_secs(u64::from(profile.timeout_s)))
         .user_agent(format!("mirroir-run/{}", env!("CARGO_PKG_VERSION")))
         .build()
@@ -77,39 +79,18 @@ pub async fn run_judge(
             url: profile.base_url.clone(),
             source,
         })?;
-    let req = ChatRequest {
-        model: profile.model.as_str(),
-        messages: vec![ChatMessage {
-            role: "user",
-            content: prompt,
-        }],
-        temperature: 0.0,
+    let endpoint = Endpoint {
+        http,
+        url: profile.base_url.clone(),
+        model: profile.model.clone(),
+        api_key,
     };
-    let mut request = client.post(profile.base_url.as_str()).json(&req);
-    if let Some(key) = api_key {
-        request = request.bearer_auth(key);
-    }
-    let response = request
-        .send()
-        .await
-        .map_err(|source| OracleError::Transport {
-            url: profile.base_url.clone(),
-            source,
-        })?;
-    let body: ChatResponse = response
-        .json()
-        .await
-        .map_err(|source| OracleError::Transport {
-            url: profile.base_url.clone(),
-            source,
-        })?;
-    let Some(choice) = body.choices.into_iter().next() else {
-        return Err(OracleError::Decode {
-            reason: "no choices in response".to_owned(),
-        }
-        .into());
+    let system = profile.system_prompt.text.as_str();
+    let raw = match profile.api_target {
+        ApiTarget::OpenAi => OpenAiClient(endpoint).complete(system, &prompt).await?,
+        ApiTarget::Anthropic => AnthropicClient(endpoint).complete(system, &prompt).await?,
+        ApiTarget::Ollama => OllamaClient(endpoint).complete(system, &prompt).await?,
     };
-    let raw = choice.message.content;
     let score = parse_score(&raw)?;
     debug!(score, raw = %raw, "judge returned");
     Ok(JudgeOutcome { score, raw })
@@ -228,230 +209,6 @@ fn parse_score(raw: &str) -> Result<f64> {
     Ok(value)
 }
 
-#[derive(Serialize)]
-struct ChatRequest<'a> {
-    model: &'a str,
-    messages: Vec<ChatMessage<'a>>,
-    temperature: f64,
-}
-
-#[derive(Serialize)]
-struct ChatMessage<'a> {
-    role: &'a str,
-    content: String,
-}
-
-#[derive(Deserialize)]
-struct ChatResponse {
-    choices: Vec<ChatChoice>,
-}
-
-#[derive(Deserialize)]
-struct ChatChoice {
-    message: ChatChoiceMessage,
-}
-
-#[derive(Deserialize)]
-struct ChatChoiceMessage {
-    content: String,
-}
-
 #[cfg(test)]
-mod tests {
-    use std::error::Error as StdError;
-    use std::result::Result as StdResult;
-    use std::sync::Arc;
-
-    use tokio::io::{AsyncReadExt, AsyncWriteExt};
-    use tokio::net::TcpListener;
-    use tokio::sync::Mutex;
-    use tokio::task::JoinHandle;
-
-    use super::*;
-    use crate::error::RunnerError;
-
-    type TestResult = StdResult<(), Box<dyn StdError>>;
-
-    /// Spin a stub HTTP server that returns the canned response body for the
-    /// next connection. Returns `(port, JoinHandle)`.
-    async fn stub_server(
-        canned_json: &'static str,
-    ) -> StdResult<(u16, JoinHandle<()>), Box<dyn StdError>> {
-        let listener = TcpListener::bind("127.0.0.1:0").await?;
-        let port = listener.local_addr()?.port();
-        let response = format!(
-            "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {}\r\n\r\n{}",
-            canned_json.len(),
-            canned_json
-        );
-        let response = Arc::new(Mutex::new(response));
-        let handle = tokio::spawn(async move {
-            if let Ok((mut sock, _)) = listener.accept().await {
-                let mut buf = [0u8; 8192];
-                let _ = sock.read(&mut buf).await;
-                let resp = response.lock().await;
-                let _ = sock.write_all(resp.as_bytes()).await;
-                let _ = sock.shutdown().await;
-            }
-        });
-        Ok((port, handle))
-    }
-
-    fn judge_args(profile: &str) -> JudgeArgs {
-        JudgeArgs {
-            profile: profile.to_owned(),
-            user_prompt_template_hash: user_prompt_template_hash(),
-            response_selector: "[data-test=reply]".to_owned(),
-            pass_threshold: 0.8,
-            pass_threshold_tolerance: Some(0.05),
-            expected_signal: Some("response correctly summarises the topic".to_owned()),
-            response_drift: None,
-            response_text: None,
-            response_file: None,
-            drift_baseline_file: None,
-        }
-    }
-
-    fn stub_profile(name: &str, base_url: &str) -> JudgeProfile {
-        JudgeProfile {
-            name: name.to_owned(),
-            base_url: base_url.to_owned(),
-            model: "stub".to_owned(),
-            api_key_env: None,
-            timeout_s: 5,
-        }
-    }
-
-    #[tokio::test]
-    async fn run_judge_extracts_score_from_response() -> TestResult {
-        let canned = r#"{"choices":[{"message":{"content":"0.95"}}]}"#;
-        let (port, server) = stub_server(canned).await?;
-        let base_url: &'static str =
-            Box::leak(format!("http://127.0.0.1:{port}/v1/chat/completions").into_boxed_str());
-        let registry = JudgeRegistry::from_profiles(vec![stub_profile("stub", base_url)]);
-        let outcome = run_judge(&registry, &judge_args("stub"), "Some response").await?;
-        if (outcome.score - 0.95).abs() > 1e-9 {
-            return Err(format!("wrong score: {}", outcome.score).into());
-        }
-        server.await?;
-        Ok(())
-    }
-
-    #[tokio::test]
-    async fn run_judge_tolerates_surrounding_whitespace_and_period() -> TestResult {
-        let canned = r#"{"choices":[{"message":{"content":"  0.7.  "}}]}"#;
-        let (port, server) = stub_server(canned).await?;
-        let base_url: &'static str =
-            Box::leak(format!("http://127.0.0.1:{port}/v1/chat/completions").into_boxed_str());
-        let registry = JudgeRegistry::from_profiles(vec![stub_profile("stub", base_url)]);
-        let outcome = run_judge(&registry, &judge_args("stub"), "x").await?;
-        if (outcome.score - 0.7).abs() > 1e-9 {
-            return Err(format!("wrong score: {}", outcome.score).into());
-        }
-        server.await?;
-        Ok(())
-    }
-
-    #[tokio::test]
-    async fn run_judge_returns_decode_error_for_bad_score() -> TestResult {
-        let canned = r#"{"choices":[{"message":{"content":"definitely not a number"}}]}"#;
-        let (port, server) = stub_server(canned).await?;
-        let base_url: &'static str =
-            Box::leak(format!("http://127.0.0.1:{port}/v1/chat/completions").into_boxed_str());
-        let registry = JudgeRegistry::from_profiles(vec![stub_profile("stub", base_url)]);
-        let res = run_judge(&registry, &judge_args("stub"), "x").await;
-        if !matches!(res, Err(RunnerError::Oracle(OracleError::Decode { .. }))) {
-            return Err(format!("expected a decode error, got {res:?}").into());
-        }
-        server.await?;
-        Ok(())
-    }
-
-    #[tokio::test]
-    async fn run_judge_unknown_profile() -> TestResult {
-        let registry = JudgeRegistry::default();
-        let res = run_judge(&registry, &judge_args("does-not-exist"), "x").await;
-        if !matches!(
-            res,
-            Err(RunnerError::Oracle(OracleError::UnknownProfile { .. }))
-        ) {
-            return Err(format!("expected an unknown-profile error, got {res:?}").into());
-        }
-        Ok(())
-    }
-
-    #[test]
-    fn enforce_threshold_passes_within_tolerance() -> TestResult {
-        let args = JudgeArgs {
-            pass_threshold: 0.9,
-            pass_threshold_tolerance: Some(0.05),
-            ..judge_args("stub")
-        };
-        let outcome = JudgeOutcome {
-            score: 0.86,
-            raw: "0.86".to_owned(),
-        };
-        enforce_threshold("stub", &args, &outcome)?;
-        Ok(())
-    }
-
-    #[test]
-    fn enforce_threshold_fails_below_tolerance() -> TestResult {
-        let args = JudgeArgs {
-            pass_threshold: 0.9,
-            pass_threshold_tolerance: Some(0.05),
-            ..judge_args("stub")
-        };
-        let outcome = JudgeOutcome {
-            score: 0.5,
-            raw: "0.5".to_owned(),
-        };
-        let res = enforce_threshold("stub", &args, &outcome);
-        let Err(RunnerError::Oracle(OracleError::BelowThreshold {
-            score, threshold, ..
-        })) = res
-        else {
-            return Err(format!("expected a below-threshold error, got {res:?}").into());
-        };
-        if (score - 0.5).abs() > 1e-9 || (threshold - 0.85).abs() > 1e-9 {
-            return Err(format!("wrong values: score={score} threshold={threshold}").into());
-        }
-        Ok(())
-    }
-
-    #[test]
-    fn parse_score_rejects_out_of_range() -> TestResult {
-        let res = parse_score("1.5");
-        if !matches!(res, Err(RunnerError::Oracle(OracleError::Decode { .. }))) {
-            return Err(format!("expected a decode error, got {res:?}").into());
-        }
-        Ok(())
-    }
-
-    #[tokio::test]
-    async fn run_judge_rejects_template_hash_mismatch() -> TestResult {
-        let registry = JudgeRegistry::default();
-        let mut args = judge_args("fast-ci");
-        args.user_prompt_template_hash = "sha256:stale-pinned-value".to_owned();
-        let res = run_judge(&registry, &args, "x").await;
-        if !matches!(
-            res,
-            Err(RunnerError::Oracle(OracleError::TemplateMismatch { .. }))
-        ) {
-            return Err(format!("expected a template-mismatch error, got {res:?}").into());
-        }
-        Ok(())
-    }
-
-    #[test]
-    fn template_hash_is_stable() {
-        // Guards the pinned hash baked into shipped sample scenarios. If the
-        // oracle prompt changes, update this constant AND every scenario's
-        // judge.user_prompt_template_hash in lockstep.
-        assert_eq!(
-            user_prompt_template_hash(),
-            "sha256:2fd94adeba57835b2267269c672245aeb82c450908f866bd4c887da010602834",
-            "template hash drifted — re-pin sample scenarios"
-        );
-    }
-}
+#[path = "judge_tests.rs"]
+mod tests;

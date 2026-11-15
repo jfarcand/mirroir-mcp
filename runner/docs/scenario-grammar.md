@@ -20,6 +20,7 @@ name: "scenario name"
 description: "free-form prose"   # optional
 app: "spring-boot-chat"          # optional; references SAMPLE.md slug
 tags: ["smoke", "streaming"]     # optional
+requires_clean_boot: true        # optional; in a boot_once sample, boot a server for this scenario alone
 drift:                           # optional; the scenario layer of the drift hierarchy
   fingerprint_similarity:    { min: 0.90 }
   judge_score_swing:         { max_delta: 0.05 }
@@ -36,6 +37,11 @@ when one is given, else to the empty string.
 
 In `--sample` mode the runner additionally exposes `${MIRROIR_SAMPLE_DIR}`
 so scenarios can reference baseline files relative to the sample directory.
+
+`requires_clean_boot: true` matters only in a `boot_once` sample: the shared
+server is stopped, this scenario runs against a server booted for it alone, and
+the scenarios after it get a freshly booted shared server. A destructive flow or
+a state reset neither inherits the shared server's state nor leaks its own.
 
 The `drift:` block declares only the metrics this scenario wants to own; every
 other metric falls through to the sample's `APP.md` `drift_defaults:` block and
@@ -173,7 +179,21 @@ REST probe with optional status + body substring assertions.
     timeout_s: 30                            # optional per-request timeout (default 30)
 ```
 
-Errors (`HttpError`): `Client`, `Tls`, `Request`, `StatusMismatch`, `BodyRead`, `BodyMismatch`.
+A `file://` URL reads a local file instead, for filesystem assertions: `expect_body_contains`
+applies to the file's contents. Only `GET` reads a file, and a file has no status, so
+`expect_status` is refused by name.
+
+```yaml
+- http:
+    method: GET
+    url: "file:///tmp/export/report.csv"
+    expect_body_contains:
+      - "12 rows"
+```
+
+Errors (`HttpError`): `Client`, `Tls`, `Request`, `StatusMismatch`, `BodyRead`, `BodyMismatch`,
+and for `file://`: `FileUrl`, `FileRead` (missing or unreadable file, naming its path),
+`FileStatus`, `FileMethod`.
 
 ---
 
@@ -214,6 +234,12 @@ discard the first one's state.
 
 - target: { kind: ios, app: "Safari" }              # handed, as one block, to `mirroir-mcp test`
 ```
+
+Each browser runs as its own Playwright project, and a failure names the
+browser it happened in (`[firefox] checkout: Timeout 5000ms exceeded`). A
+`judge:`, `cross_surface:` or `measure:` reads one captured value per run, so a
+scenario that declares one and lists more than one browser is refused by name
+(`MultiBrowserCapture`): run it in one browser, or split it per browser.
 
 | `kind` | Engine | Where it runs |
 |---|---|---|

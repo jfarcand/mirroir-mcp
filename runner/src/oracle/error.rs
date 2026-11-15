@@ -87,6 +87,21 @@ pub enum OracleError {
         declared: String,
     },
 
+    /// A judge profile's system prompt does not hash to its pin.
+    #[error(
+        "judge profile `{profile}`: system prompt {source_name} is `{actual}`, pinned `{pinned}` — update the pin with the prompt"
+    )]
+    SystemPromptMismatch {
+        /// Profile name.
+        profile: String,
+        /// Where the prompt came from.
+        source_name: String,
+        /// The pin the profile declares.
+        pinned: String,
+        /// The digest of the text that was read.
+        actual: String,
+    },
+
     /// Judge scored the response below `pass_threshold - tolerance`.
     #[error("judge score {score:.3} below pass_threshold {threshold:.3} (profile `{profile}`)")]
     BelowThreshold {

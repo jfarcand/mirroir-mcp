@@ -58,6 +58,9 @@ impl ReporterVerdict {
 /// One failed Playwright test case, carrying the reporter's own error text.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TestFailure {
+    /// The Playwright project (browser) the failing run belonged to; `None`
+    /// for an engine with no projects, such as `mirroir-mcp test`.
+    pub project: Option<String>,
     /// Spec title the reporter recorded for the failing test.
     pub title: String,
     /// The reporter's error message — the locator text, timeout, or assertion
@@ -135,7 +138,7 @@ fn walk_suites(suites: &[ReporterSuite], ingest: &mut Ingest) -> Result<()> {
         for spec in &suite.specs {
             for test in &spec.tests {
                 for result in &test.results {
-                    ingest_result(&spec.title, result, ingest)?;
+                    ingest_result(&spec.title, test.project_name.as_deref(), result, ingest)?;
                 }
             }
         }
@@ -144,7 +147,12 @@ fn walk_suites(suites: &[ReporterSuite], ingest: &mut Ingest) -> Result<()> {
     Ok(())
 }
 
-fn ingest_result(title: &str, result: &ReporterResult, ingest: &mut Ingest) -> Result<()> {
+fn ingest_result(
+    title: &str,
+    project: Option<&str>,
+    result: &ReporterResult,
+    ingest: &mut Ingest,
+) -> Result<()> {
     // Every status Playwright can write is accounted for. `timedOut` and
     // `interrupted` are failures — a test that never finished asserted nothing
     // — and an unrecognized status is refused rather than dropped, because a
@@ -154,6 +162,7 @@ fn ingest_result(title: &str, result: &ReporterResult, ingest: &mut Ingest) -> R
         "failed" | "unexpected" | "timedOut" | "interrupted" => {
             ingest.outcome.verdict.failed += 1;
             ingest.failures.push(TestFailure {
+                project: project.filter(|name| !name.is_empty()).map(str::to_owned),
                 title: title.to_owned(),
                 message: result.failure_message(),
             });
@@ -221,6 +230,9 @@ struct ReporterSpec {
 
 #[derive(Deserialize)]
 struct ReporterTest {
+    /// The Playwright project this test ran under: one per browser.
+    #[serde(default, rename = "projectName")]
+    project_name: Option<String>,
     #[serde(default)]
     results: Vec<ReporterResult>,
 }
@@ -427,6 +439,26 @@ mod tests {
             return Err("captures should be empty".to_owned());
         }
         Ok(())
+    }
+
+    #[test]
+    fn a_failure_names_the_browser_project_it_ran_under() -> TestResult {
+        let json = r#"{"suites":[{"title":"s","specs":[{"title":"checkout","tests":[
+            {"projectName":"chromium","results":[{"status":"passed"}]},
+            {"projectName":"firefox","results":[{"status":"failed","error":{"message":"Timeout 5000ms exceeded"}}]}
+        ]}],"suites":[]}]}"#;
+        match parse_report_body(ReportEngine::Playwright, "report.json", json) {
+            Err(RunnerError::Report(ReportError::TestFailures {
+                failures,
+                failed: 1,
+                total: 2,
+                ..
+            })) => match failures.as_slice() {
+                [failure] if failure.project.as_deref() == Some("firefox") => Ok(()),
+                other => Err(format!("wrong failures: {other:?}")),
+            },
+            other => Err(format!("expected TestFailures, got {other:?}")),
+        }
     }
 
     #[test]

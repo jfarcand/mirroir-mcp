@@ -25,7 +25,10 @@ use crate::baseline_coverage::ensure_ios_baselines_are_referenced;
 use crate::error::{Result, RunnerError};
 use crate::parser::sample::SampleManifest;
 use crate::parser::step::{KillArgs, PortState, SpawnArgs, WaitPortArgs};
-use crate::replay::{ReplayRoots, SampleContext, load_sample_manifest, run_scenario_with_context};
+use crate::replay::{
+    ReplayRoots, SampleContext, load_sample_manifest, load_scenario_with_extras,
+    run_scenario_with_context,
+};
 use crate::scenario_set::{ScenarioSet, select_scenarios};
 use crate::target::process::ProcessRegistry;
 use crate::verdict::RunVerdict;
@@ -89,8 +92,24 @@ pub async fn run_sample(
     for scenario_rel in selected {
         let resolved = sample_dir.join(&scenario_rel);
         info!(scenario = %scenario_rel.display(), "running scenario");
-        let outcome =
-            run_scenario_with_context(&resolved, Some(context), session.as_mut(), roots).await;
+        let outcome = if manifest.session.boot_once && requires_clean_boot(&resolved, sample_dir) {
+            // The shared server is stopped first, so the scenario's own boot
+            // can take its port, and is booted again for the scenarios after.
+            if let Some(shared) = session.take() {
+                tear_down(shared).await;
+            }
+            info!(scenario = %scenario_rel.display(), "booting a clean session for this scenario");
+            let mut clean = boot_session(sample_dir, &manifest).await?;
+            let outcome =
+                run_scenario_with_context(&resolved, Some(context), Some(&mut clean), roots).await;
+            tear_down(clean).await;
+            outcome
+        } else {
+            if manifest.session.boot_once && session.is_none() {
+                session = Some(boot_session(sample_dir, &manifest).await?);
+            }
+            run_scenario_with_context(&resolved, Some(context), session.as_mut(), roots).await
+        };
         match outcome {
             Ok(scenario_verdict) => {
                 verdict = verdict.merge(scenario_verdict);
@@ -112,16 +131,8 @@ pub async fn run_sample(
         }
     }
 
-    // Tear down the shared session boot, if any.
-    if let Some(mut shared) = session.take() {
-        let kill_args = KillArgs {
-            id: SESSION_BOOT_ID.to_owned(),
-            grace_s: 3,
-            cleanup: None,
-        };
-        if let Err(err) = shared.kill_process(&kill_args).await {
-            error!(error = %err, "session boot teardown failed");
-        }
+    if let Some(shared) = session.take() {
+        tear_down(shared).await;
     }
 
     if failed == 0 {
@@ -141,6 +152,25 @@ pub async fn run_sample(
 /// runs. Scenarios authored with `spawn: { from: SAMPLE.md, id: ... }` are
 /// expected to use this same id so the spawn becomes an idempotent no-op.
 const SESSION_BOOT_ID: &str = "session";
+
+/// Whether the scenario at `path` declares `requires_clean_boot: true`. A
+/// scenario that will not load answers false here; its run reports why.
+fn requires_clean_boot(path: &Path, sample_dir: &Path) -> bool {
+    let extras = [("MIRROIR_SAMPLE_DIR", sample_dir.display().to_string())];
+    load_scenario_with_extras(path, &extras).is_ok_and(|scenario| scenario.requires_clean_boot)
+}
+
+/// Stop a session boot, logging a teardown that fails.
+async fn tear_down(mut registry: ProcessRegistry) {
+    let kill_args = KillArgs {
+        id: SESSION_BOOT_ID.to_owned(),
+        grace_s: 3,
+        cleanup: None,
+    };
+    if let Err(err) = registry.kill_process(&kill_args).await {
+        error!(error = %err, "session boot teardown failed");
+    }
+}
 
 async fn boot_session(sample_dir: &Path, manifest: &SampleManifest) -> Result<ProcessRegistry> {
     let mut registry = ProcessRegistry::default();
@@ -223,6 +253,10 @@ pub fn resolve_spawn_args(
     }
     Ok(resolved)
 }
+
+#[cfg(test)]
+#[path = "replay_sample_clean_boot_tests.rs"]
+mod clean_boot_tests;
 
 #[cfg(test)]
 mod tests {

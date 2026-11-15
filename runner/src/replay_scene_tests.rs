@@ -107,6 +107,7 @@ fn failed(entries: Vec<(&str, SceneCapture)>) -> Result<ReporterOutcome> {
         failed: 1,
         total: 1,
         failures: vec![TestFailure {
+            project: None,
             title: "scene".to_owned(),
             message: "step 1 (launch: \"Scene Frames\"): not found".to_owned(),
         }],

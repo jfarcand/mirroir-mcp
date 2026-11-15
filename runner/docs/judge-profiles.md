@@ -8,11 +8,11 @@ them); the scoring call itself is `runner/src/oracle/judge.rs`. CI uses
 
 ## Built-in profiles
 
-| Name | Base URL | Model | API key env | Timeout |
-|---|---|---|---|---|
-| `fast-ci` | `https://api.openai.com/v1/chat/completions` | `gpt-4o-mini` | `OPENAI_API_KEY` | 30 s |
-| `byte-stable` | `http://127.0.0.1:11434/v1/chat/completions` | `qwen2.5:0.5b` | *(none — local)* | 60 s |
-| `cheap-local` | `http://127.0.0.1:11434/v1/chat/completions` | `qwen2.5:0.5b` | *(none — local)* | 30 s |
+| Name | Base URL | `api_target` | Model | API key env | Timeout |
+|---|---|---|---|---|---|
+| `fast-ci` | `https://api.openai.com/v1/chat/completions` | `openai` | `gpt-4o-mini` | `OPENAI_API_KEY` | 30 s |
+| `byte-stable` | `http://127.0.0.1:11434/api/chat` | `ollama` | `qwen2.5:0.5b` | *(none — local)* | 60 s |
+| `cheap-local` | `http://127.0.0.1:11434/api/chat` | `ollama` | `qwen2.5:0.5b` | *(none — local)* | 30 s |
 
 CI (`runner-e2e` lane) installs Ollama, starts the daemon, pulls
 `qwen2.5:0.5b`, and points scenarios at the `byte-stable` profile. The
@@ -21,21 +21,30 @@ it is not exercised by CI to keep runs free of remote-LLM dependencies.
 
 ## Wire format
 
-All profiles speak the **OpenAI chat-completions** API. Anthropic's API can be
-adapted via a base-URL override; Ollama natively exposes a compatible endpoint
-at `/v1/chat/completions`.
+A profile's `api_target` picks the client (`runner/src/oracle/llm_client.rs`,
+one `LlmClient` trait):
 
-Request shape the runner sends:
+| `api_target` | Endpoint | Auth | Request |
+|---|---|---|---|
+| `openai` (default) | chat completions, `/v1/chat/completions` | `Authorization: Bearer` from `api_key_env` | system + user messages, `temperature: 0.0` |
+| `anthropic` | Messages, `/v1/messages` | `x-api-key` from `api_key_env`, `anthropic-version: 2026-10-21` | top-level `system`, one user message, `max_tokens: 256`, no sampling parameters (that API version rejects them) |
+| `ollama` | native chat, `/api/chat` | none | system + user messages, `stream: false`, `options.temperature: 0.0` |
 
-```json
-{
-  "model": "qwen2.5:0.5b",
-  "messages": [{"role": "user", "content": "<prompt>"}],
-  "temperature": 0.0
-}
+An Anthropic reply that stops with `refusal` is a decode error, never a score.
+A home profile reaching Anthropic directly:
+
+```yaml
+version: 1
+profiles:
+  - name: claude-judge
+    base_url: https://api.anthropic.com/v1/messages
+    api_target: anthropic
+    model: claude-haiku-5-5
+    api_key_env: ANTHROPIC_API_KEY
 ```
 
-`temperature: 0.0` keeps scoring deterministic across runs.
+A repo-local overlay may not change `api_target`, for the same reason it may
+not change `base_url`.
 
 ## Prompt template
 
@@ -66,6 +75,30 @@ verifies it on **every** invocation: `verify_template_hash` runs first thing in
 the step with `RunnerError::JudgeTemplateMismatch` — the scenario must be
 re-pinned. This keeps a score calibrated against one prompt from silently
 running against a changed prompt.
+
+## System prompt pin
+
+Every profile carries a system prompt pinned by sha256. The built-ins use the
+canonical prompt compiled in from `runner/src/oracle/prompts/judge-system.md`.
+A `profiles.yaml` entry may name its own, relative to that file, with its pin:
+
+```yaml
+version: 1
+profiles:
+  - name: byte-stable
+    base_url: http://127.0.0.1:11434/api/chat
+    api_target: ollama
+    model: qwen2.5:0.5b
+    system_prompt: strict.md
+    system_prompt_sha256: "sha256:<hex of strict.md>"
+```
+
+`JudgeRegistry::load` hashes every profile's prompt and logs
+`judge system prompt matches pin`; a prompt that does not match its pin fails
+the load with `SystemPromptMismatch`, and a `system_prompt` without its
+`system_prompt_sha256` (or the reverse) fails it with `ProfilesParse`. A
+repo-local overlay may set a pinned prompt: it changes scores, not where
+prompts and keys are sent.
 
 ## Score parsing
 
