@@ -45,7 +45,9 @@ Measured on macOS 26.5 with an iPhone XR:
 | Mac screen locked | Nothing can be read or sent. `status` and every input say the Mac's screen is locked and ask for it to be unlocked. After unlocking, the window may show "Mac Locked" with a Connect button to press once. |
 | Window minimized (Cmd+M) | The window is no longer the app's main window, so nothing can be read from it or sent to it. `status` says `Window minimized`, and every read and input says the window is minimized and that the user must bring it back from the Dock. |
 
-No tool brings a minimized or hidden window back: on this macOS version that takes activating the app, which mirroir does not do for you. Stage Manager has not been measured.
+No tool brings a minimized or hidden window back: on this macOS version that takes activating the app, which mirroir does not do for you.
+
+With Stage Manager on, a window in the strip (or shown in Mission Control) is reported by the window server at its thumbnail size. Measured on macOS 26.5: 47x141 for a 430x942 window. mirroir reports the window's own frame instead, which is where the window shows once it is on stage.
 
 ### Alternatives That Don't Work
 

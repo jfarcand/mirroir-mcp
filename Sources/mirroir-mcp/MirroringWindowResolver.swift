@@ -45,6 +45,12 @@ enum MirroringWindowResolver {
     /// title first, which stays correct when the AX size is the lagging value;
     /// a size match against AX identifies it when the window server exposes no
     /// titles. AX geometry is reported only when neither identifies a window.
+    ///
+    /// One exception: when the window server shows the window as a thumbnail
+    /// (the Stage Manager strip, Mission Control), its bounds are that scaled
+    /// copy while AX keeps the frame the window takes once it is shown. The
+    /// AX frame is then reported, with the window server's ID for capture;
+    /// see `isThumbnail`.
     /// Returns nil when nothing identifies a window and AX has no frame.
     static func windowInfo(
         pid: pid_t, axWindow: MirroringAXWindow, windowList: [WindowListEntry]
@@ -52,6 +58,10 @@ enum MirroringWindowResolver {
         let owned = windowList.filter { $0.ownerPID == pid }
         if let entry = titleMatch(owned, title: axWindow.title)
             ?? axWindow.frame.flatMap({ sizeMatch(owned, size: $0.size) }) {
+            if let frame = axWindow.frame, isThumbnail(entry.bounds.size, of: frame.size) {
+                return WindowInfo(
+                    windowID: entry.windowID, position: frame.origin, size: frame.size, pid: pid)
+            }
             return WindowInfo(
                 windowID: entry.windowID, position: entry.bounds.origin,
                 size: entry.bounds.size, pid: pid)
@@ -104,6 +114,20 @@ enum MirroringWindowResolver {
     /// resume instead of risking the crash.
     static func isResumeControl(label: String?, phrases: InterstitialPhrases = .live) -> Bool {
         phrases.isResumeControl(label: label)
+    }
+
+    /// Largest share of the AX frame's area a window-server size may cover
+    /// and still be read as a thumbnail of it. Measured on macOS 26.5: the
+    /// Stage Manager strip shows a 430x942 window at 47x141 (1.6% of its
+    /// area), Mission Control at 228x499 (28%). A rotation keeps the area and
+    /// a resize of the mirroring window changes it far less than half.
+    static let thumbnailAreaRatio: CGFloat = 0.5
+
+    /// Whether `shown` is a scaled-down presentation of a window whose real
+    /// size is `frame`, rather than the window itself.
+    static func isThumbnail(_ shown: CGSize, of frame: CGSize) -> Bool {
+        let frameArea = frame.width * frame.height
+        return frameArea > 0 && shown.width * shown.height < frameArea * thumbnailAreaRatio
     }
 
     // MARK: - Private
