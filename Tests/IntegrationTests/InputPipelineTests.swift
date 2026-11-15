@@ -27,6 +27,9 @@ import HelperLib
 /// renders the effect → OCR detects the resulting change.
 final class InputPipelineTests: XCTestCase {
 
+    /// OCR glyph errors a read of typed text may carry and still count as it.
+    private static let ocrGlyphTolerance = 1
+
     private var bridge: MirroringBridge!
     private var input: InputSimulation!
     private var describer: ScreenDescriber!
@@ -118,10 +121,18 @@ final class InputPipelineTests: XCTestCase {
         XCTAssertTrue(typeResult.success, "typeText should succeed: \(typeResult.error ?? "")")
         usleep(500_000)
 
-        // Verify typed text appears in OCR
+        // Verify the typed text appeared: a line that was not on screen before
+        // typing and reads as the typed text, allowing one OCR glyph error.
+        // The hosted macOS 26 VM renders the field so that Vision reads
+        // "hello" as "nello" (carnet#65): the keys arrived, the read slipped.
+        let beforeTexts = Set(screen.elements.map { $0.text.lowercased() })
         let afterScreen = try describeOrFail()
         let afterTexts = afterScreen.elements.map { $0.text.lowercased() }
-        XCTAssertTrue(afterTexts.contains(where: { $0.contains(typedString) }),
+        let typedLine = afterTexts.first { text in
+            !beforeTexts.contains(text)
+                && ScrollDeduplicator.levenshteinDistance(text, typedString) <= Self.ocrGlyphTolerance
+        }
+        XCTAssertNotNil(typedLine,
             "Typed text '\(typedString)' should appear via OCR. Found: \(afterTexts)")
     }
 
