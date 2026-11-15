@@ -27,6 +27,10 @@ struct MirroirMCP {
         // disconnects or its stdio pipe closes unexpectedly.
         signal(SIGPIPE, SIG_IGN)
 
+        // A second process of this binary runs from its own link, so the
+        // two do not take screen capture from each other (carnet#58).
+        ExecutablePathIsolation.isolateIfShared()
+
         // Parse CLI flags. `--debug` is global: the server and every
         // subcommand honor it, so it is removed before a subcommand parses.
         // MIRROIR_DEBUG turns it on for a host that cannot add arguments.

@@ -63,9 +63,10 @@ extension MirroirMCP {
                 (scroll up), swipe left to reveal content on the right. \
                 Paging surfaces like video feeds snap to the next page only on a \
                 real flick, 2000 points per second or faster: for example 75% of \
-                the screen height in 150 ms. The default 300 ms over a third of the \
-                screen scrolls a list a bounded distance and does not page a feed. \
-                Use a long duration_ms for a slow scroll without inertia.
+                the screen height in 150 ms. Anything slower is a drag that moves \
+                the content exactly as far as the finger, with no inertia: it runs \
+                at most 140 points per second, so the default 300 ms over a third \
+                of the screen takes about 2 s.
                 """,
             inputSchema: [
                 "type": .string("object"),
@@ -89,7 +90,7 @@ extension MirroirMCP {
                     "duration_ms": .object([
                         "type": .string("number"),
                         "description": .string(
-                            "Duration of swipe in milliseconds (default: 300)"),
+                            "Duration of swipe in milliseconds (default: 300); a drag below flick speed is slowed to at most 140 points per second"),
                     ]),
                     "cursor_mode": cursorModeSchema,
                 ]),

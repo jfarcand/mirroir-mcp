@@ -121,31 +121,50 @@ final class TrackpadScrollFieldsTests: XCTestCase {
         XCTAssertTrue(plan.momentumVelocities.isEmpty)
     }
 
-    func testAFastSwipeIsATrackpadFlick() {
+    func testAFastSwipeIsAFlickWithMomentum() {
         // 700px in 150ms = 4667 px/s, the speed of a real flick
-        XCTAssertTrue(SwipeGestureProfile.plan(deltaX: 0, deltaY: -700, durationMs: 150).isTrackpadFlick)
-    }
-
-    func testAListScrollIsNotATrackpadFlick() {
-        // 282px in 300ms = 940 px/s, what calibration and the explorers send
-        let plan = SwipeGestureProfile.plan(deltaX: 0, deltaY: -282, durationMs: 300)
-        XCTAssertFalse(plan.isTrackpadFlick)
+        let plan = SwipeGestureProfile.plan(deltaX: 0, deltaY: -700, durationMs: 150)
         XCTAssertFalse(plan.momentum.isEmpty)
+        XCTAssertEqual(plan.durationMs, 150)
     }
 
-    func testASlowScrollIsNotATrackpadFlick() {
-        XCTAssertFalse(SwipeGestureProfile.plan(deltaX: 0, deltaY: -282, durationMs: 2000).isTrackpadFlick)
+    /// carnet#61: the 300 ms list scroll the explorers send is a drag at
+    /// `maxDragSpeed`, so it never leaves a list held past its end.
+    func testAListScrollIsStretchedToADragAtMaxSpeed() {
+        let plan = SwipeGestureProfile.plan(deltaX: 0, deltaY: -282, durationMs: 300)
+        XCTAssertTrue(plan.momentum.isEmpty)
+        XCTAssertEqual(plan.durationMs, Int((282 / SwipeGestureProfile.maxDragSpeed * 1000).rounded(.up)))
+        XCTAssertEqual(plan.drag.reduce(0) { $0 + $1.wheel1 },
+                       Int32(-282 * SwipeGestureProfile.dragAmplification))
     }
 
-    func testTheThresholdSpeedIsATrackpadFlick() {
-        let velocity = SwipeGestureProfile.trackpadFlickVelocity
-        XCTAssertTrue(SwipeGestureProfile.plan(deltaX: 0, deltaY: velocity, durationMs: 1000).isTrackpadFlick)
-        XCTAssertFalse(SwipeGestureProfile.plan(deltaX: 0, deltaY: velocity - 1, durationMs: 1000).isTrackpadFlick)
+    /// carnet#44: a drag slower than `maxDragSpeed` keeps its own pace.
+    func testASlowerDragKeepsItsDuration() {
+        let plan = SwipeGestureProfile.plan(deltaX: 0, deltaY: -100, durationMs: 2000)
+        XCTAssertTrue(plan.momentum.isEmpty)
+        XCTAssertEqual(plan.durationMs, 2000)
     }
 
-    func testMultitouchLookupDoesNotReportAZeroID() {
-        if let id = TrackpadScrollFields.multitouchDeviceID() {
+    func testAVeryLongDragIsCapped() {
+        let plan = SwipeGestureProfile.plan(deltaX: 0, deltaY: -100_000, durationMs: 60_000)
+        XCTAssertEqual(plan.durationMs, SwipeGestureProfile.maxDragDurationMs)
+    }
+
+    func testTheFlickSpeedIsTheBoundary() {
+        let velocity = SwipeGestureProfile.flickVelocity
+        XCTAssertFalse(SwipeGestureProfile.plan(deltaX: 0, deltaY: velocity, durationMs: 1000).momentum.isEmpty)
+        XCTAssertTrue(SwipeGestureProfile.plan(deltaX: 0, deltaY: velocity - 1, durationMs: 1000).momentum.isEmpty)
+    }
+
+    func testTheSenderLookupDoesNotReportAZeroID() {
+        if let id = TrackpadScrollFields.senderDeviceID() {
             XCTAssertNotEqual(id, 0)
         }
+    }
+
+    /// carnet#42: a Mac with no trackpad still names a real device, its keyboard.
+    func testTheSenderPrefersTheTrackpadThenTheKeyboard() {
+        XCTAssertEqual(TrackpadScrollFields.senderServiceClasses.first, "AppleMultitouchDevice")
+        XCTAssertTrue(TrackpadScrollFields.senderServiceClasses.contains("AppleHIDKeyboardEventDriverV2"))
     }
 }

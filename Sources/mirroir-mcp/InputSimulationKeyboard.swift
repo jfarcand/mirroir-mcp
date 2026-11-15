@@ -100,12 +100,29 @@ extension InputSimulation {
 
         DebugLog.log("typeText", "typing \(text.count) char(s)")
 
-        let segments = buildTypeSegments(text)
+        return enter(buildTypeSegments(text), targetPID: prep.targetPID)
+    }
+
+    /// Paste `text` verbatim through the clipboard into the focused field and
+    /// confirm it on screen. No keyboard layout or input method can change
+    /// pasted text, which is why a query that typing garbled is pasted.
+    func pasteText(_ text: String) -> TypeResult {
+        let prep = prepareWindowKeyboardInput(tag: "pasteText")
+        if let keyboardError = prep.error {
+            return TypeResult(success: false, error: keyboardError)
+        }
+        DebugLog.log("pasteText", "pasting \(text.count) char(s)")
+        return enter([TypeSegment(text: text, method: .paste)], targetPID: prep.targetPID)
+    }
+
+    /// Enter `segments` through `VerifiedTextEntry`, then restore the pasteboard
+    /// a paste replaced.
+    private func enter(_ segments: [TypeSegment], targetPID: pid_t?) -> TypeResult {
         let saved = pasteboard.string()
         let pastes = segments.contains { $0.method == .paste }
 
         let entry = VerifiedTextEntry(
-            typeKeys: { [self] run in typeViaCGEvent(run, targetPID: prep.targetPID) },
+            typeKeys: { [self] run in typeViaCGEvent(run, targetPID: targetPID) },
             paste: { [self] run in pasteRun(run) },
             readScreen: { [self] in screenLines() },
             sleep: { usleep($0) },

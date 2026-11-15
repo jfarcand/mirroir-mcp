@@ -102,6 +102,15 @@ enum SpotlightDetector {
         }
     }
 
+    /// The text Spotlight's search field shows after its magnifier glyph, or
+    /// nil when no element in a search-field band reads as the field.
+    static func searchFieldQuery(elements: [TapPoint], windowHeight: Double) -> String? {
+        elements.lazy
+            .filter { isInSearchFieldBand($0.tapY, windowHeight: windowHeight) }
+            .compactMap { searchFieldText($0.text) }
+            .first
+    }
+
     /// Shortest normalized text treated as an echo of the query, so single
     /// OCR glyphs never count.
     static let minEchoLength = 3

@@ -33,8 +33,8 @@ final class SwipeGestureProfileTests: XCTestCase {
     // MARK: - Displacement conservation
 
     func testFlickConservesTotalDisplacement() {
-        // TikTok-style vertical flick: 300px up in 300ms (issue #33)
-        let plan = SwipeGestureProfile.plan(deltaX: 0, deltaY: -300, durationMs: 300)
+        // TikTok-style vertical flick: 300px up in 100ms (issue #33)
+        let plan = SwipeGestureProfile.plan(deltaX: 0, deltaY: -300, durationMs: 100)
         let expected = Int32(-300 * SwipeGestureProfile.scrollAmplification)
         XCTAssertEqual(totalWheel1(plan), expected)
         XCTAssertEqual(totalWheel2(plan), 0)
@@ -42,14 +42,14 @@ final class SwipeGestureProfileTests: XCTestCase {
 
     func testSlowScrollConservesTotalDisplacement() {
         let plan = SwipeGestureProfile.plan(deltaX: 0, deltaY: 550, durationMs: 6000)
-        let expected = Int32(550 * SwipeGestureProfile.scrollAmplification)
+        let expected = Int32(550 * SwipeGestureProfile.dragAmplification)
         XCTAssertEqual(totalWheel1(plan), expected)
         XCTAssertEqual(totalWheel2(plan), 0)
     }
 
     func testHorizontalFlickConservesTotalDisplacement() {
-        // Share-sheet row swipe: 150px left in 300ms (issue #25 geometry)
-        let plan = SwipeGestureProfile.plan(deltaX: -150, deltaY: 0, durationMs: 300)
+        // Share-sheet row flick: 150px left in 50ms (issue #25 geometry)
+        let plan = SwipeGestureProfile.plan(deltaX: -150, deltaY: 0, durationMs: 50)
         let expected = Int32(-150 * SwipeGestureProfile.scrollAmplification)
         XCTAssertEqual(totalWheel2(plan), expected)
         XCTAssertEqual(totalWheel1(plan), 0)
@@ -58,8 +58,8 @@ final class SwipeGestureProfileTests: XCTestCase {
     // MARK: - Flick gating
 
     func testFastSwipeGetsMomentumTail() {
-        // 300px in 300ms = 1000 px/s, above the flick threshold
-        let plan = SwipeGestureProfile.plan(deltaX: 0, deltaY: -300, durationMs: 300)
+        // 300px in 100ms = 3000 px/s, above the flick speed
+        let plan = SwipeGestureProfile.plan(deltaX: 0, deltaY: -300, durationMs: 100)
         XCTAssertFalse(plan.momentum.isEmpty)
     }
 
@@ -70,22 +70,22 @@ final class SwipeGestureProfileTests: XCTestCase {
     }
 
     func testThresholdVelocityIsAFlick() {
-        // Exactly at the threshold: 500px in 1000ms = 500 px/s
-        let plan = SwipeGestureProfile.plan(deltaX: 0, deltaY: 500, durationMs: 1000)
+        // Exactly at the flick speed: 2000px in 1000ms
+        let plan = SwipeGestureProfile.plan(deltaX: 0, deltaY: SwipeGestureProfile.flickVelocity, durationMs: 1000)
         XCTAssertFalse(plan.momentum.isEmpty)
     }
 
     func testDiagonalVelocityUsesEuclideanDistance() {
-        // 300px on each axis in 500ms: hypot = 424px -> 848 px/s, a flick
-        let plan = SwipeGestureProfile.plan(deltaX: 300, deltaY: 300, durationMs: 500)
+        // 300px on each axis in 150ms: hypot = 424px -> 2828 px/s, a flick
+        let plan = SwipeGestureProfile.plan(deltaX: 300, deltaY: 300, durationMs: 150)
         XCTAssertFalse(plan.momentum.isEmpty)
     }
 
     // MARK: - Direction symmetry (issue #25 regression guard)
 
     func testHorizontalPlansAreSymmetric() {
-        let leftward = SwipeGestureProfile.plan(deltaX: -150, deltaY: 0, durationMs: 300)
-        let rightward = SwipeGestureProfile.plan(deltaX: 150, deltaY: 0, durationMs: 300)
+        let leftward = SwipeGestureProfile.plan(deltaX: -150, deltaY: 0, durationMs: 50)
+        let rightward = SwipeGestureProfile.plan(deltaX: 150, deltaY: 0, durationMs: 50)
         XCTAssertEqual(leftward.drag.count, rightward.drag.count)
         XCTAssertEqual(leftward.momentum.count, rightward.momentum.count)
         for (l, r) in zip(leftward.drag, rightward.drag) {
@@ -99,8 +99,8 @@ final class SwipeGestureProfileTests: XCTestCase {
     }
 
     func testVerticalPlansAreSymmetric() {
-        let upward = SwipeGestureProfile.plan(deltaX: 0, deltaY: -400, durationMs: 300)
-        let downward = SwipeGestureProfile.plan(deltaX: 0, deltaY: 400, durationMs: 300)
+        let upward = SwipeGestureProfile.plan(deltaX: 0, deltaY: -400, durationMs: 100)
+        let downward = SwipeGestureProfile.plan(deltaX: 0, deltaY: 400, durationMs: 100)
         XCTAssertEqual(upward.drag.count, downward.drag.count)
         for (u, d) in zip(upward.drag, downward.drag) {
             XCTAssertEqual(u.wheel1, -d.wheel1)
@@ -117,7 +117,7 @@ final class SwipeGestureProfileTests: XCTestCase {
         // so assert the decay trend: the first half of the tail carries more
         // displacement than the second half, and the tail ends smaller than
         // it starts.
-        let plan = SwipeGestureProfile.plan(deltaX: 0, deltaY: -400, durationMs: 300)
+        let plan = SwipeGestureProfile.plan(deltaX: 0, deltaY: -400, durationMs: 100)
         let magnitudes = plan.momentum.map { abs(Int($0.wheel1)) }
         XCTAssertFalse(magnitudes.isEmpty)
         let firstHalf = magnitudes.prefix(magnitudes.count / 2).reduce(0, +)
@@ -129,7 +129,7 @@ final class SwipeGestureProfileTests: XCTestCase {
     func testFlickIsMomentumDominant() {
         // A real trackpad flick delivers most of its displacement in the
         // momentum tail (~70% in captured traces).
-        let plan = SwipeGestureProfile.plan(deltaX: 0, deltaY: -400, durationMs: 300)
+        let plan = SwipeGestureProfile.plan(deltaX: 0, deltaY: -400, durationMs: 100)
         let dragSum = abs(plan.drag.reduce(0) { $0 + Int($1.wheel1) })
         let momentumSum = abs(plan.momentum.reduce(0) { $0 + Int($1.wheel1) })
         XCTAssertGreaterThan(momentumSum, dragSum)
@@ -138,7 +138,7 @@ final class SwipeGestureProfileTests: XCTestCase {
     func testMomentumVelocityIsContinuousAtLift() {
         // The first momentum frame continues from the drag's peak velocity —
         // no jump up at the finger lift.
-        let plan = SwipeGestureProfile.plan(deltaX: 0, deltaY: -400, durationMs: 300)
+        let plan = SwipeGestureProfile.plan(deltaX: 0, deltaY: -400, durationMs: 100)
         let lastDrag = abs(Int(plan.drag.last?.wheel1 ?? 0))
         let firstMomentum = abs(Int(plan.momentum.first?.wheel1 ?? 0))
         XCTAssertLessThanOrEqual(firstMomentum, lastDrag + 1)
@@ -148,7 +148,7 @@ final class SwipeGestureProfileTests: XCTestCase {
     func testDragRampsUpToPeakVelocity() {
         // Drag frames of a flick ramp from near rest to peak velocity,
         // matching the captured real-flick trace shape.
-        let plan = SwipeGestureProfile.plan(deltaX: 0, deltaY: -400, durationMs: 300)
+        let plan = SwipeGestureProfile.plan(deltaX: 0, deltaY: -400, durationMs: 100)
         let magnitudes = plan.drag.map { abs(Int($0.wheel1)) }
         let first = magnitudes.first ?? 0
         let last = magnitudes.last ?? 0
@@ -156,14 +156,14 @@ final class SwipeGestureProfileTests: XCTestCase {
     }
 
     func testMomentumSignMatchesGestureDirection() {
-        let plan = SwipeGestureProfile.plan(deltaX: 0, deltaY: -400, durationMs: 300)
+        let plan = SwipeGestureProfile.plan(deltaX: 0, deltaY: -400, durationMs: 100)
         for step in plan.momentum {
             XCTAssertLessThanOrEqual(step.wheel1, 0)
         }
     }
 
     func testMomentumTrimsTrailingZeroFrames() {
-        let plan = SwipeGestureProfile.plan(deltaX: 0, deltaY: -400, durationMs: 300)
+        let plan = SwipeGestureProfile.plan(deltaX: 0, deltaY: -400, durationMs: 100)
         if let last = plan.momentum.last {
             XCTAssertFalse(last.wheel1 == 0 && last.wheel2 == 0)
         }
@@ -173,7 +173,7 @@ final class SwipeGestureProfileTests: XCTestCase {
     // MARK: - Drag shape
 
     func testDragStepCountFollowsDuration() {
-        let plan = SwipeGestureProfile.plan(deltaX: 0, deltaY: -400, durationMs: 320)
+        let plan = SwipeGestureProfile.plan(deltaX: 0, deltaY: -1000, durationMs: 320)
         XCTAssertEqual(plan.drag.count, 320 / SwipeGestureProfile.frameMs)
     }
 

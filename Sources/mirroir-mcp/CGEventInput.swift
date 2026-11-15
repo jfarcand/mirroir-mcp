@@ -176,7 +176,7 @@ enum CGEventInput {
         let plan = SwipeGestureProfile.plan(
             deltaX: deltaX, deltaY: deltaY, durationMs: durationMs
         )
-        let sender = plan.isTrackpadFlick ? TrackpadSender.current() : nil
+        let sender: TrackpadSender? = TrackpadSender.current()
 
         if let prime = makeScrollEvent(SwipeWheelStep(wheel1: 0, wheel2: 0), at: midpoint, sender: sender) {
             prime.setIntegerValueField(scrollPhaseField, value: phaseMayBegin)
@@ -194,7 +194,7 @@ enum CGEventInput {
         // so each wheel delta carries the same sign as its pixel delta.
         // SwipeGestureProfile splits the amplified distance into a drag phase
         // and, for fast flicks, a decaying momentum tail.
-        let stepDelay = UInt32(durationMs) * 1000 / UInt32(plan.drag.count)
+        let stepDelay = UInt32(plan.durationMs) * 1000 / UInt32(plan.drag.count)
         let dragVelocities = plan.dragVelocities
         let momentumVelocities = plan.momentumVelocities
 

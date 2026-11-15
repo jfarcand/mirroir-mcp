@@ -14,7 +14,7 @@
  * the License.
  */
 // ABOUTME: Stamps a scroll event with the fields that make it read as a real trackpad frame: sender, line and velocity deltas.
-// ABOUTME: iOS paging surfaces release and snap a flick only when its events name a real multitouch device and carry velocity.
+// ABOUTME: iOS paging surfaces release and snap a flick only when its events name a real HID device and carry velocity.
 
 import CoreGraphics
 import Foundation
@@ -30,13 +30,13 @@ struct TrackpadVelocity: Equatable {
 
 /// Who a trackpad flick says it came from.
 struct TrackpadSender: Equatable {
-    /// The IORegistry ID of the multitouch device, or nil when this Mac has none.
+    /// The IORegistry ID of a real HID device, or nil when this Mac has none.
     let registryID: UInt64?
 
     static func current() -> TrackpadSender {
-        let registryID = TrackpadScrollFields.multitouchDeviceID()
+        let registryID = TrackpadScrollFields.senderDeviceID()
         if registryID == nil {
-            DebugLog.log("swipe", "no multitouch device found; flick events carry no sender")
+            DebugLog.log("swipe", "no HID device found; scroll events carry no sender")
         }
         return TrackpadSender(registryID: registryID)
     }
@@ -48,7 +48,7 @@ struct TrackpadSender: Equatable {
 /// Delta fields alone are not enough: a flick without the sender field parks
 /// between pages, and one with the sender but no velocity fields returns to
 /// the page it left. A made-up sender also returns to the page it left, so the
-/// value has to be the registry ID of a real multitouch device.
+/// value has to be the registry ID of a real HID device.
 enum TrackpadScrollFields {
 
     /// Points of scroll per line of the line and fixed-point delta fields.
@@ -106,14 +106,25 @@ enum TrackpadScrollFields {
         event.setDoubleValueField(pointVelocityAxis2, value: -velocity.axis2)
     }
 
-    /// The IORegistry ID of this Mac's multitouch device, or nil when it has none.
-    static func multitouchDeviceID() -> UInt64? {
-        let service = IOServiceGetMatchingService(kIOMainPortDefault,
-                                                  IOServiceMatching("AppleMultitouchDevice"))
-        guard service != IO_OBJECT_NULL else { return nil }
-        defer { IOObjectRelease(service) }
-        var entryID: UInt64 = 0
-        guard IORegistryEntryGetRegistryEntryID(service, &entryID) == KERN_SUCCESS else { return nil }
-        return entryID
+    /// IOKit classes whose registry ID a scroll event may name as its sender,
+    /// in order of preference. A flick naming none parks between pages; one
+    /// naming the built-in keyboard's driver paged 4 of 4 on an XR
+    /// (2026-11-14), so a Mac with no trackpad still has a sender (carnet#42).
+    static let senderServiceClasses = ["AppleMultitouchDevice", "AppleHIDKeyboardEventDriverV2",
+                                       "IOHIDEventService"]
+
+    /// The IORegistry ID of the first service of `senderServiceClasses` this
+    /// Mac has, or nil when it has none of them.
+    static func senderDeviceID() -> UInt64? {
+        for serviceClass in senderServiceClasses {
+            let service = IOServiceGetMatchingService(kIOMainPortDefault, IOServiceMatching(serviceClass))
+            guard service != IO_OBJECT_NULL else { continue }
+            defer { IOObjectRelease(service) }
+            var entryID: UInt64 = 0
+            if IORegistryEntryGetRegistryEntryID(service, &entryID) == KERN_SUCCESS {
+                return entryID
+            }
+        }
+        return nil
     }
 }

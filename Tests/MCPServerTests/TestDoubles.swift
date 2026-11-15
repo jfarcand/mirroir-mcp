@@ -402,3 +402,24 @@ func makeTestRegistry(
     )
     return TargetRegistry(targets: ["iphone": ctx], defaultName: "iphone")
 }
+
+// MARK: - RecordingPasteboard
+
+/// The Mac pasteboard as a value: records every write instead of touching the
+/// real general pasteboard the developer running the tests is using.
+final class RecordingPasteboard: PasteboardAccessing, @unchecked Sendable {
+    private(set) var contents: String?
+    private(set) var writes: [String] = []
+
+    init(contents: String?) {
+        self.contents = contents
+    }
+
+    func string() -> String? { contents }
+
+    func replaceContents(with text: String) -> Bool {
+        writes.append(text)
+        contents = text
+        return true
+    }
+}

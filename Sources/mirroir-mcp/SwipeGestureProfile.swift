@@ -37,14 +37,17 @@ struct SwipeWheelStep: Equatable {
 /// those momentum semantics as a native flick, so paging surfaces (feeds,
 /// carousels) snap to the next page exactly as they do for a finger flick.
 ///
-/// Swipes slower than the flick threshold are deliberate drag-scrolls:
-/// the finger stops before lifting, so all displacement is delivered by
-/// evenly spaced drag frames and no momentum follows.
+/// Swipes slower than `flickVelocity` are deliberate drags: the finger
+/// stops before lifting, so all displacement is delivered by evenly spaced
+/// drag frames, no faster than `maxDragSpeed`, and no momentum follows.
+/// With their own amplification the content follows the finger one to one.
+///
+/// Every swipe carries a real trackpad's fields (see `TrackpadScrollFields`).
+/// Without them a drag moved anywhere from 3 to 649 pt for 282 (carnet#44)
+/// and a list's end was left held on every other swipe (carnet#61).
 ///
 /// Total displacement is conserved exactly: the drag and momentum deltas
-/// of a plan always sum to the amplified pixel distance, so scroll
-/// calibration that estimates content offset from swipe distance behaves
-/// identically whether or not a momentum tail is emitted.
+/// of a plan always sum to the amplified pixel distance.
 enum SwipeGestureProfile {
 
     /// Wheel-pixel multiplier applied to the requested pixel distance.
@@ -53,11 +56,20 @@ enum SwipeGestureProfile {
     /// physical trackpad scroll distance.
     static let scrollAmplification: Double = 3.0
 
-    /// Gesture speed (pixels/second, pre-amplification) at or above which
-    /// a swipe is treated as a flick and receives a momentum tail.
-    /// Below this, the gesture is a deliberate drag-scroll: the finger
-    /// stops before lifting, so no inertia follows.
-    static let flickVelocityThreshold: Double = 500.0
+    /// Wheel-pixel multiplier for a drag, so the content follows the finger
+    /// one to one at `maxDragSpeed`: at 1.5 a 282 pt drag moved 260 to 262 pt
+    /// on an XR (Safari, 2026-11-14), up and down, every time.
+    static let dragAmplification: Double = 1.6
+
+    /// Fastest a drag goes, in points per second. Up to here a drag carrying
+    /// the trackpad fields moves the same distance every time and never
+    /// leaves a list held past its end (carnet#44, carnet#61); at 200 pt/s it
+    /// moved 289 to 433 pt for 200. A slower requested drag keeps its pace,
+    /// a faster one is stretched to this speed.
+    static let maxDragSpeed: Double = 140.0
+
+    /// Longest a drag is stretched to, so a very long swipe still ends.
+    static let maxDragDurationMs: Int = 10_000
 
     /// Per-frame decay factor for momentum deltas, measured from a real
     /// trackpad flick trace through iPhone Mirroring.
@@ -74,12 +86,10 @@ enum SwipeGestureProfile {
     /// Minimum number of drag frames regardless of duration.
     static let minimumDragSteps: Int = 5
 
-    /// Gesture speed (pixels/second, pre-amplification) at or above which a
-    /// flick carries real trackpad fields. A real trackpad flick measures about
-    /// 3300. iOS honors the momentum of such a flick in full, so slower swipes
-    /// leave these fields out: list scrolling keeps its bounded travel, which
-    /// calibration, `scroll_to` and the explorers rely on.
-    static let trackpadFlickVelocity: Double = 2000.0
+    /// Gesture speed (points per second) at or above which a swipe is a
+    /// flick: a drag that ramps up, then a momentum tail. A real trackpad
+    /// flick measures about 3300. Anything slower is a drag (`maxDragSpeed`).
+    static let flickVelocity: Double = 2000.0
 
     /// Reported velocity per point of a drag frame, measured from real
     /// trackpad flicks: the hardware's velocity leads its per-frame delta.
@@ -92,9 +102,9 @@ enum SwipeGestureProfile {
         /// Deltas posted after the finger lifts (momentum phase).
         /// Empty when the gesture is too slow to be a flick.
         let momentum: [SwipeWheelStep]
-        /// Whether the events identify themselves as a real trackpad flick,
-        /// which iOS paging surfaces need before they snap to the next page.
-        var isTrackpadFlick = false
+        /// How long the drag frames take, in milliseconds: the requested
+        /// duration, or longer for a drag stretched to `maxDragSpeed`.
+        let durationMs: Int
 
         /// The velocity a trackpad reports for each drag frame.
         var dragVelocities: [TrackpadVelocity] {
@@ -119,17 +129,14 @@ enum SwipeGestureProfile {
     /// Compute the delta schedule for a swipe covering `deltaX`/`deltaY`
     /// pixels over `durationMs` milliseconds.
     static func plan(deltaX: Double, deltaY: Double, durationMs: Int) -> Plan {
+        let seconds = Double(max(durationMs, 1)) / 1000.0
+        let distance = (deltaX * deltaX + deltaY * deltaY).squareRoot()
+        guard distance / seconds >= flickVelocity else {
+            return dragPlan(deltaX: deltaX, deltaY: deltaY, distance: distance, durationMs: durationMs)
+        }
         let dragStepCount = max(minimumDragSteps, durationMs / frameMs)
         let totalWheel1 = wheelDelta(deltaY * scrollAmplification)
         let totalWheel2 = wheelDelta(deltaX * scrollAmplification)
-
-        let seconds = Double(max(durationMs, 1)) / 1000.0
-        let velocity = (deltaX * deltaX + deltaY * deltaY).squareRoot() / seconds
-        guard velocity >= flickVelocityThreshold else {
-            let uniform = [Double](repeating: 1.0, count: dragStepCount)
-            let drag = steps(wheel1: totalWheel1, wheel2: totalWheel2, weights: uniform)
-            return Plan(drag: drag, momentum: [])
-        }
 
         // Flick: drag frames ramp linearly from rest to a peak velocity,
         // and the momentum tail continues from that peak with geometric
@@ -154,8 +161,19 @@ enum SwipeGestureProfile {
         while let last = momentum.last, last.wheel1 == 0, last.wheel2 == 0 {
             momentum.removeLast()
         }
-        return Plan(drag: drag, momentum: momentum,
-                    isTrackpadFlick: velocity >= trackpadFlickVelocity)
+        return Plan(drag: drag, momentum: momentum, durationMs: max(durationMs, 1))
+    }
+
+    /// A deliberate drag: evenly spaced frames at no more than `maxDragSpeed`,
+    /// and no momentum, because the finger stops before it lifts.
+    private static func dragPlan(deltaX: Double, deltaY: Double, distance: Double,
+                                 durationMs: Int) -> Plan {
+        let atMaxSpeed = distance.isFinite ? Int((distance / maxDragSpeed * 1000).rounded(.up)) : 0
+        let stretchedMs = min(max(durationMs, atMaxSpeed, 1), maxDragDurationMs)
+        let uniform = [Double](repeating: 1.0, count: max(minimumDragSteps, stretchedMs / frameMs))
+        let drag = steps(wheel1: wheelDelta(deltaY * dragAmplification),
+                         wheel2: wheelDelta(deltaX * dragAmplification), weights: uniform)
+        return Plan(drag: drag, momentum: [], durationMs: stretchedMs)
     }
 
     /// Convert an amplified pixel distance into a wheel delta, saturating at

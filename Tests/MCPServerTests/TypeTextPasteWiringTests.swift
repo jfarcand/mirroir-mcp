@@ -93,25 +93,6 @@ final class TypeTextPasteWiringTests: XCTestCase {
 
 // MARK: - Test doubles
 
-/// The Mac pasteboard as a value: records every write instead of touching the
-/// real general pasteboard the developer running the tests is using.
-private final class RecordingPasteboard: PasteboardAccessing, @unchecked Sendable {
-    private(set) var contents: String?
-    private(set) var writes: [String] = []
-
-    init(contents: String?) {
-        self.contents = contents
-    }
-
-    func string() -> String? { contents }
-
-    func replaceContents(with text: String) -> Bool {
-        writes.append(text)
-        contents = text
-        return true
-    }
-}
-
 /// Stands in for the iPhone's focused text field: key events type their
 /// character into it, and Cmd+V pastes the pasteboard into it (Universal
 /// Clipboard modelled as instant). No event reaches the real HID event tap.

@@ -14,7 +14,7 @@
  * the License.
  */
 // ABOUTME: Starts iPhone Mirroring in the background when an input call finds it not running, and launches apps through Spotlight.
-// ABOUTME: A launch taps the app's top-hit tile (Return when there is none); a name Spotlight never shows goes to the Home Screen.
+// ABOUTME: A launch taps the app's top-hit tile (Return when there is none); a typed name that never shows is pasted, then goes to the Home Screen.
 
 import Foundation
 import HelperLib
@@ -123,7 +123,8 @@ extension InputSimulation {
             return typeResult.error ?? "Failed to type app name"
         }
         usleep(EnvConfig.searchResultsPopulateUs)
-        guard spotlightShows(name, comparedTo: before) else {
+        guard spotlightShows(name, comparedTo: before)
+                || pastedIntoSpotlight(name, comparedTo: before, field: opened.elements) else {
             // Spotlight can open on its idle page, then restore the held query that
             // swallowed the typing: its tile for this app still opens it.
             if let screen = pasteVerifier?.describe(settleTimeoutUs: 0),
@@ -236,6 +237,29 @@ extension InputSimulation {
             + "Spotlight in an iPhone Mirroring session can take typing only once; apps still take "
             + "typing and taps still work. Opening it from its Home Screen icon failed too: \(homeFailure). "
             + "Find the app with describe_screen (in a folder, or by swiping to the App Library) and tap it."
+    }
+
+    /// Typed keys can come out as other text: a non-Latin keyboard (Korean,
+    /// carnet#33) composes them into its own script. The query is selected and
+    /// `name` pasted verbatim, which no layout changes. True once Spotlight
+    /// shows it. A search field the typing left as it was (its placeholder, or
+    /// a query held from before, carnet#60) took no keys: nothing is pasted
+    /// then, because a paste there only races Universal Clipboard, which can
+    /// hand over another Mac's clipboard (seen on the XR, 2026-11-14).
+    private func pastedIntoSpotlight(_ name: String, comparedTo before: [String],
+                                     field opened: [TapPoint]) -> Bool {
+        let height = Double(bridge.getWindowInfo()?.size.height ?? 0)
+        let fieldBefore = SpotlightDetector.searchFieldQuery(elements: opened, windowHeight: height)
+        guard let screen = pasteVerifier?.describe(settleTimeoutUs: 0),
+              let fieldNow = SpotlightDetector.searchFieldQuery(elements: screen.elements, windowHeight: height),
+              !fieldNow.isEmpty, fieldNow != fieldBefore else {
+            DebugLog.log("launchApp", "typing '\(name)' left Spotlight's field as it was; not pasting")
+            return false
+        }
+        DebugLog.log("launchApp", "typed '\(name)' came out as other text; selecting it and pasting the name")
+        guard pressKey(keyName: "a", modifiers: ["command"]).success,
+              pasteText(name).success else { return false }
+        return spotlightShows(name, comparedTo: before)
     }
 
     /// Whether `name` shows up on screen more often than in `before`, polling

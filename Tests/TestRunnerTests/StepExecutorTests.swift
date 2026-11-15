@@ -73,6 +73,22 @@ final class StepExecutorTests: XCTestCase {
         XCTAssertEqual(result.message, "App not found")
     }
 
+    /// carnet#27: a launch that leaves Spotlight up opened nothing, and the
+    /// replay says so instead of passing the step.
+    func testALaunchThatLeavesSpotlightOpenFails() {
+        input.launchAppResult = nil
+        bridge.windowInfo = WindowInfo(windowID: 1, position: .zero,
+                                       size: CGSize(width: 430, height: 942), pid: 1)
+        describer.describeResult = ScreenDescriber.DescribeResult(elements: [
+            TapPoint(text: "Meilleur résultat", tapX: 86, tapY: 107, confidence: 0.9),
+            TapPoint(text: "Q Horloge - Ouvrir", tapX: 133, tapY: 874, confidence: 0.9),
+        ], screenshotBase64: "img")
+        let result = executor.execute(
+            step: .launch(appName: "Horloge"), stepIndex: 0, skillName: "test")
+        XCTAssertEqual(result.status, .failed)
+        XCTAssertTrue(result.message?.contains("Spotlight is still open") ?? false, result.message ?? "")
+    }
+
     // MARK: - Tap
 
     func testTapSuccess() {

@@ -74,7 +74,7 @@ final class HomeScreenLaunchTests: XCTestCase {
         }
         let input = InputSimulation(bridge: bridge, keyboardLayout: .usQWERTY,
                                     pasteVerifier: describer, keyPoster: RecordingKeyPoster(),
-                                    windowPoster: poster)
+                                    pasteboard: RecordingPasteboard(contents: nil), windowPoster: poster)
         return (input.launchApp(name: name), bridge, poster)
     }
 

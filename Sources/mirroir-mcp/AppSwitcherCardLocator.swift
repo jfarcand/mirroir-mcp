@@ -92,6 +92,8 @@ enum AppSwitcherCardLocator {
             let key = normalize(el.text)
             return el.tapX >= leftEdge && key.count >= minTextLength && appTexts.contains(key)
         }
+        DebugLog.log("reset_app", "fingerprint matches: "
+            + matches.map { "'\($0.text)'@\(Int($0.tapX))" }.joined(separator: ", "))
         guard !matches.isEmpty else { return nil }
 
         // Cluster by X proximity — one cluster per app card.
@@ -115,6 +117,8 @@ enum AppSwitcherCardLocator {
             }
             .sorted { $0.score > $1.score }
 
+        DebugLog.log("reset_app", "card clusters (score@x): "
+            + scored.map { "\($0.score)@\(Int($0.xs[$0.xs.count / 2]))" }.joined(separator: ", "))
         guard let best = scored.first, best.score >= minClusterScore else { return nil }
         // Fail closed on a near-tie between two cards.
         if scored.count >= 2 {

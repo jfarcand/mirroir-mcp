@@ -256,7 +256,17 @@ final class StepExecutor {
             return StepResult(step: step, status: .failed, message: error,
                               durationSeconds: elapsed(startTime))
         }
-        return StepResult(step: step, status: .passed, message: nil,
+        // Confirmed the way the launch_app tool confirms it: a launch that
+        // left Spotlight or the Home Screen up opened nothing (carnet#27).
+        let outcome = LaunchAppConfirmation.outcome(
+            appName: appName, describer: describer,
+            windowHeight: bridge.getWindowInfo().map { Double($0.size.height) })
+        let report = outcome.content.compactMap { content -> String? in
+            if case .text(let text) = content { return text }
+            return nil
+        }.joined(separator: " ")
+        return StepResult(step: step, status: outcome.isError ? .failed : .passed,
+                          message: outcome.isError ? report : nil,
                           durationSeconds: elapsed(startTime))
     }
 
