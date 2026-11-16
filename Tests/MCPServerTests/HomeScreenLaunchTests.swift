@@ -85,7 +85,23 @@ final class HomeScreenLaunchTests: XCTestCase {
         XCTAssertNil(run.error, run.error ?? "")
         XCTAssertEqual(run.bridge.menuActionCalls.map(\.item), ["Spotlight", "Home Screen"],
                        "Spotlight opened, then Home, which closes it: the toggle is not pressed again")
-        XCTAssertEqual(run.poster.buttons.first?.point, CGPoint(x: 165, y: 160), "the Rappels label's tap point")
+        XCTAssertEqual(run.poster.buttons.first?.point, CGPoint(x: 165, y: 160 - SpotlightAppTile.iconTapLift),
+                       "inside the Rappels icon, above its label (no icon was detected)")
+    }
+
+    /// carnet#81, XR 2026-11-16: a label tap opened nothing; the icon's center does.
+    func testADetectedIconIsTappedAtItsCenter() {
+        let label = el("Horloge", 262, 290)
+        let icons = [el(CoreMLElementDetector.iconLabel, 262, 245), el(CoreMLElementDetector.iconLabel, 357, 245)]
+        let point = HomeScreenAppIcon.tapPoint(for: label, in: icons + [label])
+        XCTAssertEqual(point.x, 262)
+        XCTAssertEqual(point.y, 245)
+    }
+
+    func testAnIconBesideTheLabelIsNotItsIcon() {
+        let label = el("Horloge", 262, 290)
+        let point = HomeScreenAppIcon.tapPoint(for: label, in: [el(CoreMLElementDetector.iconLabel, 357, 245), label])
+        XCTAssertEqual(point.y, 290 - SpotlightAppTile.iconTapLift, "App Store's icon is not Horloge's")
     }
 
     func testAHomeScreenThatNeverShowsFailsWithTheSpotlightOnceExplanation() {

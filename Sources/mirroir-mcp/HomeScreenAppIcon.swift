@@ -40,6 +40,24 @@ enum HomeScreenAppIcon {
             .min { $0.tapY < $1.tapY }
     }
 
+    /// Where to tap the icon `label` names on a Home Screen page: the center
+    /// of the detected icon right above it, or `SpotlightAppTile.iconTapLift`
+    /// above the label when no icon was detected. A tap on the label itself
+    /// opens nothing (XR, 2026-11-16: "Horloge" beside the Météo widget at
+    /// (262,290) did nothing, the icon at (262,245) opened Clock), and
+    /// `TapPointCalculator` lifts labels only in rows of three or more, so a
+    /// label beside a widget keeps its own point. A label it already lifted
+    /// ends `2 * iconTapLift` above its text, still inside the icon.
+    static func tapPoint(for label: TapPoint, in elements: [TapPoint]) -> (x: Double, y: Double) {
+        let icon = elements
+            .filter { $0.text == CoreMLElementDetector.iconLabel }
+            .filter { abs($0.tapX - label.tapX) <= SpotlightAppTile.maxCenterOffset
+                && SpotlightAppTile.iconAboveLabel.contains(label.tapY - $0.tapY) }
+            .min { abs($0.tapX - label.tapX) < abs($1.tapX - label.tapX) }
+        if let icon { return (icon.tapX, icon.tapY) }
+        return SpotlightAppTile.tapPoint(for: label)
+    }
+
     /// `text` trimmed, without case or accents.
     static func fold(_ text: String) -> String {
         SystemPhrases.fold(text.trimmingCharacters(in: .whitespacesAndNewlines))

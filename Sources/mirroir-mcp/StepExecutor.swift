@@ -301,7 +301,12 @@ final class StepExecutor {
                               durationSeconds: elapsed(startTime))
         }
 
-        if let error = input.tap(x: match.element.tapX, y: match.element.tapY) {
+        // On the Home Screen a label opens nothing: the tap goes to its icon.
+        let height = Double(bridge.getWindowInfo()?.size.height ?? 0)
+        let point = SpotlightDetector.isHomeScreenVisible(elements: describeResult.elements, windowHeight: height)
+            ? HomeScreenAppIcon.tapPoint(for: match.element, in: describeResult.elements)
+            : (match.element.tapX, match.element.tapY)
+        if let error = input.tap(x: point.0, y: point.1) {
             return StepResult(step: step, status: .failed, message: error,
                               durationSeconds: elapsed(startTime))
         }

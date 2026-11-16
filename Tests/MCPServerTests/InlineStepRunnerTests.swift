@@ -166,7 +166,8 @@ final class InlineStepRunnerTests: XCTestCase {
         XCTAssertTrue(byPoint.isError, byPoint.text)
         let inSteps = call(server, "run_steps", steps(["tap: Horloge", "tap: Réglages"]))
         XCTAssertTrue(inSteps.isError, inSteps.text)
-        XCTAssertEqual(input.tapCalls.map(\.y), [289], "only the allowed Horloge tap was sent")
+        XCTAssertEqual(input.tapCalls.map(\.y), [289 - SpotlightAppTile.iconTapLift],
+                       "only the allowed Horloge tap was sent, to its icon")
     }
 
     func testTextThatLooksLikeNumbersIsStillText() {

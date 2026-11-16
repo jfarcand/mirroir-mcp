@@ -65,7 +65,8 @@ extension InputSimulation {
     /// polling for up to `pasteVerifyTimeoutUs`. Nil on success.
     private func openIcon(_ label: TapPoint, name: String, home: [TapPoint], windowHeight: Double) -> String? {
         DebugLog.log("launchApp", "tapping the '\(name)' icon on the Home Screen")
-        if let tapError = tap(x: label.tapX, y: label.tapY) {
+        let point = HomeScreenAppIcon.tapPoint(for: label, in: home)
+        if let tapError = tap(x: point.x, y: point.y) {
             return "the '\(name)' icon could not be tapped: \(tapError)"
         }
         let poll = max(1, EnvConfig.pasteVerifyPollUs)
