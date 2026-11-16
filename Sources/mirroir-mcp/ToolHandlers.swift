@@ -26,9 +26,9 @@ extension MirroirMCP {
         policy: PermissionPolicy
     ) {
         registerScreenTools(server: server, registry: registry)
-        registerInputTools(server: server, registry: registry)
-        registerTapTools(server: server, registry: registry)
-        registerTouchTools(server: server, registry: registry)
+        registerInputTools(server: server, registry: registry, policy: policy)
+        registerTapTools(server: server, registry: registry, policy: policy)
+        registerTouchTools(server: server, registry: registry, policy: policy)
         registerGestureTools(server: server, registry: registry)
         registerHoldKeysTools(server: server, registry: registry)
         registerNavigationTools(server: server, registry: registry,

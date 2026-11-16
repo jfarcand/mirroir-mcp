@@ -70,7 +70,7 @@ extension MirroirMCP {
                     return .error(refusal.message)
                 case .success(let steps):
                     let executor = InlineStepRunner.executor(for: ctx, registry: registry)
-                    let report = InlineStepRunner.run(steps, executor: executor)
+                    let report = InlineStepRunner.run(steps, executor: executor, policy: policy)
                     return report.failed ? .error(report.text) : .text(report.text)
                 }
             }

@@ -16,6 +16,7 @@
 // ABOUTME: Registers the touch MCP tool: one persistent touch contact held across calls.
 // ABOUTME: Parses begin/move/end/cancel arguments and delegates to InputProviding.touch.
 
+import CoreGraphics
 import Foundation
 import HelperLib
 
@@ -26,7 +27,8 @@ extension MirroirMCP {
 
     static func registerTouchTools(
         server: MCPServer,
-        registry: TargetRegistry
+        registry: TargetRegistry,
+        policy: PermissionPolicy
     ) {
         server.registerTool(MCPToolDefinition(
             name: "touch",
@@ -80,6 +82,11 @@ extension MirroirMCP {
                 case .failure(let parseError): return .error(parseError.message)
                 }
 
+                // A begin and an end on an icon open its app, as a tap does.
+                if case .begin(let x, let y) = command,
+                   let refusal = BlockedAppTapGuard.refusal(at: CGPoint(x: x, y: y), ctx: ctx, policy: policy) {
+                    return .error(refusal)
+                }
                 switch ctx.input.touch(command) {
                 case .success(let outcome): return .text(touchOutcomeText(outcome))
                 case .failure(let touchError): return .error(touchError.description)

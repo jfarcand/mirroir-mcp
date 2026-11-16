@@ -31,7 +31,8 @@ final class TouchToolHandlerTests: XCTestCase {
         server = MCPServer(policy: PermissionPolicy(skipPermissions: true, config: nil), transport: .stdio)
         input = StubInput()
         MirroirMCP.registerTouchTools(
-            server: server, registry: makeTestRegistry(bridge: StubBridge(), input: input))
+            server: server, registry: makeTestRegistry(bridge: StubBridge(), input: input),
+            policy: PermissionPolicy(skipPermissions: true, config: nil))
     }
 
     private func call(_ args: [String: JSONValue]) -> (text: String?, isError: Bool) {

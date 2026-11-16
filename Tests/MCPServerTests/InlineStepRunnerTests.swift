@@ -39,8 +39,8 @@ final class InlineStepRunnerTests: XCTestCase {
         let server = MCPServer(policy: policy, transport: .stdio)
         let registry = makeTestRegistry(bridge: StubBridge(), input: input, describer: describer)
         MirroirMCP.registerRunStepsTools(server: server, registry: registry, policy: policy)
-        MirroirMCP.registerInputTools(server: server, registry: registry)
-        MirroirMCP.registerTapTools(server: server, registry: registry)
+        MirroirMCP.registerInputTools(server: server, registry: registry, policy: policy)
+        MirroirMCP.registerTapTools(server: server, registry: registry, policy: policy)
         return server
     }
 
@@ -144,6 +144,29 @@ final class InlineStepRunnerTests: XCTestCase {
         XCTAssertFalse(typed.text.contains("read the same"), typed.text)
         let point = call(makeServer(policy: allowAll), "run_steps", steps(["tap: @324,113"]))
         XCTAssertFalse(point.text.contains("read the same"), "a point tap has no read before it")
+    }
+
+    // MARK: - Blocked apps (carnet#78)
+
+    /// A tap on a blocked app's Home Screen icon is refused before any input,
+    /// by text, by point and in a step list.
+    func testATapOnABlockedAppsIconSendsNothing() {
+        describer.describeResult = ScreenDescriber.DescribeResult(
+            elements: [TapPoint(text: "Horloge", tapX: 263, tapY: 289, confidence: 0.9),
+                       TapPoint(text: "Réglages", tapX: 263, tapY: 394, confidence: 0.9),
+                       TapPoint(text: "Q Rechercher", tapX: 215, tapY: 784, confidence: 0.9)],
+            screenshotBase64: "")
+        let policy = PermissionPolicy(skipPermissions: false, config: PermissionConfig(
+            allow: ["*"], blockedApps: ["Réglages"]))
+        let server = makeServer(policy: policy)
+        let byText = call(server, "tap", ["text": .string("Réglages")])
+        XCTAssertTrue(byText.isError, byText.text)
+        XCTAssertTrue(byText.text.contains("'Réglages' icon"), byText.text)
+        let byPoint = call(server, "tap", ["x": .number(263), "y": .number(350)])
+        XCTAssertTrue(byPoint.isError, byPoint.text)
+        let inSteps = call(server, "run_steps", steps(["tap: Horloge", "tap: Réglages"]))
+        XCTAssertTrue(inSteps.isError, inSteps.text)
+        XCTAssertEqual(input.tapCalls.map(\.y), [289], "only the allowed Horloge tap was sent")
     }
 
     func testTextThatLooksLikeNumbersIsStillText() {

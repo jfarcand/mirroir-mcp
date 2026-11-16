@@ -162,7 +162,7 @@ final class ScreenshotPointToolTests: XCTestCase {
         capture = StubCapture()
         let registry = makeTestRegistry(bridge: bridge, input: input, capture: capture)
         MirroirMCP.registerScreenTools(server: server, registry: registry)
-        MirroirMCP.registerTapTools(server: server, registry: registry)
+        MirroirMCP.registerTapTools(server: server, registry: registry, policy: PermissionPolicy(skipPermissions: true, config: nil))
     }
 
     private func call(_ name: String, _ args: [String: JSONValue]) -> (content: [[String: JSONValue]], isError: Bool) {

@@ -107,7 +107,7 @@ enum InlineStepRunner {
     /// then read the screen once. When the last step is a passing text tap
     /// and the executor reads through a `RecordingDescriber`, the read the
     /// tap was found in is compared with the read after it.
-    static func run(_ steps: [SkillStep], executor: StepExecutor) -> Report {
+    static func run(_ steps: [SkillStep], executor: StepExecutor, policy: PermissionPolicy) -> Report {
         let reads = executor.describer as? RecordingDescriber
         var results: [StepResult] = []
         var tapRead: (label: String, elements: [TapPoint])?
@@ -118,7 +118,8 @@ enum InlineStepRunner {
                                           durationSeconds: 0))
                 continue
             }
-            let result = executor.execute(step: step, stepIndex: index, skillName: runName)
+            let result = blockedTap(step, executor: executor, policy: policy)
+                ?? executor.execute(step: step, stepIndex: index, skillName: runName)
             results.append(result)
             tapRead = nil
             if case .tap(let label) = step, TapStepPoint.parse(label) == nil,
@@ -141,6 +142,22 @@ enum InlineStepRunner {
     static func readsTheSame(_ before: [TapPoint], _ after: [TapPoint]) -> Bool {
         let structural = StructuralFingerprint.extractStructural(from: before)
         return !structural.isEmpty && structural == StructuralFingerprint.extractStructural(from: after)
+    }
+
+    /// A failed result for a tap or long press that lands on the icon of an
+    /// app `policy` blocks (`BlockedAppTapGuard`); nil for any other step.
+    private static func blockedTap(
+        _ step: SkillStep, executor: StepExecutor, policy: PermissionPolicy
+    ) -> StepResult? {
+        let label: String
+        switch step {
+        case .tap(let text), .longPress(let text, _): label = text
+        default: return nil
+        }
+        guard let refusal = BlockedAppTapGuard.refusal(
+            target: .label(label), bridge: executor.bridge, describer: executor.describer,
+            policy: policy) else { return nil }
+        return StepResult(step: step, status: .failed, message: refusal, durationSeconds: 0)
     }
 
     /// The text a read shows. Unlabeled icons carry a placeholder name, not

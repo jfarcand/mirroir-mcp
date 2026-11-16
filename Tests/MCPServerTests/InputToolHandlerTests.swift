@@ -33,8 +33,8 @@ final class InputToolHandlerTests: XCTestCase {
         bridge = StubBridge()
         input = StubInput()
         let registry = makeTestRegistry(bridge: bridge, input: input)
-        MirroirMCP.registerInputTools(server: server, registry: registry)
-        MirroirMCP.registerTapTools(server: server, registry: registry)
+        MirroirMCP.registerInputTools(server: server, registry: registry, policy: policy)
+        MirroirMCP.registerTapTools(server: server, registry: registry, policy: policy)
     }
 
     private func callTool(_ name: String, args: [String: JSONValue] = [:]) -> JSONRPCResponse {

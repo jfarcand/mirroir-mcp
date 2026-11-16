@@ -24,7 +24,8 @@ extension MirroirMCP {
 
     static func registerTapTools(
         server: MCPServer,
-        registry: TargetRegistry
+        registry: TargetRegistry,
+        policy: PermissionPolicy
     ) {
         server.registerTool(MCPToolDefinition(
             name: "tap",
@@ -83,7 +84,7 @@ extension MirroirMCP {
                         return .error("image_size needs x and y: it converts a point, not text")
                     }
                     let executor = InlineStepRunner.executor(for: ctx, registry: registry)
-                    let report = InlineStepRunner.run([.tap(label: text)], executor: executor)
+                    let report = InlineStepRunner.run([.tap(label: text)], executor: executor, policy: policy)
                     return report.failed ? .error(report.text) : .text(report.text)
                 }
                 guard let x = args["x"]?.asNumber(), let y = args["y"]?.asNumber() else {
@@ -106,6 +107,9 @@ extension MirroirMCP {
                     return .error(refusal.message)
                 }
 
+                if let refusal = BlockedAppTapGuard.refusal(at: point, ctx: ctx, policy: policy) {
+                    return .error(refusal)
+                }
                 if let error = input.tap(x: point.x, y: point.y, cursorMode: cursorMode) {
                     return .error(error)
                 }
