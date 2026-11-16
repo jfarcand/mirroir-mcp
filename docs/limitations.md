@@ -12,6 +12,8 @@ On iPhone Mirroring, taps, keystrokes and swipes no longer take the front: the a
 | `drag`, `pinch`, `rotate` | Borrowed | HID events, which macOS routes to the frontmost app. iPhone Mirroring is activated for the gesture (measured: about 1 s), then the previous front app and the pointer are returned. |
 | `hold_keys`, `touch` | Taken | HID events that span the gesture or several calls. iPhone Mirroring is activated first and keeps the front afterwards. |
 
+This window path is used only on the macOS versions it was measured on (through macOS 26). On a later macOS, taps, keys and swipes are HID input and bring iPhone Mirroring to the front: on macOS 27.3 the window events were accepted and dropped, so nothing reached the iPhone ([#84](https://github.com/jfarcand/mirroir-mcp/issues/84)). The `windowInput` setting forces either path, and `mirroir-mcp doctor` says which one is in use.
+
 Measured on macOS 26.5 with iTerm in front and the front app sampled every 0.2s: Clock tab taps, taps with a Finder window over the whole mirror, typing, a select-all/copy/delete/paste round trip, back-to-back Spotlight launches and a launch that first had to start iPhone Mirroring all left iTerm in front throughout.
 
 ### Why Gestures Still Take the Front

@@ -29,6 +29,9 @@ enum InlineStepRunner {
     struct Report {
         let results: [StepResult]
         let screenText: String?
+        /// The label of a final text tap after which the screen read the same
+        /// as just before it, or nil.
+        var unchangedTap: String?
 
         var failed: Bool { results.contains { $0.status.isFailure } }
 
@@ -38,6 +41,12 @@ enum InlineStepRunner {
                 let seconds = String(format: "%.1f", result.durationSeconds)
                 let message = result.message.map { " — \($0)" } ?? ""
                 return "\(index + 1). \(result.status.rawValue) \(result.step.displayName) (\(seconds)s)\(message)"
+            }
+            if let unchangedTap {
+                lines.append("")
+                lines.append("The screen read the same before and after tapping \"\(unchangedTap)\". "
+                    + "If the tap should change it, describe the screen again; if it still has not "
+                    + "changed, the tap did not reach the iPhone.")
             }
             if let screenText {
                 lines.append("")
@@ -95,9 +104,13 @@ enum InlineStepRunner {
     }
 
     /// Run `steps` in order on `executor`, skipping the rest after a failure,
-    /// then read the screen once.
+    /// then read the screen once. When the last step is a passing text tap
+    /// and the executor reads through a `RecordingDescriber`, the read the
+    /// tap was found in is compared with the read after it.
     static func run(_ steps: [SkillStep], executor: StepExecutor) -> Report {
+        let reads = executor.describer as? RecordingDescriber
         var results: [StepResult] = []
+        var tapRead: (label: String, text: String)?
         for (index, step) in steps.enumerated() {
             if results.last?.status.isFailure == true {
                 results.append(StepResult(step: step, status: .skipped,
@@ -105,15 +118,28 @@ enum InlineStepRunner {
                                           durationSeconds: 0))
                 continue
             }
-            results.append(executor.execute(step: step, stepIndex: index, skillName: runName))
+            let result = executor.execute(step: step, stepIndex: index, skillName: runName)
+            results.append(result)
+            tapRead = nil
+            if case .tap(let label) = step, TapStepPoint.parse(label) == nil,
+               result.status == .passed, let before = reads?.lastResult {
+                tapRead = (label, screenText(before))
+            }
         }
-        // Unlabeled icons carry a placeholder name, not text the screen shows.
-        let screen = executor.describer.describe()
-            .map { result in
-                ScenarioStepFormatter.screenText(
-                    elements: result.elements.filter { $0.text != CoreMLElementDetector.iconLabel })
-                .trimmingCharacters(in: .whitespacesAndNewlines) }
-        return Report(results: results, screenText: screen)
+        let screen = executor.describer.describe().map(screenText)
+        var report = Report(results: results, screenText: screen)
+        if let tapRead, tapRead.text == screen {
+            report.unchangedTap = tapRead.label
+        }
+        return report
+    }
+
+    /// The text a read shows. Unlabeled icons carry a placeholder name, not
+    /// text the screen shows, so they are left out.
+    private static func screenText(_ result: ScreenDescriber.DescribeResult) -> String {
+        ScenarioStepFormatter.screenText(
+            elements: result.elements.filter { $0.text != CoreMLElementDetector.iconLabel })
+            .trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
     /// The executor for a run on `ctx`: the target's own input and OCR, with
@@ -125,8 +151,9 @@ enum InlineStepRunner {
             settlingDelayMs: defaults.settlingDelayMs,
             screenshotDir: (NSTemporaryDirectory() as NSString).appendingPathComponent(runName),
             dryRun: false)
+        // Recorded so a final text tap can be compared with the read it was found in.
         return StepExecutor(bridge: ctx.bridge, input: ctx.input,
-                            describer: ctx.describer, capture: ctx.capture,
+                            describer: RecordingDescriber(wrapping: ctx.describer), capture: ctx.capture,
                             config: config, registry: registry,
                             ocrDescriber: ctx.ocrDescriber, profile: ctx.profile)
     }

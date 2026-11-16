@@ -99,6 +99,38 @@ final class InlineStepRunnerTests: XCTestCase {
         XCTAssertEqual(describer.describeCallCount, 1, "only the final read: a point needs no OCR")
     }
 
+    // MARK: - A tap the screen did not answer
+
+    /// jfarcand/mirroir-mcp#84: on macOS 27.3 every tap reported PASS while
+    /// the screen never moved. The reply now says when the read after a text
+    /// tap matches the read it was found in.
+    func testATextTapOnAnUnchangedScreenSaysSo() {
+        let result = call(makeServer(policy: allowAll), "tap", ["text": .string("Search")])
+        XCTAssertFalse(result.isError, "an unchanged screen is a hint, not a failure: \(result.text)")
+        XCTAssertTrue(result.text.contains(
+            "The screen read the same before and after tapping \"Search\""), result.text)
+        XCTAssertTrue(result.text.hasSuffix("Screen now: Search Today"), result.text)
+    }
+
+    func testATextTapThatChangesTheScreenSaysNothingMore() {
+        let after = ScreenDescriber.DescribeResult(
+            elements: [TapPoint(text: "Games", tapX: 60, tapY: 100, confidence: 0.99)],
+            screenshotBase64: "")
+        describer.describeResults = [describer.describeResult, after]
+        let result = call(makeServer(policy: allowAll), "tap", ["text": .string("Search")])
+        XCTAssertFalse(result.isError, result.text)
+        XCTAssertFalse(result.text.contains("read the same"), result.text)
+        XCTAssertTrue(result.text.hasSuffix("Screen now: Games"), result.text)
+    }
+
+    func testOnlyAFinalTextTapIsCompared() {
+        let typed = call(makeServer(policy: allowAll), "run_steps",
+                         steps(["tap: Search", "type: calculator"]))
+        XCTAssertFalse(typed.text.contains("read the same"), typed.text)
+        let point = call(makeServer(policy: allowAll), "run_steps", steps(["tap: @324,113"]))
+        XCTAssertFalse(point.text.contains("read the same"), "a point tap has no read before it")
+    }
+
     func testTextThatLooksLikeNumbersIsStillText() {
         XCTAssertNil(TapStepPoint.parse("12,41"))
         XCTAssertNil(TapStepPoint.parse("@12"))

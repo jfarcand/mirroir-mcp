@@ -62,6 +62,7 @@ extension EnvConfig {
                 ("debugLogging", "\(debugLogging)"),
                 ("debugLogMaxBytes", "\(debugLogMaxBytes)"),
                 ("keepDisplayAwake", "\(keepDisplayAwake)"),
+                ("windowInput", windowInput),
                 ("grantPollUs", "\(grantPollUs)"),
                 ("grantWaitUs", "\(grantWaitUs)"),
             ]),

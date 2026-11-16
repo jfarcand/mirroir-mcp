@@ -57,4 +57,11 @@ extension EnvConfig {
     public static var keepDisplayAwake: Bool {
         readBool("keepDisplayAwake", default: true)
     }
+
+    /// How input reaches iPhone Mirroring: `auto` posts taps, keys and swipes
+    /// to its window on the macOS versions that was measured on and uses HID
+    /// input elsewhere; `on` and `off` force the window path or HID input.
+    public static var windowInput: String {
+        readString("windowInput", envVar: "MIRROIR_WINDOW_INPUT", default: "auto")
+    }
 }

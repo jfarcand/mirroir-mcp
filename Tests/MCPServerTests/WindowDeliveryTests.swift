@@ -162,8 +162,10 @@ final class WindowDeliveryTests: XCTestCase {
     }
 
     /// `test`, `compile` and `record` build their input through this factory,
-    /// so the CLI posts to the window exactly like the MCP server does.
-    func testEveryMirrorEntryPointGetsTheWindowPoster() {
-        XCTAssertNotNil(IPhoneMirroringTarget.input(bridge: MirroringBridge()).windowPoster)
+    /// so the CLI posts to the window exactly like the MCP server does, on the
+    /// macOS versions `WindowInputPolicy` allows.
+    func testEveryMirrorEntryPointFollowsTheWindowInputPolicy() {
+        let poster = IPhoneMirroringTarget.input(bridge: MirroringBridge()).windowPoster
+        XCTAssertEqual(poster != nil, WindowInputPolicy.live.usesWindow)
     }
 }

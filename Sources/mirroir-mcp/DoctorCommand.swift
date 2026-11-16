@@ -74,6 +74,7 @@ enum DoctorCommand {
         }
         var checks = [DoctorCheck]()
         checks.append(checkMacOSVersion())
+        checks.append(checkInputPath(WindowInputPolicy.live))
         checks.append(checkMirroringRunning())
         let connected = checkMirroringConnected()
         checks.append(connected)
@@ -200,6 +201,15 @@ enum DoctorCommand {
             detail: "macOS \(versionStr) (requires 15.0+)",
             fixHint: "iPhone Mirroring requires macOS 15 (Sequoia) or later. Update in System Settings > General > Software Update."
         )
+    }
+
+    /// Which path taps, keys and swipes take to iPhone Mirroring, and why.
+    static func checkInputPath(_ decision: WindowInputPolicy.Decision) -> DoctorCheck {
+        let path = decision.usesWindow
+            ? "window records (your front app stays in front)"
+            : "HID input (iPhone Mirroring comes to the front for each action)"
+        return DoctorCheck(name: "Input path", status: .passed,
+                           detail: "\(path): \(decision.reason)", fixHint: nil)
     }
 
     static func checkMirroringRunning() -> DoctorCheck {
