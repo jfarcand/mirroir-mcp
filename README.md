@@ -17,6 +17,7 @@
   <a href="https://mirroir.dev/?utm_source=github&utm_medium=readme&utm_campaign=header#demo">Demos</a> ·
   <a href="docs/onboarding.md">Set up with your agent</a> ·
   <a href="docs/tools.md">Tools</a> ·
+  <a href="CHANGELOG.md">Changelog</a> ·
   <a href="https://discord.gg/u8ug9QCSqF">Discord</a>
 </p>
 
