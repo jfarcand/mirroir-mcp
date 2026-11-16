@@ -6,6 +6,7 @@ What changed for you in each release. Full notes, with every commit, are on [Git
 
 - **macOS 27: input reaches the iPhone again** ([#84](https://github.com/jfarcand/mirroir-mcp/issues/84)). On macOS 27.3, taps, keys and swipes were reported as done but never arrived. On any macOS newer than 26, mirroir now uses HID input, which brings iPhone Mirroring to the front. The `windowInput` setting (`auto`, `on`, `off`) forces either path, and `mirroir-mcp doctor` shows which one is in use.
 - **`tap` says when nothing changed.** When the screen reads the same before and after a `tap(text:)`, the reply says so, instead of a silent pass.
+- **Tapping an app's name on the Home Screen opens it.** `tap` by text goes to the icon above the name; next to a widget it used to land on the name and open nothing.
 - **`launch_app` works with iOS 27's Spotlight**, which opens as a bare search field and shows its top hit without a heading.
 - **`launch_app` never opens the App Store for an app that is not installed.** It refuses when Spotlight's top hit is a store card with a Get button, and waits for the results to settle before pressing Return.
 - **`blockedApps` covers more routes.** `open_url` (Safari), `set_network` (Settings), and a tap, double tap, long press or touch on a blocked app's icon on the Home Screen or in Spotlight are refused before any input.
