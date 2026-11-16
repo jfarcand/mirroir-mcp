@@ -123,6 +123,21 @@ final class InlineStepRunnerTests: XCTestCase {
         XCTAssertTrue(result.text.hasSuffix("Screen now: Games"), result.text)
     }
 
+    /// 2026-11-16, iPhone 16: an icon tap that opened nothing went unnoticed
+    /// because the status bar's clock and a badge read differently after it.
+    func testAClockThatTickedStillReadsAsTheSameScreen() {
+        let before = [TapPoint(text: "14:03", tapX: 60, tapY: 20, confidence: 0.9),
+                      TapPoint(text: "Horloge", tapX: 159, tapY: 159, confidence: 0.9),
+                      TapPoint(text: "Calendrier", tapX: 251, tapY: 159, confidence: 0.9)]
+        let after = [TapPoint(text: "14:04", tapX: 60, tapY: 20, confidence: 0.9),
+                     TapPoint(text: "Horloge", tapX: 159, tapY: 160, confidence: 0.9),
+                     TapPoint(text: "Calendrier", tapX: 251, tapY: 159, confidence: 0.9)]
+        XCTAssertTrue(InlineStepRunner.readsTheSame(before, after))
+        let opened = [TapPoint(text: "14:04", tapX: 60, tapY: 20, confidence: 0.9),
+                      TapPoint(text: "Chronomètre", tapX: 267, tapY: 857, confidence: 0.9)]
+        XCTAssertFalse(InlineStepRunner.readsTheSame(before, opened))
+    }
+
     func testOnlyAFinalTextTapIsCompared() {
         let typed = call(makeServer(policy: allowAll), "run_steps",
                          steps(["tap: Search", "type: calculator"]))

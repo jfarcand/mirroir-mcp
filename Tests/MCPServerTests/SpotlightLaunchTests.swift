@@ -147,7 +147,10 @@ final class SpotlightLaunchTests: XCTestCase {
             el("Meilleur résultat", 86, 107), el("OpenTable", 165, 151), el("Obtenir", 342, 171),
             el("Food & Drink", 167, 172), el("OpenTable - Ouvrir", 156, 874),
         ])
-        let run = launch(name: "OpenTable", screens: [clock, idleSpotlight, fieldFirst, storeCard])
+        // Reads 1-4: before opening, Spotlight open, and the typed name shown.
+        // Read 5 opens the top-hit poll with the field alone; the old check
+        // pressed Return there. The card is drawn on read 6.
+        let run = launch(name: "OpenTable", screens: [clock, idleSpotlight, fieldFirst, fieldFirst, fieldFirst, storeCard])
         XCTAssertNotNil(run.error)
         XCTAssertTrue(run.keys.keycodes.isEmpty, "Return is never pressed on the store card")
         XCTAssertTrue(run.poster.buttons.isEmpty)

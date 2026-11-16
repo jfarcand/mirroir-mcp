@@ -231,6 +231,8 @@ extension InputSimulation {
                 continue
             }
             if let previous, StructuralFingerprint.areEquivalent(previous, screen.elements) {
+                DebugLog.log("launchApp", "top hit agreed on two reads: "
+                    + screen.elements.map(\.text).joined(separator: " | "))
                 return screen.elements
             }
             previous = screen.elements

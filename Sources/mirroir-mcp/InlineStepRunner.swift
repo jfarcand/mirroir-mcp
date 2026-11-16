@@ -110,7 +110,7 @@ enum InlineStepRunner {
     static func run(_ steps: [SkillStep], executor: StepExecutor) -> Report {
         let reads = executor.describer as? RecordingDescriber
         var results: [StepResult] = []
-        var tapRead: (label: String, text: String)?
+        var tapRead: (label: String, elements: [TapPoint])?
         for (index, step) in steps.enumerated() {
             if results.last?.status.isFailure == true {
                 results.append(StepResult(step: step, status: .skipped,
@@ -123,15 +123,24 @@ enum InlineStepRunner {
             tapRead = nil
             if case .tap(let label) = step, TapStepPoint.parse(label) == nil,
                result.status == .passed, let before = reads?.lastResult {
-                tapRead = (label, screenText(before))
+                tapRead = (label, before.elements)
             }
         }
-        let screen = executor.describer.describe().map(screenText)
-        var report = Report(results: results, screenText: screen)
-        if let tapRead, tapRead.text == screen {
+        let after = executor.describer.describe()
+        var report = Report(results: results, screenText: after.map(screenText))
+        if let tapRead, let after, readsTheSame(tapRead.elements, after.elements) {
             report.unchangedTap = tapRead.label
         }
         return report
+    }
+
+    /// Whether two reads show the same screen: the same structural text, with
+    /// the clock, counters and badges left out (`StructuralFingerprint`), so a
+    /// status bar that ticked or OCR that read a glyph differently does not
+    /// hide a tap the screen did not answer.
+    static func readsTheSame(_ before: [TapPoint], _ after: [TapPoint]) -> Bool {
+        let structural = StructuralFingerprint.extractStructural(from: before)
+        return !structural.isEmpty && structural == StructuralFingerprint.extractStructural(from: after)
     }
 
     /// The text a read shows. Unlabeled icons carry a placeholder name, not
