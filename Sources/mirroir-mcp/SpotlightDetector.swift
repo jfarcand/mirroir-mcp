@@ -61,7 +61,7 @@ enum SpotlightDetector {
     /// Whether Return would open an app, not a web suggestion, an App Store page
     /// or a message: the search field says it opens the result, or Spotlight has
     /// a top result and it is a tile. The field is enough on its own: Spotlight
-    /// can show an app's top hit without a heading above it (XR, iOS 26,
+    /// can show an app's top hit without a heading above it (iOS 27,
     /// 2026-11-16: "Horloge — Ouvrir" over the Horloge tile row, no heading).
     /// Neither counts when the first result named `name` is an App Store card:
     /// the field says it opens that card too. Looks at the screen before Return

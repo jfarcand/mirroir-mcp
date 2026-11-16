@@ -59,7 +59,7 @@ saying it opens it ("OpenTable — Ouvrir" over an "Obtenir" card, XR, iOS 26,
 
 Other text that shows only while Spotlight covers the screen. The top-hit
 headings above count too. The search field's placeholder is the only text
-Spotlight adds when it opens as a bare field over the Home Screen (XR, iOS 26,
+Spotlight adds when it opens as a bare field over the Home Screen (iOS 27,
 2026-11-16).
 
 - rechercher ou demander

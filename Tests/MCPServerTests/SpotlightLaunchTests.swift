@@ -136,6 +136,23 @@ final class SpotlightLaunchTests: XCTestCase {
                        "opened, then closed again so the query is not left on screen")
     }
 
+    /// carnet#74, XR 2026-11-16: the field said "OpenTable — Ouvrir" before the
+    /// store card's "Obtenir" was read; Return on that first read opened the
+    /// App Store page. Two reads in a row must agree before Return.
+    func testTheFieldIsNotTrustedBeforeTheStoreCardIsDrawn() {
+        let fieldFirst = screen([
+            el("Meilleur résultat", 86, 107), el("OpenTable", 165, 151), el("OpenTable - Ouvrir", 156, 874),
+        ])
+        let storeCard = screen([
+            el("Meilleur résultat", 86, 107), el("OpenTable", 165, 151), el("Obtenir", 342, 171),
+            el("Food & Drink", 167, 172), el("OpenTable - Ouvrir", 156, 874),
+        ])
+        let run = launch(name: "OpenTable", screens: [clock, idleSpotlight, fieldFirst, storeCard])
+        XCTAssertNotNil(run.error)
+        XCTAssertTrue(run.keys.keycodes.isEmpty, "Return is never pressed on the store card")
+        XCTAssertTrue(run.poster.buttons.isEmpty)
+    }
+
     /// 14:39 on an XR: a refused launch left Spotlight open, and the next name was
     /// typed after it ("KeynoteNotes").
     func testAQuerySpotlightStillHoldsIsSelectedBeforeTyping() {

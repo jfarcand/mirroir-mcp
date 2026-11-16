@@ -215,17 +215,25 @@ extension InputSimulation {
 
     /// The Spotlight screen once its top result is an app, polling for up to
     /// `pasteVerifyTimeoutUs`, because results fill in after the typed text
-    /// shows. Nil when no app named `name` becomes the top result.
+    /// shows. Two reads in a row must agree: the field can say it opens the
+    /// result before the result's App Store button is drawn (XR, iOS 26,
+    /// 2026-11-16: Return opened OpenTable's store page, carnet#74). Nil when
+    /// no app named `name` becomes the top result.
     private func appTopHitScreen(name: String) -> [TapPoint]? {
         let poll = max(1, EnvConfig.pasteVerifyPollUs)
         let attempts = max(1, Int(EnvConfig.pasteVerifyTimeoutUs / poll))
+        var previous: [TapPoint]?
         for attempt in 0 ..< attempts {
             if attempt > 0 { usleep(poll) }
-            if let screen = pasteVerifier?.describe(settleTimeoutUs: 0),
-               screen.ocrFailure == nil,
-               SpotlightDetector.returnOpensApp(elements: screen.elements, name: name) {
+            guard let screen = pasteVerifier?.describe(settleTimeoutUs: 0), screen.ocrFailure == nil,
+                  SpotlightDetector.returnOpensApp(elements: screen.elements, name: name) else {
+                previous = nil
+                continue
+            }
+            if let previous, StructuralFingerprint.areEquivalent(previous, screen.elements) {
                 return screen.elements
             }
+            previous = screen.elements
         }
         return nil
     }

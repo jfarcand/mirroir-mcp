@@ -125,7 +125,7 @@ final class SpotlightDetectorTests: XCTestCase {
         XCTAssertTrue(SpotlightDetector.returnOpensApp(elements: english, name: "Clock"))
     }
 
-    /// XR, iOS 26, 2026-11-16 (carnet#76): the top hit showed with no heading
+    /// iOS 27, 2026-11-16 (carnet#76): the top hit showed with no heading
     /// above it; only the field said Return opens it.
     func testAFieldSayingOpenNeedsNoHeading() {
         let screen = [
@@ -197,7 +197,7 @@ final class SpotlightDetectorTests: XCTestCase {
         XCTAssertFalse(SpotlightDetector.holdsQuery(elements: screen))
     }
 
-    /// XR, iOS 26, 2026-11-16 (carnet#76): Spotlight opened as a bare field
+    /// iOS 27, 2026-11-16 (carnet#76): Spotlight opened as a bare field
     /// over the Home Screen, with no suggestions; only its placeholder shows it.
     func testABareSearchFieldIsSpotlight() {
         let screen = [point("Rechercher ou demander", 172, 98), point("Horloge", 159, 159),
