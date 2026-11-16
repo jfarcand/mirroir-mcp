@@ -50,13 +50,15 @@ enum SpotlightDetector {
     }
 
     /// Whether Return would open an app, not a web suggestion, an App Store page
-    /// or a message: Spotlight has a top result, and either the search field says
-    /// it opens it, or the result is a tile. Looks at the screen before Return
-    /// because nothing afterwards names the app in front.
+    /// or a message: the search field says it opens the result, or Spotlight has
+    /// a top result and it is a tile. The field is enough on its own: Spotlight
+    /// can show an app's top hit without a heading above it (XR, iOS 26,
+    /// 2026-11-16: "Horloge — Ouvrir" over the Horloge tile row, no heading).
+    /// Looks at the screen before Return because nothing afterwards names the
+    /// app in front.
     static func returnOpensApp(elements: [TapPoint]) -> Bool {
-        guard holdsQuery(elements: elements) else { return false }
-        return elements.contains(where: fieldSaysOpen)
-            || SpotlightAppTile.topHit(in: elements) != nil
+        if elements.contains(where: fieldSaysOpen) { return true }
+        return holdsQuery(elements: elements) && SpotlightAppTile.topHit(in: elements) != nil
     }
 
     /// Whether `element` reads as the field's completion: the query, a dash, then

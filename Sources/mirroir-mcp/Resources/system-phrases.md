@@ -48,8 +48,11 @@ The word the search field adds after the query when Return would open an app
 ## Spotlight Overlay
 
 Other text that shows only while Spotlight covers the screen. The top-hit
-headings above count too.
+headings above count too. The search field's placeholder is the only text
+Spotlight adds when it opens as a bare field over the Home Screen (XR, iOS 26,
+2026-11-16).
 
+- rechercher ou demander
 - search in app
 - rechercher dans l'app
 - rechercher dans les apps

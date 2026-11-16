@@ -125,6 +125,24 @@ final class SpotlightDetectorTests: XCTestCase {
         XCTAssertTrue(SpotlightDetector.returnOpensApp(elements: english))
     }
 
+    /// XR, iOS 26, 2026-11-16 (carnet#76): the top hit showed with no heading
+    /// above it; only the field said Return opens it.
+    func testAFieldSayingOpenNeedsNoHeading() {
+        let screen = [
+            point("Horloge — Ouvrir", 137, 101), point(icon, 168, 166), point("Horloge", 79, 266),
+            point("Régler le", 163, 265), point("Réglages", 76, 319),
+            point("Rechercher dans l'app Q", 287, 320),
+        ]
+        XCTAssertFalse(SpotlightDetector.holdsQuery(elements: screen))
+        XCTAssertTrue(SpotlightDetector.returnOpensApp(elements: screen))
+    }
+
+    func testAFieldNamingAnotherResultWithoutAHeadingIsNoApp() {
+        let screen = [point("M/t/o - Clinique dentaire St-Sauve", 189, 101), point(icon, 168, 166),
+                      point("Horloge", 79, 266)]
+        XCTAssertFalse(SpotlightDetector.returnOpensApp(elements: screen))
+    }
+
     func testATileUnderTheHeadingCountsWhenTheFieldIsUnread() {
         let screen = [point("Meilleur résultat", 86, 107), point(icon, 81, 188), point("Météo", 79, 219)]
         XCTAssertTrue(SpotlightDetector.returnOpensApp(elements: screen),
@@ -148,6 +166,16 @@ final class SpotlightDetectorTests: XCTestCase {
                       point("Keynote", 107, 872)]
         XCTAssertFalse(SpotlightDetector.returnOpensApp(elements: screen))
         XCTAssertFalse(SpotlightDetector.holdsQuery(elements: screen))
+    }
+
+    /// XR, iOS 26, 2026-11-16 (carnet#76): Spotlight opened as a bare field
+    /// over the Home Screen, with no suggestions; only its placeholder shows it.
+    func testABareSearchFieldIsSpotlight() {
+        let screen = [point("Rechercher ou demander", 172, 98), point("Horloge", 159, 159),
+                      point("Q Rechercher", 205, 736)]
+        XCTAssertTrue(SpotlightDetector.isSpotlightVisible(elements: screen))
+        XCTAssertFalse(SpotlightDetector.isSpotlightVisible(elements: [point("Q Rechercher", 205, 736)]),
+                       "the Home Screen's search pill is not Spotlight")
     }
 
     func testTheIdlePageHoldsNoQuery() {
