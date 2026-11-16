@@ -45,6 +45,16 @@ The word the search field adds after the query when Return would open an app
 - abrir
 - öffnen
 
+## Spotlight Store Button
+
+The whole label of the button an App Store result shows when the app is not
+installed. Spotlight can make that result its top hit, with the field still
+saying it opens it ("OpenTable — Ouvrir" over an "Obtenir" card, XR, iOS 26,
+2026-11-15); Return then opens the App Store page.
+
+- get
+- obtenir
+
 ## Spotlight Overlay
 
 Other text that shows only while Spotlight covers the screen. The top-hit

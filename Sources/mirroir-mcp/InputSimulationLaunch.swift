@@ -138,7 +138,7 @@ extension InputSimulation {
 
         // Step 3: Open the top result, once that result is an app. Without one,
         // Return opens a web suggestion or an App Store page.
-        guard let results = appTopHitScreen() else {
+        guard let results = appTopHitScreen(name: name) else {
             DebugLog.log("launchApp", "ERROR: no app is Spotlight's top result for '\(name)'")
             // The menu item toggles it: leave the iPhone as it was, not on this query.
             _ = menuBridge.triggerMenuAction(menu: "View", item: "Spotlight")
@@ -215,15 +215,15 @@ extension InputSimulation {
 
     /// The Spotlight screen once its top result is an app, polling for up to
     /// `pasteVerifyTimeoutUs`, because results fill in after the typed text
-    /// shows. Nil when no app becomes the top result.
-    private func appTopHitScreen() -> [TapPoint]? {
+    /// shows. Nil when no app named `name` becomes the top result.
+    private func appTopHitScreen(name: String) -> [TapPoint]? {
         let poll = max(1, EnvConfig.pasteVerifyPollUs)
         let attempts = max(1, Int(EnvConfig.pasteVerifyTimeoutUs / poll))
         for attempt in 0 ..< attempts {
             if attempt > 0 { usleep(poll) }
             if let screen = pasteVerifier?.describe(settleTimeoutUs: 0),
                screen.ocrFailure == nil,
-               SpotlightDetector.returnOpensApp(elements: screen.elements) {
+               SpotlightDetector.returnOpensApp(elements: screen.elements, name: name) {
                 return screen.elements
             }
         }

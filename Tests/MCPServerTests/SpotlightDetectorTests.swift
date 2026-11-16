@@ -120,9 +120,9 @@ final class SpotlightDetectorTests: XCTestCase {
 
     func testAFieldSayingOpenMeansReturnOpensAnApp() {
         let screen = [point("Meilleur résultat", 86, 107), point("Q Horloge - Ouvrir", 133, 874)]
-        XCTAssertTrue(SpotlightDetector.returnOpensApp(elements: screen))
+        XCTAssertTrue(SpotlightDetector.returnOpensApp(elements: screen, name: "Horloge"))
         let english = [point("Top Hit", 86, 107), point("Clock — Open", 133, 874)]
-        XCTAssertTrue(SpotlightDetector.returnOpensApp(elements: english))
+        XCTAssertTrue(SpotlightDetector.returnOpensApp(elements: english, name: "Clock"))
     }
 
     /// XR, iOS 26, 2026-11-16 (carnet#76): the top hit showed with no heading
@@ -134,18 +134,18 @@ final class SpotlightDetectorTests: XCTestCase {
             point("Rechercher dans l'app Q", 287, 320),
         ]
         XCTAssertFalse(SpotlightDetector.holdsQuery(elements: screen))
-        XCTAssertTrue(SpotlightDetector.returnOpensApp(elements: screen))
+        XCTAssertTrue(SpotlightDetector.returnOpensApp(elements: screen, name: "Horloge"))
     }
 
     func testAFieldNamingAnotherResultWithoutAHeadingIsNoApp() {
         let screen = [point("M/t/o - Clinique dentaire St-Sauve", 189, 101), point(icon, 168, 166),
                       point("Horloge", 79, 266)]
-        XCTAssertFalse(SpotlightDetector.returnOpensApp(elements: screen))
+        XCTAssertFalse(SpotlightDetector.returnOpensApp(elements: screen, name: "M/t/o"))
     }
 
     func testATileUnderTheHeadingCountsWhenTheFieldIsUnread() {
         let screen = [point("Meilleur résultat", 86, 107), point(icon, 81, 188), point("Météo", 79, 219)]
-        XCTAssertTrue(SpotlightDetector.returnOpensApp(elements: screen),
+        XCTAssertTrue(SpotlightDetector.returnOpensApp(elements: screen, name: "Weather"),
                       "an English name on a French iPhone still has an app as its top hit")
     }
 
@@ -158,13 +158,42 @@ final class SpotlightDetectorTests: XCTestCase {
             point("Nous désirons vous rappeler votr...", 241, 232),
             point("Q M/t/o - Clinique dentaire St-Sauve", 189, 829),
         ]
-        XCTAssertFalse(SpotlightDetector.returnOpensApp(elements: screen))
+        XCTAssertFalse(SpotlightDetector.returnOpensApp(elements: screen, name: "M/t/o"))
+    }
+
+    /// XR, iOS 26, 2026-11-15 (carnet#74): OpenTable not installed. The top hit
+    /// was its App Store card, and the field still said Return opens it.
+    private var storeCardScreen: [TapPoint] {
+        [
+            point("Meilleur résultat", 86, 107), point("OpenTable", 165, 151), point("Obtenir", 342, 171),
+            point("Food & Drink", 167, 172), point(icon, 202, 174), point("Suggestions", 72, 253),
+            point("OpenTable", 111, 298), point(icon, 42, 299), point("OpenTable - Ouvrir", 158, 874),
+        ]
+    }
+
+    func testAnAppStoreCardAsTopHitIsNoApp() {
+        XCTAssertTrue(SpotlightDetector.firstResultIsStoreCard(elements: storeCardScreen, name: "OpenTable"))
+        XCTAssertFalse(SpotlightDetector.returnOpensApp(elements: storeCardScreen, name: "OpenTable"))
+    }
+
+    func testAnAppStoreCardWithoutAHeadingIsNoApp() {
+        let screen = storeCardScreen.filter { $0.text != "Meilleur résultat" }
+        XCTAssertFalse(SpotlightDetector.returnOpensApp(elements: screen, name: "OpenTable"))
+    }
+
+    func testAStoreButtonFarBelowAnInstalledAppDoesNotCount() {
+        let screen = [
+            point("Horloge — Ouvrir", 137, 101), point(icon, 168, 166), point("Horloge", 79, 266),
+            point("Horloge Mondiale", 165, 420), point("Obtenir", 342, 430),
+        ]
+        XCTAssertFalse(SpotlightDetector.firstResultIsStoreCard(elements: screen, name: "Horloge"))
+        XCTAssertTrue(SpotlightDetector.returnOpensApp(elements: screen, name: "Horloge"))
     }
 
     func testNoTopHitMeansNoApp() {
         let screen = [point("Suggestions", 72, 108), point(icon, 42, 153), point("Keynote", 101, 154),
                       point("Keynote", 107, 872)]
-        XCTAssertFalse(SpotlightDetector.returnOpensApp(elements: screen))
+        XCTAssertFalse(SpotlightDetector.returnOpensApp(elements: screen, name: "Keynote"))
         XCTAssertFalse(SpotlightDetector.holdsQuery(elements: screen))
     }
 

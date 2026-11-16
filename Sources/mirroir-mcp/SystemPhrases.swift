@@ -38,6 +38,8 @@ struct SystemPhrases: Sendable, Equatable {
         case spotlightTopHit = "Spotlight Top Hit"
         /// The whole word the search field adds when Return would open an app.
         case spotlightOpen = "Spotlight Open"
+        /// The whole label of an App Store result's button for an app not installed.
+        case spotlightStoreButton = "Spotlight Store Button"
         /// Other fragments shown only while Spotlight covers the screen.
         case spotlightOverlay = "Spotlight Overlay"
         /// The whole label of the Home Screen's search pill.
