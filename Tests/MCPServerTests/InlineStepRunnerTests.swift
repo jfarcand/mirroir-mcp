@@ -175,6 +175,18 @@ final class InlineStepRunnerTests: XCTestCase {
         XCTAssertEqual(index, 0)
     }
 
+    /// carnet#78: steps that open an app themselves are checked for that app.
+    func testStepsThatOpenABlockedAppAreRefused() {
+        let policy = PermissionPolicy(skipPermissions: true,
+                                      config: PermissionConfig(blockedApps: ["Safari", "Settings"]))
+        for step in ["open_url: https://example.com", "set_network: wifi_off"] {
+            guard case .failure(.denied(let index, _, _)) = InlineStepRunner.prepare([step], policy: policy) else {
+                return XCTFail("\(step) must be refused while its app is blocked")
+            }
+            XCTAssertEqual(index, 0)
+        }
+    }
+
     func testAMeasureIsCheckedForTheActionItRuns() {
         let policy = PermissionPolicy(skipPermissions: false,
                                       config: PermissionConfig(allow: ["measure"]))

@@ -101,6 +101,38 @@ final class NavigationToolHandlerTests: XCTestCase {
         XCTAssertTrue(text?.contains("blocked") ?? false)
     }
 
+    /// A server whose policy blocks `apps`, with the tools that open an app
+    /// on their own (carnet#78).
+    private func serverBlocking(_ apps: [String]) -> MCPServer {
+        let policy = PermissionPolicy(skipPermissions: true,
+                                      config: PermissionConfig(allow: ["*"], blockedApps: apps))
+        let policyServer = MCPServer(policy: policy, transport: .stdio)
+        let policyRegistry = makeTestRegistry(bridge: bridge, input: input)
+        MirroirMCP.registerNavigationTools(server: policyServer, registry: policyRegistry, policy: policy)
+        MirroirMCP.registerNetworkTools(server: policyServer, registry: policyRegistry, policy: policy)
+        return policyServer
+    }
+
+    private func call(_ server: MCPServer, _ tool: String, _ args: [String: JSONValue]) -> JSONRPCResponse {
+        server.handleRequest(JSONRPCRequest(
+            jsonrpc: "2.0", id: .number(1), method: "tools/call",
+            params: .object(["name": .string(tool), "arguments": .object(args)])))!
+    }
+
+    func testOpenURLIsRefusedWhenSafariIsBlocked() {
+        let response = call(serverBlocking(["safari"]), "open_url", ["url": .string("https://example.com")])
+        XCTAssertTrue(isError(response))
+        XCTAssertTrue(extractText(response)?.contains("blocked") ?? false)
+        XCTAssertEqual(input.openURLCalls, [])
+    }
+
+    func testSetNetworkIsRefusedWhenSettingsIsBlocked() {
+        let response = call(serverBlocking(["Settings"]), "set_network", ["mode": .string("wifi_off")])
+        XCTAssertTrue(isError(response))
+        XCTAssertTrue(extractText(response)?.contains("blocked") ?? false)
+        XCTAssertTrue(input.launchAppCalls.isEmpty, "Settings must not be opened")
+    }
+
     func testLaunchAppSuccess() {
         input.launchAppResult = nil
         describer.describeResult = ScreenDescriber.DescribeResult(

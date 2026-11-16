@@ -110,7 +110,8 @@ final class DescriberRoutingTests: XCTestCase {
         let ocr = StubDescriber()
         ocr.describeResult = screen("Wi-Fi")
         let server = server(client: client, ocr: ocr) { server, registry in
-            MirroirMCP.registerNetworkTools(server: server, registry: registry)
+            MirroirMCP.registerNetworkTools(server: server, registry: registry,
+                                           policy: PermissionPolicy(skipPermissions: true, config: nil))
         }
 
         try call(server, "set_network", ["mode": .string("wifi_off")])

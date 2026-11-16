@@ -22,7 +22,8 @@ import HelperLib
 extension MirroirMCP {
     static func registerNetworkTools(
         server: MCPServer,
-        registry: TargetRegistry
+        registry: TargetRegistry,
+        policy: PermissionPolicy
     ) {
         // set_network — toggle network settings via the Settings app
         server.registerTool(MCPToolDefinition(
@@ -53,6 +54,9 @@ extension MirroirMCP {
                 }
                 guard let mode = args["mode"]?.asString() else {
                     return .error("Missing required parameter: mode (string)")
+                }
+                if case .denied(let reason) = policy.checkAppLaunch(NetworkToggle.settingsAppName) {
+                    return .error(reason)
                 }
 
                 switch NetworkToggle.toggle(

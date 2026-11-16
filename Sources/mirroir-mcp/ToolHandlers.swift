@@ -40,7 +40,7 @@ extension MirroirMCP {
         registerScrollToTools(server: server, registry: registry)
         registerAppManagementTools(server: server, registry: registry)
         registerMeasureTools(server: server, registry: registry)
-        registerNetworkTools(server: server, registry: registry)
+        registerNetworkTools(server: server, registry: registry, policy: policy)
         registerTargetTools(server: server, registry: registry)
         registerNotesTools(server: server)
         registerListenTools(server: server, registry: registry)

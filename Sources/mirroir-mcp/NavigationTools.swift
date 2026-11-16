@@ -102,6 +102,9 @@ extension MirroirMCP {
                 guard let url = args["url"]?.asString() else {
                     return .error("Missing required parameter: url (string)")
                 }
+                if case .denied(let reason) = policy.checkAppLaunch(InputSimulation.openURLAppName) {
+                    return .error(reason)
+                }
 
                 if let error = input.openURL(url) {
                     return .error(error)

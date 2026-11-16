@@ -167,6 +167,10 @@ enum InlineStepRunner {
         switch step {
         case .launch(let app), .resetApp(let app):
             if case .denied(let reason) = policy.checkAppLaunch(app) { return reason }
+        case .openURL:
+            if case .denied(let reason) = policy.checkAppLaunch(InputSimulation.openURLAppName) { return reason }
+        case .setNetwork:
+            if case .denied(let reason) = policy.checkAppLaunch(NetworkToggle.settingsAppName) { return reason }
         case .measure(_, let action, _, _):
             return denial(for: action, policy: policy)
         default:

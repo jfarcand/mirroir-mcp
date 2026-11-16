@@ -44,6 +44,9 @@ extension InputSimulation {
         return TypeResult(success: false, error: "CGEvent shake failed")
     }
 
+    /// The app open_url opens, as launch_app opens it.
+    static let openURLAppName = "Safari"
+
     /// Open a URL on the mirrored iPhone by launching Safari and navigating to it.
     /// Opens Safari via Spotlight, selects the address bar with Cmd+L, types the URL,
     /// and presses Return to navigate.
@@ -52,7 +55,7 @@ extension InputSimulation {
         DebugLog.log("openURL", "opening '\(url)'")
 
         // Step 1: Launch Safari
-        if let error = launchApp(name: "Safari") {
+        if let error = launchApp(name: Self.openURLAppName) {
             return error
         }
         usleep(EnvConfig.safariLoadUs)
