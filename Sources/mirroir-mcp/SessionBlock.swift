@@ -80,7 +80,7 @@ enum SessionBlockClassifier {
 
     /// Non-empty labels of the static text and buttons under the hosting view
     /// and the attached sheets, in tree order, duplicates dropped. Toolbar
-    /// chrome is skipped: it says nothing about the interruption.
+    /// chrome and the Mac's text-input UI are skipped: they say nothing about the interruption.
     static func labels(of window: MirroringAXWindow) -> [String] {
         var seen = Set<String>()
         return roots(of: window).flatMap(collect).filter { seen.insert($0).inserted }
@@ -93,7 +93,7 @@ enum SessionBlockClassifier {
     }
 
     private static func collect(_ node: AXNodeSnapshot) -> [String] {
-        if MirroringWindowResolver.isToolbarControl(node) { return [] }
+        if MirroringWindowResolver.isChrome(node) { return [] }
         let label = node.label?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
         var own: [String] = []
         if !label.isEmpty {

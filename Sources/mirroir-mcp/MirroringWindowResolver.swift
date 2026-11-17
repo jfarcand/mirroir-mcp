@@ -38,6 +38,14 @@ enum MirroringWindowResolver {
         "app.grid.3x3", "iphone.app.switcher",
     ]
 
+    /// Identifiers of the Mac's own text-input UI drawn over the window while
+    /// keys are typed into it: the autocorrection bubble ("Horloge" with a
+    /// close button after typing "horloge"). It belongs to the Mac, not to
+    /// an interruption, and goes away with the next keystroke or click.
+    static let macTextInputIdentifiers: Set<String> = [
+        "NSAutocorrectionSuggestion",
+    ]
+
     /// Resolve the mirroring window's live geometry.
     ///
     /// The window server's bounds are authoritative: AX geometry can lag after
@@ -172,7 +180,7 @@ enum MirroringWindowResolver {
     /// The strongest overlay content in `node` and its descendants. Toolbar
     /// chrome is skipped whole.
     static func overlayContent(_ node: AXNodeSnapshot) -> OverlayContent {
-        if isToolbarControl(node) { return .none }
+        if isChrome(node) { return .none }
         let hasLabel = !(node.label?.trimmingCharacters(in: .whitespaces).isEmpty ?? true)
         var own = OverlayContent.none
         if node.role == kAXButtonRole as String {
@@ -181,6 +189,15 @@ enum MirroringWindowResolver {
             own = .labeled
         }
         return ([own] + node.children.map(overlayContent)).max() ?? own
+    }
+
+    /// Whether `node` is chrome the Mac draws over a live session: a window
+    /// or toolbar control, or the Mac's text-input UI. Skipped whole.
+    static func isChrome(_ node: AXNodeSnapshot) -> Bool {
+        if let identifier = node.identifier, macTextInputIdentifiers.contains(identifier) {
+            return true
+        }
+        return isToolbarControl(node)
     }
 
     /// Whether `node` is a window control or a toolbar button: chrome that

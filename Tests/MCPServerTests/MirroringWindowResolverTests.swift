@@ -217,6 +217,34 @@ final class MirroringWindowResolverTests: XCTestCase {
             .paused)
     }
 
+    /// carnet#77: the AX tree captured on 2026-11-17 after typing "horloge"
+    /// into Spotlight on an iOS 27 phone. The Mac drew its autocorrection
+    /// bubble over the live window: "Horloge" and a close button.
+    private var autocorrectionBubble: AXNodeSnapshot {
+        AXNodeSnapshot(role: "AXGroup", identifier: "NSAutocorrectionSuggestion", children: [
+            AXNodeSnapshot(role: "AXList", children: [
+                AXNodeSnapshot(role: "AXStaticText", label: "Horloge"),
+            ]),
+            AXNodeSnapshot(role: "AXButton", label: "close"),
+        ])
+    }
+
+    func testTheMacAutocorrectionBubbleOverALiveSessionIsConnected() {
+        let hosting = AXNodeSnapshot(role: "AXGroup", children: [autocorrectionBubble])
+        XCTAssertEqual(state(axWindow(frame: nil, hosting: hosting)), .connected)
+    }
+
+    func testTheAutocorrectionBubbleDoesNotHideAnOverlay() {
+        let hosting = AXNodeSnapshot(role: "AXGroup", children: [
+            autocorrectionBubble,
+            AXNodeSnapshot(role: "AXGroup", children: [
+                AXNodeSnapshot(role: "AXStaticText", label: "iPhone Mirroring Paused"),
+                AXNodeSnapshot(role: "AXButton", label: "Resume"),
+            ]),
+        ])
+        XCTAssertEqual(state(axWindow(frame: nil, hosting: hosting)), .paused)
+    }
+
     func testToolbarButtonWithoutSubroleOrIdentifierStillReadsAsOverlay() {
         // Only known chrome is exempt; an unknown button keeps the safe answer.
         let hosting = AXNodeSnapshot(role: "AXGroup", children: [
