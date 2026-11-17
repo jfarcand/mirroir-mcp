@@ -88,6 +88,11 @@ final class SkyLightWindowPoster: WindowEventPosting, @unchecked Sendable {
         static let pressureOffset = 0x90
         static let mouseDown: UInt8 = 1
         static let mouseUp: UInt8 = 2
+        /// An AppKit-defined event; with `applicationActivated` in the
+        /// event-number field it is the window server's "application
+        /// activated" record.
+        static let appKitDefined: UInt8 = 0x0d
+        static let applicationActivated: Int16 = 0x01
         /// Marks the record as addressed to the window in `windowIDOffset`.
         static let windowTargeted: UInt8 = 0x10
         static let fullPressure: UInt8 = 0xff
@@ -145,16 +150,46 @@ final class SkyLightWindowPoster: WindowEventPosting, @unchecked Sendable {
         }
     }
 
+    /// Makes the app AppKit-active, then its window key.
     func focusKeys(in window: WindowInfo) -> Bool {
-        [Record.mouseDown, Record.mouseUp].allSatisfy { type in
-            post(to: window) { record in
-                record.storeBytes(of: type, toByteOffset: Record.typeOffset, as: UInt8.self)
-                for offset in 0..<Record.windowLocationLength {
-                    record.storeBytes(of: Record.blankedLocationByte,
-                                      toByteOffset: Record.windowLocationOffset + offset, as: UInt8.self)
-                }
+        Self.focusKeyFills.allSatisfy { post(to: window, fill: $0) }
+    }
+
+    /// Fills one event record's fields.
+    typealias RecordFill = @Sendable (UnsafeMutableRawPointer) -> Void
+
+    /// The records `focusKeys` posts, in order. The app handles keys only
+    /// while it believes it is active; the "application activated" record
+    /// runs that without making it the front process, so the user's own
+    /// typing stays in their app (without it, keys never reach an iOS 27
+    /// phone). The blanked-location button pair then makes the window key
+    /// without a click.
+    static let focusKeyFills: [RecordFill] = [
+        { record in
+            record.storeBytes(of: Record.appKitDefined, toByteOffset: Record.typeOffset, as: UInt8.self)
+            record.storeBytes(of: Record.applicationActivated,
+                              toByteOffset: Record.eventNumberOffset, as: Int16.self)
+        },
+    ] + [Record.mouseDown, Record.mouseUp].map { type in
+        { record in
+            record.storeBytes(of: type, toByteOffset: Record.typeOffset, as: UInt8.self)
+            for offset in 0..<Record.windowLocationLength {
+                record.storeBytes(of: Record.blankedLocationByte,
+                                  toByteOffset: Record.windowLocationOffset + offset, as: UInt8.self)
             }
         }
+    }
+
+    /// The bytes of one record addressed to `windowID`, with `fill` applied.
+    static func record(windowID: CGWindowID, fill: RecordFill) -> [UInt8] {
+        let record = UnsafeMutableRawPointer.allocate(byteCount: Record.size, alignment: 8)
+        defer { record.deallocate() }
+        record.initializeMemory(as: UInt8.self, repeating: 0, count: Record.size)
+        record.storeBytes(of: UInt8(Record.size), toByteOffset: Record.lengthOffset, as: UInt8.self)
+        record.storeBytes(of: Record.windowTargeted, toByteOffset: Record.flagsOffset, as: UInt8.self)
+        record.storeBytes(of: UInt32(windowID), toByteOffset: Record.windowIDOffset, as: UInt32.self)
+        fill(record)
+        return Array(UnsafeBufferPointer(start: record.assumingMemoryBound(to: UInt8.self), count: Record.size))
     }
 
     func pause(microseconds: UInt32) {
@@ -178,14 +213,8 @@ final class SkyLightWindowPoster: WindowEventPosting, @unchecked Sendable {
 
     /// Build one record addressed to `window`, let `fill` set its event
     /// fields, and post it to the window's process.
-    private func post(to window: WindowInfo, fill: (UnsafeMutableRawPointer) -> Void) -> Bool {
-        let record = UnsafeMutableRawPointer.allocate(byteCount: Record.size, alignment: 8)
-        defer { record.deallocate() }
-        record.initializeMemory(as: UInt8.self, repeating: 0, count: Record.size)
-        record.storeBytes(of: UInt8(Record.size), toByteOffset: Record.lengthOffset, as: UInt8.self)
-        record.storeBytes(of: Record.windowTargeted, toByteOffset: Record.flagsOffset, as: UInt8.self)
-        record.storeBytes(of: UInt32(window.windowID), toByteOffset: Record.windowIDOffset, as: UInt32.self)
-        fill(record)
+    private func post(to window: WindowInfo, fill: RecordFill) -> Bool {
+        var record = Self.record(windowID: window.windowID, fill: fill)
 
         let psn = UnsafeMutableRawPointer.allocate(byteCount: Self.processSerialNumberSize, alignment: 4)
         defer { psn.deallocate() }
@@ -194,7 +223,10 @@ final class SkyLightWindowPoster: WindowEventPosting, @unchecked Sendable {
             DebugLog.log("skylight", "no process serial number for pid \(window.pid)")
             return false
         }
-        let status = postEventRecord(psn, record)
+        let status = record.withUnsafeMutableBytes { bytes -> Int32 in
+            guard let base = bytes.baseAddress else { return -1 }
+            return postEventRecord(psn, base)
+        }
         if status != 0 { DebugLog.log("skylight", "post failed: \(status)") }
         return status == 0
     }
