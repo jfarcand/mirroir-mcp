@@ -83,7 +83,7 @@ enum AlertDetector {
         let hasTitlePattern = elements.contains { element in
             let lowered = SystemPhrases.fold(element.text)
             return titles.contains { pattern in
-                lowered.contains(pattern) || matchesRegexLike(text: lowered, pattern: pattern)
+                SystemPhrases.matches(lowered, pattern: pattern)
             }
         }
 
@@ -97,15 +97,5 @@ enum AlertDetector {
 
         let alertType = hasTitlePattern ? "permission/tracking dialog" : "system alert"
         return DetectedAlert(dismissTarget: best.element, alertType: alertType)
-    }
-
-    /// Simple pattern matching that handles ".*" wildcard in patterns.
-    private static func matchesRegexLike(text: String, pattern: String) -> Bool {
-        guard pattern.contains(".*") else { return text.contains(pattern) }
-        let parts = pattern.components(separatedBy: ".*")
-        guard parts.count == 2 else { return text.contains(pattern) }
-        guard let firstRange = text.range(of: parts[0]) else { return false }
-        let remaining = text[firstRange.upperBound...]
-        return remaining.contains(parts[1])
     }
 }

@@ -28,6 +28,10 @@ final class MCPServer: Sendable {
     private let encoder: JSONEncoder
     private let decoder: JSONDecoder
     private let policy: PermissionPolicy
+    /// Reads the screen of the target a tool call names, for the driving check
+    /// (`DrivingGuard`) in front of every input. Nil until tools are registered.
+    private let screenReader = OSAllocatedUnfairLock(
+        initialState: (@Sendable ([String: JSONValue]) -> ScreenDescriber.DescribeResult?)?.none)
     /// Counter for server-initiated request IDs (sampling, etc.).
     let requestCounter = OSAllocatedUnfairLock(initialState: 0)
     /// Capabilities the client declared in its `initialize` handshake, which
@@ -48,6 +52,11 @@ final class MCPServer: Sendable {
 
     func registerTool(_ tool: MCPToolDefinition) {
         tools.withLock { $0[tool.name] = tool }
+    }
+
+    /// Set how the driving check reads the screen of the target a call names.
+    func setScreenReader(_ reader: @escaping @Sendable ([String: JSONValue]) -> ScreenDescriber.DescribeResult?) {
+        screenReader.withLock { $0 = reader }
     }
 
     /// Run the MCP server, reading JSON-RPC from stdin and writing to stdout.
@@ -371,6 +380,15 @@ final class MCPServer: Sendable {
         }
 
         let arguments = request.params?.getArguments() ?? [:]
+        let reader = screenReader.withLock { $0 }
+        if let refusal = DrivingGuard.refusal(tool: toolName, policy: policy, read: { reader?(arguments) }) {
+            DebugLog.log("permission", "driving refused \(toolName)")
+            let result = completeResult([
+                "content": .array([MCPContent.text(refusal).toJSON()]),
+                "isError": .bool(true),
+            ], modern: modern)
+            return JSONRPCResponse(id: request.id, result: result, error: nil)
+        }
         let context = MCPToolCallContext(
             inputResponses: Self.inputResponses(in: request),
             requestState: Self.requestState(in: request))

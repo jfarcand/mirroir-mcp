@@ -25,6 +25,9 @@ extension MirroirMCP {
         registry: TargetRegistry,
         policy: PermissionPolicy
     ) {
+        server.setScreenReader { arguments in
+            registry.resolveForTool(arguments).0?.ocrDescriber.describe()
+        }
         registerScreenTools(server: server, registry: registry)
         registerInputTools(server: server, registry: registry, policy: policy)
         registerTapTools(server: server, registry: registry, policy: policy)

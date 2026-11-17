@@ -118,7 +118,8 @@ enum InlineStepRunner {
                                           durationSeconds: 0))
                 continue
             }
-            let result = blockedTap(step, executor: executor, policy: policy)
+            let result = drivingStop(step, executor: executor, policy: policy)
+                ?? blockedTap(step, executor: executor, policy: policy)
                 ?? executor.execute(step: step, stepIndex: index, skillName: runName)
             results.append(result)
             tapRead = nil
@@ -142,6 +143,17 @@ enum InlineStepRunner {
     static func readsTheSame(_ before: [TapPoint], _ after: [TapPoint]) -> Bool {
         let structural = StructuralFingerprint.extractStructural(from: before)
         return !structural.isEmpty && structural == StructuralFingerprint.extractStructural(from: after)
+    }
+
+    /// A failed result for a step driving mode refuses (`DrivingGuard`): the
+    /// screen is read right before each step that sends input.
+    private static func drivingStop(
+        _ step: SkillStep, executor: StepExecutor, policy: PermissionPolicy
+    ) -> StepResult? {
+        guard let refusal = DrivingGuard.refusal(
+            tool: toolName(of: step), policy: policy, read: { executor.describer.describe() })
+        else { return nil }
+        return StepResult(step: step, status: .failed, message: refusal, durationSeconds: 0)
     }
 
     /// A failed result for a tap or long press that lands on the icon of an

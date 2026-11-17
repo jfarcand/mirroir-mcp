@@ -55,6 +55,17 @@ saying it opens it ("OpenTable — Ouvrir" over an "Obtenir" card, XR, iOS 26,
 - get
 - obtenir
 
+## Navigation
+
+Text a turn-by-turn navigation screen shows, a fragment of it. While driving
+mode is on, an input is refused when the phone shows one, since the phone is
+then guiding the drive. `.*` stands for any text between two parts. Read on
+Waze, iOS 27, 2026-11-16: "Re-center" and "14 min • 8.4 km".
+
+- re-center
+- min • .*km
+- min • .*mi
+
 ## Spotlight Overlay
 
 Other text that shows only while Spotlight covers the screen. The top-hit

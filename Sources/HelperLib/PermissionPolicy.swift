@@ -40,6 +40,23 @@ public struct AppToolRules: Codable, Sendable {
     }
 }
 
+/// Driving mode: the phone is on CarPlay and someone is driving with it.
+/// Only the user switches it on, in `permissions.json`: the Mac cannot see
+/// CarPlay, and the mirror shows the phone's own screen, never the car's.
+/// While it is on, only the apps `allowedApps` names open, and each input
+/// first reads the phone's screen and is refused when it shows navigation.
+public struct DrivingRules: Codable, Sendable, Equatable {
+    /// Whether driving mode is on.
+    public var on: Bool
+    /// The apps that may open while driving (case-insensitive). None when absent.
+    public var allowedApps: [String]?
+
+    public init(on: Bool, allowedApps: [String]? = nil) {
+        self.on = on
+        self.allowedApps = allowedApps
+    }
+}
+
 /// JSON-decodable permission configuration loaded from ~/.mirroir-mcp/permissions.json.
 /// The loader checks project-local (<cwd>/.mirroir-mcp/) first, then global (~/.mirroir-mcp/).
 public struct PermissionConfig: Codable, Sendable {
@@ -62,12 +79,16 @@ public struct PermissionConfig: Codable, Sendable {
     /// global `allow`/`deny` lists: per-app `deny` wins over global `allow`, and
     /// per-app `allow` opens tools that the global lists would close.
     public var perApp: [String: AppToolRules]?
+    /// Driving mode. `PermissionPolicy` reads it from the file on every check,
+    /// so switching it on or off needs no restart.
+    public var driving: DrivingRules?
 
     public init(
         allow: [String]? = nil, deny: [String]? = nil,
         blockedApps: [String]? = nil, skipElements: [String]? = nil,
         confirmElements: [String]? = nil,
-        perApp: [String: AppToolRules]? = nil
+        perApp: [String: AppToolRules]? = nil,
+        driving: DrivingRules? = nil
     ) {
         self.allow = allow
         self.deny = deny
@@ -75,6 +96,7 @@ public struct PermissionConfig: Codable, Sendable {
         self.skipElements = skipElements
         self.confirmElements = confirmElements
         self.perApp = perApp
+        self.driving = driving
     }
 }
 
@@ -84,6 +106,9 @@ public struct PermissionPolicy: Sendable {
     public let skipPermissions: Bool
     /// Optional config loaded from disk.
     public let config: PermissionConfig?
+    /// Reads the driving rules as they are now: by default from
+    /// `permissions.json` on every call, not from the `config` read at start.
+    public let drivingSource: @Sendable () -> DrivingRules?
 
     /// Base directory name for config files (both global and project-local).
     public static let configDirName = ".mirroir-mcp"
@@ -190,9 +215,26 @@ public struct PermissionPolicy: Sendable {
         ]
     }
 
-    public init(skipPermissions: Bool, config: PermissionConfig?) {
+    public init(
+        skipPermissions: Bool, config: PermissionConfig?,
+        drivingSource: @escaping @Sendable () -> DrivingRules? = { PermissionPolicy.loadConfig()?.driving }
+    ) {
         self.skipPermissions = skipPermissions
         self.config = config
+        self.drivingSource = drivingSource
+    }
+
+    /// The driving rules while driving mode is on, nil otherwise. Neither
+    /// `--dangerously-skip-permissions` nor any allow list turns it off.
+    public var driving: DrivingRules? {
+        guard let rules = drivingSource(), rules.on else { return nil }
+        return rules
+    }
+
+    /// Whether `checkAppLaunch` can refuse any app right now, so a tap guard
+    /// knows whether reading the screen for app icons is worth it.
+    public var restrictsApps: Bool {
+        !(config?.blockedApps ?? []).isEmpty || driving != nil
     }
 
     /// Check whether a tool is allowed to execute.
@@ -291,6 +333,15 @@ public struct PermissionPolicy: Sendable {
             return .denied(reason:
                 "App '\(appName)' is blocked by permissions config. " +
                 "Remove it from blockedApps in \(Self.configPath) to allow launching it. "
+                + AgentInstruction.userDecides)
+        }
+
+        if let driving, !(driving.allowedApps ?? []).contains(where: { $0.lowercased() == name }) {
+            let allowed = (driving.allowedApps ?? []).joined(separator: ", ")
+            return .denied(reason:
+                "App '\(appName)' does not open while driving: driving mode is on, and only "
+                + (allowed.isEmpty ? "no app is" : "\(allowed) are") + " listed in driving.allowedApps. "
+                + "Add it there, or turn driving mode off, in \(Self.configPath). "
                 + AgentInstruction.userDecides)
         }
 

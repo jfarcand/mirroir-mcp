@@ -56,7 +56,7 @@ enum BlockedAppTapGuard {
     }
 
     /// The refusal for a tap at `point` on `ctx`'s screen right now. Reads the
-    /// screen only when `policy` blocks an app; nil when the screen cannot be read.
+    /// screen only when `policy` can refuse an app; nil when the screen cannot be read.
     static func refusal(at point: CGPoint, ctx: TargetContext, policy: PermissionPolicy) -> String? {
         refusal(target: .point(point), bridge: ctx.bridge, describer: ctx.ocrDescriber, policy: policy)
     }
@@ -69,13 +69,13 @@ enum BlockedAppTapGuard {
 
     /// The refusal for a tap at `target` on the screen `describer` reads now.
     /// A label is found the way a tap step finds it (`ElementMatcher`). Reads
-    /// the screen only when `policy` blocks an app; nil when it cannot be read
+    /// the screen only when `policy` can refuse an app; nil when it cannot be read
     /// or a label is not on it.
     static func refusal(
         target: Target, bridge: any WindowBridging, describer: any ScreenDescribing,
         policy: PermissionPolicy
     ) -> String? {
-        guard !(policy.config?.blockedApps ?? []).isEmpty,
+        guard policy.restrictsApps,
               let height = bridge.getWindowInfo()?.size.height,
               let screen = describer.describe(), screen.ocrFailure == nil else { return nil }
         let point: CGPoint

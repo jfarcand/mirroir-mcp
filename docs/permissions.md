@@ -24,6 +24,7 @@ Create `~/.mirroir-mcp/permissions.json` (or `<cwd>/.mirroir-mcp/permissions.jso
 - **`deny`** — blocklist that overrides allow. A tool in both lists is denied.
 - **`blockedApps`** — app names, as the iPhone labels them, that mirroir refuses to open (case-insensitive): `launch_app`, `open_url` (Safari), `set_network` (Settings), `generate_skill(action:"explore")`, and a `tap`, `double_tap`, `long_press` or `run_steps` tap on that app's labelled icon on the Home Screen or in Spotlight. Icons with no name under them are not checked: the Dock, folders, the App Library and App Switcher cards.
 - **`skipElements`** — element text patterns the explorer should never tap (case-insensitive containment match). Useful for preventing the explorer from tapping destructive elements like "Delete Account".
+- **`driving`** — driving mode, for a phone on CarPlay: `{ "on": true, "allowedApps": [...] }`. The Mac cannot see CarPlay, so you switch it on yourself, and it is read on every call, so no restart is needed. While it is on, only the apps in `allowedApps` open (by name or by tapping their icon, as for `blockedApps`; no list means no app opens), and every input first reads the phone's screen and is refused when it shows turn-by-turn navigation or cannot be read. `press_home` and `launch_app` still leave a navigation screen: CarPlay goes on guiding while the phone shows another app. `generate_skill` does not run. `--dangerously-skip-permissions` does not turn it off.
 - **`perApp`** — per-app tool allow/deny layered on top of the global `allow`/`deny`. Keys are app names (case-insensitive); values are `{ "allow": […], "deny": […] }`. Per-app `deny` overrides global `allow`; per-app `allow` opens tools the global rules would close. Evaluated during `generate_skill` exploration — if an app's `deny` list blocks tools the explorer needs (`tap`, `swipe`, `type_text`, `press_key`), exploration refuses to start.
 
 ## Examples
@@ -52,6 +53,15 @@ Block Instagram from being launched:
 {
   "allow": ["*"],
   "blockedApps": ["Instagram"]
+}
+```
+
+Driving with the phone on CarPlay, music only:
+
+```json
+{
+  "allow": ["*"],
+  "driving": { "on": true, "allowedApps": ["Spotify"] }
 }
 ```
 

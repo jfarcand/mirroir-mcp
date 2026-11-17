@@ -40,6 +40,8 @@ struct SystemPhrases: Sendable, Equatable {
         case spotlightOpen = "Spotlight Open"
         /// The whole label of an App Store result's button for an app not installed.
         case spotlightStoreButton = "Spotlight Store Button"
+        /// Fragments of a turn-by-turn navigation screen, `.*` standing for any text.
+        case navigation = "Navigation"
         /// Other fragments shown only while Spotlight covers the screen.
         case spotlightOverlay = "Spotlight Overlay"
         /// The whole label of the Home Screen's search pill.
@@ -74,6 +76,15 @@ struct SystemPhrases: Sendable, Equatable {
     /// curly apostrophe iOS draws read as a straight one.
     static func fold(_ text: String) -> String {
         text.lowercased().replacingOccurrences(of: "\u{2019}", with: "'")
+    }
+
+    /// Whether folded `text` contains `pattern`, where a `.*` in the pattern
+    /// stands for any text between its two parts.
+    static func matches(_ text: String, pattern: String) -> Bool {
+        let parts = pattern.components(separatedBy: ".*")
+        guard parts.count == 2 else { return text.contains(pattern) }
+        guard let first = text.range(of: parts[0]) else { return false }
+        return text[first.upperBound...].contains(parts[1])
     }
 
     /// The bullets under each known `##` heading, folded, in file order.

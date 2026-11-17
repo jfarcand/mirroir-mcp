@@ -4,6 +4,10 @@ What changed for you in each release. Full notes, with every commit, are on [Git
 
 ## Unreleased
 
+- **Driving mode, for a phone on CarPlay.** Add `"driving": { "on": true, "allowedApps": [...] }` to `permissions.json`. While it is on, only the listed apps open, and each input first reads the phone's screen and is refused on a navigation screen; Home and opening a listed app still leave it. It is read on every call, so no restart is needed.
+
+## 0.50.0 (2026-11-16)
+
 - **macOS 27: input reaches the iPhone again** ([#84](https://github.com/jfarcand/mirroir-mcp/issues/84)). On macOS 27.3, taps, keys and swipes were reported as done but never arrived. On any macOS newer than 26, mirroir now uses HID input, which brings iPhone Mirroring to the front. The `windowInput` setting (`auto`, `on`, `off`) forces either path, and `mirroir-mcp doctor` shows which one is in use.
 - **`tap` says when nothing changed.** When the screen reads the same before and after a `tap(text:)`, the reply says so, instead of a silent pass.
 - **Tapping an app's name on the Home Screen opens it.** `tap` by text goes to the icon above the name; next to a widget it used to land on the name and open nothing.
