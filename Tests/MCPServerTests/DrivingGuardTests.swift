@@ -143,9 +143,19 @@ final class DrivingGuardTests: XCTestCase {
 
     func testATapOnTheHomeScreenGoesThrough() {
         let server = makeServer(policy: driving)
-        let result = call(server, "tap", ["x": .number(249), "y": .number(860)])
+        let result = call(server, "tap", ["x": .number(249), "y": .number(500)])
         XCTAssertFalse(result.isError, result.text)
         XCTAssertEqual(input.tapCalls.count, 1)
+    }
+
+    /// carnet#83: a Dock icon carries no name, so driving mode cannot tell
+    /// whether it opens a listed app.
+    func testADockTapSendsNothingWhileDriving() {
+        let server = makeServer(policy: driving)
+        let result = call(server, "tap", ["x": .number(249), "y": .number(860)])
+        XCTAssertTrue(result.isError, result.text)
+        XCTAssertTrue(result.text.contains("lands in the Dock"), result.text)
+        XCTAssertTrue(input.tapCalls.isEmpty)
     }
 
     func testOnlyTheListedAppsOpenWhileDriving() {

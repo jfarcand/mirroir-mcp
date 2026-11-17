@@ -74,6 +74,31 @@ final class BlockedAppTapGuardTests: XCTestCase {
             at: CGPoint(x: 79, y: 189), elements: spotlight, windowHeight: height, policy: blocking(["Réglages"])))
     }
 
+    // MARK: - Driving: the Dock (carnet#83)
+
+    private func driving(_ apps: [String]) -> PermissionPolicy {
+        PermissionPolicy(skipPermissions: true, config: nil,
+                         drivingSource: { DrivingRules(on: true, allowedApps: apps) })
+    }
+
+    /// Parked CarPlay test, 2026-11-16: a Dock tap opened Messages, which
+    /// driving mode did not list. Dock icons carry no name to check.
+    func testADockTapIsRefusedWhileDriving() {
+        let refusal = BlockedAppTapGuard.refusal(
+            at: CGPoint(x: 341, y: 850), elements: home, windowHeight: height, policy: driving(["Spotify"]))
+        XCTAssertTrue(refusal?.contains("lands in the Dock") == true, refusal ?? "nil")
+    }
+
+    func testAListedAppsIconAboveTheDockStillOpensWhileDriving() {
+        XCTAssertNil(BlockedAppTapGuard.refusal(
+            at: CGPoint(x: 72, y: 350), elements: home, windowHeight: height, policy: driving(["Plans"])))
+    }
+
+    func testTheDockIsNotCheckedWhenNotDriving() {
+        XCTAssertNil(BlockedAppTapGuard.refusal(
+            at: CGPoint(x: 341, y: 850), elements: home, windowHeight: height, policy: blocking(["Réglages"])))
+    }
+
     func testNothingIsBlockedWithoutBlockedApps() {
         XCTAssertNil(BlockedAppTapGuard.refusal(
             at: CGPoint(x: 263, y: 345), elements: home, windowHeight: height,

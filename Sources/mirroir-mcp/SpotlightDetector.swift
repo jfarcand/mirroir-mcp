@@ -225,7 +225,7 @@ enum SpotlightDetector {
     static let searchGlyphPrefixes: [String] = ["Q ", "🔍"]
 
     /// The text after the magnifier glyph, or nil when `text` does not start with it.
-    private static func searchFieldText(_ text: String) -> String? {
+    static func searchFieldText(_ text: String) -> String? {
         let trimmed = text.trimmingCharacters(in: .whitespaces)
         for glyph in searchGlyphPrefixes where trimmed.hasPrefix(glyph) {
             return String(trimmed.dropFirst(glyph.count)).trimmingCharacters(in: .whitespaces)

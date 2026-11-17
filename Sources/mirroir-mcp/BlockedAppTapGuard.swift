@@ -26,7 +26,9 @@ import HelperLib
 /// in `blockedApps`, the tap is refused before any input is sent.
 ///
 /// Only labelled icons can be read: Dock icons, folders, the App Library and
-/// App Switcher cards carry no name under them, so a tap there is not checked.
+/// App Switcher cards carry no name under them, so a tap there is not checked
+/// against `blockedApps`. While driving, a tap in the Dock is refused outright,
+/// since only listed apps may open and a Dock icon cannot be named.
 enum BlockedAppTapGuard {
 
     /// Widest horizontal offset, in points, between a tap and the center of the
@@ -39,14 +41,35 @@ enum BlockedAppTapGuard {
     /// How far below its label's center a tap still lands on the label.
     static let labelSlack = 15.0
 
+    /// How far below the search pill's center the Dock begins, in points:
+    /// past the pill's own lower half (XR: pill at 784, Dock icons from 812).
+    static let dockGapBelowPill = 20.0
+
+    /// The Home Screen's search pill, the last row above the Dock.
+    private static func homeSearchPill(in elements: [TapPoint], windowHeight: Double) -> TapPoint? {
+        let bandTop = windowHeight * SpotlightDetector.homeSearchPillBandStart
+        return elements.first { element in
+            guard element.tapY >= bandTop, let field = SpotlightDetector.searchFieldText(element.text) else {
+                return false
+            }
+            return SpotlightDetector.homeSearchPillLabels.contains(SystemPhrases.fold(field))
+        }
+    }
+
     /// The refusal for a tap at `point` on the screen `elements` show, or nil
     /// when it lands on no labelled icon of a blocked app. Only the Home
     /// Screen and Spotlight show app icons with their names.
     static func refusal(
         at point: CGPoint, elements: [TapPoint], windowHeight: Double, policy: PermissionPolicy
     ) -> String? {
-        guard SpotlightDetector.isHomeScreenVisible(elements: elements, windowHeight: windowHeight)
-                || SpotlightDetector.isSpotlightVisible(elements: elements) else { return nil }
+        let home = SpotlightDetector.isHomeScreenVisible(elements: elements, windowHeight: windowHeight)
+        guard home || SpotlightDetector.isSpotlightVisible(elements: elements) else { return nil }
+        if home, policy.driving != nil, let pill = homeSearchPill(in: elements, windowHeight: windowHeight),
+           Double(point.y) > pill.tapY + dockGapBelowPill {
+            return "The tap at (\(Int(point.x)), \(Int(point.y))) lands in the Dock, whose icons carry no "
+                + "name, so the app it opens cannot be checked against driving mode's allowed apps. "
+                + "Open a listed app with launch_app. No input was sent."
+        }
         for label in elements where label.text != CoreMLElementDetector.iconLabel && isOnIcon(point, of: label) {
             if case .denied(let reason) = policy.checkAppLaunch(label.text.trimmingCharacters(in: .whitespaces)) {
                 return "The tap at (\(Int(point.x)), \(Int(point.y))) lands on the '\(label.text)' icon. \(reason)"
