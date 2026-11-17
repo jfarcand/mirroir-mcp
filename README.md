@@ -158,6 +158,6 @@ Join the [Discord server](https://discord.gg/u8ug9QCSqF) to ask questions, share
 
 ---
 
-mirroir is developed by [async-io.live](https://async-io.live). Apache 2.0 - Copyright 2026 [async-io.live](https://async-io.live).
+Apache 2.0 - Copyright 2026 [Async-IO](https://async-io.live).
 
 > **Why "mirroir"?** — It's the old French spelling of *miroir* (mirror). A nod to the author's roots, not a typo.
