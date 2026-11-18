@@ -130,6 +130,16 @@ struct DisputedKeysReport {
         chosen != nil && !disputed.isEmpty && result.success && result.misreadingShown
     }
 
+    /// The failure for a `chosen` layout the screen shows was wrong.
+    private func wrongAnswer(_ chosen: String) -> String {
+        let names: String = layouts.joined(separator: ", ")
+        let shown = "Typed \"\(text)\" with the \(chosen) keyboard layout, but the screen shows "
+        let other = "what another layout types instead: the connected iPhone uses another layout. "
+        let forgot = "The \(chosen) answer for this phone is forgotten. Clear the field, then retry "
+        let retry = "with keyboard_layout set to the iPhone's hardware keyboard (one of: \(names))."
+        return shown + other + forgot + retry
+    }
+
     /// `result` with what the caller needs to know about the disputed characters.
     func apply(to result: TypeResult) -> TypeResult {
         guard !disputed.isEmpty else { return result }
@@ -137,19 +147,16 @@ struct DisputedKeysReport {
             guard answerFailed(result) else { return result }
             return TypeResult(
                 success: false,
-                error: "Typed \"\(text)\" with the \(chosen) keyboard layout, but the screen shows "
-                    + "what another layout types instead: the connected iPhone uses another layout. "
-                    + "The \(chosen) answer for this phone is forgotten. Clear the field, then retry "
-                    + "with keyboard_layout set to the iPhone's hardware keyboard (one of: "
-                    + "\(layouts.joined(separator: ", "))).")
+                error: wrongAnswer(chosen))
         }
-        let chars = disputed.map { "'\($0)'" }.joined(separator: " ")
-        let hint = "The text holds \(chars), which the keyboard layouts in settings ("
-            + layouts.joined(separator: ", ") + ") type with different keys, and which one the "
-            + "connected iPhone uses is not known, so it goes through the clipboard. Pass "
-            + "keyboard_layout with its hardware keyboard (Settings › General › Keyboard › Hardware "
-            + "Keyboard on the iPhone; ask the user) and it is typed by key from then on, remembered "
-            + "for this phone."
+        let chars: String = disputed.map { "'\($0)'" }.joined(separator: " ")
+        let names: String = layouts.joined(separator: ", ")
+        let unknown = "The text holds \(chars), which the keyboard layouts in settings (\(names)) "
+        let how = "type with different keys, and which one the connected iPhone uses is not known, "
+        let pass = "so it goes through the clipboard. Pass keyboard_layout with its hardware keyboard "
+        let onPhone = "(Settings › General › Keyboard › Hardware Keyboard on the iPhone; ask the user) "
+        let then = "and it is typed by key from then on, remembered for this phone."
+        let hint: String = unknown + how + pass + onPhone + then
         var reported = result
         if result.success {
             reported.notice = result.notice.map { "\(hint)\n\n\($0)" } ?? hint

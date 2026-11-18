@@ -165,12 +165,18 @@ final class SkyLightWindowPoster: WindowEventPosting, @unchecked Sendable {
     /// phone). The blanked-location button pair then makes the window key
     /// without a click.
     static let focusKeyFills: [RecordFill] = [
-        { record in
-            record.storeBytes(of: Record.appKitDefined, toByteOffset: Record.typeOffset, as: UInt8.self)
-            record.storeBytes(of: Record.applicationActivated,
-                              toByteOffset: Record.eventNumberOffset, as: Int16.self)
-        },
-    ] + [Record.mouseDown, Record.mouseUp].map { type in
+        activationFill, keyWindowFill(Record.mouseDown), keyWindowFill(Record.mouseUp),
+    ]
+
+    /// The window server's "application activated" record.
+    private static let activationFill: RecordFill = { record in
+        record.storeBytes(of: Record.appKitDefined, toByteOffset: Record.typeOffset, as: UInt8.self)
+        record.storeBytes(of: Record.applicationActivated,
+                          toByteOffset: Record.eventNumberOffset, as: Int16.self)
+    }
+
+    /// A button record of `type` with a blanked location: the window becomes key, unclicked.
+    private static func keyWindowFill(_ type: UInt8) -> RecordFill {
         { record in
             record.storeBytes(of: type, toByteOffset: Record.typeOffset, as: UInt8.self)
             for offset in 0..<Record.windowLocationLength {
