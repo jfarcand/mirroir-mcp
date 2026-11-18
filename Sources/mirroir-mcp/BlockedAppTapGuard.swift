@@ -45,16 +45,6 @@ enum BlockedAppTapGuard {
     /// past the pill's own lower half (XR: pill at 784, Dock icons from 812).
     static let dockGapBelowPill = 20.0
 
-    /// The Home Screen's search pill, the last row above the Dock.
-    private static func homeSearchPill(in elements: [TapPoint], windowHeight: Double) -> TapPoint? {
-        let bandTop = windowHeight * SpotlightDetector.homeSearchPillBandStart
-        return elements.first { element in
-            guard element.tapY >= bandTop, let field = SpotlightDetector.searchFieldText(element.text) else {
-                return false
-            }
-            return SpotlightDetector.homeSearchPillLabels.contains(SystemPhrases.fold(field))
-        }
-    }
 
     /// The refusal for a tap at `point` on the screen `elements` show, or nil
     /// when it lands on no labelled icon of a blocked app. Only the Home
@@ -64,7 +54,7 @@ enum BlockedAppTapGuard {
     ) -> String? {
         let home = SpotlightDetector.isHomeScreenVisible(elements: elements, windowHeight: windowHeight)
         guard home || SpotlightDetector.isSpotlightVisible(elements: elements) else { return nil }
-        if home, policy.driving != nil, let pill = homeSearchPill(in: elements, windowHeight: windowHeight),
+        if home, policy.driving != nil, let pill = SpotlightDetector.homeSearchPill(in: elements, windowHeight: windowHeight),
            Double(point.y) > pill.tapY + dockGapBelowPill {
             return "The tap at (\(Int(point.x)), \(Int(point.y))) lands in the Dock, whose icons carry no "
                 + "name, so the app it opens cannot be checked against driving mode's allowed apps. "

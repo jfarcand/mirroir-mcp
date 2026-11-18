@@ -20,6 +20,8 @@ What changed for you in each release. Full notes, with every commit, are on [Git
 
 - **`start_recording` keeps recording until `stop_recording`** ([#85](https://github.com/jfarcand/mirroir-mcp/issues/85)). screencapture read the server's own stdin: under `serve` it stopped at once, and over stdio it swallowed the next request. On macOS 15 it also recorded the main display instead of the window; it now records the window's frame there.
 
+- **`tap` by text in Settings hits the row you named.** iOS 26 and 27 Settings end on a search field that read as the Home Screen's, so the tap aimed at an icon above the label and opened the row above (Bluetooth for Cellular). Regression in 0.50.0.
+
 ## 0.50.0 (2026-11-16)
 
 - **macOS 27: input reaches the iPhone again** ([#84](https://github.com/jfarcand/mirroir-mcp/issues/84)). On macOS 27.3, taps, keys and swipes were reported as done but never arrived. On any macOS newer than 26, mirroir now uses HID input, which brings iPhone Mirroring to the front. The `windowInput` setting (`auto`, `on`, `off`) forces either path, and `mirroir-mcp doctor` shows which one is in use.

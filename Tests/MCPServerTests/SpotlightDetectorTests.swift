@@ -207,6 +207,18 @@ final class SpotlightDetectorTests: XCTestCase {
                        "the Home Screen's search pill is not Spotlight")
     }
 
+    /// iPhone 16, iOS 27, 2026-11-18: Settings ends on its own "Q Rechercher"
+    /// field at the bottom edge. Read as the Home Screen, a tap on "Réseau
+    /// cellulaire" was lifted to the icon above the label and opened Bluetooth.
+    func testSettingsBottomSearchFieldIsNotTheHomeScreen() {
+        let settings = [point("Mode Avion", 129, 511), point("Wi-Fi", 106, 561), point("Bluetooth", 121, 614),
+                        point("Réseau cellulaire", 148, 667), point("Q Rechercher", 109, 838)]
+        XCTAssertFalse(SpotlightDetector.isHomeScreenVisible(elements: settings, windowHeight: 898))
+        XCTAssertTrue(SpotlightDetector.isHomeScreenVisible(
+            elements: [point("Horloge", 159, 159), point("Q Rechercher", 205, 736)], windowHeight: 898),
+                      "the Home Screen's pill sits above the Dock")
+    }
+
     func testTheIdlePageHoldsNoQuery() {
         let screen = [point("Suggestions de Siri", 97, 109), point(icon, 171, 189), point("Notes", 170, 218)]
         XCTAssertFalse(SpotlightDetector.holdsQuery(elements: screen))

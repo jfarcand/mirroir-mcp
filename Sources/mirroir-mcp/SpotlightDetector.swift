@@ -121,6 +121,13 @@ enum SpotlightDetector {
     /// ("Q Rechercher" in Settings) must not read as the Home Screen.
     static let homeSearchPillBandStart = 0.8
 
+    /// Fraction of the window height above which the Home Screen's search
+    /// pill sits: the Dock is below it (iPhone 16 at 736 of 898, XR at 783 of
+    /// 942, 82-83%). Settings' own search field on iOS 26 and 27 ("Q
+    /// Rechercher" at 838 of 898) and Spotlight's idle field (872 of 942) sit
+    /// at the bottom edge, 93%, and are not the Home Screen.
+    static let homeSearchPillBandEnd = 0.88
+
     /// Whether `y` lies in one of Spotlight's search-field bands of a window
     /// `windowHeight` points tall.
     static func isInSearchFieldBand(_ y: Double, windowHeight: Double) -> Bool {
@@ -172,9 +179,14 @@ enum SpotlightDetector {
 
     /// Whether the home screen's search pill is showing, i.e. no app is in front.
     static func isHomeScreenVisible(elements: [TapPoint], windowHeight: Double) -> Bool {
-        let bandTop = windowHeight * homeSearchPillBandStart
-        return elements.contains { el in
-            guard el.tapY >= bandTop, let field = searchFieldText(el.text) else { return false }
+        homeSearchPill(in: elements, windowHeight: windowHeight) != nil
+    }
+
+    /// The Home Screen's search pill, the last row above the Dock, or nil.
+    static func homeSearchPill(in elements: [TapPoint], windowHeight: Double) -> TapPoint? {
+        let band = windowHeight * homeSearchPillBandStart ... windowHeight * homeSearchPillBandEnd
+        return elements.first { el in
+            guard band.contains(el.tapY), let field = searchFieldText(el.text) else { return false }
             return homeSearchPillLabels.contains(SystemPhrases.fold(field))
         }
     }
