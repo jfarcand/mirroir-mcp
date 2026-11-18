@@ -88,7 +88,7 @@ final class VerifiedTextEntryTests: XCTestCase {
         let result = screen.entry().enter(segments([("hello world", .keyEvent)]))
         XCTAssertTrue(result.success, result.error ?? "")
         XCTAssertNil(result.notice)
-        XCTAssertEqual(screen.log, ["keys:hello world", "read"])
+        XCTAssertEqual(screen.log, ["read", "keys:hello world", "read"], "one read before the keys, one after")
         XCTAssertEqual(screen.field, "hello world")
     }
 
@@ -118,6 +118,26 @@ final class VerifiedTextEntryTests: XCTestCase {
         let notice = result.notice ?? ""
         XCTAssertTrue(notice.contains("changed the capitalization of \"mirroir test\""), notice)
         XCTAssertFalse(notice.contains("autocorrect"), "a case change is not a rewrite: \(notice)")
+    }
+
+    /// carnet#84, measured 2026-11-17 on an iOS 27 iPhone: "horloge" typed into
+    /// Spotlight never landed, and the Home Screen's "Horloge" label behind it
+    /// passed for the typed text, case aside.
+    func testTextAlreadyOnScreenIsNotTakenForTheTypedText() {
+        let screen = ScriptedField()
+        screen.otherLines = ["Horloge", "Calendrier"]
+        screen.autocorrect = { _ in "" }
+        let result = screen.entry().enter(segments([("horloge", .keyEvent)]))
+        XCTAssertTrue(result.success, "every keystroke was sent")
+        let notice = result.notice ?? ""
+        XCTAssertTrue(notice.contains("\"horloge\" is not what the screen shows"), notice)
+    }
+
+    func testTypedTextAlsoShownElsewhereIsSeenWhenItLands() {
+        let screen = ScriptedField()
+        screen.otherLines = ["horloge"]
+        let result = screen.entry().enter(segments([("horloge", .keyEvent)]))
+        XCTAssertNil(result.notice, result.notice ?? "")
     }
 
     func testTextShownWithItsOwnCaseGetsNoNotice() {

@@ -51,6 +51,11 @@ struct VerifiedTextEntry {
     /// Enter every segment in order. Success only when every keyed run was
     /// posted and every pasted run was seen on screen.
     func enter(_ segments: [InputSimulation.TypeSegment]) -> TypeResult {
+        let keyedOnly = segments.allSatisfy { $0.method == .keyEvent }
+        // What the screen held before any key, so the read-back counts only
+        // text the keys added: the typed word is often on screen already (an
+        // icon label behind Spotlight, a search result).
+        let before = keyedOnly ? readScreen() : nil
         var entered = ""
         for (index, segment) in segments.enumerated() {
             let remaining = segments[index...].map(\.text).joined()
@@ -68,22 +73,26 @@ struct VerifiedTextEntry {
                 entered += segment.text
             }
         }
-        let keyedOnly = segments.allSatisfy { $0.method == .keyEvent }
         return TypeResult(success: true, error: nil,
-                          notice: keyedOnly ? keyedReadBack(entered) : nil)
+                          notice: keyedOnly ? keyedReadBack(entered, before: before ?? []) : nil)
     }
 
     /// Read typed text back from the screen. iOS autocorrect rewrites keystrokes
     /// at each word boundary ("teh" becomes "the" in Notes), so the field can
     /// hold other text than was typed. The text counts as shown when its
     /// readable characters appear in the screen's lines read in order, which
-    /// keeps a line the field wrapped whole. Nil when it is shown, when it has
-    /// nothing OCR could read, or when the screen cannot be read at all;
-    /// otherwise a notice saying what was not seen. It is a notice, not a
-    /// failure: every keystroke was posted, and a password field shows dots.
-    private func keyedReadBack(_ typed: String) -> String? {
+    /// keeps a line the field wrapped whole, more often than in `before`, the
+    /// read taken before the first key: text already on screen proves nothing.
+    /// Nil when it is shown, when it has nothing OCR could read, or when the
+    /// screen cannot be read at all; otherwise a notice saying what was not
+    /// seen. It is a notice, not a failure: every keystroke was posted, and a
+    /// password field shows dots.
+    private func keyedReadBack(_ typed: String, before: [String]) -> String? {
         let needle = PasteNeedle.readable(typed, foldingCase: false)
         guard !needle.isEmpty else { return nil }
+        let shownBefore = PasteNeedle.readable(before.joined(), foldingCase: false)
+        let exactBefore = PasteNeedle.count(needle, in: shownBefore)
+        let foldedBefore = PasteNeedle.count(needle.lowercased(), in: shownBefore.lowercased())
         var screenRead = false
         var recased = false
         for _ in 0 ..< Self.readBackReads {
@@ -91,8 +100,9 @@ struct VerifiedTextEntry {
             guard let lines = readScreen() else { continue }
             screenRead = true
             let shown = PasteNeedle.readable(lines.joined(), foldingCase: false)
-            if shown.contains(needle) { return nil }
-            recased = recased || shown.lowercased().contains(needle.lowercased())
+            if PasteNeedle.count(needle, in: shown) > exactBefore { return nil }
+            recased = recased
+                || PasteNeedle.count(needle.lowercased(), in: shown.lowercased()) > foldedBefore
         }
         guard screenRead else { return nil }
         if recased {
@@ -184,6 +194,11 @@ enum PasteNeedle {
         let needle = readable(text)
         guard !needle.isEmpty else { return false }
         return occurrences(of: needle, in: after) > occurrences(of: needle, in: before)
+    }
+
+    /// How many times `needle` appears in `text`, both already normalized.
+    static func count(_ needle: String, in text: String) -> Int {
+        text.components(separatedBy: needle).count - 1
     }
 
     /// How many times `needle` appears across `lines`, each line normalized
