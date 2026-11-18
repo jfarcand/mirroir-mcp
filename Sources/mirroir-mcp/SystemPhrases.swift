@@ -50,12 +50,18 @@ struct SystemPhrases: Sendable, Equatable {
         case alertDismiss = "Alert Dismiss"
         /// Fragments of a system alert's title, `.*` standing for any text.
         case alertTitle = "Alert Title"
-        /// The Settings row set_network taps for Airplane Mode.
+        /// The Settings app's name, which set_network opens.
+        case settingsApp = "Settings App"
+        /// The Settings row holding the Airplane Mode switch.
         case settingsAirplaneRow = "Settings Airplane Row"
-        /// The Settings row set_network taps for Wi-Fi.
+        /// The Settings row that opens the Wi-Fi page.
         case settingsWiFiRow = "Settings Wi-Fi Row"
-        /// The Settings row set_network taps for Cellular.
+        /// The row on the Wi-Fi page holding the Wi-Fi switch.
+        case settingsWiFiSwitch = "Settings Wi-Fi Switch"
+        /// The Settings row that opens the cellular page.
         case settingsCellularRow = "Settings Cellular Row"
+        /// The row on the cellular page holding the cellular data switch.
+        case settingsCellularSwitch = "Settings Cellular Switch"
     }
 
     /// Each section's bullets, folded with `fold`, in file order.

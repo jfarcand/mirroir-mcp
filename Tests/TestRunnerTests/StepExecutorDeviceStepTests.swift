@@ -291,7 +291,9 @@ extension StepExecutorTests {
 
     // MARK: - set_network
 
-    func testSetNetworkAirplaneOn() {
+    /// The step reads the switch from the screenshot; with none to read it
+    /// refuses and taps nothing (carnet#79: it used to tap the label blind).
+    func testSetNetworkWithAnUnreadableSwitchTapsNothing() {
         describer.describeResult = ScreenDescriber.DescribeResult(
             elements: [TapPoint(text: "Airplane Mode", tapX: 200, tapY: 150, confidence: 0.95)],
             screenshotBase64: ""
@@ -299,10 +301,11 @@ extension StepExecutorTests {
 
         let result = executor.execute(
             step: .setNetwork(mode: "airplane_on"), stepIndex: 0, skillName: "test")
-        XCTAssertEqual(result.status, .passed)
-        XCTAssertTrue(result.message?.contains("airplane_on") ?? false)
+        XCTAssertEqual(result.status, .failed)
+        XCTAssertTrue(result.message?.contains("No Airplane Mode switch was found") ?? false,
+                      result.message ?? "nil")
         XCTAssertEqual(input.launchAppCalls, ["Settings"])
-        XCTAssertEqual(input.tapCalls.count, 1)
+        XCTAssertTrue(input.tapCalls.isEmpty)
     }
 
     func testSetNetworkInvalidMode() {

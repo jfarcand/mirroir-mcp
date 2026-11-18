@@ -116,7 +116,7 @@ final class DescriberRoutingTests: XCTestCase {
 
         try call(server, "set_network", ["mode": .string("wifi_off")])
 
-        XCTAssertEqual(ocr.describeCallCount, 1)
+        XCTAssertGreaterThan(ocr.describeCallCount, 0, "it reads the screen before and after the switch")
         XCTAssertEqual(client.describeCallCount, 0, "set_network must not use the vision describer")
     }
 

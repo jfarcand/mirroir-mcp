@@ -29,10 +29,15 @@ extension MirroirMCP {
         server.registerTool(MCPToolDefinition(
             name: "set_network",
             description: """
-                Toggle network settings on the mirrored iPhone by navigating to the \
-                Settings app and tapping the appropriate control. Supported modes: \
-                airplane_on, airplane_off, wifi_on, wifi_off, cellular_on, cellular_off. \
-                After toggling, returns to the home screen.
+                Set Airplane Mode, Wi-Fi or cellular data on the mirrored iPhone in \
+                the Settings app. The switch is read first and tapped only when it \
+                is not already in the asked state, then read again; the result says \
+                what it shows. A switch that cannot be read (a menu, as cellular \
+                data is with two SIMs, or the dark appearance) is refused without a \
+                tap. airplane_on and wifi_off can cut iPhone Mirroring's connection, \
+                and only the iPhone can then turn them back. Modes: airplane_on, \
+                airplane_off, wifi_on, wifi_off, cellular_on, cellular_off. Returns to \
+                the home screen afterwards.
                 """,
             inputSchema: [
                 "type": .string("object"),

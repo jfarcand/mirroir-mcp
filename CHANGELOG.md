@@ -22,6 +22,8 @@ What changed for you in each release. Full notes, with every commit, are on [Git
 
 - **`tap` by text in Settings hits the row you named.** iOS 26 and 27 Settings end on a search field that read as the Home Screen's, so the tap aimed at an icon above the label and opened the row above (Bluetooth for Cellular). Regression in 0.50.0.
 
+- **`set_network` reads the switch before and after.** It tapped the row's label without reading anything, so `airplane_on` could turn Airplane Mode off, and the Wi-Fi and cellular modes only opened a page while reporting success. It now taps the switch only when it is not already in the asked state, reports what the switch shows afterwards, refuses a row with no switch (cellular data with two SIMs), and finds French labels.
+
 ## 0.50.0 (2026-11-16)
 
 - **macOS 27: input reaches the iPhone again** ([#84](https://github.com/jfarcand/mirroir-mcp/issues/84)). On macOS 27.3, taps, keys and swipes were reported as done but never arrived. On any macOS newer than 26, mirroir now uses HID input, which brings iPhone Mirroring to the front. The `windowInput` setting (`auto`, `on`, `off`) forces either path, and `mirroir-mcp doctor` shows which one is in use.

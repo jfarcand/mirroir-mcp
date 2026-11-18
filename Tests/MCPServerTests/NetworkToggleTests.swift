@@ -14,9 +14,10 @@
  * the License.
  */
 // ABOUTME: Tests for NetworkToggle, the set_network procedure behind the tool and the skill step.
-// ABOUTME: Covers mode validation, the row labels from system-phrases.md, the tap, and the return home.
+// ABOUTME: The switch is read before and after; it is tapped only when not already in the asked state.
 
 import XCTest
+import CoreGraphics
 import HelperLib
 @testable import mirroir_mcp
 
@@ -26,6 +27,13 @@ final class NetworkToggleTests: XCTestCase {
     private var describer: StubDescriber!
     private var bridge: StubBridge!
 
+    /// The switch on the row at `switchRowY`, as the reader sees it: `initial`
+    /// until a tap lands on the switch, then the other state.
+    private var switchRowY = 511.0
+    private var initial = SettingsSwitchReader.State.off
+    private var flips = true
+    private let switchX = 345.0
+
     override func setUp() {
         super.setUp()
         input = StubInput()
@@ -33,43 +41,114 @@ final class NetworkToggleTests: XCTestCase {
         bridge = StubBridge()
     }
 
-    private func settings(_ rows: [(String, Double)]) -> ScreenDescriber.DescribeResult {
+    private func screen(_ rows: [(String, Double)]) -> ScreenDescriber.DescribeResult {
         ScreenDescriber.DescribeResult(
             elements: rows.map { TapPoint(text: $0.0, tapX: 120, tapY: $0.1, confidence: 0.95) },
-            screenshotBase64: "dGVzdA==")
+            screenshotBase64: "")
     }
 
-    private func toggle(_ mode: String, phrases: SystemPhrases = .live) -> Result<String, NetworkToggle.ToggleError> {
-        NetworkToggle.toggle(mode: mode, input: input, describer: describer, menuBridge: bridge,
-                             settleUs: 0, loadUs: 0, phrases: phrases)
+    /// Settings' first page on an iPhone 16 (iOS 27, French), 2026-11-18.
+    private var firstPage: ScreenDescriber.DescribeResult {
+        screen([("Réglages", 178), ("Mode Avion", 511), ("Wi-Fi", 561), ("Bluetooth", 614),
+                ("Réseau cellulaire", 667), ("Q Rechercher", 838)])
+    }
+
+    /// The Wi-Fi page: its title and its switch row both read "Wi-Fi".
+    private var wifiPage: ScreenDescriber.DescribeResult {
+        screen([("Wi-Fi", 290), ("Wi-Fi", 456), ("Assistance connectivité", 785)])
+    }
+
+    private var switchTapped: Bool { input.tapCalls.contains { $0.x == switchX } }
+
+    private func toggle(_ mode: String) -> Result<String, NetworkToggle.ToggleError> {
+        let (input, switchRowY, initial, flips, switchX) = (input!, switchRowY, initial, flips, switchX)
+        let read: NetworkToggle.SwitchRead = { _, rowY, _ in
+            guard rowY == switchRowY else { return .init(state: .none, center: nil) }
+            let tapped = input.tapCalls.contains { $0.x == switchX }
+            let state: SettingsSwitchReader.State = tapped && flips ? (initial == .on ? .off : .on) : initial
+            return .init(state: state, center: CGPoint(x: switchX, y: rowY))
+        }
+        return NetworkToggle.toggle(mode: mode, input: input, describer: describer, menuBridge: bridge,
+                                    settleUs: 0, loadUs: 0, read: read)
     }
 
     private var wentHome: Bool {
         bridge.menuActionCalls.contains { $0.menu == "View" && $0.item == "Home Screen" }
     }
 
-    func testTapsTheModesRowThenGoesHome() {
-        describer.describeResult = settings([("Airplane Mode", 200), ("Wi-Fi", 260), ("Cellular", 320)])
+    // MARK: - Airplane Mode, on the first page
 
-        XCTAssertEqual(toggle("wifi_off"), .success("Toggled wifi_off"))
-        XCTAssertEqual(input.launchAppCalls, ["Settings"])
-        XCTAssertEqual(input.tapCalls.map(\.y), [260])
+    /// carnet#79: _on and _off tapped the same label, so _on could turn it off.
+    func testASwitchAlreadyInTheAskedStateIsNotTapped() {
+        describer.describeResult = firstPage
+        XCTAssertEqual(toggle("airplane_off"), .success("Airplane Mode is already off: nothing was tapped."))
+        XCTAssertTrue(input.tapCalls.isEmpty)
         XCTAssertTrue(wentHome)
     }
 
-    func testEachModeTapsItsOwnRow() {
-        let rows: [(String, Double)] = [("Airplane Mode", 200), ("Wi-Fi", 260), ("Cellular", 320)]
-        let expected: [String: Double] = [
-            "airplane_on": 200, "airplane_off": 200, "wifi_on": 260, "wifi_off": 260,
-            "cellular_on": 320, "cellular_off": 320,
-        ]
-        XCTAssertEqual(Set(expected.keys), Set(NetworkToggle.Mode.names))
-        for (mode, rowY) in expected {
-            input = StubInput()
-            describer.describeResult = settings(rows)
-            XCTAssertEqual(toggle(mode), .success("Toggled \(mode)"), mode)
-            XCTAssertEqual(input.tapCalls.map(\.y), [rowY], mode)
-        }
+    func testTheSwitchIsTappedAndReadAgain() throws {
+        describer.describeResult = firstPage
+        let message = try toggle("airplane_on").get()
+        XCTAssertTrue(message.hasPrefix("Turned Airplane Mode on: the switch now reads on."), message)
+        XCTAssertTrue(message.contains("cut iPhone Mirroring's connection"), message)
+        XCTAssertEqual(input.tapCalls.map(\.x), [switchX], "the switch, not the label")
+    }
+
+    func testATapThatDidNotTakeFails() {
+        flips = false
+        describer.describeResult = firstPage
+        guard case .failure(let error) = toggle("airplane_on") else { return XCTFail("passed") }
+        XCTAssertTrue(error.message.contains("still reads off"), error.message)
+    }
+
+    func testTwoDifferentReadsTapNothing() {
+        describer.describeResults = [firstPage, firstPage, screen([("Mode Avion", 520)])]
+        guard case .failure(let error) = toggle("airplane_on") else { return XCTFail("passed") }
+        XCTAssertTrue(error.message.contains("nothing was tapped"), error.message)
+        XCTAssertFalse(switchTapped)
+    }
+
+    // MARK: - Wi-Fi and cellular data, on their pages
+
+    func testWiFiIsSetOnItsPageAtTheRowWithASwitch() throws {
+        switchRowY = 456
+        initial = .on
+        describer.describeResults = [firstPage, wifiPage]
+        let message = try toggle("wifi_off").get()
+        XCTAssertTrue(message.hasPrefix("Turned Wi-Fi off"), message)
+        XCTAssertEqual(input.tapCalls.map(\.y), [561, 456], "open the page, then the switch")
+    }
+
+    /// iPhone 16, two SIMs: cellular data is a menu ("Principale >"), no switch.
+    func testACellularMenuIsRefused() {
+        switchRowY = 0
+        describer.describeResults = [firstPage, screen([("Réseau cellulaire", 270), ("Données cellulaires", 497)])]
+        guard case .failure(let error) = toggle("cellular_off") else { return XCTFail("passed") }
+        XCTAssertTrue(error.message.hasPrefix("No cellular data switch was found"), error.message)
+        XCTAssertEqual(input.tapCalls.map(\.y), [667], "only the page was opened")
+        XCTAssertTrue(wentHome)
+    }
+
+    // MARK: - Reaching the first page
+
+    /// Settings reopens on the page it was left on (2026-11-18: the Wi-Fi page).
+    func testSettingsReopenedOnASubPageGoesBack() {
+        describer.describeResults = [wifiPage, firstPage]
+        XCTAssertEqual(toggle("airplane_off"), .success("Airplane Mode is already off: nothing was tapped."))
+        XCTAssertEqual(input.tapCalls.count, 1, "one back tap")
+    }
+
+    func testARowNotFoundTapsNothing() {
+        describer.describeResult = screen([("Général", 300)])
+        guard case .failure(let error) = toggle("airplane_on") else { return XCTFail("passed") }
+        XCTAssertTrue(error.message.contains("not found in Settings"), error.message)
+        XCTAssertFalse(switchTapped)
+        XCTAssertTrue(wentHome)
+    }
+
+    func testEnglishLabelsAreFound() {
+        describer.describeResult = screen([("Airplane Mode", 511), ("Wi-Fi", 561)])
+        XCTAssertEqual(toggle("airplane_off"), .success("Airplane Mode is already off: nothing was tapped."))
     }
 
     func testUnknownModeOpensNothing() {
@@ -79,51 +158,11 @@ final class NetworkToggleTests: XCTestCase {
         XCTAssertFalse(wentHome)
     }
 
-    func testRowLabelsComeFromThePhrasesFile() {
-        let french = SystemPhrases.parse(content: "## Settings Wi-Fi Row\n\n- wi-fi\n- réseau sans fil\n")
-        describer.describeResult = settings([("Mode Avion", 200), ("Réseau sans fil", 260)])
-
-        XCTAssertEqual(toggle("wifi_on", phrases: french), .success("Toggled wifi_on"))
-        XCTAssertEqual(input.tapCalls.map(\.y), [260])
-    }
-
-    func testShippedPhrasesNameEveryRow() {
-        for mode in NetworkToggle.Mode.allCases {
-            XCTAssertFalse(SystemPhrases.live.phrases(mode.rowSection).isEmpty, mode.rawValue)
-        }
-    }
-
-    func testMissingRowFailsWithoutTappingAndGoesHome() {
-        describer.describeResult = settings([("General", 200)])
-
-        guard case .failure(let error) = toggle("cellular_on") else { return XCTFail("toggled") }
-        XCTAssertTrue(error.message.hasPrefix("\"cellular\" not found in Settings"), error.message)
+    func testEachSettingsNameIsTriedToLaunch() {
+        input.launchAppResult = "not installed"
+        guard case .failure(let error) = toggle("airplane_on") else { return XCTFail("passed") }
+        XCTAssertEqual(input.launchAppCalls, ["Settings", "Réglages"])
+        XCTAssertTrue(error.message.hasPrefix("Failed to launch Settings"), error.message)
         XCTAssertTrue(input.tapCalls.isEmpty)
-        XCTAssertTrue(wentHome)
-    }
-
-    func testUnreadableScreenFailsAndGoesHome() {
-        describer.describeResult = nil
-
-        XCTAssertEqual(toggle("airplane_on"),
-                       .failure(NetworkToggle.ToggleError("Failed to capture Settings screen")))
-        XCTAssertTrue(wentHome)
-    }
-
-    func testFailedLaunchStopsBeforeReadingTheScreen() {
-        input.launchAppResult = "Spotlight did not open"
-
-        XCTAssertEqual(toggle("airplane_on"),
-                       .failure(NetworkToggle.ToggleError("Failed to launch Settings: Spotlight did not open")))
-        XCTAssertTrue(input.tapCalls.isEmpty)
-    }
-
-    func testFailedTapIsReportedAndGoesHome() {
-        describer.describeResult = settings([("Airplane Mode", 200)])
-        input.tapResult = "tap dropped"
-
-        XCTAssertEqual(toggle("airplane_off"),
-                       .failure(NetworkToggle.ToggleError("Failed to tap airplane: tap dropped")))
-        XCTAssertTrue(wentHome)
     }
 }
