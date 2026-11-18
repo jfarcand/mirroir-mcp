@@ -191,6 +191,21 @@ enum MirroringWindowResolver {
         return ([own] + node.children.map(overlayContent)).max() ?? own
     }
 
+    /// Identifiers of iPhone Mirroring's own accessory windows, which can be
+    /// its main window while open: never the mirror.
+    static let accessoryWindowIdentifiers: Set<String> = [
+        "com_apple_SwiftUI_Settings_window",
+    ]
+
+    /// Index of the first window in `identifiers` (the main window, then the
+    /// app's windows) that is not an accessory window, or nil.
+    static func mirrorWindowIndex(identifiers: [String?]) -> Int? {
+        identifiers.firstIndex { identifier in
+            guard let identifier else { return true }
+            return !accessoryWindowIdentifiers.contains(identifier)
+        }
+    }
+
     /// Whether `node` is chrome the Mac draws over a live session: a window
     /// or toolbar control, or the Mac's text-input UI. Skipped whole.
     static func isChrome(_ node: AXNodeSnapshot) -> Bool {

@@ -255,6 +255,28 @@ final class MirroringWindowResolverTests: XCTestCase {
             .paused)
     }
 
+    // MARK: - mirror window
+
+    /// carnet#85, measured 2026-11-17: with iPhone Mirroring Settings open, the
+    /// Settings window was the AX main window and read as a paused session.
+    func testTheSettingsWindowIsNeverTakenForTheMirror() {
+        let index = MirroringWindowResolver.mirrorWindowIndex(identifiers: [
+            "com_apple_SwiftUI_Settings_window", "iphone-mirroring-main", "com_apple_SwiftUI_Settings_window",
+        ])
+        XCTAssertEqual(index, 1)
+    }
+
+    func testTheMainWindowIsTheMirrorWhenItIsNotAnAccessory() {
+        XCTAssertEqual(MirroringWindowResolver.mirrorWindowIndex(identifiers: ["iphone-mirroring-main"]), 0)
+        XCTAssertEqual(MirroringWindowResolver.mirrorWindowIndex(identifiers: [nil]), 0,
+                       "a window with no identifier (FakeMirroring) is the mirror")
+    }
+
+    func testOnlyAccessoryWindowsMeanNoMirror() {
+        XCTAssertNil(MirroringWindowResolver.mirrorWindowIndex(
+            identifiers: ["com_apple_SwiftUI_Settings_window"]))
+    }
+
     // MARK: - resume control
 
     func testResumeControlAcceptsOnlyKnownTitles() {

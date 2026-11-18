@@ -14,6 +14,8 @@ What changed for you in each release. Full notes, with every commit, are on [Git
 
 - **`type_text` no longer mistakes text already on screen for what it typed.** A typed word that never landed passed when the same word was elsewhere on screen (an icon label behind Spotlight); only text the keys add counts now.
 
+- **An open iPhone Mirroring Settings window no longer blocks input.** It was read as the mirroring window, so `status` said paused and every action refused.
+
 ## 0.50.0 (2026-11-16)
 
 - **macOS 27: input reaches the iPhone again** ([#84](https://github.com/jfarcand/mirroir-mcp/issues/84)). On macOS 27.3, taps, keys and swipes were reported as done but never arrived. On any macOS newer than 26, mirroir now uses HID input, which brings iPhone Mirroring to the front. The `windowInput` setting (`auto`, `on`, `off`) forces either path, and `mirroir-mcp doctor` shows which one is in use.
