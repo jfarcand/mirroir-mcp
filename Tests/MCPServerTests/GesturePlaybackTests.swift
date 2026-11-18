@@ -167,7 +167,7 @@ final class GesturePlaybackTests: XCTestCase {
         bridge.state = .notRunning
         let device = GestureDevice(poster: poster,
                                    senderResolver: FixedSenderResolver(senderID: senderID))
-        let input = InputSimulation(bridge: bridge, keyboardLayout: .usQWERTY,
+        let input = InputSimulation(bridge: bridge, keyboardLayouts: .usQWERTY,
                                     touchSession: touchSession ?? TouchSession(poster: RecordingTouchPoster()),
                                     gestureDevice: device)
         return (input, bridge)

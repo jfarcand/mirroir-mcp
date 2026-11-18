@@ -108,6 +108,7 @@ final class StubInput: InputProviding, @unchecked Sendable {
         return shakeResult
     }
     func typeText(_ text: String) -> TypeResult { typeTextResult }
+    func rememberKeyboardLayout(_ name: String) -> String? { nil }
     /// Every pressKey() call as "<modifiers+>key", in order.
     var pressKeyCalls: [String] = []
     func pressKey(keyName: String, modifiers: [String]) -> TypeResult {

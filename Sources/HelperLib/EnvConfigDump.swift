@@ -73,7 +73,7 @@ extension EnvConfig {
             ]),
             ("Keyboard", [
                 ("deadKeyDelayUs", "\(deadKeyDelayUs)"),
-                ("keyboardLayout", "\(keyboardLayout.isEmpty ? "(none)" : keyboardLayout)"),
+                ("keyboardLayout", keyboardLayouts.joined(separator: ", ")),
             ]),
             ("Drag & Swipe", [
                 ("dragInterpolationSteps", "\(dragInterpolationSteps)"),

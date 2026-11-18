@@ -62,7 +62,7 @@ final class SpotlightLaunchTests: XCTestCase {
         let poster = RecordingWindowPoster()
         let keys = RecordingKeyPoster()
         let reader = TapFollowingDescriber(base: describer, poster: poster, afterTap: afterTap)
-        let input = InputSimulation(bridge: bridge, keyboardLayout: .usQWERTY,
+        let input = InputSimulation(bridge: bridge, keyboardLayouts: .usQWERTY,
                                     pasteVerifier: reader, keyPoster: keys,
                                     pasteboard: RecordingPasteboard(contents: nil), windowPoster: poster)
         return (input.launchApp(name: name), bridge, poster, keys, describer)
@@ -224,7 +224,7 @@ final class SpotlightLaunchTests: XCTestCase {
             bridge.menuActionCalls.map(\.item).contains("Spotlight")
                 && !bridge.menuActionCalls.map(\.item).contains("Home Screen") ? idle : front
         }
-        let input = InputSimulation(bridge: bridge, keyboardLayout: .usQWERTY,
+        let input = InputSimulation(bridge: bridge, keyboardLayouts: .usQWERTY,
                                     pasteVerifier: reader, keyPoster: RecordingKeyPoster(),
                                     pasteboard: pasteboard, windowPoster: poster)
         XCTAssertNotNil(input.launchApp(name: "Rappels"))
@@ -251,7 +251,7 @@ final class SpotlightLaunchTests: XCTestCase {
             if !poster.keyFocusWindows.isEmpty { return garbled }
             return bridge.menuActionCalls.isEmpty ? front : idle
         }
-        let input = InputSimulation(bridge: bridge, keyboardLayout: .usQWERTY,
+        let input = InputSimulation(bridge: bridge, keyboardLayouts: .usQWERTY,
                                     pasteVerifier: reader, keyPoster: keys,
                                     pasteboard: pasteboard, windowPoster: poster)
         XCTAssertNil(input.launchApp(name: "Notes"))

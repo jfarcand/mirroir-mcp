@@ -81,17 +81,10 @@ public enum LayoutMapper {
         layout.isEmpty || sourceID(forLayout: layout) == usSourceID
     }
 
-    /// Find the iPhone's keyboard layout when it is not US QWERTY.
-    ///
-    /// Reads the layout name from `EnvConfig.keyboardLayout` which resolves
-    /// from settings.json (set by `mirroir-mcp configure`) or the
-    /// `IPHONE_KEYBOARD_LAYOUT` environment variable.
-    ///
-    /// Pass an explicit `layout` to override config lookup (used by tests).
-    /// Returns nil when the layout is empty or US QWERTY, or when macOS has no
-    /// layout by that name.
-    public static func findNonUSLayout(layout override: String? = nil) -> (sourceID: String, layoutData: Data)? {
-        let layout = override ?? EnvConfig.keyboardLayout
+    /// The source ID and key-layout data of `layout` when it is not US
+    /// QWERTY. Nil when the layout is empty or US QWERTY, or when macOS has
+    /// no layout by that name.
+    public static func findNonUSLayout(layout: String) -> (sourceID: String, layoutData: Data)? {
         guard !isUSLayout(layout) else { return nil }
         let fullID = sourceID(forLayout: layout)
         return layoutData(forSourceID: fullID).map { (fullID, $0) }

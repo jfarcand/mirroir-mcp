@@ -81,7 +81,7 @@ final class WindowStableDescriberTests: XCTestCase {
         let bridge = bridge(size: portrait)
         let rotating = RotatingDescriber(bridge: bridge)
         rotating.sizeAfterRead = landscape
-        let input = InputSimulation(bridge: bridge, keyboardLayout: .usQWERTY,
+        let input = InputSimulation(bridge: bridge, keyboardLayouts: .usQWERTY,
                                     pasteVerifier: rotating)
 
         XCTAssertNil(input.pasteVerifier?.describe(settleTimeoutUs: 0),

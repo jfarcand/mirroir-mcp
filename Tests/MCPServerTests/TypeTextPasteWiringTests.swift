@@ -31,7 +31,7 @@ final class TypeTextPasteWiringTests: XCTestCase {
     private func makeInput(phone: SimulatedPhone, verifier: (any ScreenDescribing)?) -> InputSimulation {
         let bridge = StubBridge()
         bridge.processRunning = false
-        return InputSimulation(bridge: bridge, keyboardLayout: .usQWERTY,
+        return InputSimulation(bridge: bridge, keyboardLayouts: .usQWERTY,
                                pasteVerifier: verifier,
                                keyPoster: phone, pasteboard: phone.pasteboard)
     }

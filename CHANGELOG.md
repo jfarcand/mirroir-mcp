@@ -14,6 +14,8 @@ What changed for you in each release. Full notes, with every commit, are on [Git
 
 - **`type_text` no longer mistakes text already on screen for what it typed.** A typed word that never landed passed when the same word was elsewhere on screen (an icon label behind Spotlight); only text the keys add counts now.
 
+- **Two iPhones with different keyboards on one Mac.** `keyboardLayout` takes a list (`["Canadian-CSA", "US"]`). Text with characters the layouts type with different keys (`'`, `/`, `é`) is pasted until `type_text` gets `keyboard_layout` for the connected phone; the answer is remembered per phone, and one that types what another layout would is forgotten. Older versions read a list as US. Before, one layout for the Mac meant the other phone typed `'` as `<`.
+
 - **An open iPhone Mirroring Settings window no longer blocks input.** It was read as the mirroring window, so `status` said paused and every action refused.
 
 - **`start_recording` keeps recording until `stop_recording`** ([#85](https://github.com/jfarcand/mirroir-mcp/issues/85)). screencapture read the server's own stdin: under `serve` it stopped at once, and over stdio it swallowed the next request. On macOS 15 it also recorded the main display instead of the window; it now records the window's frame there.

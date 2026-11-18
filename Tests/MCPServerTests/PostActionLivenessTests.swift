@@ -26,7 +26,7 @@ final class PostActionLivenessTests: XCTestCase {
         // Not running as a process, so nothing on the test Mac is touched.
         bridge.processRunning = false
         bridge.state = state
-        return InputSimulation(bridge: bridge, keyboardLayout: .usQWERTY)
+        return InputSimulation(bridge: bridge, keyboardLayouts: .usQWERTY)
     }
 
     func testAConnectedSessionAfterTheActionIsPlainSuccess() {

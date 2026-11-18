@@ -40,7 +40,7 @@ final class KeyModifierIsolationTests: XCTestCase {
         bridge.windowInfo = WindowInfo(
             windowID: 4242, position: CGPoint(x: 100, y: 50),
             size: CGSize(width: 410, height: 898), pid: windowPID)
-        return InputSimulation(bridge: bridge, keyboardLayout: .usQWERTY,
+        return InputSimulation(bridge: bridge, keyboardLayouts: .usQWERTY,
                                keyPoster: keys, windowPoster: window ? RecordingWindowPoster() : nil)
     }
 

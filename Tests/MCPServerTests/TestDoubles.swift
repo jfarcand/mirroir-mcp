@@ -180,6 +180,13 @@ final class StubInput: InputProviding, @unchecked Sendable {
         keyboardLog.append("type:\(text)")
         return typeTextResult
     }
+    /// Every keyboard_layout given, and the refusal to answer instead of nil.
+    var rememberedLayouts: [String] = []
+    var rememberLayoutRefusal: String?
+    func rememberKeyboardLayout(_ name: String) -> String? {
+        rememberedLayouts.append(name)
+        return rememberLayoutRefusal
+    }
     func pressKey(keyName: String, modifiers: [String]) -> TypeResult {
         keyboardLog.append("key:" + (modifiers + [keyName]).joined(separator: "+"))
         return pressKeyResultByKey[keyName] ?? pressKeyResult

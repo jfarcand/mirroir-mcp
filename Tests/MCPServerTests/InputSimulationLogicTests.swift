@@ -31,7 +31,7 @@ final class InputSimulationLogicTests: XCTestCase {
         super.setUp()
         let bridge = MirroringBridge()
         // Pin US QWERTY to test pure segment logic independent of the configured layout
-        simulation = InputSimulation(bridge: bridge, keyboardLayout: .usQWERTY)
+        simulation = InputSimulation(bridge: bridge, keyboardLayouts: .usQWERTY)
     }
 
     // MARK: - validateBounds
@@ -162,7 +162,7 @@ final class InputSimulationLogicTests: XCTestCase {
     private func makeCanadianCSASimulation() throws -> InputSimulation {
         let layout = try XCTUnwrap(IPhoneKeyboardLayout.named("Canadian-CSA"),
                                    "Canadian-CSA layout not available on this system")
-        return InputSimulation(bridge: MirroringBridge(), keyboardLayout: layout)
+        return InputSimulation(bridge: MirroringBridge(), keyboardLayouts: KeyboardLayoutSet(single: layout, name: "Canadian-CSA"))
     }
 
     func testCanadianCSAURLIsTypedEntirelyByKey() throws {

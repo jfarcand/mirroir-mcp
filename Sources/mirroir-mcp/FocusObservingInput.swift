@@ -101,6 +101,10 @@ final class FocusObservingInput: InputProviding, @unchecked Sendable {
         observe(.type) { wrapped.typeText(text) }
     }
 
+    func rememberKeyboardLayout(_ name: String) -> String? {
+        wrapped.rememberKeyboardLayout(name)
+    }
+
     func pressKey(keyName: String, modifiers: [String]) -> TypeResult {
         observe(.key) { wrapped.pressKey(keyName: keyName, modifiers: modifiers) }
     }

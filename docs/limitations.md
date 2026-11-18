@@ -66,6 +66,12 @@ From a non-US layout, mirroir takes single keystrokes (unshifted or shifted) and
 
 The setting must match the layout chosen on the iPhone. A mismatch types the wrong character rather than skipping it — with no layout set on a Canadian-CSA iPhone, `/` arrives as `é` and every URL is garbled.
 
+### iPhones with different keyboards on one Mac
+
+Nothing iPhone Mirroring exposes names the connected phone: the paired-device ID and the window ID stay the same when you switch phones. When the phones that take turns on a Mac use different hardware keyboards, list every layout (`"keyboardLayout": ["Canadian-CSA", "US"]`). A character every listed layout types with the same keys (letters, digits, most punctuation) is typed by key. Text holding a character they type with different keys (`'`, `/`, `?`, `é` between Canadian-CSA and US) is pasted through the clipboard in one run until the connected phone's layout is known, and `type_text` says so. A list needs mirroir 0.50.2 or later: older versions read a list as US.
+
+Pass `keyboard_layout` to `type_text` with the phone's layout (Settings › General › Keyboard › Hardware Keyboard on the iPhone) and those characters are typed by key. The answer is saved in `~/.mirroir-mcp/keyboard-layouts.json` under the mirroring window's size, so each phone model keeps its own answer and a switch does not ask again. The size only decides whether an answer applies: a size with no answer pastes again, and when the screen shows what another listed layout types instead (`J<arrive` for `J'arrive`), the call fails and the answer is forgotten. Two phones of the same model with different keyboards trigger that check, so they cost a question rather than a wrong character kept.
+
 ### Clipboard paste is confirmed by OCR
 
 `type_text` types every character it has a key for and pastes only the runs it has none for (emoji, CJK, symbols the layout lacks), one `Cmd+V` per run. `Cmd+V` pastes the *iPhone's* clipboard; the Mac pasteboard reaches it only through Universal Clipboard (Handoff on both ends, Bluetooth and Wi-Fi, same iCloud account), asynchronously. With Handoff off nothing arrives; with a lagging sync the device pastes its previous clipboard value.

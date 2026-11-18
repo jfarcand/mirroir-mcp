@@ -32,6 +32,10 @@ protocol InputProviding: Sendable {
     func doubleTap(x: Double, y: Double, cursorMode: CursorMode?) -> String?
     func shake() -> TypeResult
     func typeText(_ text: String) -> TypeResult
+    /// Remember the connected iPhone's hardware keyboard layout, one of the
+    /// configured `keyboardLayout` names, for the characters the layouts type
+    /// with different keys. Nil when remembered, else why not.
+    func rememberKeyboardLayout(_ name: String) -> String?
     func pressKey(keyName: String, modifiers: [String]) -> TypeResult
     func launchApp(name: String) -> String?
     func openURL(_ url: String) -> String?

@@ -61,6 +61,15 @@ enum CGKeyMap {
         return nil
     }
 
+    /// The character `sequence` types on US QWERTY, or nil when none does.
+    static func character(typedBy sequence: CGKeySequence) -> Character? {
+        if sequence.steps.count == 1, let step = sequence.steps.first,
+           let match = characterMap.first(where: { $0.value == step }) {
+            return match.key
+        }
+        return deadKeyMap.first { $0.value == sequence }?.key
+    }
+
     /// Number of directly mapped characters (excludes dead-key sequences).
     static var count: Int { characterMap.count }
 

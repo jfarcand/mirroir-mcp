@@ -88,7 +88,7 @@ extension InputSimulation {
     ///
     /// CGEvent keycodes are layout-independent physical keys (same concept as
     /// USB HID keycodes). Each character is typed with the key that produces it
-    /// on the iPhone's layout (`keyboardLayout`, from `keyboardLayout` /
+    /// on the iPhone's layout (`keyboardLayouts`, from `keyboardLayout` /
     /// `IPHONE_KEYBOARD_LAYOUT`). Runs that layout cannot type go through the
     /// clipboard one run at a time, and `VerifiedTextEntry` confirms each paste
     /// on screen with `pasteVerifier` before the next clipboard write: Universal
@@ -103,7 +103,45 @@ extension InputSimulation {
 
         DebugLog.log("typeText", "typing \(text.count) char(s)")
 
-        return enter(buildTypeSegments(text), targetPID: prep.targetPID)
+        let size = bridge.getWindowInfo()?.size
+        let chosen = size.flatMap(layoutAnswers.answer(for:)).flatMap(keyboardLayouts.layout(named:))
+        let disputed = keyboardLayouts.disputed(in: text)
+        let result: TypeResult
+        if let chosen {
+            result = enter(buildTypeSegments(text, chosen: chosen.layout), targetPID: prep.targetPID,
+                           chosen: chosen.layout,
+                           misreadings: keyboardLayouts.misreadings(of: text, chosen: chosen.layout))
+        } else if !disputed.isEmpty {
+            // One paste for the whole text: a paste per disputed character
+            // costs a clipboard round trip each, and a lone glyph is the
+            // hardest thing for OCR to confirm.
+            result = enter([TypeSegment(text: text, method: .paste)], targetPID: prep.targetPID, chosen: nil)
+        } else {
+            result = enter(buildTypeSegments(text), targetPID: prep.targetPID, chosen: nil)
+        }
+        let report = DisputedKeysReport(text: text, disputed: disputed, chosen: chosen?.name,
+                                        layouts: keyboardLayouts.names)
+        if report.answerFailed(result), let size {
+            layoutAnswers.forget(for: size)
+            DebugLog.log("typeText", "forgot the \(chosen?.name ?? "") answer: typed text not on screen")
+        }
+        return report.apply(to: result)
+    }
+
+    /// Remember that the connected iPhone's hardware keyboard uses `name`, one
+    /// of the configured layouts. Nil when remembered, else why not.
+    func rememberKeyboardLayout(_ name: String) -> String? {
+        guard let layout = keyboardLayouts.layout(named: name) else {
+            return "keyboard_layout '\(name)' is not one of the layouts in settings: "
+                + keyboardLayouts.names.joined(separator: ", ") + ". Nothing was typed."
+        }
+        guard let size = bridge.getWindowInfo()?.size else {
+            return "The '\(bridge.targetName)' window is not available, so keyboard_layout "
+                + "cannot be remembered for it. Nothing was typed."
+        }
+        layoutAnswers.remember(layout.name, for: size)
+        DebugLog.log("typeText", "remembered \(layout.name) for \(KeyboardLayoutAnswers.key(size))")
+        return nil
     }
 
     /// Paste `text` verbatim through the clipboard into the focused field and
@@ -115,17 +153,18 @@ extension InputSimulation {
             return TypeResult(success: false, error: keyboardError)
         }
         DebugLog.log("pasteText", "pasting \(text.count) char(s)")
-        return enter([TypeSegment(text: text, method: .paste)], targetPID: prep.targetPID)
+        return enter([TypeSegment(text: text, method: .paste)], targetPID: prep.targetPID, chosen: nil)
     }
 
     /// Enter `segments` through `VerifiedTextEntry`, then restore the pasteboard
     /// a paste replaced.
-    private func enter(_ segments: [TypeSegment], targetPID: pid_t?) -> TypeResult {
+    private func enter(_ segments: [TypeSegment], targetPID: pid_t?,
+                       chosen: IPhoneKeyboardLayout?, misreadings: [String] = []) -> TypeResult {
         let saved = pasteboard.string()
         let pastes = segments.contains { $0.method == .paste }
 
         let entry = VerifiedTextEntry(
-            typeKeys: { [self] run in typeViaCGEvent(run, targetPID: targetPID) },
+            typeKeys: { [self] run in typeViaCGEvent(run, targetPID: targetPID, chosen: chosen) },
             paste: { [self] run in pasteRun(run) },
             readScreen: { [self] in screenLines() },
             sleep: { usleep($0) },
@@ -133,7 +172,7 @@ extension InputSimulation {
             verifyPollUs: EnvConfig.pasteVerifyPollUs,
             windowChars: EnvConfig.pasteVerifyWindowChars
         )
-        let result = entry.enter(segments)
+        let result = entry.enter(segments, misreadings: misreadings)
 
         // Restored once, after every paste is confirmed or abandoned, so the
         // restore is never a clipboard write racing a paste still in flight.
@@ -179,15 +218,17 @@ extension InputSimulation {
 
     /// Split text into segments based on whether each character can be typed
     /// via CGEvent key events on the iPhone's layout or must be pasted. Both
-    /// kinds carry the original characters: key events look up their keys on
-    /// `keyboardLayout`, and the clipboard carries text verbatim.
-    func buildTypeSegments(_ text: String) -> [TypeSegment] {
+    /// kinds carry the original characters: key events look up their keys in
+    /// `keyboardLayouts` (on `chosen` when the phone's layout is known), and
+    /// the clipboard carries text verbatim.
+    func buildTypeSegments(_ text: String, chosen: IPhoneKeyboardLayout? = nil) -> [TypeSegment] {
         var segments: [TypeSegment] = []
         var currentText = ""
         var currentMethod: TypeMethod = .keyEvent
 
         for char in text {
-            let method: TypeMethod = keyboardLayout.keySequence(for: char) != nil ? .keyEvent : .paste
+            let method: TypeMethod =
+                keyboardLayouts.keySequence(for: char, chosen: chosen) != nil ? .keyEvent : .paste
 
             if method == currentMethod {
                 currentText.append(char)
@@ -207,9 +248,10 @@ extension InputSimulation {
     }
 
     /// Type text by posting CGEvent keyboard events for each character.
-    private func typeViaCGEvent(_ text: String, targetPID: pid_t?) -> TypeResult? {
+    private func typeViaCGEvent(_ text: String, targetPID: pid_t?,
+                                chosen: IPhoneKeyboardLayout?) -> TypeResult? {
         for char in text {
-            guard let sequence = keyboardLayout.keySequence(for: char) else {
+            guard let sequence = keyboardLayouts.keySequence(for: char, chosen: chosen) else {
                 return TypeResult(
                     success: false,
                     error: "No key mapping for character '\(char)'"

@@ -30,6 +30,9 @@ struct TypeResult {
     /// not what the screen shows (the iPhone autocorrected it, or the field
     /// hides its text). Nil when nothing needs saying.
     var notice: String? = nil
+    /// The screen newly shows what the keys type on another configured
+    /// keyboard layout instead of the text: the phone uses that layout.
+    var misreadingShown = false
 }
 
 /// Controls how the mouse cursor is managed during coordinate-based operations.
@@ -55,10 +58,13 @@ enum CursorMode: Sendable {
 final class InputSimulation: Sendable {
     let bridge: any WindowBridging
     private let cursorMode: CursorMode
-    /// The iPhone's hardware keyboard layout: which physical keys type each
+    /// The iPhones' hardware keyboard layouts: which physical keys type each
     /// character. CGEvent keycodes are physical keys and the iPhone applies its
-    /// own layout to them, so text is typed through this table.
-    let keyboardLayout: IPhoneKeyboardLayout
+    /// own layout to them, so text is typed through these tables.
+    let keyboardLayouts: KeyboardLayoutSet
+    /// The layout given for each phone, which decides the characters the
+    /// layouts type with different keys.
+    let layoutAnswers: KeyboardLayoutAnswers
     /// The persistent touch contact shared by every target; while it is held,
     /// pointing operations refuse and no escape click is posted.
     let touchSession: TouchSession
@@ -100,7 +106,8 @@ final class InputSimulation: Sendable {
     }
 
     init(bridge: any WindowBridging, cursorMode: CursorMode = .direct,
-         keyboardLayout override: IPhoneKeyboardLayout? = nil,
+         keyboardLayouts override: KeyboardLayoutSet? = nil,
+         layoutAnswers: KeyboardLayoutAnswers? = nil,
          touchSession: TouchSession = .shared,
          gestureDevice: GestureDevice = .live,
          heldInputPoster: any HeldInputPosting = CGEventHeldInputPoster(),
@@ -124,9 +131,10 @@ final class InputSimulation: Sendable {
         self.touchSession = touchSession
         self.gestureDevice = gestureDevice
         self.heldInputPoster = heldInputPoster
-        // The configured iPhone layout (settings.json `keyboardLayout` or
+        // The configured iPhone layouts (settings.json `keyboardLayout` or
         // IPHONE_KEYBOARD_LAYOUT) unless the caller pins one.
-        self.keyboardLayout = override ?? IPhoneKeyboardLayout.configured()
+        self.keyboardLayouts = override ?? .configured()
+        self.layoutAnswers = layoutAnswers ?? KeyboardLayoutAnswers()
     }
 
     /// Verify that the target window is connected and accepting input.

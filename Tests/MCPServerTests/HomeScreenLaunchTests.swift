@@ -72,7 +72,7 @@ final class HomeScreenLaunchTests: XCTestCase {
             if items.contains("Home Screen") { return home(!poster.buttons.isEmpty) }
             return items.count % 2 == 1 ? idle : front
         }
-        let input = InputSimulation(bridge: bridge, keyboardLayout: .usQWERTY,
+        let input = InputSimulation(bridge: bridge, keyboardLayouts: .usQWERTY,
                                     pasteVerifier: describer, keyPoster: RecordingKeyPoster(),
                                     pasteboard: RecordingPasteboard(contents: nil), windowPoster: poster)
         return (input.launchApp(name: name), bridge, poster)

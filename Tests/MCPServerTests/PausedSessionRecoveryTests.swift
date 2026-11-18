@@ -24,7 +24,7 @@ import HelperLib
 final class PausedSessionRecoveryTests: XCTestCase {
 
     private func makeInput(_ bridge: StubBridge) -> InputSimulation {
-        InputSimulation(bridge: bridge, keyboardLayout: .usQWERTY)
+        InputSimulation(bridge: bridge, keyboardLayouts: .usQWERTY)
     }
 
     // MARK: - freePausedSession

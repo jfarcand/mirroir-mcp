@@ -233,7 +233,11 @@ extension MirroirMCP {
                 scripts are confirmed only when ocrLanguages includes them. \
                 Typed text is read back from the screen: when iOS autocorrect \
                 rewrote it, the call still succeeds and the result says the \
-                screen does not show what was typed. Typing adds to what the \
+                screen does not show what was typed. When keyboardLayout lists \
+                several layouts (iPhones with different keyboards on one Mac), \
+                characters they type with different keys are pasted, and the \
+                result says so, until keyboard_layout gives the connected \
+                phone's layout. Typing adds to what the \
                 field already holds; pass clear=true to empty a pre-filled \
                 field first (Cmd+A, then Delete). Clear only a text field you \
                 just focused: with no field focused, Cmd+A acts on whatever \
@@ -251,6 +255,14 @@ extension MirroirMCP {
                         "description": .string(
                             "Empty the focused field first (Cmd+A, then Delete). Default false."),
                     ]),
+                    "keyboard_layout": .object([
+                        "type": .string("string"),
+                        "description": .string(
+                            "The connected iPhone's hardware keyboard layout, one of the "
+                            + "keyboardLayout names in settings. Give it when a result says "
+                            + "characters were pasted because the layouts disagree; it is "
+                            + "remembered for this phone."),
+                    ]),
                 ]),
                 "required": .array([.string("text")]),
             ],
@@ -264,6 +276,10 @@ extension MirroirMCP {
                 }
 
                 let clear = args["clear"]?.asBool() ?? false
+                if let layout = args["keyboard_layout"]?.asString(),
+                   let refusal = input.rememberKeyboardLayout(layout) {
+                    return .error(refusal)
+                }
 
                 let result = FieldClearing.type(text, clearFirst: clear, using: input)
                 guard result.success else {

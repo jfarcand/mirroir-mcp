@@ -69,6 +69,7 @@ final class TapRecordingInput: InputProviding, @unchecked Sendable {
 
     func shake() -> TypeResult { base.shake() }
     func typeText(_ text: String) -> TypeResult { base.typeText(text) }
+    func rememberKeyboardLayout(_ name: String) -> String? { base.rememberKeyboardLayout(name) }
     func pressKey(keyName: String, modifiers: [String]) -> TypeResult {
         base.pressKey(keyName: keyName, modifiers: modifiers)
     }

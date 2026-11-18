@@ -65,7 +65,10 @@ iPhone Mirroring forwards physical keys, and the iPhone turns them into characte
 ```jsonc
 // .mirroir-mcp/settings.json
 { "keyboardLayout": "Canadian-CSA" }   // or "com.apple.keylayout.Canadian-CSA"; "" or "US" = US QWERTY
+{ "keyboardLayout": ["Canadian-CSA", "US"] }   // iPhones with different keyboards take turns on this Mac
 ```
+
+With a list, characters the layouts type with different keys are pasted until `type_text` gets `keyboard_layout` for the connected phone; see [limitations](limitations.md#iphones-with-different-keyboards-on-one-mac).
 
 A character the layout types with a dead key (`ê` is `^` then `e` on Canadian-CSA) is typed as that key pair. A character the layout has no keys for (emoji, CJK, `<` on Canadian-CSA) goes through the clipboard, which needs Universal Clipboard.
 

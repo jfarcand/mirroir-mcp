@@ -53,6 +53,8 @@ export IPHONE_KEYBOARD_LAYOUT="Canadian-CSA"
 
 Accepted formats: `"Canadian-CSA"` or `"com.apple.keylayout.Canadian-CSA"`. Supported layouts include Canadian-CSA, French (AZERTY), German (QWERTZ), and others. Without this variable, the server sends US QWERTY keycodes (which is correct if your iPhone uses a US keyboard layout).
 
+Two iPhones with different keyboards on one Mac: list both (`"keyboardLayout": ["Canadian-CSA", "US"]`). Characters the layouts type with different keys are pasted until `type_text` gets `keyboard_layout` for the connected phone, which is then remembered for it. See [limitations](limitations.md#iphones-with-different-keyboards-on-one-mac).
+
 Dead-key compositions such as `ê` on Canadian-CSA are typed as the dead key then the base key. Characters the layout has no keys for, such as `<` on Canadian-CSA, are sent through the clipboard with a warning, which needs Universal Clipboard.
 
 ## What happens if iPhone Mirroring disconnects?

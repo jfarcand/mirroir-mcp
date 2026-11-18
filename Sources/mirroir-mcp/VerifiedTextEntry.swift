@@ -50,7 +50,7 @@ struct VerifiedTextEntry {
 
     /// Enter every segment in order. Success only when every keyed run was
     /// posted and every pasted run was seen on screen.
-    func enter(_ segments: [InputSimulation.TypeSegment]) -> TypeResult {
+    func enter(_ segments: [InputSimulation.TypeSegment], misreadings: [String] = []) -> TypeResult {
         let keyedOnly = segments.allSatisfy { $0.method == .keyEvent }
         // What the screen held before any key, so the read-back counts only
         // text the keys added: the typed word is often on screen already (an
@@ -73,8 +73,10 @@ struct VerifiedTextEntry {
                 entered += segment.text
             }
         }
-        return TypeResult(success: true, error: nil,
-                          notice: keyedOnly ? keyedReadBack(entered, before: before ?? []) : nil)
+        guard keyedOnly else { return TypeResult(success: true, error: nil) }
+        let readBack = keyedReadBack(entered, before: before ?? [], misreadings: misreadings)
+        return TypeResult(success: true, error: nil, notice: readBack.notice,
+                          misreadingShown: readBack.misread)
     }
 
     /// Read typed text back from the screen. iOS autocorrect rewrites keystrokes
@@ -86,35 +88,44 @@ struct VerifiedTextEntry {
     /// Nil when it is shown, when it has nothing OCR could read, or when the
     /// screen cannot be read at all; otherwise a notice saying what was not
     /// seen. It is a notice, not a failure: every keystroke was posted, and a
-    /// password field shows dots.
-    private func keyedReadBack(_ typed: String, before: [String]) -> String? {
+    /// password field shows dots. `misread` says the screen newly shows one
+    /// of `misreadings` instead: what the keys type on another keyboard layout.
+    private func keyedReadBack(
+        _ typed: String, before: [String], misreadings: [String]
+    ) -> (notice: String?, misread: Bool) {
         let needle = PasteNeedle.readable(typed, foldingCase: false)
-        guard !needle.isEmpty else { return nil }
+        guard !needle.isEmpty else { return (nil, false) }
         let shownBefore = PasteNeedle.readable(before.joined(), foldingCase: false)
         let exactBefore = PasteNeedle.count(needle, in: shownBefore)
         let foldedBefore = PasteNeedle.count(needle.lowercased(), in: shownBefore.lowercased())
+        let misneedles = misreadings.map { PasteNeedle.readable($0) }.filter { !$0.isEmpty }
+        let misBefore = misneedles.map { PasteNeedle.count($0, in: shownBefore.lowercased()) }
         var screenRead = false
         var recased = false
+        var misread = false
         for _ in 0 ..< Self.readBackReads {
             sleep(verifyPollUs)
             guard let lines = readScreen() else { continue }
             screenRead = true
             let shown = PasteNeedle.readable(lines.joined(), foldingCase: false)
-            if PasteNeedle.count(needle, in: shown) > exactBefore { return nil }
+            if PasteNeedle.count(needle, in: shown) > exactBefore { return (nil, false) }
             recased = recased
                 || PasteNeedle.count(needle.lowercased(), in: shown.lowercased()) > foldedBefore
+            misread = misread || zip(misneedles, misBefore).contains { mis, before in
+                PasteNeedle.count(mis, in: shown.lowercased()) > before
+            }
         }
-        guard screenRead else { return nil }
+        guard screenRead else { return (nil, false) }
         if recased {
-            return "Every keystroke was sent, but the iPhone changed the capitalization of "
+            return ("Every keystroke was sent, but the iPhone changed the capitalization of "
                 + "\"\(typed)\" (it capitalizes the start of a sentence, for example). Read the "
-                + "field if the exact case matters."
+                + "field if the exact case matters.", false)
         }
-        return "Every keystroke was sent, but \"\(typed)\" is not what the screen shows. " +
+        return ("Every keystroke was sent, but \"\(typed)\" is not what the screen shows. " +
             "The iPhone may have autocorrected it (for example \"teh\" to \"the\", or " +
             "English words rewritten by a French keyboard); read the field before relying " +
             "on its text. A password field hides what it holds, so this notice is " +
-            "expected there."
+            "expected there.", misread)
     }
 
     /// Screen reads the keyed read-back makes, each after one `verifyPollUs` gap.

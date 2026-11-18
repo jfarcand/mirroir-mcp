@@ -72,21 +72,10 @@ struct IPhoneKeyboardLayout: Sendable {
         })
     }
 
-    /// The layout `keyboardLayout` (settings.json) or `IPHONE_KEYBOARD_LAYOUT`
-    /// names. A name macOS does not know is reported on stderr and typing
-    /// uses US QWERTY keystrokes.
-    static func configured() -> IPhoneKeyboardLayout {
-        let name = EnvConfig.keyboardLayout
-        guard let layout = named(name) else {
-            fputs("Keyboard layout '\(name)' is not a macOS keyboard layout; "
-                + "typing uses US QWERTY keystrokes. Run `mirroir-mcp configure` "
-                + "to pick the iPhone's layout.\n", stderr)
-            return .usQWERTY
-        }
-        if let sourceID = layout.sourceID {
-            DebugLog.persist("keyboard", "iPhone keyboard layout: \(sourceID)")
-        }
-        return layout
+    /// The character `sequence` types on this layout, or nil when none does.
+    func character(typedBy sequence: CGKeySequence) -> Character? {
+        guard let strokes else { return CGKeyMap.character(typedBy: sequence) }
+        return strokes.first { $0.value == sequence }?.key
     }
 
     /// Keystrokes that type `char` on this layout, or nil when it has none.

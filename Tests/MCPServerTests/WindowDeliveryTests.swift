@@ -38,7 +38,7 @@ final class WindowDeliveryTests: XCTestCase {
         bridge.windowInfo = WindowInfo(
             windowID: windowID ?? self.windowID, position: CGPoint(x: 100, y: 50),
             size: CGSize(width: 410, height: 898), pid: windowPID)
-        return InputSimulation(bridge: bridge, keyboardLayout: .usQWERTY,
+        return InputSimulation(bridge: bridge, keyboardLayouts: .usQWERTY,
                                keyPoster: keys, windowPoster: poster)
     }
 
@@ -103,7 +103,7 @@ final class WindowDeliveryTests: XCTestCase {
         bridge.frontmost = false
         bridge.windowInfo = WindowInfo(windowID: windowID, position: CGPoint(x: 100, y: 50),
                                        size: CGSize(width: 410, height: 898), pid: 99_999)
-        let input = InputSimulation(bridge: bridge, keyboardLayout: .usQWERTY,
+        let input = InputSimulation(bridge: bridge, keyboardLayouts: .usQWERTY,
                                     keyPoster: RecordingKeyPoster(), windowPoster: poster)
         XCTAssertNil(input.swipe(fromX: 200, fromY: 600, toX: 200, toY: 200,
                                  durationMs: 100, cursorMode: nil))

@@ -168,7 +168,8 @@ with a `cross_surface:` step as above.
   of the design but not built.
 - `keyboardLayout` must match the phone's hardware-keyboard layout. A mismatch garbles typed
   URLs (for example `/` arriving as `é` on a `Canadian-CSA` phone with no layout set), so an
-  `open_url:` step fails there.
+  `open_url:` step fails there. With several phones on one Mac, list each layout
+  (`["Canadian-CSA", "US"]`); the characters they disagree on are pasted.
 - `macos` window targets are driven by `mirroir-mcp test` directly; `mirroir-run` does not open
   a block for them.
 
