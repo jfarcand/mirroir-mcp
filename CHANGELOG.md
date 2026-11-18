@@ -2,7 +2,7 @@
 
 What changed for you in each release. Full notes, with every commit, are on [GitHub Releases](https://github.com/jfarcand/mirroir-mcp/releases).
 
-## Unreleased
+## 0.50.2 (2026-11-18)
 
 - **Driving mode, for a phone on CarPlay.** Add `"driving": { "on": true, "allowedApps": [...] }` to `permissions.json`. While it is on, only the listed apps open, and each input first reads the phone's screen and is refused on a navigation screen; Home and opening a listed app still leave it. It is read on every call, so no restart is needed.
 
