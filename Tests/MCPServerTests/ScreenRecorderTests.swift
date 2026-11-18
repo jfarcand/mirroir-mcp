@@ -94,6 +94,36 @@ final class ScreenRecorderTests: XCTestCase {
         _ = recorder.stopRecording()
     }
 
+    /// GitHub #85: screencapture -v stops on any byte or EOF on its stdin. It
+    /// inherited the server's stdin, which is /dev/null under launchd (it
+    /// ended at once) and the JSON-RPC stream on stdio (it ate the next
+    /// request). The stand-in ends the same way.
+    func testARecordingIsNotEndedByTheServersStdin() {
+        let recorder = recorder(
+            "exec /usr/bin/perl -e '$SIG{INT} = sub { exit 2 }; sysread(STDIN, my $byte, 1); exit 0'")
+        XCTAssertNil(recorder.startRecording(outputPath: video))
+        usleep(1_500_000)
+        XCTAssertTrue(recorder.isRecording, "stdin stays open until stop_recording")
+        let stop = recorder.stopRecording()
+        XCTAssertEqual(stop.filePath, video)
+        XCTAssertNil(stop.endedEarly, stop.endedEarly ?? "")
+    }
+
+    private let window = WindowInfo(
+        windowID: 134_183, position: CGPoint(x: 1603, y: -1200), size: CGSize(width: 440, height: 970), pid: 1)
+
+    func testMacOS26RecordsTheWindowByID() {
+        let (_, arguments) = ScreenRecorder.screencapture(window: window, path: "/tmp/x.mov", macOSMajor: 26)
+        XCTAssertEqual(arguments, ["-v", "-x", "-l", "134183", "-o", "/tmp/x.mov"])
+    }
+
+    /// GitHub #85, macOS 15.7: -l with -v recorded the main display; -R with
+    /// the window's frame recorded the window, on a display above the main one.
+    func testOlderMacOSRecordsTheWindowsFrame() {
+        let (_, arguments) = ScreenRecorder.screencapture(window: window, path: "/tmp/x.mov", macOSMajor: 15)
+        XCTAssertEqual(arguments, ["-v", "-x", "-R", "1603,-1200,440,970", "/tmp/x.mov"])
+    }
+
     func testAProcessThatDiesAtOnceIsAFailedStart() {
         let recorder = recorder("exit 1")
         let error = recorder.startRecording(outputPath: video)

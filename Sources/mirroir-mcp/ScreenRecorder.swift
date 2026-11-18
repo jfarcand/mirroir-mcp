@@ -21,8 +21,10 @@ import HelperLib
 import os
 
 /// Records the iPhone Mirroring window as a video file.
-/// Uses the macOS `screencapture -v -l <windowID>` command which records
-/// a specific window until stopped via SIGINT.
+/// Uses the macOS `screencapture -v` command, which records until stopped via
+/// SIGINT, or until its stdin delivers a byte or ends: it is given a pipe of
+/// its own that stays open while it records, never the server's stdin (the
+/// JSON-RPC stream on stdio, `/dev/null` under launchd).
 ///
 /// screencapture can end on its own (measured once around display sleep).
 /// The recorder then keeps the file's path, so `stopRecording` still returns
@@ -33,11 +35,27 @@ import os
 final class ScreenRecorder: Sendable {
     private let bridge: any WindowBridging
     private let displayAwake: DisplayAwake
-    private let command: @Sendable (_ windowID: UInt32, _ path: String) -> (URL, [String])
+    private let command: @Sendable (_ window: WindowInfo, _ path: String) -> (URL, [String])
 
-    /// The screencapture command that records `windowID` into `path`.
-    static func screencapture(windowID: UInt32, path: String) -> (URL, [String]) {
-        (URL(fileURLWithPath: "/usr/sbin/screencapture"), ["-v", "-l", String(windowID), "-x", "-o", path])
+    /// The newest macOS on which `screencapture -v -l <windowID>` was measured
+    /// to record only the window (macOS 26.5: 860x1884 for a 430x942 window).
+    /// On macOS 15.7 it records the main display, so older versions record
+    /// the window's frame with `-R` instead, which also shows whatever covers it.
+    static let windowRecordingMacOSMajor = 26
+
+    /// The screencapture command that records `window` into `path`.
+    static func screencapture(
+        window: WindowInfo, path: String,
+        macOSMajor: Int = ProcessInfo.processInfo.operatingSystemVersion.majorVersion
+    ) -> (URL, [String]) {
+        let target: [String]
+        if macOSMajor >= windowRecordingMacOSMajor {
+            target = ["-l", String(window.windowID), "-o"]
+        } else {
+            let frame = [window.position.x, window.position.y, window.size.width, window.size.height]
+            target = ["-R", frame.map { String(Int($0.rounded())) }.joined(separator: ",")]
+        }
+        return (URL(fileURLWithPath: "/usr/sbin/screencapture"), ["-v", "-x"] + target + [path])
     }
 
     /// screencapture's exit status when SIGINT stops it, as `stopRecording` does.
@@ -48,6 +66,8 @@ final class ScreenRecorder: Sendable {
     /// is serialized through OSAllocatedUnfairLock.
     private struct RecordingState: @unchecked Sendable {
         var process: Process?
+        /// screencapture's stdin, held open while it records.
+        var input: Pipe?
         var path: String?
         /// Set by `stopRecording` before it interrupts, so the end it causes
         /// is not taken for an early one.
@@ -61,7 +81,9 @@ final class ScreenRecorder: Sendable {
     ///   - displayAwake: kept entered while a recording runs.
     ///   - command: the program and arguments that record a window into a file.
     init(bridge: any WindowBridging, displayAwake: DisplayAwake = .shared,
-         command: @escaping @Sendable (UInt32, String) -> (URL, [String]) = ScreenRecorder.screencapture) {
+         command: @escaping @Sendable (WindowInfo, String) -> (URL, [String]) = {
+             ScreenRecorder.screencapture(window: $0, path: $1)
+         }) {
         self.bridge = bridge
         self.displayAwake = displayAwake
         self.command = command
@@ -89,10 +111,12 @@ final class ScreenRecorder: Sendable {
         }
 
         let path = outputPath ?? defaultRecordingPath()
-        let (executable, arguments) = command(info.windowID, path)
+        let (executable, arguments) = command(info, path)
         let process = Process()
         process.executableURL = executable
         process.arguments = arguments
+        let input = Pipe()
+        process.standardInput = input
 
         // Suppress stdout/stderr from screencapture
         process.standardOutput = FileHandle.nullDevice
@@ -117,7 +141,7 @@ final class ScreenRecorder: Sendable {
         }
 
         state.withLock {
-            $0 = RecordingState(process: process, path: path)
+            $0 = RecordingState(process: process, input: input, path: path)
         }
 
         // Verify the process actually started (Screen Recording permission may block it)
