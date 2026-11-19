@@ -33,8 +33,14 @@ It uses the apps already signed in on your phone: no connector, no OAuth, no pas
 ## What people build
 
 - **A saved recipe reel becomes a grocery list.** The agent opens the reel, reads its frames with `describe_screen`, hears the narration with [`listen`](docs/tools.md#listening), then types the ingredients into Reminders. That is the run in the GIF above.
+- **A DJ on Spotify.** The agent asks what you want to hear, builds the playlist in Spotify, then plays it. No Spotify API, no connector: it uses the app the way you would. See the GIF below.
 - **Errands across apps.** Read the commute time in Waze, then post it in Slack: the agent carries what one app shows into another. [Watch the demo](https://mirroir.dev/?utm_source=github&utm_medium=readme&utm_campaign=body#demo). The same errand as a skill (Waze to Messages) is in [Skills, exploration and CI](docs/skills-and-ci.md#skills).
 - **Games.** A [`scene:` step](docs/skills-marketplace.md#scenes) plays a turn-based or tap-driven game, frame by frame, under a hard frame, token and time budget; a run that runs out of budget is inconclusive (exit 66), never a silent pass. [`touch`](docs/tools.md#games-and-multi-touch) holds a finger for virtual joysticks, `hold_keys` drives games that take keyboard and mouse, and `pinch` and `rotate` zoom and rotate. iPhone Mirroring exposes a single pointer, so twin-stick games stay out of reach. See [Games](docs/games.md).
+
+<p align="center">
+  <img src="website/public/spotify-dj-playlist.gif" alt="The Claude app and a real iPhone side by side: the agent asks what to play, builds a five-track Gui Boratto-style playlist in Spotify, then starts it" width="720" />
+</p>
+<p align="center"><em>"Be my DJ": the agent asks for a vibe, builds a Gui Boratto-style playlist in Spotify and starts it. A real iPhone, sped up.</em></p>
 
 <p align="center">
   <img src="website/public/chess-vs-maximum.gif" alt="The console and a real iPhone side by side during a full chess game: each move is logged as it is played, ending in checkmate against the Maximum bot on Chess.com" width="720" />

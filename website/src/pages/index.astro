@@ -73,6 +73,13 @@ app: Clock
           <p class="demo-caption">A saved recipe reel becomes a grocery list. Sped up.</p>
         </div>
         <div class="carousel-slide demo-slide">
+          <h3>Your DJ on Spotify</h3>
+          <video class="demo-wide" loop muted playsinline preload="none" tabindex="0" data-full={`${import.meta.env.BASE_URL}spotify-dj-playlist.full.mp4`} data-full-label="Watch the full run (49 s)" poster={`${import.meta.env.BASE_URL}spotify-dj-playlist.poster.jpg`} aria-label="The Claude app and a real iPhone side by side: the agent asks what to play, builds a five-track Gui Boratto-style playlist in Spotify, then starts it">
+            <source src={`${import.meta.env.BASE_URL}spotify-dj-playlist.mp4`} type="video/mp4" />
+          </video>
+          <p class="demo-caption">Asks what you want to hear, builds the playlist in Spotify, plays it. Sped up.</p>
+        </div>
+        <div class="carousel-slide demo-slide">
           <h3>Chess against the strongest bot</h3>
           <video class="demo-wide" loop muted playsinline preload="none" tabindex="0" poster={`${import.meta.env.BASE_URL}chess-vs-maximum.poster.jpg`} aria-label="The console and a real iPhone side by side during a full chess game: each move is logged as it is played, ending in checkmate against the Maximum bot on Chess.com">
             <source src={`${import.meta.env.BASE_URL}chess-vs-maximum.mp4`} type="video/mp4" />
