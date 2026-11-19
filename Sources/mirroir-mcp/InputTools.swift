@@ -230,7 +230,8 @@ extension MirroirMCP {
                 what was not confirmed. Emoji and pictographic symbols cannot \
                 be read back by OCR, so text containing them always returns an \
                 error even when the paste landed — check the screen. Non-Latin \
-                scripts are confirmed only when ocrLanguages includes them. \
+                scripts are confirmed only when OCR reads their language (the \
+                Mac's preferred languages, or ocrLanguages when set). \
                 Typed text is read back from the screen: when iOS autocorrect \
                 rewrote it, the call still succeeds and the result says the \
                 screen does not show what was typed. When keyboardLayout lists \

@@ -79,7 +79,7 @@ Pass `keyboard_layout` to `type_text` with the phone's layout (Settings › Gene
 So each paste is read back from the screen with local OCR before the next clipboard write: the last `pasteVerifyWindowChars` readable characters of the line — the pasted run plus the text typed just before it — must appear one more time than before the paste, within `pasteVerifyTimeoutUs`. A paste not seen stops the call with an error that names what was confirmed and what was not; the MCP tool returns `isError`, and a skill step fails. What this means in practice:
 
 - **Emoji and pictographic symbols are never confirmed.** OCR has no glyph to read for them, so a run made only of them is still pasted but the call returns an error saying it is unverified. Check the screen yourself before relying on it.
-- **Non-Latin scripts need `ocrLanguages`.** With the default `["en-US"]`, Vision does not read CJK, so a CJK paste that landed is reported as not seen. Add the script (e.g. `["ja-JP","en-US"]`).
+- **Non-Latin scripts need their language requested.** OCR reads your Mac's preferred languages plus English. When the phone shows a script the Mac's languages do not cover, Vision does not read it, so a CJK paste that landed is reported as not seen. Set `ocrLanguages` (e.g. `["ja-JP","en-US"]`).
 - **Secure fields hide what was pasted.** A password field shows dots, so a paste into one cannot be confirmed; keyed characters are unaffected.
 - **The confirmed text must sit on one visible line.** A field that wraps the pasted tail across lines, or scrolls it out of view, fails the check.
 - **A mixed run is judged as a whole.** A pasted run holding both readable characters and emoji is reported unverified: a stale clipboard holding only the readable part would otherwise pass.

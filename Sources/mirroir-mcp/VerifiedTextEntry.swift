@@ -168,7 +168,8 @@ struct VerifiedTextEntry {
             "within \(seconds)s. The clipboard path needs Universal Clipboard (Handoff " +
             "on the Mac and the iPhone, Bluetooth and Wi-Fi on, same iCloud account); " +
             "a lagging sync pastes the device's previous clipboard instead. Non-Latin " +
-            "scripts are only readable when `ocrLanguages` includes them."
+            "scripts are only readable when OCR reads their language: the Mac's " +
+            "preferred languages, or `ocrLanguages` when set."
     }
 
     /// A failure naming what was confirmed delivered and what was not.

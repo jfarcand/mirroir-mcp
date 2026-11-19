@@ -13,46 +13,31 @@
  * License for the specific language governing permissions and limitations under
  * the License.
  */
-// ABOUTME: Tests for EnvConfig.readStringArray helper and ocrLanguages property.
-// ABOUTME: Validates fallback defaults and comma-separated parsing logic.
+// ABOUTME: Tests for EnvConfig.readOptionalStringArray and the ocrLanguages property.
+// ABOUTME: Validates the unset (nil) path and comma-separated parsing logic.
 
 import XCTest
 @testable import HelperLib
 
 final class EnvConfigReadStringArrayTests: XCTestCase {
 
-    // MARK: - readStringArray fallback behavior
+    // MARK: - readOptionalStringArray unset behavior
 
     // EnvConfig.env is a static let captured at process start, so env var
     // injection via setenv() is not possible in unit tests. These tests
     // verify the fallback path (key absent from both settings and env).
 
-    func testReturnsDefaultWhenKeyAbsent() {
+    func testReturnsNilWhenKeyAbsent() {
         // Use a key that won't exist in settings.json or env
-        let result = EnvConfig.readStringArray(
-            "zzzNonExistentTestKey", envVar: "MIRROIR_ZZZ_NONEXISTENT",
-            default: ["fallback-a", "fallback-b"])
-        XCTAssertEqual(result, ["fallback-a", "fallback-b"])
-    }
-
-    func testReturnsSingleElementDefault() {
-        let result = EnvConfig.readStringArray(
-            "zzzNonExistentTestKey2", envVar: "MIRROIR_ZZZ_NONEXISTENT2",
-            default: ["only-one"])
-        XCTAssertEqual(result, ["only-one"])
-    }
-
-    func testReturnsEmptyArrayDefault() {
-        let result = EnvConfig.readStringArray(
-            "zzzNonExistentTestKey3", envVar: "MIRROIR_ZZZ_NONEXISTENT3",
-            default: [])
-        XCTAssertEqual(result, [])
+        let result = EnvConfig.readOptionalStringArray(
+            "zzzNonExistentTestKey", envVar: "MIRROIR_ZZZ_NONEXISTENT")
+        XCTAssertNil(result)
     }
 
     // MARK: - Comma-separated parsing logic
 
     // These test the parsing branch directly by verifying its behavior
-    // matches Swift's split + trim semantics used in readStringArray.
+    // matches Swift's split + trim semantics used in readOptionalStringArray.
 
     func testCommaSplitBasic() {
         let input = "ja-JP,en-US"
@@ -92,10 +77,9 @@ final class EnvConfigReadStringArrayTests: XCTestCase {
 
     // MARK: - ocrLanguages property
 
-    func testOcrLanguagesDefaultIncludesEnglish() {
-        let result = EnvConfig.ocrLanguages
-        XCTAssertFalse(result.isEmpty, "ocrLanguages should never be empty")
-        XCTAssertTrue(result.contains("en-US"),
-                      "Default ocrLanguages should include en-US")
+    func testOcrLanguagesUnsetUnderIsolatedHome() {
+        // scripts/unit-tests.sh runs under a throwaway home with no
+        // settings.json, so the setting is unset and OCR picks its default.
+        XCTAssertNil(EnvConfig.ocrLanguages)
     }
 }

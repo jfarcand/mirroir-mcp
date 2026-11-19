@@ -123,7 +123,7 @@ struct AppleVisionTextRecognizer: Sendable {
         let request = VNRecognizeTextRequest()
         request.recognitionLevel = EnvConfig.ocrRecognitionLevel == "fast" ? .fast : .accurate
         request.usesLanguageCorrection = EnvConfig.ocrLanguageCorrection
-        request.recognitionLanguages = EnvConfig.ocrLanguages
+        request.recognitionLanguages = try recognitionLanguages(for: request)
         if cpuOnly {
             pinToCPU(request)
         }
@@ -131,6 +131,19 @@ struct AppleVisionTextRecognizer: Sendable {
         let handler = VNImageRequestHandler(cgImage: image, options: [:])
         try handler.perform([request])
         return request.results ?? []
+    }
+
+    /// The configured `ocrLanguages`, or the Mac's preferred languages then
+    /// English, each matched to a code `request` supports at its level.
+    private func recognitionLanguages(for request: VNRecognizeTextRequest) throws -> [String] {
+        let requested = EnvConfig.ocrLanguages
+            ?? OCRLanguageResolver.defaultRequest(preferred: Locale.preferredLanguages)
+        let supported = try request.supportedRecognitionLanguages()
+        let unmatched = OCRLanguageResolver.unmatched(requested: requested, supported: supported)
+        if !unmatched.isEmpty {
+            DebugLog.log("OCR", "Vision does not read \(unmatched); requesting the rest")
+        }
+        return OCRLanguageResolver.resolve(requested: requested, supported: supported)
     }
 
     /// Route every stage of `request` to the CPU, where the device offers one.
