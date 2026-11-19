@@ -13,8 +13,8 @@
  * License for the specific language governing permissions and limitations under
  * the License.
  */
-// ABOUTME: Refuses a HID click when another Mac window covers the point on the target, and waits out a notification banner.
-// ABOUTME: Wires the live window list, display bounds and Notification Center lookup into the PointCoverage verdict.
+// ABOUTME: Refuses a HID click when another Mac window covers the point on the target, and waits out a banner over the point.
+// ABOUTME: Wires the live window list, display bounds, Notification Center lookup and Accessibility hit test into PointCoverage.
 
 import AppKit
 import CoreGraphics
@@ -24,7 +24,8 @@ import HelperLib
 extension InputSimulation {
 
     /// Check that a click at window-relative (x, y) would reach the target and
-    /// not a window in front of it. Waits while a notification banner is up.
+    /// not a window in front of it. Waits while a notification banner is over
+    /// the point; a banner elsewhere on the display does not hold the click.
     /// Returns nil when the point is clear, or the refusal to report.
     ///
     /// A cursor-free post goes to the target process directly, so no window can
@@ -38,7 +39,8 @@ extension InputSimulation {
             let verdict = PointCoverage.verdict(
                 entries: WindowListHelper.windowEntries(onScreenOnly: true),
                 targetPID: info.pid, point: point, displays: Self.displayBounds(),
-                isTransientOverlay: Self.isNotificationCenter)
+                isTransientOverlay: Self.isNotificationCenter,
+                ownerAtPoint: { Self.accessibilityOwner(at: point) })
             switch verdict {
             case .clear, .targetNotUnderPoint:
                 return nil
@@ -76,6 +78,20 @@ extension InputSimulation {
         var ids = [CGDirectDisplayID](repeating: 0, count: Int(count))
         guard CGGetActiveDisplayList(count, &ids, &count) == .success else { return [] }
         return ids.prefix(Int(count)).map { CGDisplayBounds($0) }
+    }
+
+    /// The process whose Accessibility element sits at `point` (global screen
+    /// coordinates), or nil when Accessibility cannot say. The window server's
+    /// hit test skips the clear part of a banner's display-sized window, so
+    /// only the banner itself reports Notification Center here.
+    private static func accessibilityOwner(at point: CGPoint) -> pid_t? {
+        var element: AXUIElement?
+        guard AXUIElementCopyElementAtPosition(AXUIElementCreateSystemWide(),
+                                               Float(point.x), Float(point.y), &element) == .success,
+              let element else { return nil }
+        var pid: pid_t = 0
+        guard AXUIElementGetPid(element, &pid) == .success else { return nil }
+        return pid
     }
 
     private static func isNotificationCenter(_ pid: pid_t) -> Bool {

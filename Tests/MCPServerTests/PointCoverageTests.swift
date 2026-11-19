@@ -14,7 +14,7 @@
  * the License.
  */
 // ABOUTME: Tests for PointCoverage over window lists shaped like ones measured on a real Mac.
-// ABOUTME: Pins that the Dock's display-sized overlay is ignored, a banner is waited out, and a covering window refuses.
+// ABOUTME: Pins that the Dock's display-sized overlay is ignored, a banner over the point is waited out, and a covering window refuses.
 
 import CoreGraphics
 import Foundation
@@ -38,10 +38,19 @@ final class PointCoverageTests: XCTestCase {
                         bounds: bounds, ownerName: name, layer: layer)
     }
 
-    private func verdict(_ entries: [WindowListEntry]) -> PointCoverageVerdict {
+    /// `ownerAtPoint` is what Accessibility reports at the point: the banner
+    /// by default, as when the banner sits over it.
+    private func verdict(_ entries: [WindowListEntry],
+                         ownerAtPoint: pid_t? = nil) -> PointCoverageVerdict {
         PointCoverage.verdict(entries: entries, targetPID: mirrorPID, point: point,
                               displays: [display],
-                              isTransientOverlay: { $0 == self.bannerPID })
+                              isTransientOverlay: { $0 == self.bannerPID },
+                              ownerAtPoint: { ownerAtPoint ?? self.bannerPID })
+    }
+
+    private var bannerOverlay: [WindowListEntry] {
+        [entry(bannerPID, display, layer: 21), entry(dockPID, display, layer: 20),
+         entry(mirrorPID, mirror)]
     }
 
     /// Measured 2026-11-03: the Dock owns a display-sized layer-20 window in
@@ -53,11 +62,44 @@ final class PointCoverageTests: XCTestCase {
 
     /// Measured 2026-11-03: a banner adds a display-sized Notification Center
     /// window at layer 21 for about five seconds.
-    func testABannerOverlayIsReportedAsTransient() {
-        XCTAssertEqual(verdict([entry(bannerPID, display, layer: 21),
-                                entry(dockPID, display, layer: 20),
-                                entry(mirrorPID, mirror)]),
-                       .transientOverlay(ownerPID: bannerPID))
+    func testABannerOverThePointIsReportedAsTransient() {
+        XCTAssertEqual(verdict(bannerOverlay), .transientOverlay(ownerPID: bannerPID))
+    }
+
+    /// GitHub #86: a banner in one corner blocked every tap on a mirror in the
+    /// middle of the screen. Its display-sized window lets clicks through
+    /// outside the banner, so the mirror owns the point and the click goes.
+    func testABannerAwayFromThePointDoesNotHoldTheClick() {
+        XCTAssertEqual(verdict(bannerOverlay, ownerAtPoint: mirrorPID), .clear)
+    }
+
+    /// With a banner up and the point owned by another app's window, the
+    /// window list still decides: that window covers the point.
+    func testABannerAwayFromThePointLeavesACoveringWindowCovering() {
+        let chrome = CGRect(x: 1000, y: 50, width: 700, height: 600)
+        let entries = [entry(bannerPID, display, layer: 21),
+                       entry(otherPID, chrome, name: "Google Chrome"), entry(mirrorPID, mirror)]
+        XCTAssertEqual(verdict(entries, ownerAtPoint: otherPID),
+                       .covered(ownerPID: otherPID, ownerName: "Google Chrome"))
+    }
+
+    /// When Accessibility cannot say who holds the point, the banner is
+    /// waited out as if it were over it: no click on an unknown banner.
+    func testAnUnreadableOwnerAtThePointWaitsOutTheBanner() {
+        let verdict = PointCoverage.verdict(
+            entries: bannerOverlay, targetPID: mirrorPID, point: point, displays: [display],
+            isTransientOverlay: { $0 == self.bannerPID }, ownerAtPoint: { nil })
+        XCTAssertEqual(verdict, .transientOverlay(ownerPID: bannerPID))
+    }
+
+    /// Accessibility is asked only when a banner overlay is in front.
+    func testTheOwnerAtThePointIsNotAskedWithoutABanner() {
+        var asked = false
+        _ = PointCoverage.verdict(
+            entries: [entry(dockPID, display, layer: 20), entry(mirrorPID, mirror)],
+            targetPID: mirrorPID, point: point, displays: [display],
+            isTransientOverlay: { $0 == self.bannerPID }, ownerAtPoint: { asked = true; return nil })
+        XCTAssertFalse(asked)
     }
 
     func testAFloatingPanelOverThePointCovers() {
@@ -107,14 +149,14 @@ final class PointCoverageTests: XCTestCase {
         let offScreen = CGRect(x: 10108, y: 64, width: 430, height: 942)
         let verdict = PointCoverage.verdict(
             entries: [entry(mirrorPID, offScreen)], targetPID: mirrorPID,
-            point: CGPoint(x: 10200, y: 120), displays: [display], isTransientOverlay: { _ in false })
+            point: CGPoint(x: 10200, y: 120), displays: [display], isTransientOverlay: { _ in false }, ownerAtPoint: { nil })
         XCTAssertEqual(verdict, .offDisplay)
     }
 
     func testAnUnreadableDisplayListDoesNotBlockTheClick() {
         let verdict = PointCoverage.verdict(
             entries: [entry(mirrorPID, mirror)], targetPID: mirrorPID, point: point,
-            displays: [], isTransientOverlay: { _ in false })
+            displays: [], isTransientOverlay: { _ in false }, ownerAtPoint: { nil })
         XCTAssertEqual(verdict, .clear)
     }
 }

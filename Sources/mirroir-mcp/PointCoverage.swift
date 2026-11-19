@@ -14,7 +14,7 @@
  * the License.
  */
 // ABOUTME: Decides from the window server's list whether another window sits over a screen point on the target.
-// ABOUTME: Ignores display-sized system overlays, flags a transient banner overlay, and names any window that covers the point.
+// ABOUTME: Ignores display-sized system overlays, flags a banner overlay that holds the point, and names any window that covers it.
 
 import CoreGraphics
 import Foundation
@@ -23,8 +23,9 @@ import Foundation
 enum PointCoverageVerdict: Equatable, Sendable {
     /// No window in front of the target's window takes clicks at the point.
     case clear
-    /// A transient full-display overlay (a notification banner) is up; it
-    /// clears by itself, so the caller waits rather than clicking through it.
+    /// A transient full-display overlay (a notification banner) holds the
+    /// point; it clears by itself, so the caller waits rather than clicking
+    /// on it.
     case transientOverlay(ownerPID: pid_t)
     /// Another window sits over the point and would take the click.
     case covered(ownerPID: pid_t, ownerName: String?)
@@ -49,9 +50,15 @@ enum PointCoverage {
     ///     bar in one, always present), not a window that takes the click.
     ///   - isTransientOverlay: whether a display-sized overlay's owner shows
     ///     transient content (notification banners), which is waited out.
+    ///   - ownerAtPoint: the process Accessibility finds at `point`, or nil
+    ///     when it cannot say. Asked only when a transient overlay is in
+    ///     front. A banner fills one corner of its display-sized window and
+    ///     the rest lets clicks through, so the overlay is waited out only
+    ///     when it owns the point itself, or when that cannot be read.
     static func verdict(entries: [WindowListEntry], targetPID: pid_t, point: CGPoint,
                         displays: [CGRect],
-                        isTransientOverlay: (pid_t) -> Bool) -> PointCoverageVerdict {
+                        isTransientOverlay: (pid_t) -> Bool,
+                        ownerAtPoint: () -> pid_t?) -> PointCoverageVerdict {
         // An empty display list is a failed read, not proof the point is off-screen.
         if !displays.isEmpty && !displays.contains(where: { $0.contains(point) }) {
             return .offDisplay
@@ -63,7 +70,10 @@ enum PointCoverage {
         for entry in entries[..<targetIndex] where entry.layer >= 0 && entry.bounds.contains(point) {
             if entry.layer > 0 && isDisplaySized(entry.bounds, displays: displays) {
                 if isTransientOverlay(entry.ownerPID) {
-                    return .transientOverlay(ownerPID: entry.ownerPID)
+                    let owner = ownerAtPoint()
+                    if owner == nil || owner == entry.ownerPID {
+                        return .transientOverlay(ownerPID: entry.ownerPID)
+                    }
                 }
                 continue
             }
