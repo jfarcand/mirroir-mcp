@@ -114,7 +114,7 @@ Env-var names are derived from the camelCase key by inserting `_` before every u
 | `grantPollUs` | `2000000` | `MIRROIR_GRANT_POLL_US` | How often `mirroir doctor --fix` starts a new process to see whether a permission is on |
 | `grantWaitUs` | `300000000` | `MIRROIR_GRANT_WAIT_US` | How long `mirroir doctor --fix` waits for each permission before moving on |
 | `debugLogMaxBytes` | `10485760` | `MIRROIR_DEBUG_LOG_MAX_BYTES` | Size of `~/.mirroir-mcp/debug.log`, in bytes, past which a starting server moves it to `debug.log.1`. The log is never truncated |
-| `updateCheck` | `true` | `MIRROIR_UPDATE_CHECK` | Ask the npm registry, at most once a day (two-second timeout, answer cached in `~/.mirroir-mcp/update-check.json`), whether a newer mirroir-mcp is published; `status`, `check_health` and `mirroir doctor` then say so. Nothing else is sent. `false` turns it off |
+| `updateCheck` | `true` | `MIRROIR_UPDATE_CHECK` | Ask the npm registry, at most once a day (two-second timeout, answer cached in `~/.mirroir-mcp/update-check.json`), whether a newer mirroir-mcp is published; `status` and `check_health` then say so. `mirroir doctor` asks the registry each time it runs, so it never repeats a day-old answer. Nothing else is sent. `false` turns it off |
 | `cursorFreeInput` | `false` | `MIRROIR_CURSOR_FREE` | Post mouse events directly to the target PID via `postToPid` instead of global HID posting. Works for regular macOS apps (e.g. FakeMirroring) for local integration tests without cursor interference, but NOT for iPhone Mirroring — per-process injection does not register taps there |
 
 ## AI Provider Timeouts

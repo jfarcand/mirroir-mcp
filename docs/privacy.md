@@ -12,7 +12,7 @@ When your AI client calls its tools, mirroir takes screenshots of the iPhone Mir
 
 - **To your AI client.** Screenshots and screen text go to the MCP client that called the tool, such as Claude Code. That client's own terms and privacy policy decide what happens next, including what it sends to its AI provider.
 - **To an AI provider you set up, only if you set one up.** Some features, such as playing a game from screenshots, can call a provider you configure, such as Anthropic or OpenAI, and send it screenshots and screen text. That provider's terms and privacy policy apply. These features stay off until you configure them.
-- **To the npm registry, without your screen data.** At most once a day, mirroir asks `registry.npmjs.org` for its newest version. Like any web request, this reveals your IP address to npm. Turn it off with `updateCheck: false` in the settings.
+- **To the npm registry, without your screen data.** At most once a day, and each time you run `mirroir doctor`, mirroir asks `registry.npmjs.org` for its newest version. Like any web request, this reveals your IP address to npm. Turn it off with `updateCheck: false` in the settings.
 - **To the addresses you choose.** If you set `yoloModelURL`, mirroir downloads a model from it. Installing through npm downloads the package from npm and the matching binary from this project's GitHub releases. Neither download sends your screen data.
 
 ## What mirroir stores on your Mac

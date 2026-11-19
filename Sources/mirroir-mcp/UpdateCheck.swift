@@ -13,17 +13,26 @@
  * License for the specific language governing permissions and limitations under
  * the License.
  */
-// ABOUTME: At most once a day, asks the npm registry for the newest mirroir-mcp and says when this binary is behind.
-// ABOUTME: Cached in ~/.mirroir-mcp, two-second timeout, off with updateCheck=false; status, check_health and doctor show it.
+// ABOUTME: Asks the npm registry for the newest mirroir-mcp and says when this binary is behind; status and check_health ask once a day.
+// ABOUTME: Cached in ~/.mirroir-mcp, two-second timeout, off with updateCheck=false; doctor always asks the registry itself.
 
 import Foundation
 import HelperLib
 
-/// A once-a-day check for a newer release. The answer is cached so that
-/// status, check_health and doctor never wait on the network more than once
-/// in 24 hours, and a failed lookup is cached too: an offline Mac is asked
-/// again the next day, not on every call.
+/// A check for a newer release. The answer is cached so that status and
+/// check_health never wait on the network more than once in 24 hours, and a
+/// failed lookup is cached too: an offline Mac is asked again the next day,
+/// not on every call. Doctor is run on purpose to diagnose an install, so it
+/// asks the registry every time rather than repeat a day-old answer.
 enum UpdateCheck {
+
+    /// Whether a lookup may answer from a cache younger than `cacheLifetime`.
+    enum CachePolicy {
+        /// Reuse a cache younger than a day (status, check_health).
+        case reuse
+        /// Ask the registry now and store its answer (doctor).
+        case refresh
+    }
 
     /// How long a lookup, successful or not, is reused.
     static let cacheLifetime: TimeInterval = 24 * 60 * 60
@@ -62,11 +71,12 @@ enum UpdateCheck {
             + "to see how to upgrade this install."
     }
 
-    /// The newest version, from `cache` when it is younger than a day, else
-    /// from `fetch`, whose result (even a failure) becomes the new cache.
-    static func latest(now: Date, cache: Cache?, fetch: () -> String?,
+    /// The newest version, from `cache` when the policy allows it and it is
+    /// younger than a day, else from `fetch`, whose result (even a failure)
+    /// becomes the new cache.
+    static func latest(now: Date, policy: CachePolicy = .reuse, cache: Cache?, fetch: () -> String?,
                        store: (Cache) -> Void) -> String? {
-        if let cache, now.timeIntervalSince(cache.checkedAt) < cacheLifetime {
+        if policy == .reuse, let cache, now.timeIntervalSince(cache.checkedAt) < cacheLifetime {
             return cache.latest
         }
         let fresh = Cache(checkedAt: now, latest: fetch())
@@ -78,8 +88,40 @@ enum UpdateCheck {
     /// off, or the registry could not be reached.
     static func liveNotice() -> String? {
         guard EnvConfig.updateCheck else { return nil }
-        let latest = latest(now: Date(), cache: readCache(), fetch: fetchLatest, store: writeCache)
-        return notice(current: MirroirVersion.current, latest: latest)
+        return notice(current: MirroirVersion.current, latest: liveLatest(policy: .reuse))
+    }
+
+    /// The registry's newest version under `policy`, or nil when it could not
+    /// be reached. Callers check `EnvConfig.updateCheck` first.
+    static func liveLatest(policy: CachePolicy) -> String? {
+        latest(now: Date(), policy: policy, cache: readCache(), fetch: fetchLatest, store: writeCache)
+    }
+
+    // MARK: - Doctor
+
+    /// Doctor's version check: the registry asked just now, never a cached answer.
+    static func doctorCheck() -> DoctorCheck {
+        let enabled = EnvConfig.updateCheck
+        return doctorCheck(enabled: enabled, latest: enabled ? liveLatest(policy: .refresh) : nil)
+    }
+
+    /// Whether a newer release is published, from the registry's answer just
+    /// now (`latest`, nil when it could not be reached); a warning, never a failure.
+    static func doctorCheck(enabled: Bool, latest: String?,
+                            current: String = MirroirVersion.current) -> DoctorCheck {
+        let name = "mirroir-mcp version"
+        guard enabled else {
+            return DoctorCheck(name: name, status: .passed, detail: "\(current) (check off)", fixHint: nil)
+        }
+        guard let latest else {
+            return DoctorCheck(name: name, status: .warned,
+                               detail: "\(current) (the npm registry could not be reached to check for a newer release)",
+                               fixHint: "Check the network, or run `mirroir-mcp update` later.")
+        }
+        guard let notice = notice(current: current, latest: latest) else {
+            return DoctorCheck(name: name, status: .passed, detail: "\(current) (latest release)", fixHint: nil)
+        }
+        return DoctorCheck(name: name, status: .warned, detail: notice, fixHint: "Run `mirroir-mcp update`.")
     }
 
     // MARK: - Live sources

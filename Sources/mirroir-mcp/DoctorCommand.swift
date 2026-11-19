@@ -85,7 +85,7 @@ enum DoctorCommand {
             checks.append(DoctorCaptureCheck.run(grantee: grantee))
         }
         checks.append(checkAccessibility(grantee: grantee))
-        checks.append(updateCheck(notice: UpdateCheck.liveNotice()))
+        checks.append(UpdateCheck.doctorCheck())
         checks.append(EmbacleVersionCheck.run())
         checks.append(contentsOf: PromptOverrideCheck.run())
         checks.append(contentsOf: checkConfiguredTargets())
@@ -313,17 +313,6 @@ enum DoctorCommand {
             detail: "pre-check not available (macOS <15)",
             fixHint: nil
         )
-    }
-
-    /// Whether a newer release is published; a warning, never a failure.
-    static func updateCheck(notice: String?) -> DoctorCheck {
-        guard let notice else {
-            let detail = EnvConfig.updateCheck
-                ? "\(MirroirVersion.current) (no newer release found)" : "\(MirroirVersion.current) (check off)"
-            return DoctorCheck(name: "mirroir-mcp version", status: .passed, detail: detail, fixHint: nil)
-        }
-        return DoctorCheck(name: "mirroir-mcp version", status: .warned, detail: notice,
-                           fixHint: "Run `mirroir-mcp update`.")
     }
 
     static func checkAccessibility(grantee: HostApp.Grantee?) -> DoctorCheck {

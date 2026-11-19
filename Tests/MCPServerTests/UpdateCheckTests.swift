@@ -53,6 +53,15 @@ final class UpdateCheckTests: XCTestCase {
         XCTAssertEqual(fetches, 0)
     }
 
+    func testARefreshAsksTheRegistryDespiteAFreshCache() {
+        var stored: [UpdateCheck.Cache] = []
+        let cache = UpdateCheck.Cache(checkedAt: now.addingTimeInterval(-3600), latest: "0.50.1")
+        let latest = UpdateCheck.latest(now: now, policy: .refresh, cache: cache, fetch: { "0.50.2" },
+                                        store: { stored.append($0) })
+        XCTAssertEqual(latest, "0.50.2", "doctor must not repeat a release check made before the release")
+        XCTAssertEqual(stored, [UpdateCheck.Cache(checkedAt: now, latest: "0.50.2")])
+    }
+
     func testAStaleCacheIsRefreshedAndAFailureIsRemembered() {
         var stored: [UpdateCheck.Cache] = []
         let stale = UpdateCheck.Cache(checkedAt: now.addingTimeInterval(-UpdateCheck.cacheLifetime), latest: "0.44.0")
@@ -110,7 +119,24 @@ final class UpdateCheckTests: XCTestCase {
     }
 
     func testDoctorWarnsButNeverFailsOnAnOldVersion() {
-        XCTAssertEqual(DoctorCommand.updateCheck(notice: "newer").status, .warned)
-        XCTAssertEqual(DoctorCommand.updateCheck(notice: nil).status, .passed)
+        let behind = UpdateCheck.doctorCheck(enabled: true, latest: "0.50.2", current: "0.50.1")
+        XCTAssertEqual(behind.status, .warned)
+        XCTAssertTrue(behind.detail.contains("0.50.2 is available"))
+        let current = UpdateCheck.doctorCheck(enabled: true, latest: "0.50.1", current: "0.50.1")
+        XCTAssertEqual(current.status, .passed)
+        XCTAssertEqual(current.detail, "0.50.1 (latest release)")
+    }
+
+    func testDoctorDoesNotCallAnUnreachableRegistryCurrent() {
+        let offline = UpdateCheck.doctorCheck(enabled: true, latest: nil, current: "0.50.1")
+        XCTAssertEqual(offline.status, .warned)
+        XCTAssertTrue(offline.detail.contains("could not be reached"))
+        XCTAssertFalse(offline.detail.contains("latest release"))
+    }
+
+    func testDoctorWithTheCheckOffSaysSo() {
+        let off = UpdateCheck.doctorCheck(enabled: false, latest: nil, current: "0.50.1")
+        XCTAssertEqual(off.status, .passed)
+        XCTAssertEqual(off.detail, "0.50.1 (check off)")
     }
 }
