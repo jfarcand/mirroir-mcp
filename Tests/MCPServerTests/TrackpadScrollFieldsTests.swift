@@ -31,6 +31,23 @@ final class TrackpadScrollFieldsTests: XCTestCase {
                               wheel1: 0, wheel2: 0, wheel3: 0))
     }
 
+    /// carnet#89: a line-delta write recomputes the point deltas from whole
+    /// lines, so a frame built in the wrong order reaches the app as 0 (4 pt)
+    /// or 16 (30 pt) instead of the planned points.
+    func testAScrollFrameCarriesItsPlannedPointDeltas() throws {
+        for sender in [TrackpadSender(registryID: 1), TrackpadSender(registryID: nil)] {
+            for points: Int32 in [-4, -10, -30, 4, 51] {
+                let event = try XCTUnwrap(CGEventInput.makeScrollEvent(
+                    SwipeWheelStep(wheel1: points, wheel2: -points), at: .zero, sender: sender))
+                XCTAssertEqual(event.getIntegerValueField(field(96)), Int64(points))
+                XCTAssertEqual(event.getIntegerValueField(field(97)), Int64(-points))
+            }
+        }
+        let bare = try XCTUnwrap(CGEventInput.makeScrollEvent(
+            SwipeWheelStep(wheel1: -4, wheel2: 0), at: .zero, sender: nil))
+        XCTAssertEqual(bare.getIntegerValueField(field(96)), -4)
+    }
+
     func testLineDeltaMatchesARealTrace() {
         XCTAssertEqual(TrackpadScrollFields.lineDelta(points: -55), -5)
         XCTAssertEqual(TrackpadScrollFields.lineDelta(points: -28), -2)

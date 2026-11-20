@@ -266,7 +266,7 @@ enum CGEventInput {
 
     /// Create a continuous scroll wheel event carrying one gesture frame.
     /// Phase fields are left for the caller to set.
-    private static func makeScrollEvent(
+    static func makeScrollEvent(
         _ step: SwipeWheelStep, at location: CGPoint, velocity: TrackpadVelocity = .zero,
         momentumPhase: Int64 = 0, sender: TrackpadSender?
     ) -> CGEvent? {
@@ -284,12 +284,14 @@ enum CGEventInput {
         let pointDeltaY = CGEventField(rawValue: 96)!         // kCGScrollWheelEventPointDeltaAxis1
         let pointDeltaX = CGEventField(rawValue: 97)!         // kCGScrollWheelEventPointDeltaAxis2
         scroll.setIntegerValueField(isContinuousField, value: 1)
-        scroll.setIntegerValueField(pointDeltaY, value: Int64(step.wheel1))
-        scroll.setIntegerValueField(pointDeltaX, value: Int64(step.wheel2))
         if let sender {
             TrackpadScrollFields.apply(to: scroll, step: step, velocity: velocity,
                                        momentumPhase: momentumPhase, senderID: sender.registryID)
         }
+        // The point deltas go last: writing a line delta recomputes them from
+        // whole lines, which turns a 4-point frame into 0 and 30 into 16.
+        scroll.setIntegerValueField(pointDeltaY, value: Int64(step.wheel1))
+        scroll.setIntegerValueField(pointDeltaX, value: Int64(step.wheel2))
         return scroll
     }
 
