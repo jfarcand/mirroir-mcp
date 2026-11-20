@@ -6,12 +6,12 @@
     "url": "https://github.com/jfarcand/mirroir-mcp",
     "source": "github"
   },
-  "version": "0.50.2",
+  "version": "0.50.3",
   "packages": [
     {
       "registryType": "npm",
       "identifier": "mirroir-mcp",
-      "version": "0.50.2",
+      "version": "0.50.3",
       "transport": {
         "type": "stdio"
       },
