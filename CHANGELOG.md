@@ -2,6 +2,16 @@
 
 What changed for you in each release. Full notes, with every commit, are on [GitHub Releases](https://github.com/jfarcand/mirroir-mcp/releases).
 
+## 0.50.3 (2026-11-19)
+
+- **Swipes move the content again.** Every scroll frame lost its movement before it was sent: a slow drag reached the iPhone as zero, and larger frames were cut short. Drags now page the Home Screen and scroll lists by the distance asked, both when iPhone Mirroring is brought to the front and when input goes straight to its window.
+
+- **A Mac notification elsewhere on screen no longer blocks taps** ([#86](https://github.com/jfarcand/mirroir-mcp/issues/86)). A banner anywhere refused every tap with "A notification is showing over 'iphone'"; now only a banner over the tapped point waits, up to 8 s.
+
+- **OCR reads your Mac's languages by default.** With `ocrLanguages` unset, a Korean or Japanese Mac reads Korean or Japanese screens; codes like `fr` are matched to the ones Vision lists.
+
+- **`mirroir doctor` checks for a newer release every time.** It reused an answer up to a day old, so it could call an outdated version current.
+
 ## 0.50.2 (2026-11-18)
 
 - **Driving mode, for a phone on CarPlay.** Add `"driving": { "on": true, "allowedApps": [...] }` to `permissions.json`. While it is on, only the listed apps open, and each input first reads the phone's screen and is refused on a navigation screen; Home and opening a listed app still leave it. It is read on every call, so no restart is needed.
