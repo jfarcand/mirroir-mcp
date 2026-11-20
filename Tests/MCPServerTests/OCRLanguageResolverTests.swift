@@ -54,6 +54,7 @@ final class OCRLanguageResolverTests: XCTestCase {
     func testUnlistedLanguageHasNoMatch() {
         XCTAssertNil(OCRLanguageResolver.match("ga-IE", in: supported))
         XCTAssertNil(OCRLanguageResolver.match("", in: supported))
+        XCTAssertNil(OCRLanguageResolver.match("und", in: supported))
     }
 
     func testResolveKeepsOrderAndDropsDuplicates() {

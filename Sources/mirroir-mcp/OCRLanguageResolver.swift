@@ -30,6 +30,9 @@ enum OCRLanguageResolver {
     /// (app names, system labels) whatever the device language.
     static let english = "en-US"
 
+    /// The BCP 47 code for "no language named".
+    private static let undetermined = "und"
+
     /// The languages to request when `ocrLanguages` is not configured: the
     /// Mac's preferred languages, then English. The phone mirrored on this Mac
     /// usually shares its owner's languages, and a non-Latin script is read
@@ -60,6 +63,10 @@ enum OCRLanguageResolver {
     /// form (`"en-CA"` and `"en-US"` are both `en-Latn`).
     static func match(_ code: String, in supported: [String]) -> String? {
         if supported.contains(code) { return code }
+        // Some macOS releases expand a code naming no language ("", "und") to
+        // the system's default, so the code itself must name one before expansion.
+        guard let named = Locale.Language(identifier: code).languageCode?.identifier,
+              named != undetermined else { return nil }
         let wanted = languageAndScript(code)
         guard wanted.language != nil else { return nil }
         return supported.first { languageAndScript($0) == wanted }
