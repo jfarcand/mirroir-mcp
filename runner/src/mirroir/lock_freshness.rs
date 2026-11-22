@@ -145,7 +145,7 @@ mod tests {
     use std::error::Error as StdError;
     use std::result::Result as StdResult;
 
-    use chrono::Utc;
+    use jiff::Timestamp;
 
     use super::*;
     use crate::parser::lockfile::{LockedArchetype, LockedOrigin, ResolvedRecord};
@@ -171,7 +171,7 @@ plan:
     fn empty_lockfile() -> Lockfile {
         Lockfile {
             version: ArtifactKind::Lockfile.current(),
-            generated_at: Utc::now(),
+            generated_at: Timestamp::now(),
             generated_by: "test".to_owned(),
             archetypes: Vec::new(),
         }

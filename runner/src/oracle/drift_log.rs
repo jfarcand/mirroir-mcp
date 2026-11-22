@@ -21,7 +21,7 @@ use std::fs::{self, OpenOptions};
 use std::io::Write as _;
 use std::path::{Path, PathBuf};
 
-use chrono::Utc;
+use jiff::Timestamp;
 use tracing::info;
 
 use crate::error::{Result, RunnerError};
@@ -201,7 +201,7 @@ pub fn append_findings(root: &Path, scenario: &str, findings: &[DriftFinding]) -
     if fresh {
         rows.push_str(DRIFT_LOG_HEADER);
     }
-    let observed_at = Utc::now().to_rfc3339();
+    let observed_at = Timestamp::now().to_string();
     for finding in findings {
         let (observed, threshold) = finding.measurement_cells();
         writeln!(

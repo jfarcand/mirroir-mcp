@@ -25,9 +25,9 @@ path = "src/main.rs"
 
 [dependencies]
 base64 = "0.23"
-chrono = { version = "0.4", default-features = false, features = ["serde", "clock"] }
 clap = { version = "4", features = ["derive", "env"] }
 hex = "0.4"
+jiff = { version = "1.0.2", default-features = false, features = ["std", "serde"] }
 regex = "1"
 # `rustls-no-provider` keeps aws-lc-rs out of the build; src/tls.rs hands every client a
 # rustls config built on the ring provider and the bundled Mozilla roots.

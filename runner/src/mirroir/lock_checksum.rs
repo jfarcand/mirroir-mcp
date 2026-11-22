@@ -105,7 +105,7 @@ mod tests {
     use std::fs;
     use std::result::Result as StdResult;
 
-    use chrono::Utc;
+    use jiff::Timestamp;
 
     use super::*;
     use crate::parser::lockfile::LockedArchetype;
@@ -122,7 +122,7 @@ mod tests {
         let checksum = checksum_directory(&dir)?;
         Ok(Lockfile {
             version: ArtifactKind::Lockfile.current(),
-            generated_at: Utc::now(),
+            generated_at: Timestamp::now(),
             generated_by: "test".to_owned(),
             archetypes: vec![LockedArchetype {
                 reference: "./archetypes/custom".to_owned(),
@@ -205,7 +205,7 @@ mod tests {
     fn a_pack_record_without_a_version_is_reported_as_malformed() -> TestResult {
         let lock = Lockfile {
             version: ArtifactKind::Lockfile.current(),
-            generated_at: Utc::now(),
+            generated_at: Timestamp::now(),
             generated_by: "test".to_owned(),
             archetypes: vec![LockedArchetype {
                 reference: "mirroir-skills/foo/bar@v1".to_owned(),
@@ -243,7 +243,7 @@ mod tests {
         let checksum = checksum_directory(&dir)?;
         let mut lock = Lockfile {
             version: ArtifactKind::Lockfile.current(),
-            generated_at: Utc::now(),
+            generated_at: Timestamp::now(),
             generated_by: "test".to_owned(),
             archetypes: vec![LockedArchetype {
                 reference: "mirroir-skills/atmosphere/ai-console@v1".to_owned(),

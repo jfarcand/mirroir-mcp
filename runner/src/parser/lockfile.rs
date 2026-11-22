@@ -16,7 +16,7 @@
 // ABOUTME: Schema + (de)serializer for `.mirroir/mirroir.lock` — exact archetype resolutions.
 // ABOUTME: Path-independent (no install_path field); install path is computed at resolve time.
 
-use chrono::{DateTime, Utc};
+use jiff::Timestamp;
 use serde::{Deserialize, Serialize};
 
 use crate::error::{Result, RunnerError};
@@ -29,7 +29,7 @@ pub struct Lockfile {
     /// carries [`ArtifactKind::current`].
     pub version: SchemaVersion,
     /// UTC timestamp recorded when the lockfile was last regenerated.
-    pub generated_at: DateTime<Utc>,
+    pub generated_at: Timestamp,
     /// Human-readable producer (`"mirroir-run 0.2.0"` etc.).
     pub generated_by: String,
     /// Per-archetype resolution records. Ordered by `ref` for deterministic diffs.
@@ -136,7 +136,7 @@ mod tests {
     type TestResult = StdResult<(), Box<dyn StdError>>;
 
     fn sample_lockfile() -> StdResult<Lockfile, Box<dyn StdError>> {
-        let ts = DateTime::parse_from_rfc3339("2026-05-16T18:22:14Z")?.with_timezone(&Utc);
+        let ts: Timestamp = "2026-05-16T18:22:14Z".parse()?;
         Ok(Lockfile {
             version: ArtifactKind::Lockfile.current(),
             generated_at: ts,

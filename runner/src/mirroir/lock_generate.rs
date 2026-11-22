@@ -20,7 +20,7 @@ use std::collections::HashSet;
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use chrono::Utc;
+use jiff::Timestamp;
 use sha2::{Digest, Sha256};
 
 use crate::error::{Result, RunnerError};
@@ -76,7 +76,7 @@ pub fn regenerate_lockfile(
 
     Ok(Lockfile {
         version: ArtifactKind::Lockfile.current(),
-        generated_at: Utc::now(),
+        generated_at: Timestamp::now(),
         generated_by: format!("mirroir-run {}", env!("CARGO_PKG_VERSION")),
         archetypes,
     })

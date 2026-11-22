@@ -21,7 +21,7 @@ use std::fs;
 use std::io;
 use std::path::{Path, PathBuf};
 
-use chrono::{DateTime, Utc};
+use jiff::Timestamp;
 use serde::{Deserialize, Serialize};
 
 use crate::error::{Result, RunnerError};
@@ -58,7 +58,7 @@ pub struct RunSummary {
     /// Absolute path to the `.mirroir/mirroir.yaml` that was loaded.
     pub config_path: PathBuf,
     /// Generation timestamp.
-    pub generated_at: DateTime<Utc>,
+    pub generated_at: Timestamp,
     /// Per-sample outcomes in plan order.
     pub samples: Vec<SampleVerdict>,
     /// Aggregate counts.
@@ -164,7 +164,7 @@ pub fn write_summary_full(
     let summary = RunSummary {
         version: SUMMARY_SCHEMA_VERSION,
         config_path: config_path.to_path_buf(),
-        generated_at: Utc::now(),
+        generated_at: Timestamp::now(),
         samples: verdicts,
         totals: RunTotals {
             samples: total,

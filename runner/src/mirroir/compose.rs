@@ -21,7 +21,7 @@ use std::fs;
 use std::io;
 use std::path::{Path, PathBuf};
 
-use chrono::Utc;
+use jiff::Timestamp;
 
 use crate::error::{Result, RunnerError};
 use crate::mirroir::compose_cache::{
@@ -225,7 +225,7 @@ fn compose_archetype_entry(
     // Write the compose manifest.
     let manifest = ComposeManifest {
         version: ArtifactKind::ComposeManifest.current(),
-        composed_at: Utc::now(),
+        composed_at: Timestamp::now(),
         archetype: ComposeManifestArchetype {
             reference: format!("{:?}", resolved.origin),
             resolved_version: archetype_version(resolved),

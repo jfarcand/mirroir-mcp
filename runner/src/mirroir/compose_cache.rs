@@ -22,7 +22,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::time::SystemTime;
 
-use chrono::{DateTime, Utc};
+use jiff::Timestamp;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use tracing::info;
@@ -90,7 +90,10 @@ pub fn compose_needed(
     }
 
     // Fast-path: compare each recorded source file's mtime to composed_at.
-    let composed_at_sys: SystemTime = manifest.composed_at.into();
+    let Ok(composed_at_sys) = SystemTime::try_from(manifest.composed_at) else {
+        // A timestamp this platform's clock cannot hold → corrupt → recompose.
+        return Ok(true);
+    };
     let mut needs_sha = false;
     for record in &manifest.archetype.source_files {
         let abs = resolved.directory.join(&record.path);
@@ -236,7 +239,7 @@ pub struct ComposeManifest {
     /// Manifest schema version, gated by [`ArtifactKind::ComposeManifest`].
     pub version: SchemaVersion,
     /// Timestamp the sample was composed at (fast-path mtime comparison anchor).
-    pub composed_at: DateTime<Utc>,
+    pub composed_at: Timestamp,
     /// Archetype-side provenance (reference, version, source-file checksums).
     pub archetype: ComposeManifestArchetype,
     /// Instance-side provenance (sample name + plan-entry hash).
