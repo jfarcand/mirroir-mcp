@@ -2,6 +2,14 @@
 
 What changed for you in each release. Full notes, with every commit, are on [GitHub Releases](https://github.com/jfarcand/mirroir-mcp/releases).
 
+## 0.50.4 (2026-11-22)
+
+- **Screen reads recover on macOS 27 when Vision's model cache goes away.** A server running for a while could end up failing every read with `e5rtError … 13` until it was restarted. When every read in the server fails, mirroir now reads the screen in a fresh process. The first read after an upgrade or reinstall still takes about 50 s while macOS compiles the model ([troubleshooting](docs/troubleshooting.md)).
+
+- **`mirroir-mcp recognize-text <image>`** prints the text in a PNG or JPEG as JSON. mirroir runs it itself for the recovery above.
+
+- **mirroir-run** drops the unmaintained `chrono` crate for `jiff`, and moves to `url` 2.5.9 for a security fix.
+
 ## 0.50.3 (2026-11-19)
 
 - **Swipes move the content again.** Every scroll frame lost its movement before it was sent: a slow drag reached the iPhone as zero, and larger frames were cut short. Drags now page the Home Screen and scroll lists by the distance asked, both when iPhone Mirroring is brought to the front and when input goes straight to its window.
