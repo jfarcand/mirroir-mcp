@@ -224,7 +224,7 @@ no `panic!()`. Test functions returning Result have worked in Rust since the
 ### Workflow
 
 Same as the Swift side: feature branches → squash merge to `main`. Bug fixes
-go directly to `main`. No PRs. The `commit-msg` hook applies to both Swift
+go directly to `main`. The maintainer opens no PR for it. The `commit-msg` hook applies to both Swift
 and Rust commits — conventional commit format, max 2 lines, no `Co-Authored-By:
 Claude`.
 
@@ -316,10 +316,11 @@ STOP and surface to ChefFamille before proceeding when you find:
 8. **Invariant test with an exception list** — you're pinning debt.
 9. **Phantom dependency integration** — a crate whose API isn't actually called.
 
-## Git Workflow: No Pull Requests
+## Git Workflow: Maintainer Branches Merge Locally
 
-All merges happen locally via squash merge, so don't open a pull request (`gh pr create` or any
-other way) and don't suggest one.
+This section is the maintainer's workflow. The maintainer's own branches merge locally via squash
+merge, so in a maintainer session don't open a pull request (`gh pr create` or any other way) and
+don't suggest one. Outside contributors open pull requests from a fork: see CONTRIBUTING.md.
 
 ### Rules
 - Feature branches are merged via **local squash merge**
@@ -457,7 +458,7 @@ swift build
 #    throwaway home, so your own ~/.mirroir-mcp and settings.json cannot change
 #    a result; options after the runner name go to `swift test`.
 scripts/unit-tests.sh xctest --filter <TestClassName>/<testMethodName>
-# Example: scripts/unit-tests.sh xctest --filter HelperLibTests.AppleScriptKeyMapTests
+# Example: scripts/unit-tests.sh xctest --filter HelperLibTests.EnvConfigReadNumberTests
 
 # A swift-testing @Suite (e.g. AppleVisionTextRecognizerTests) runs in the other
 # runner. Filtering one in the XCTest runner reports "Executed 0 tests" — which

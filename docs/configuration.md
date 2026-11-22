@@ -23,7 +23,7 @@ Env-var names are derived from the camelCase key by inserting `_` before every u
 
 | Setting | Default | Description |
 |---------|---------|-------------|
-| `screenDescriberMode` | `"auto"` | `"auto"` uses vision when embacle FFI is linked, OCR otherwise. `"vision"` forces AI vision, `"ocr"` forces local OCR + YOLO |
+| `screenDescriberMode` | `"auto"` | `"auto"` and `"ocr"` use local OCR + YOLO. `"vision"` uses AI vision through the configured `agent` (`embacle` when none is set) |
 | `agent` | `""` | AI agent name for vision mode and diagnosis (e.g. `"embacle"`, `"embacle:claude"`) |
 | `agentTransport` | `"auto"` | Agent transport: `"auto"` runs an `embacle` agent whose model is a bare Copilot model id on the embedded Rust FFI when it is linked, HTTP otherwise. A `runner:model` embacle model (e.g. `embacle:claude` → `claude:sonnet`), a bare embacle-server runner name (`claude`, `copilot`, `gemini`, …, meaning that runner's default model) and every Anthropic, OpenAI and Ollama agent always use HTTP. `"http"` forces HTTP for everything |
 | `visionImageWidth` | `500` | Target image width in pixels for vision API calls (screenshots are resized before sending) |

@@ -1,7 +1,7 @@
 # mirroir-onboard
 
 Claude Code Agent Skill that onboards a web consumer repository to
-[mirroir](../../README.md)'s `.mirroir/` dotfile system.
+[mirroir](../../../README.md)'s `.mirroir/` dotfile system.
 
 ## Install
 
@@ -46,5 +46,5 @@ See [`SKILL.md`](./SKILL.md) for the full algorithm.
   catches backend/seed/proxy/auth-gate breakage a mocked suite can't).
 - Generate iOS skills (use `mcp__mirroir__generate_skill` instead).
 - Author archetypes — the cross-app multiplier, but a separate task
-  (see [`runner/docs/archetype-authoring.md`](../../runner/docs/archetype-authoring.md)).
+  (see [`runner/docs/archetype-authoring.md`](../../../runner/docs/archetype-authoring.md)).
 - Commit anything (it stops after a green replay, awaits your review).

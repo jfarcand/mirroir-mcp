@@ -8,13 +8,14 @@ Thank you for your interest in contributing! By submitting a contribution, you a
 2. Run the [installer](mirroir.sh) to build the server binary
 3. Read this guide to understand the system
 4. Create a feature branch for your work
+5. Open a pull request against `main`; the [template](.github/PULL_REQUEST_TEMPLATE.md) lists what a reviewer checks
 
 ## Project Structure
 
 ```
 mirroir-mcp/
 ├── Sources/
-│   ├── mirroir-mcp/           # MCP server + CLI subcommands (~155 files)
+│   ├── mirroir-mcp/           # MCP server + CLI subcommands (~325 files)
 │   │   │
 │   │   │── # ── Core Infrastructure ──
 │   │   ├── mirroir_mcp.swift        # Entry point, CLI dispatch, target registry init
@@ -28,7 +29,7 @@ mirroir-mcp/
 │   │   │
 │   │   │── # ── Tool Registration (one file per category, thin handlers) ──
 │   │   ├── ScreenTools.swift        # screenshot, describe_screen, recording
-│   │   ├── InputTools.swift         # tap, swipe, drag, type_text, press_key, long_press, double_tap, shake
+│   │   ├── InputTools.swift         # swipe, drag, type_text, press_key, long_press, double_tap, shake
 │   │   ├── NavigationTools.swift    # launch_app, open_url, press_home, press_app_switcher, press_back, spotlight
 │   │   ├── ScrollToTools.swift      # scroll_to
 │   │   ├── AppManagementTools.swift # reset_app
@@ -116,7 +117,7 @@ mirroir-mcp/
 │   │   ├── ActionStepFormatter.swift # Format action steps for SKILL.md
 │   │   ├── LandmarkPicker.swift     # Pick OCR landmarks for skill steps
 │   │   │
-│   │   │── # ── Compiled Skills (zero-OCR replay) ──
+│   │   │── # ── Compiled Skills (replay without AI) ──
 │   │   ├── CompiledSkill.swift      # Compiled skill data model + SHA-256
 │   │   ├── CompiledStepExecutor.swift # Replay compiled steps (OCR-verified)
 │   │   ├── TestRunnerCompiled.swift # Test compiled skills
@@ -186,11 +187,11 @@ mirroir-mcp/
 │       └── SpotlightOverlay.swift   # Spotlight search overlay
 │
 ├── Tests/
-│   ├── MCPServerTests/        # XCTest — server routing, tool handlers, exploration (94 files)
-│   ├── HelperLibTests/        # Swift Testing — shared library utilities (11 files)
-│   ├── TestRunnerTests/       # Swift Testing — test runner, recorder, skill parser (14 files)
-│   ├── IntegrationTests/      # XCTest — FakeMirroring integration, requires running app (15 files)
-│   └── Fixtures/              # Test skill files (YAML + SKILL.md)
+│   ├── MCPServerTests/        # XCTest + Swift Testing — server routing, tool handlers, exploration (233 files)
+│   ├── HelperLibTests/        # Swift Testing + XCTest — shared library utilities (21 files)
+│   ├── TestRunnerTests/       # XCTest + Swift Testing — test runner, recorder, skill parser (36 files)
+│   ├── IntegrationTests/      # XCTest — FakeMirroring integration, requires running app (23 files)
+│   └── Fixtures/              # Test fixtures (YAML skills, recordings, AX window captures)
 │
 ├── docs/                      # User-facing documentation
 ├── scripts/                   # Build/install/CI scripts
@@ -352,10 +353,10 @@ Add tests in `Tests/MCPServerTests/` for tool handler logic and `Tests/HelperLib
 
 | Target | Framework | Files | Purpose |
 |--------|-----------|-------|---------|
-| `MCPServerTests` | XCTest | 94 | Server routing, tool handlers, exploration algorithms, component detection, graph algorithms |
-| `HelperLibTests` | Swift Testing | 11 | Key mapping, permissions, protocol types, OCR coordinates, layout translation |
-| `TestRunnerTests` | Swift Testing | 14 | Skill parsing, step execution, element matching, event classification, reporters |
-| `IntegrationTests` | XCTest | 15 | Full workflows with FakeMirroring app (requires running FakeMirroring, skipped in CI unit tests) |
+| `MCPServerTests` | XCTest + Swift Testing | 233 | Server routing, tool handlers, exploration algorithms, component detection, graph algorithms |
+| `HelperLibTests` | Swift Testing + XCTest | 21 | Key mapping, permissions, protocol types, OCR coordinates, layout translation |
+| `TestRunnerTests` | XCTest + Swift Testing | 36 | Skill parsing, step execution, element matching, event classification, reporters |
+| `IntegrationTests` | XCTest | 23 | Full workflows with FakeMirroring app (requires running FakeMirroring, skipped in CI unit tests) |
 
 ### Dependency Injection
 
@@ -466,7 +467,7 @@ defaults to the Settings pack on launch so tests start on a known screen.
 There is no `FakeScenario` enum to edit — apps live entirely in APP.md:
 
 1. Add (or edit) an APP.md in the skills repo (`patterns/apps/<app>/APP.md`) with a
-   `## Simulator` section declaring `root_screen` and metadata, plus one
+   `## Simulator` section declaring `root` and metadata, plus one
    `## Simulator Screen <id>` section per screen and `## Simulator Obstacle <id>` per
    modal. Bullet syntax is `- key: value` for properties and `- element <kind>: …`
    for screen elements (see `SimulatorSpecParser` unit tests for examples).
@@ -506,7 +507,7 @@ swift test --filter IntegrationTests
 swift test --filter BFSExplorationIntegrationTests/testMultiViewportExploration
 ```
 
-Integration tests are **skipped in CI** (`swift test --skip IntegrationTests`) because they require a visible macOS window and CGEvent access. They run locally before merging.
+`scripts/unit-tests.sh` skips integration tests (`--skip IntegrationTests`) because they require a visible macOS window and CGEvent access. CI runs them against FakeMirroring; run them locally before merging.
 
 ### Test Pattern
 
@@ -607,9 +608,8 @@ Every Swift and Rust file must have:
 
 ### Git Workflow
 
-- **Features:** Create a branch (`feature/my-feature`), squash merge locally to main
-- **Bug fixes:** Commit directly to main
-- **Never create Pull Requests** — all merges happen locally
+- **Contributors:** open a pull request from a branch in your fork; it lands on `main` as one squashed commit
+- **Maintainers:** create a branch (`feature/my-feature`) and squash merge locally to main; bug fixes are committed directly to main
 - **Commit messages must use conventional commit format:** `type(scope): description`
   - Types: `feat`, `fix`, `chore`, `docs`, `test`, `refactor`, `ci`, `style`, `perf`, `build`, `revert`
   - Scope is optional. Multi-scope with `|` is permitted: `fix(module|context): description`

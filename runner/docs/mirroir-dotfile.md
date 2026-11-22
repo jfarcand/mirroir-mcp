@@ -165,7 +165,7 @@ hashes to sha256:9c02…
 | Mode | When | Behavior on a stale or drifted lockfile |
 |------|------|----------------------------|
 | Default | `mirroir-run` (no `--locked` / `--frozen`) | Regenerate a stale lockfile; warn on a checksum that moved, naming `mirroir-run accept` |
-| `--locked` | CI | Exit non-zero with `MirroirLockfileStale` |
+| `--locked` | CI | Exit non-zero with `MirroirError::LockfileStale` |
 | `--frozen` | Hermetic offline CI | As `--locked` plus forbid network fetch |
 
 ### Re-recording the lockfile
@@ -277,18 +277,18 @@ After every run, mirroir-run writes a summary to `--report`:
 
 ```json
 {
-  "version": 1,
+  "version": 2,
   "config_path": "/path/.mirroir/mirroir.yaml",
   "generated_at": "2026-05-17T...",
   "samples": [
     { "name": "spring-boot-ai-chat", "verdict": "pass" },
     { "name": "spring-boot-broken", "verdict": "fail", "error": "..." }
   ],
-  "totals": { "samples": 21, "passed": 21, "failed": 0, "skipped": 0 }
+  "totals": { "samples": 21, "passed": 21, "failed": 0, "drifted": 0, "skipped": 0 }
 }
 ```
 
-`verdict` is `pass` / `fail` / `skipped` / `composed` (the last only
+`verdict` is `pass` / `fail` / `drift` / `skipped` / `composed` (the last only
 appears under `--compose-only`).
 
 ## Compose pipeline + `.build/` cache
@@ -458,20 +458,20 @@ in [drift-and-accept.md](drift-and-accept.md).
 
 ## Troubleshooting
 
-- **`MirroirConfigNotFound`** — no `.mirroir/mirroir.yaml` in cwd or any
+- **`MirroirError::ConfigNotFound`** — no `.mirroir/mirroir.yaml` in cwd or any
   ancestor. Run from inside a consumer repo, or pass `--config <PATH>`.
-- **`MirroirArchetypeNotFound`** — pack not installed at the required
+- **`MirroirError::ArchetypeNotFound`** — pack not installed at the required
   version. `mirroir-run pack install <pack-repository>` (add `--ref` for a
   branch or tag that carries the version you need).
-- **`MirroirLockfileStale`** — `mirroir.yaml` and `mirroir.lock` disagree
+- **`MirroirError::LockfileStale`** — `mirroir.yaml` and `mirroir.lock` disagree
   under `--locked` / `--frozen`, either on the ref set / version pins or on a
   recorded `checksum:` the archetype tree no longer hashes to. A message
   naming `now hashes to` means the tree's contents moved under an unchanged
   pin. In dev: `mirroir-run accept` (re-records + warns what changed). In CI:
   re-record locally, review `git diff .mirroir/mirroir.lock`, commit it.
-- **`MirroirCompositionUnsupported`** — plan entry has `archetypes:`
+- **`MirroirError::CompositionUnsupported`** — plan entry has `archetypes:`
   with more than one element. v1 supports exactly one ref; cross-archetype
   composition is on the roadmap.
-- **`MirroirInvalidArchetypeRef`** — bare name without prefix
+- **`MirroirError::InvalidArchetypeRef`** — bare name without prefix
   (`dashboard`). Use `mirroir-skills/dashboard@v1`, `./<path>`, or
   `user/dashboard@v1`.

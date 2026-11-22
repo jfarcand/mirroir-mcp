@@ -146,7 +146,7 @@ tags: [<archetype>, must-pass]
 steps:
   - target:
       kind: web
-      browsers: [chromium]
+      browsers: [chrome]
       url: "http://127.0.0.1:${PORT}/console/"
   - wait_for: "[data-testid=status-label]:has-text('Connected')"
   - tap: "[data-testid=input]"

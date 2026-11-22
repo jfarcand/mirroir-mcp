@@ -18,7 +18,7 @@ The locked spec's build sequence (the design gist, §12) has 18 steps. The
 runner milestones below cover its spine; iOS delegation and live web↔iOS parity
 (steps 17–18, sequential form) run through mirroir-mcp. Still open against the
 spec: parallel web/iOS lanes, `wait_for_agui_event`, the LLM
-`cross_surface_equivalent` judge, native Anthropic/Ollama judge clients,
+`cross_surface_equivalent` judge,
 and per-browser verdicts. `main.rs` dispatches a
 multi-mode runner: scenario `--validate` / `--emit playwright` /
 `--run-scenario`, `--sample` session replay, `--diff-text` drift, and the
@@ -319,7 +319,7 @@ src/
 │   ├── sample.rs          # SAMPLE.md manifest (fenced-yaml block + Session)
 │   ├── scenario.rs        # Scenario top-level (singleton_map_recursive enum form)
 │   ├── shorthand.rs       # step args as `"label"` shorthand or a record, unknown keys still visible
-│   ├── step.rs            # SkillStep enum — 30 variants (Launch..CrossSurface)
+│   ├── step.rs            # SkillStep enum — 31 variants (Launch..CrossSurface)
 │   ├── step_args.rs       # oracle/verdict step args (judge, drift, http, report, cross_surface)
 │   ├── step_process_args.rs # process-target step args (spawn, wait_port, kill, assert_log)
 │   ├── surface.rs         # web-vs-runner step classification + step-kind labels
@@ -339,13 +339,13 @@ src/
 │   ├── run.rs             # `run_mirroir` orchestrator (discover+resolve+lock+compose+run_sample)
 │   └── run_io.rs          # config + local-override loading + run-summary JSON
 ├── target/
-│   ├── mod.rs             # execution targets index (process + http)
+│   ├── mod.rs             # execution targets index (process + http + ios)
 │   ├── process.rs         # tokio::process registry (spawn/kill/SIGTERM/log capture)
 │   ├── process_log.rs     # log-capture plumbing (stream pumping, group signalling, regex)
 │   ├── process_port.rs    # TCP port-readiness polling for `wait_port:`
 │   └── http.rs            # reqwest probe + status/body assertions
 ├── compile/
-│   ├── mod.rs             # compilation targets index (Playwright only today)
+│   ├── mod.rs             # compilation targets index (Playwright for web, mirroir-mcp dialect for iOS)
 │   ├── error.rs           # PlaywrightError (compile / invoke / report-ingest failures)
 │   ├── playwright.rs      # scenario → one .spec.ts, incl. the mirroir-captures attachment
 │   ├── playwright_config.rs # playwright.config.ts (one project per declared browser)
@@ -360,7 +360,7 @@ src/
     ├── drift_log.rs       # `.harness/drift-log.md` candidate rows
     ├── baseline.rs        # `.harness/last-green.json` — what the previous PASS observed
     ├── thresholds.rs      # fail-closed hierarchy: step → scenario → APP.md → drift-defaults
-    ├── judge.rs           # OpenAI-compatible HTTP client + template-hash verification
+    ├── judge.rs           # judge scoring call + template-hash verification
     └── judge_profiles.rs  # judge profile registry (built-in + overlay, trust-tiered)
 ```
 

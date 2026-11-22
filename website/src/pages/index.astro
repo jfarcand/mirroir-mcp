@@ -55,6 +55,9 @@ app: Clock
       <a class="btn-secondary" href="https://github.com/jfarcand/mirroir-mcp" rel="noopener noreferrer">View on GitHub</a>
     </div>
     <p class="hero-requirements">
+      An MCP server, with a framework on top: a run becomes a skill and a test that replay without an LLM.
+    </p>
+    <p class="hero-requirements">
       Needs macOS 15 or later and <a href="https://support.apple.com/en-us/120421" rel="noopener noreferrer">iPhone Mirroring</a>.
     </p>
   </header>
@@ -74,7 +77,7 @@ app: Clock
         </div>
         <div class="carousel-slide demo-slide">
           <h3>Recipe reel to grocery list</h3>
-          <video class="demo-wide" loop muted playsinline preload="none" tabindex="0" data-full={`${import.meta.env.BASE_URL}recipe-grocery-list.full.mp4`} data-full-label="Watch the full run (45 s)" poster={`${import.meta.env.BASE_URL}recipe-grocery-list.poster.jpg`} aria-label="The Claude app and a real iPhone side by side: the agent opens a saved Instagram recipe reel, listens to it, then writes an eleven-item grocery list in Reminders">
+          <video class="demo-wide" loop muted playsinline preload="none" tabindex="0" data-full={`${import.meta.env.BASE_URL}recipe-grocery-list.full.mp4`} data-full-label="Watch the full run (46 s)" poster={`${import.meta.env.BASE_URL}recipe-grocery-list.poster.jpg`} aria-label="The Claude app and a real iPhone side by side: the agent opens a saved Instagram recipe reel, listens to it, then writes an eleven-item grocery list in Reminders">
             <source src={`${import.meta.env.BASE_URL}recipe-grocery-list.mp4`} type="video/mp4" />
           </video>
           <p class="demo-caption">A saved recipe reel becomes a grocery list. Sped up.</p>
@@ -302,7 +305,7 @@ app: Clock
       </details>
       <details>
         <summary>Will it take over my Mac?</summary>
-        <p>No. Taps and typing reach the phone while you keep working; a swipe moves the pointer for a moment.</p>
+        <p>Through macOS 26, no: taps and typing reach the phone while you keep working; a drag or pinch brings iPhone Mirroring forward for a moment. On macOS 27, each action brings it forward.</p>
       </details>
       <details>
         <summary>Does my phone's audio leave my Mac?</summary>

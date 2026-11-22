@@ -165,7 +165,7 @@ Use the full path to the binary in your `.mcp.json`: `<repo>/.build/release/mirr
 
 ## Updating
 
-`mirroir-mcp update` reads how this copy was installed and upgrades it (`--dry-run` prints the command first). `status`, `check_health` and `mirroir doctor` say when a newer release is out; `status` and `check_health` ask the npm registry at most once a day, doctor asks each time it runs, and `updateCheck: false` turns all of it off. By hand:
+`mirroir-mcp update` reads how this copy was installed and upgrades it (`--dry-run` prints the command without running it). `status`, `check_health` and `mirroir doctor` say when a newer release is out; `status` and `check_health` ask the npm registry at most once a day, doctor asks each time it runs, and `updateCheck: false` turns all of it off. By hand:
 
 ```bash
 # curl installer

@@ -57,16 +57,14 @@ swift build -c release
 brew reinstall mirroir-mcp
 ```
 
-#### Zero-config activation
+#### Activation
 
-When the embacle FFI is linked into the binary, `screenDescriberMode` defaults to `"auto"` which automatically resolves to vision mode. No settings change required — install embacle-ffi, rebuild, and `describe_screen` starts using AI vision.
-
-To force local OCR even when embacle is available, explicitly set `"ocr"`:
+Vision mode is opt-in. `screenDescriberMode` defaults to `"auto"`, which uses local OCR even when the embacle FFI is linked. Set `"vision"` to use AI vision:
 
 ```json
 // .mirroir-mcp/settings.json
 {
-  "screenDescriberMode": "ocr"
+  "screenDescriberMode": "vision"
 }
 ```
 

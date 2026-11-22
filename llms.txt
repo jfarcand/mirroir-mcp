@@ -17,13 +17,13 @@ The name is the old French spelling of *miroir* (mirror).
 
 ## Architecture
 
-Single-process design using the macOS CGEvent API for all input:
+Single-process design. Input is CGEvent HID events; on iPhone Mirroring, taps, keys and swipes are addressed to its window instead through macOS 26, so the front app keeps the focus.
 
 1. **mirroir-mcp** (user process) — MCP server, window discovery via AXUIElement, screen capture, Vision OCR, coordinate mapping, CGEvent input (pointing + keyboard), skill system. Communicates with MCP clients over stdin/stdout JSON-RPC 2.0.
 
 2. **HelperLib** (shared Swift library) — Types, keyboard maps, timing constants, and protocol definitions shared across the main executable and test targets.
 
-The input path: MCP client -> mirroir-mcp -> CGEvent API -> macOS HID -> iPhone Mirroring -> iPhone.
+The HID input path: MCP client -> mirroir-mcp -> CGEvent API -> macOS HID -> iPhone Mirroring -> iPhone.
 
 ## Installation
 
@@ -42,12 +42,13 @@ brew tap jfarcand/tap && brew install mirroir-mcp
 
 Requires macOS 15+ and an iPhone connected via iPhone Mirroring.
 
-## MCP Tools (33 total)
+## MCP Tools (42 total)
 
 ### Screen (read-only, always available)
 - `screenshot` — Capture iPhone screen as base64 PNG
 - `describe_screen` — Analyze the screen using local OCR (Apple Vision) or AI vision (embacle FFI) depending on `screenDescriberMode`. Returns UI elements with tap coordinates plus grid-overlaid screenshot. `scroll: true` does full-page scroll and deduplication. Detects unlabeled icons via pixel clustering.
 - `start_recording` / `stop_recording` — Video recording of the mirrored screen
+- `listen` — Hear what the phone plays, transcribed on the Mac (needs macOS 26)
 
 ### Input (mutating, requires permission)
 - `tap` — Tap at (x, y) coordinates relative to mirroring window
@@ -72,6 +73,7 @@ Requires macOS 15+ and an iPhone connected via iPhone Mirroring.
 - `spotlight` — Open Spotlight search
 - `scroll_to` — Scroll until a text element becomes visible via OCR. `direction` says where that text is (`down` by default, for what is below; it is not the finger's motion, which is `swipe`); `at` scrolls a list inside the screen. When the text never shows, the error carries `stop_reason=end_of_content` (the content read the same two scrolls in a row) or `stop_reason=max_scrolls`.
 - `reset_app` — Force-quit app via App Switcher (swipes through carousel to find off-screen cards)
+- `run_steps` — Run several steps in one call (`"tap: <text on screen>"`, `"type: calculator"`), stopping at the first failure
 
 ### Measurement & Network
 - `measure` — Time screen transitions: perform action, poll OCR until target appears
@@ -89,10 +91,11 @@ Requires macOS 15+ and an iPhone connected via iPhone Mirroring.
 
 ### Skill Generation & Compilation
 - `generate_skill` — AI explores an app and produces SKILL.md. Session-based: start -> capture -> finish. `action: "explore"` runs autonomous BFS exploration with component-aware planning, edge classification (push/tab/modal/dead), and smart scrolling with exhaustion detection. `skip_calibration: true` bypasses component detection (useful with AI vision describers). `emit: true` (on `finish` / `explore`) also writes a runnable iOS leg into the consumer repo's `.mirroir/apps/<app>/` — a `target: { kind: ios }` scenario, a `SAMPLE.md`, and a `must_pass` plan entry — that `mirroir-run` replays through `mirroir-mcp test`; `output_dir` names the repo root.
-- `record_step` / `save_compiled` — Record compiled steps during AI-driven skill execution for zero-OCR replay
+- `record_step` / `save_compiled` — Record compiled steps during AI-driven skill execution for replay without AI
 
 ### Component Detection (read-only)
 - `calibrate_component` — Test a component definition (.md) against the current live screen with a diagnostic report
+- `classify_screen` — Group the screen's OCR elements into UI components with an AI model
 
 ### Multi-Target
 - On a macOS app target, `describe_screen` marks text the app reports through Accessibility as `[tree]` (exact) and leaves pixel-read text unmarked (may misread)
@@ -135,7 +138,7 @@ Structured step definitions for the deterministic test runner.
 Skills are placed in `~/.mirroir-mcp/skills/` (global) or `<cwd>/.mirroir-mcp/skills/` (project-local).
 
 ### Compiled Skills
-Compile once to capture coordinates and timing. Replay needs no AI but verifies every step: a step the screen does not show fails. The compiled format is version 4. Compiled steps use one of four action kinds: `tap`, `assertion`, `scroll_sequence`, and `passthrough`. A labeled `tap` reads the screen first: its element at the recorded spot (within `compiledTapPositionTolerance` points) is tapped there, one found elsewhere is tapped where it is now, and one not found fails the step. `scroll_sequence` replays the recorded swipes, then requires the target on screen (one extra swipe allowed). `wait_for` compiles to `passthrough` and polls live until its element shows or its timeout passes. Assertions (`assert_visible` / `assert_not_visible`) sleep the observed delay then re-run OCR; the buffer added to that delay is configurable (`compiledSleepBufferMs`, default 200ms).
+Compile once to capture coordinates and timing. Replay needs no AI but verifies every step: a step the screen does not show fails. The compiled format is version 6. Compiled steps use one of four action kinds: `tap`, `assertion`, `scroll_sequence`, and `passthrough`. A labeled `tap` reads the screen first: its element at the recorded spot (within `compiledTapPositionTolerance` points) is tapped there, one found elsewhere is tapped where it is now, and one not found fails the step. `scroll_sequence` replays the recorded swipes, then requires the target on screen (one extra swipe allowed). `wait_for` compiles to `passthrough` and polls live until its element shows or its timeout passes. Assertions (`assert_visible` / `assert_not_visible`) sleep the observed delay then re-run OCR; the buffer added to that delay is configurable (`compiledSleepBufferMs`, default 200ms).
 
 `mirroir test` only reads a `.compiled.json`, never rewrites it: one stale for its source, format version or window size is named and the skill runs on live OCR. Its `screenFingerprint` is the screen the skill starts from, read before step 1 by both `mirroir compile` and `get_skill` → `save_compiled`. A skill holding an AI-only step (`verify`, `remember`, `condition`, `repeat`, `summarize`) fails under `mirroir test` as `not evaluated: <step> needs an AI client`. An unknown option exits 2, and `--dry-run` with `--report-json` is refused.
 
@@ -207,9 +210,9 @@ mirroir-run --frozen                         # --locked plus no network fetch
 mirroir-run accept                           # re-record every baseline; refuses to run in CI
 ```
 
-Three verdicts, three exit codes: **0 = PASS**, **1 = FAIL**, **65 = DRIFT** — every structural assertion held and a drift metric moved past its threshold. A scenario in which the runner evaluated nothing is a failure, not a pass. `--report <PATH>` writes the JSON run summary (schema 2; default `mirroir-run-report.json`).
+Three verdicts, each with its exit code: **0 = PASS**, **1 = FAIL**, **65 = DRIFT** — every structural assertion held and a drift metric moved past its threshold. A run whose only failures are `scene:` steps that ran out of budget is inconclusive and exits **66**. A scenario in which the runner evaluated nothing is a failure, not a pass. `--report <PATH>` writes the JSON run summary (schema 2; default `mirroir-run-report.json`).
 
-Drift is measured against `.harness/last-green.json`, what the previous PASS run observed, over four metrics: `fingerprint_similarity`, `judge_score_swing`, `response_levenshtein_pct`, `step_latency_pct_increase`. Thresholds resolve step → scenario `drift:` → `APP.md drift_defaults:` → the global `drift-defaults.yaml`, and are **fail-closed**: the global layer is required — its one copy lives at the root of the mirroir-skills repo (point `--skills` / `MIRROIR_SKILLS` at a checkout, or use the `.mirroir/drift-defaults.yaml` `generate_skill`'s emit seeds from it), and a run that finds none is refused at load naming every path it searched; a metric no layer declares stops the run with `unspecified drift threshold for <metric>` rather than defaulting. A drifted run appends a candidate row to `.harness/drift-log.md` and leaves the baseline for a human. `mirroir-run accept` is the answer to that queue: it re-runs the same scenarios with the baselines in write mode, rewriting `.harness/last-green.json`, every `judge.drift_baseline_file`, every `cross_surface.capture.to`, and `.mirroir/mirroir.lock`, then hands the reviewer a `git diff`. It **refuses to run when a CI environment variable is set** — a job that accepts its own drift reports green forever. A `cross_surface:` baseline owned by a surface the runner does not drive (`baselines/<flow>.ios.txt`, written by `generate_skill` on a real iPhone) is named, never overwritten.
+Drift is measured against `.harness/last-green.json`, what the previous PASS run observed, over six metrics: `fingerprint_similarity`, `judge_score_swing`, `response_levenshtein_pct`, `step_latency_pct_increase`, `scene_tokens_pct_increase`, `scene_frames_pct_increase`. Thresholds resolve step → scenario `drift:` → `APP.md drift_defaults:` → the global `drift-defaults.yaml`, and are **fail-closed**: the global layer is required — its one copy lives at the root of the mirroir-skills repo (point `--skills` / `MIRROIR_SKILLS` at a checkout, or use the `.mirroir/drift-defaults.yaml` `generate_skill`'s emit seeds from it), and a run that finds none is refused at load naming every path it searched; a metric no layer declares stops the run with `unspecified drift threshold for <metric>` rather than defaulting. A drifted run appends a candidate row to `.harness/drift-log.md` and leaves the baseline for a human. `mirroir-run accept` is the answer to that queue: it re-runs the same scenarios with the baselines in write mode, rewriting `.harness/last-green.json`, every `judge.drift_baseline_file`, every `cross_surface.capture.to`, and `.mirroir/mirroir.lock`, then hands the reviewer a `git diff`. It **refuses to run when a CI environment variable is set** — a job that accepts its own drift reports green forever. A `cross_surface:` baseline owned by a surface the runner does not drive (`baselines/<flow>.ios.txt`, written by `generate_skill` on a real iPhone) is named, never overwritten.
 
 `mirroir.lock` is verified, not just diffed: alongside the ref set and each pin's version constraint, every recorded `checksum: sha256:…` is recomputed against the archetype tree on disk, so a locally edited or tampered pack fails `--locked` / `--frozen` under an unchanged pin.
 
@@ -249,7 +252,7 @@ git clone https://github.com/jfarcand/mirroir-mcp.git
 cd mirroir-mcp
 swift build              # debug build
 swift build -c release   # release build
-swift test               # run all tests
+scripts/unit-tests.sh    # run the unit tests
 ./mirroir.sh             # full install (build + configure MCP client)
 ```
 
@@ -286,7 +289,7 @@ swift test               # run all tests
 - `Sources/mirroir-mcp/ScreenDescriber.swift` — Apple Vision OCR pipeline (local)
 - `Sources/mirroir-mcp/VisionScreenDescriber.swift` — AI vision screen describer via embacle FFI
 - `Sources/mirroir-mcp/EmbacleFFI.swift` — Rust FFI bridge to embedded embacle runtime
-- `Sources/mirroir-mcp/ScreenCapture.swift` — screencapture CLI wrapper
+- `Sources/mirroir-mcp/ScreenCapture.swift` — Screenshot capture: ScreenCaptureKit first, then the screencapture CLI
 - `Sources/mirroir-mcp/IconDetector.swift` — Unlabeled icon detection via pixel clustering + Vision saliency
 
 ### Skill System
@@ -294,7 +297,7 @@ swift test               # run all tests
 - `Sources/mirroir-mcp/SkillParser.swift` — YAML skill parser
 - `Sources/mirroir-mcp/SkillMdGenerator.swift` — Generate SKILL.md from explored screens
 - `Sources/mirroir-mcp/CompiledSkill.swift` — Compiled skill data model
-- `Sources/mirroir-mcp/CompiledStepExecutor.swift` — Zero-OCR replay engine
+- `Sources/mirroir-mcp/CompiledStepExecutor.swift` — Compiled replay engine; each step is checked against the live screen
 
 ### Autonomous Exploration
 - `Sources/mirroir-mcp/BFSExplorer.swift` — Breadth-first exploration with frontier queue and path replay (default explorer)
@@ -335,9 +338,9 @@ Multi-target configuration via `targets.json` for controlling multiple windows s
 
 ## Known Limitations
 
-- **Focus stealing**: On iPhone Mirroring, taps, keystrokes and swipes are sent to its window and leave the front app alone. Drags and two-finger gestures use HID input: they bring iPhone Mirroring forward for their duration, then return the front and the pointer.
-- **Clipboard paste**: iPhone Mirroring does not bridge Mac clipboard when paste is triggered programmatically. No workaround exists.
-- **Keyboard layout edge cases**: Two characters on the ISO section key cannot be typed due to macOS/iOS key mapping disagreement.
+- **Focus stealing**: On iPhone Mirroring through macOS 26, taps, keystrokes and swipes are sent to its window and leave the front app alone; on a later macOS they are HID input and bring it to the front. Drags and two-finger gestures use HID input: they bring iPhone Mirroring forward for their duration, then return the front and the pointer.
+- **Clipboard paste**: `type_text` pastes characters that have no key (emoji, CJK) through Universal Clipboard and confirms each paste by OCR. With Handoff off the paste fails; emoji cannot be confirmed.
+- **Keyboard layout gaps**: `keyboardLayout` must match the iPhone's hardware-keyboard layout. Characters that layout has no key for are pasted through the clipboard.
 - **iOS autocorrect**: Applied to typed text. Disable in iPhone Settings if problematic.
 
 - [Full limitations](docs/limitations.md)
@@ -352,7 +355,7 @@ Multi-target configuration via `targets.json` for controlling multiple windows s
 - [Security](docs/security.md) — Threat model, kill switch, recommendations
 - [Permissions](docs/permissions.md) — Fail-closed permission model
 - [Component Detection](docs/components.md) — Component definitions, calibration, detection pipeline
-- [Compiled Skills](docs/compiled-skills.md) — Zero-OCR skill replay
+- [Compiled Skills](docs/compiled-skills.md) — Skill replay without AI
 - [Skills Marketplace](docs/skills-marketplace.md) — Skill format and authoring
 - [Testing](docs/testing.md) — FakeMirroring, CI strategy
 - [Known Limitations](docs/limitations.md) — Focus stealing, keyboard gaps

@@ -30,6 +30,8 @@ No Developer Mode, no Xcode, no WebDriverAgent, no jailbreak. mirroir-mcp works 
 
 It uses the apps already signed in on your phone: no connector, no OAuth, no password handed to anyone.
 
+mirroir-mcp is an MCP server, with a framework on top: what an agent does once becomes a [skill](docs/skills-and-ci.md#skills) and a test that replay without an LLM.
+
 ## What people build
 
 - **A DJ on Spotify.** The agent asks what you want to hear, builds the playlist in Spotify, then plays it. No Spotify API, no connector: it uses the app the way you would. That is the run in the GIF above.
@@ -66,16 +68,16 @@ OpenClaw, Hermes Agent, Claude Desktop, Cursor, VS Code and the other clients: [
 
 Then ask for something:
 
-```
+```text
 Open Calendar, create a new event called "Dentist" next Tuesday at 2pm.
 ```
 
-```
+```text
 Open my Expo Go app, tap "LoginDemo", test the login screen with
 test@example.com / password123. Screenshot after each step.
 ```
 
-```
+```text
 Start recording, open Instagram, scroll the feed and open my profile, stop recording.
 ```
 
@@ -90,7 +92,7 @@ Start recording, open Instagram, scroll the feed and open my profile, stop recor
 ## Why mirroir
 
 - **Nothing to install on the phone.** The iPhone stays stock: no signing, no provisioning profile, no on-device agent. If iPhone Mirroring shows it, mirroir can drive it.
-- **Your Mac stays yours.** Taps, typing and swipes reach the mirror without bringing it to the front, so you can keep working. Drags and two-finger gestures bring it forward for a moment, then hand your app back.
+- **Your Mac stays yours.** Through macOS 26, taps, typing and swipes reach the mirror without bringing it to the front, so you can keep working; on macOS 27 they bring it forward. Drags and two-finger gestures bring it forward for a moment, then hand your app back.
 - **It hears the phone, too.** [`listen`](docs/tools.md#listening) turns what the phone plays, a reel's narration or a voice message, into text. It records only iPhone Mirroring's sound, and macOS transcribes it on the Mac: the audio never leaves it. Needs macOS 26; since 0.47.0.
 
 ## Testing and CI
@@ -150,7 +152,7 @@ See [Security](docs/security.md) for the full threat model.
 | [Patterns & Skills](docs/components.md) | Element patterns, screen recipes, APP.md app descriptions, and the detection pipeline |
 | [Exploring a New App](docs/exploring-a-new-app.md) | Step-by-step playbook for onboarding a new app — APP.md, permissions, components, exploration goal |
 | [YOLO Icon Detection](docs/yolo-models.md) | Recommended YOLO models, CoreML setup, and configuration |
-| [Compiled Skills](docs/compiled-skills.md) | Zero-OCR skill replay |
+| [Compiled Skills](docs/compiled-skills.md) | Skill replay without AI |
 | [Testing](docs/testing.md) | FakeMirroring, integration tests, and CI strategy |
 | [Web and iOS in one scenario](docs/web-and-ios.md) | How `mirroir-run` hands iOS blocks to `mirroir-mcp`, and how `cross_surface` compares a browser with a phone |
 | [Cross-surface replay](runner/docs/) | `mirroir-run` scenario grammar, `.mirroir/` plan, `SAMPLE.md`, judge profiles, CI |
@@ -160,10 +162,12 @@ See [Security](docs/security.md) for the full threat model.
 
 ## Community
 
-Join the [Discord server](https://discord.gg/u8ug9QCSqF) to ask questions, share skills, and discuss ideas. Contributions are welcome: see [CONTRIBUTING.md](CONTRIBUTING.md). By submitting a patch, you agree to the [Contributor License Agreement](CLA.md); your Git commit metadata serves as your electronic signature.
+Join the [Discord server](https://discord.gg/u8ug9QCSqF) to ask questions, share skills, and discuss ideas. Pull requests are welcome: see [CONTRIBUTING.md](CONTRIBUTING.md). Report a vulnerability privately: see [SECURITY.md](SECURITY.md). By submitting a patch, you agree to the [Contributor License Agreement](CLA.md); your Git commit metadata serves as your electronic signature.
 
----
+## License
 
 Apache 2.0 - Copyright 2026 [Async-IO](https://async-io.live).
+
+---
 
 > **Why "mirroir"?** — It's the old French spelling of *miroir* (mirror). A nod to the author's roots, not a typo.

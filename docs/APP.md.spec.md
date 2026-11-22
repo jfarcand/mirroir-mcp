@@ -87,7 +87,7 @@ Per-tab description. Body is injected into the generated skill's context.
 
 - RESSOURCES
 
-## Credentials          # optional — parsed only, no consumer today
+## Credentials          # optional — key names listed in generated skills
 
 - email: ${TEST_EMAIL:-test@example.com}
 - password: ${TEST_PASSWORD}
@@ -149,7 +149,7 @@ Geometric hints for the edge-control finder. Without this section, the explorer 
 - edge: right               # top | bottom | left | right (default: bottom)
 ```
 
-When declared, `TabTargetInjector.findTargets` (`Sources/mirroir-mcp/TabTargetInjector.swift`) uses the layout hint to pick which window edge to sample (a 12%-wide band) and which axis the bar runs along. Text-match remains the primary strategy; the layout hint only governs the geometric fallback when OCR text matching leaves tabs unmatched. The fallback does **not** sort detected candidates and ordinal-map them. Instead, `synthesizeAnchors` (TabTargetInjector.swift:124–156) computes N evenly-spaced anchor points from the **declared tab count** and the bar geometry — each anchor's main-axis position is `(index + 0.5) × axis / tabCount`, independent of which individual icons were detected. The cross-axis position comes from the median of the band's detected (text-less) icon points, falling back to a geometric edge offset. Synthesis is gated by a presence check: the declared band must hold at least `EnvConfig.tabSynthesisMinZoneEvidence` elements, so a detail screen whose band happens to hold a stray element gets no phantom anchors. `BFSExplorerHelpers` only *calls* `TabTargetInjector.inject`, which wraps `findTargets`.
+When declared, `TabTargetInjector.findTargets` (`Sources/mirroir-mcp/TabTargetInjector.swift`) uses the layout hint to pick which window edge to sample (a 12%-wide band) and which axis the bar runs along. Text-match remains the primary strategy; the layout hint only governs the geometric fallback when OCR text matching leaves tabs unmatched. The fallback does **not** sort detected candidates and ordinal-map them. Instead, `synthesizeAnchors` (TabTargetInjector.swift:190–222) computes N evenly-spaced anchor points from the **declared tab count** and the bar geometry — each anchor's main-axis position is `(index + 0.5) × axis / tabCount`, independent of which individual icons were detected. The cross-axis position comes from the median of the band's detected (text-less) icon points, falling back to a geometric edge offset. Synthesis is gated by a presence check: the declared band must hold at least `EnvConfig.tabSynthesisMinZoneEvidence` elements, so a detail screen whose band happens to hold a stray element gets no phantom anchors. `BFSExplorerHelpers` only *calls* `TabTargetInjector.inject`, which wraps `findTargets`.
 
 For the tab-synthesis fallback the axis is fixed by the declared `orientation` (horizontal → main axis X, vertical → main axis Y); the geometry comes from APP.md, not from inspecting the detections. The separate general icon-detection helper `IconDetector.interpolateEvenSpacing` does auto-detect a dominant axis from raw detections (extrapolating vertically when detections span a larger Y range than X range, otherwise horizontally), but that step backfills the icon list earlier in the pipeline and does not decide which axis `synthesizeAnchors` walks.
 
@@ -178,6 +178,12 @@ When `obstacle_mode: auto` (default), the explorer checks these rules after each
 
 Element text patterns the explorer must never tap. Merged with `permissions.json.skipElements` into a single global skip list for the session. A generated wait never names a text containing one of them either: `SkillMdGenerator` and the scenario emitter (`ScenarioStepFormatter.LandmarkPolicy`) both drop it from the landmark candidates.
 
+```markdown
+- Delete Account
+- Sign Out
+- Réinitialiser les données
+```
+
 ### `## Landmarks` (optional)
 
 Texts the app shows on the same screen on every run — a permanent shop category, a search button — listed one per bullet. A generated wait takes one of them before any other text: the emitter's `wait_for:` after a tap names a declared landmark the arrival screen shows (and the screen before did not), and `SkillMdGenerator` treats them as stable anchors alongside the tab names (`AppDescription.stableAnchors`). Without them the wait is the most prominent new text, which on a seasonal or paid screen ("MEILLEURE OFFRE DE BRAWL STARS !") changes between runs and fails a later replay.
@@ -185,12 +191,6 @@ Texts the app shows on the same screen on every run — a permanent shop categor
 ```markdown
 - RESSOURCES
 - BRAWLERS À DÉBLOQUER
-```
-
-```markdown
-- Delete Account
-- Sign Out
-- Réinitialiser les données
 ```
 
 ### `## Credentials` (optional)
@@ -213,7 +213,7 @@ Free-form exploration hints. Appended to the generated skill's context so the AI
 
 ### `## Simulator …` family (optional — FakeMirroring scene graph)
 
-When an app is ported to the FakeMirroring multi-app simulator, its APP.md gains a declarative scene graph alongside the guidance fields above. On the **mirroir-mcp** side, `SimulatorSpecParser.parse` extracts these into a `SimulatorSpec` carried on `AppDescription.simulator` (`AppDescription.swift:150`), but no runtime consumer reads that field — it is **parsed only** there. **FakeMirroring re-parses the same APP.md independently**: `AppPackLoader.makePack` reads the file from disk and calls `SimulatorSpecParser.parse` again to build a runnable `AppPack` at startup (`AppRegistry.swift:95–105`). The two processes never exchange the `SimulatorSpec` value; each derives its own from the file. The parser returns nil — leaving `simulator` unset (and FakeMirroring skipping the file) — when none of these sections are present, so guidance-only APP.md files are unaffected.
+When an app is ported to the FakeMirroring multi-app simulator, its APP.md gains a declarative scene graph alongside the guidance fields above. On the **mirroir-mcp** side, `SimulatorSpecParser.parse` extracts these into a `SimulatorSpec` carried on `AppDescription.simulator` (`AppDescription.swift:73`), but no runtime consumer reads that field — it is **parsed only** there. **FakeMirroring re-parses the same APP.md independently**: `AppPackLoader.makePack` reads the file from disk and calls `SimulatorSpecParser.parse` again to build a runnable `AppPack` at startup (`AppRegistry.swift:107–118`). The two processes never exchange the `SimulatorSpec` value; each derives its own from the file. The parser returns nil — leaving `simulator` unset (and FakeMirroring skipping the file) — when none of these sections are present, so guidance-only APP.md files are unaffected.
 
 Three H2 section shapes are recognized:
 
@@ -245,13 +245,17 @@ The `spotlight_name` and `icon` front-matter fields (above) feed the same `Simul
 
 1. `AppDescriptionLoader.load(appName:)` is called when `generate_skill(action:"explore", app_name:"X")` starts.
 2. Search paths, in the order `AppDescriptionLoader.searchPaths()` walks them (recursive file search per path):
-   1. `<cwd>/.mirroir-mcp/skills/**/APP.md`
-   2. `~/.mirroir-mcp/skills/**/APP.md`
+   1. `<cwd>/.mirroir-mcp/skills/patterns/apps/**/APP.md`
+   2. `~/.mirroir-mcp/skills/patterns/apps/**/APP.md`
    3. `<cwd>/../mirroir-skills/patterns/apps/**/APP.md`
-   4. `<cwd>/.mirroir-mcp/skills/patterns/apps/**/APP.md`
-   5. `~/.mirroir-mcp/skills/patterns/apps/**/APP.md`
+   4. `<cwd>/.mirroir-mcp/skills/apps/**/APP.md` *(legacy fallback)*
+   5. `~/.mirroir-mcp/skills/apps/**/APP.md` *(legacy fallback)*
    6. `<cwd>/../mirroir-skills/apps/**/APP.md` *(legacy fallback)*
-   7. `<cwd>/../mirroir-skills/**/APP.md` *(legacy fallback)*
+   7. `<cwd>/.mirroir-mcp/skills/**/APP.md` *(legacy fallback)*
+   8. `~/.mirroir-mcp/skills/**/APP.md` *(legacy fallback)*
+   9. `<cwd>/../mirroir-skills/**/APP.md` *(legacy fallback)*
+
+   When `MIRROIR_SKILLS` names a checkout, it is searched ahead of the others in each tier.
 3. Each file is parsed and its `app:` field matched against the requested app name (diacritics-insensitive, case-insensitive).
 4. Locale precedence:
    - If any APP.md's `locale:` matches `Locale.current.identifier` exactly (case-insensitive), **the first such match encountered during the walk wins and is returned immediately**.
@@ -276,7 +280,7 @@ APP.md and `permissions.json` are complementary. `permissions.json` governs what
 
 **The three enforced bridge points:**
 
-1. **Blocked-app guard — shared with `launch_app`.** `generate_skill(action:"explore", app_name:"X")` calls `policy.checkAppLaunch(appName)` before doing anything with the target. If `permissions.json.blockedApps` contains the name, the call returns the same error `launch_app` would return. Any APP.md for a blocked app is loaded but never used because exploration refuses to start.
+1. **Blocked-app guard — shared with `launch_app`.** `generate_skill(action:"explore", app_name:"X")` calls `policy.checkAppLaunch(appName)` before doing anything with the target. If `permissions.json.blockedApps` contains the name, the call returns the same error `launch_app` would return. Any APP.md for a blocked app is never loaded because exploration refuses to start.
    - **Scope note**: `generate_skill(action:"start")` does not call this guard today. Only `explore`.
 2. **Per-app tool gate at explore start.** `permissions.json.perApp` can scope tool allow/deny to a specific app. Before exploration begins, `policy.toolsDenied(for:requiredTools:)` checks that the minimum explorer tools (`tap`, `swipe`, `type_text`, `press_key`) are permitted for the app. If any are denied, the call refuses with a message naming the specific denied tools.
    ```json
@@ -320,6 +324,7 @@ See `../mirroir-skills/patterns/apps/` for live examples (Santé, Settings, Weat
 ```markdown
 ---
 app: Tapo
+version: 1
 archetype: dashboard
 ---
 

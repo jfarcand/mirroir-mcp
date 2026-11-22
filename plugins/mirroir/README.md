@@ -10,7 +10,7 @@ Let Claude use your real iPhone through macOS iPhone Mirroring, then replay what
 
 ## Requirements
 
-- macOS 15 or later, with an iPhone connected through [iPhone Mirroring](https://support.apple.com/en-us/120421)
+- An Apple Silicon Mac on macOS 15 or later, with an iPhone connected through [iPhone Mirroring](https://support.apple.com/en-us/120421)
 - Node.js, because the plugin starts the server with `npx`
 - Screen Recording and Accessibility permissions for the app that runs the server; macOS asks on first use
 

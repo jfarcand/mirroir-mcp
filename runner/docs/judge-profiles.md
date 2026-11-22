@@ -72,7 +72,7 @@ The `user_prompt_template_hash` field on the YAML `judge:` step pins the
 SHA-256 of the canonical prompt template (formatted `sha256:<hex>`). The runner
 verifies it on **every** invocation: `verify_template_hash` runs first thing in
 `run_judge` (`runner/src/oracle/judge.rs::run_judge`), and a mismatch hard-fails
-the step with `RunnerError::JudgeTemplateMismatch` — the scenario must be
+the step with `OracleError::TemplateMismatch` — the scenario must be
 re-pinned. This keeps a score calibrated against one prompt from silently
 running against a changed prompt.
 
@@ -109,7 +109,7 @@ The runner is tolerant of typical model formatting:
 - a trailing period
 
 Anything that doesn't parse as a finite `f64` in `[0, 1]` is rejected
-with `RunnerError::JudgeDecode`. Out-of-range values (e.g., `1.5`) also
+with `OracleError::Decode`. Out-of-range values (e.g., `1.5`) also
 reject — protects against hallucinated scores.
 
 ## Threshold logic
@@ -127,7 +127,7 @@ and `tolerance = 0.05`, scores ≥ 0.75 pass. The tolerance band absorbs
 hosted-model stochasticity (less relevant for local Ollama at temperature=0,
 but kept for consistency).
 
-`RunnerError::JudgeBelowThreshold` is raised when `score < effective`.
+`OracleError::BelowThreshold` is raised when `score < effective`.
 
 ## Adding a custom profile
 
@@ -212,7 +212,7 @@ distance, pure functions, no I/O).
 Drift verdict:
 
 - `Match` when `levenshtein_pct ≤ max_levenshtein_pct`.
-- `Drift` otherwise; the runner returns `RunnerError::DriftDetected`.
+- `Drift` otherwise; the scenario ends with the `DRIFT` verdict (exit 65).
 
 See [scenario-grammar.md](scenario-grammar.md) for the `response_drift`
 field shape.

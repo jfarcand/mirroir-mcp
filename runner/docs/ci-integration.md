@@ -86,7 +86,7 @@ attacker-controlled host.
 
 Independently, the judge's `user_prompt_template_hash` is verified on every
 run: a scenario that pins a stale hash hard-fails with
-`RunnerError::JudgeTemplateMismatch`, so a changed oracle template can never
+`OracleError::TemplateMismatch`, so a changed oracle template can never
 silently invalidate a scenario's reproducibility guarantee.
 
 ## Consuming the runner from another repo's CI

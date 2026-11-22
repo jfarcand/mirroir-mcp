@@ -132,8 +132,10 @@ Element patterns are loaded from all of these directories in priority order (fir
 | 5 | `../mirroir-skills/patterns/elements/` | Sibling skills repo (new) |
 | 6 | `<cwd>/.mirroir-mcp/skills/components/ios/` | Project-local skills repo (legacy fallback) |
 | 7 | `<cwd>/.mirroir-mcp/skills/components/custom/` | Project-local skills repo (legacy custom) |
-| 8 | `../mirroir-skills/components/ios/` | Sibling skills repo (legacy fallback) |
-| 9 | `../mirroir-skills/components/custom/` | Sibling skills repo (legacy custom) |
+| 8 | `~/.mirroir-mcp/skills/components/ios/` | User's global skills repo (legacy fallback) |
+| 9 | `~/.mirroir-mcp/skills/components/custom/` | User's global skills repo (legacy custom) |
+| 10 | `../mirroir-skills/components/ios/` | Sibling skills repo (legacy fallback) |
+| 11 | `../mirroir-skills/components/custom/` | Sibling skills repo (legacy custom) |
 
 The home directory `~/.mirroir-mcp/` is the Swift MCP's own config home — distinct from `.mirroir/`, the runner's consumer dotfile. Install the community patterns under the global skills home (priority 4 discovers them):
 
@@ -457,10 +459,11 @@ Dashboard app with 4 tabs: Résumé, Partage, Parcourir, Profil.
 
 | Priority | Path |
 |----------|------|
-| 1 | `<cwd>/.mirroir-mcp/skills/` (recursive) |
-| 2 | `~/.mirroir-mcp/skills/` (recursive) |
+| 1 | `<cwd>/.mirroir-mcp/skills/patterns/apps/` (recursive) |
+| 2 | `~/.mirroir-mcp/skills/patterns/apps/` (recursive) |
 | 3 | `../mirroir-skills/patterns/apps/` (recursive) |
-| 4 | `../mirroir-skills/apps/` (recursive, legacy fallback) |
+| 4 | `apps/` in the same three checkouts (recursive, legacy fallback) |
+| 5 | The root of the same three checkouts (recursive, legacy fallback) |
 
 ## Text Cleanup
 

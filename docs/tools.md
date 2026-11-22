@@ -20,7 +20,7 @@ All 42 tools exposed by the MCP server. Mutating tools require [permission](perm
 | `pinch` | `x`, `y`, `scale`, `duration_ms`? | Two-finger pinch centred at (x, y): `scale` > 1 spreads the fingers (zoom in), < 1 pinches them (zoom out); the spread ends at exactly `scale` times its start (0.1-10, 100-5000ms, default 500ms). Reaches iOS as a UIKit two-finger gesture (Maps, Photos); games that read raw touches may ignore it. Needs a Mac with a built-in trackpad or a Magic Trackpad; refused while a touch is held |
 | `rotate` | `x`, `y`, `degrees`, `duration_ms`? | Two-finger rotation centred at (x, y) by `degrees`: positive counter-clockwise, negative clockwise (non-zero, up to 360 either way, 100-5000ms, default 500ms). Same delivery and trackpad requirement as `pinch` |
 | `hold_keys` | `keys`, `duration_ms`?, `drag`? | Hold 1-6 keys for `duration_ms` (100-10000ms, default 1000ms), then release everything in reverse order. Keys are single unshifted characters (`w`), modifiers (`shift`, `command`, `option`, `control`), or named keys (`space`, `up`, ...). Plain keys re-post key-down every 50ms like a held physical key; modifiers are held without repeating. Optional `drag` `{from_x, from_y, to_x, to_y, button: left\|right}` holds that mouse button across the same duration. For games that switch to mouse/keyboard controls (e.g. Roblox: `w` walks while a right drag turns the camera); touch-only games ignore keys. Refused while a touch is held or when the mirroring window is not the frontmost app; stops early and releases everything if focus leaves it mid-hold |
-| `type_text` | `text`, `clear` | Type text — adds to what the field holds; `clear: true` empties the focused field first (Cmd+A, then Delete; clear only a field you just focused, since with none focused Cmd+A acts on whatever the app selects) — activates iPhone Mirroring and sends keystrokes. Characters with no key are pasted one run at a time and each paste is confirmed by OCR; one not seen (or unreadable, like emoji) returns an error ([limitations](limitations.md#clipboard-paste-is-confirmed-by-ocr)) |
+| `type_text` | `text`, `clear`?, `keyboard_layout`? | Type text — adds to what the field holds; `clear: true` empties the focused field first (Cmd+A, then Delete; clear only a field you just focused, since with none focused Cmd+A acts on whatever the app selects) — sends keystrokes to iPhone Mirroring. `keyboard_layout` names the connected iPhone's layout when `keyboardLayout` lists several ([limitations](limitations.md#iphones-with-different-keyboards-on-one-mac)). Characters with no key are pasted one run at a time and each paste is confirmed by OCR; one not seen (or unreadable, like emoji) returns an error ([limitations](limitations.md#clipboard-paste-is-confirmed-by-ocr)) |
 | `press_key` | `key`, `modifiers`? | Send a special key (return, escape, tab, delete, space, arrows) with optional modifiers (command, shift, option, control) |
 | `shake` | — | Trigger shake gesture (Ctrl+Cmd+Z) for undo/dev menus |
 | `launch_app` | `name` | Open app by name via Spotlight search; opens the top result only when it is an app (tapping its tile, or Return when no tile is read), so a missing app fails instead of opening a web or App Store result. When Spotlight never shows the typed name (on iOS 26 it can take typing only once per iPhone Mirroring session), it closes Spotlight and taps the Home Screen icon labeled exactly `name` on the page Home shows (no page is turned); apps on other pages, in folders, the Dock or only the App Library are not found that way |
@@ -58,7 +58,7 @@ Coordinates are in points relative to the mirroring window's top-left corner. Us
 `describe_screen` returns detected elements with their tap coordinates, plus a grid-overlaid screenshot for visual context. The backend depends on `screenDescriberMode`:
 
 - **Local OCR (default)** — Apple Vision OCR for text recognition. If a YOLO CoreML model is installed in `~/.mirroir-mcp/models/`, the server auto-detects it and merges icon detections — giving the AI tap targets for non-text elements (buttons, toggles, icons) that text-only OCR misses. See [Icon Detection](screen-intelligence.md#icon-detection-yolo-coreml) for setup.
-- **AI Vision** — When `screenDescriberMode` is `"vision"` (or `"auto"` with the embacle FFI linked), the screenshot is sent to an AI vision model that identifies UI elements semantically — cards, tabs, buttons, navigation structure — instead of raw text fragments. See [AI Vision Mode](screen-intelligence.md#ai-vision-mode-embacle) for setup.
+- **AI Vision** — When `screenDescriberMode` is `"vision"`, the screenshot is sent to an AI vision model that identifies UI elements semantically — cards, tabs, buttons, navigation structure — instead of raw text fragments. See [AI Vision Mode](screen-intelligence.md#ai-vision-mode-embacle) for setup.
 
 Set `scroll: true` to perform a full-page scroll before returning results. The server scrolls through the entire page, deduplicates elements across viewports, and returns all detected elements — not just those visible in the initial viewport.
 
@@ -81,7 +81,7 @@ Only labels are taken from the tree: a region that merely has a name (a browser,
 
 ## Typing Workflow
 
-`type_text` and `press_key` send CGEvent key events addressed to the iPhone Mirroring process, after one window event makes the mirror the key window of its own app. iPhone Mirroring is not activated: the app you are using keeps focus (see [limitations](limitations.md#focus-stealing)).
+`type_text` and `press_key` send CGEvent key events addressed to the iPhone Mirroring process, after one window event makes the mirror the key window of its own app. Through macOS 26, iPhone Mirroring is not activated: the app you are using keeps focus (see [limitations](limitations.md#focus-stealing)).
 
 - Characters are mapped to macOS virtual keycodes with automatic keyboard layout translation — non-US layouts (French AZERTY, German QWERTZ, etc.) are supported via UCKeyTranslate
 - iOS autocorrect applies, and it rewrites words as they are typed (in Notes, "Thu teh adress" lands as "They the adress"; a French keyboard turns English words into French ones). After typing, `type_text` reads the text back from the screen; when the screen does not show what was typed, the call still succeeds and its result carries a notice saying so. A password field hides its text, so the notice is expected there.
@@ -129,14 +129,14 @@ When the text never shows, the error says why the scrolling stopped. `stop_reaso
 
 Steps:
 1. Launch the app via Spotlight (handles localization — `Settings` → `Réglages` on a French iPhone).
-2. Open the App Switcher. The just-launched app is the centered card.
-3. Drag the centered card upward to dismiss it (touch drag, not scroll-wheel swipe — iOS only accepts touch events for card dismiss).
+2. Open the App Switcher and locate the app's card: by its label, else by matching the text the app showed against the cards. A card that cannot be located is an error; nothing is dragged.
+3. Drag that card upward to dismiss it (touch drag, not scroll-wheel swipe — iOS only accepts touch events for card dismiss).
 4. Return to the home screen.
 
 Use before `launch_app` to ensure a fresh app state. In a skill run by `mirroir test`,
 `reset_app:` is a destructive step that needs `--confirm-destructive`, except when the very next
 step is a `launch:` of the same app (exact name, case-sensitive after trimming) — the pair every
-emitted `.ios.yaml` flow opens with. Tunable via `appSwitcherCardXFraction`, `appSwitcherCardYFraction`, `appSwitcherSwipeDistance`, and `appSwitcherSwipeDurationMs` if your iPhone model places the centered card differently.
+emitted `.ios.yaml` flow opens with. Tunable via `appSwitcherCardYFraction`, `appSwitcherSwipeDistance`, and `appSwitcherSwipeDurationMs` if your iPhone model places the cards differently.
 
 ## Measure
 
@@ -153,7 +153,7 @@ emitted `.ios.yaml` flow opens with. Tunable via `appSwitcherCardXFraction`, `ap
 
 Supported modes: `airplane_on`, `airplane_off`, `wifi_on`, `wifi_off`, `cellular_on`, `cellular_off`.
 
-This is the most environment-dependent tool — it relies on the Settings app UI layout, which varies by locale and iOS version. `ElementMatcher` substring matching provides some resilience across locales.
+This is the most environment-dependent tool — it relies on the Settings app UI layout, which varies by locale and iOS version.
 
 ## Skills
 

@@ -9,6 +9,7 @@ mirroir can explore any iOS app blindly, but it works better when you tell it wh
 ```markdown
 ---
 app: Santé
+version: 1
 archetype: dashboard
 obstacle_mode: auto
 ---
@@ -275,7 +276,7 @@ mirroir test --agent embacle my-skill
 
 The explorer uses a three-layer pattern system to understand iOS apps — the same declarative concept at different scales:
 
-- **Element patterns** (`patterns/elements/`) — 34 definitions matching row-level UI components (table rows, tab bars, toggles, summary cards). Each specifies match rules, interaction behavior, and grouping logic.
+- **Element patterns** (`patterns/elements/`) — 33 definitions matching row-level UI components (table rows, tab bars, toggles, summary cards). Each specifies match rules, interaction behavior, and grouping logic.
 - **Screen patterns** (`patterns/screens/`) — 7 archetype recipes that identify screen-level navigation models from element composition. Auto-detected during calibration, or declared via `archetype` in APP.md.
 - **App patterns** (`patterns/apps/`) — APP.md files with structure, obstacles, skip lists, and archetype declarations. The developer's source of truth.
 

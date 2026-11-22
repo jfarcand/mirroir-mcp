@@ -8,7 +8,7 @@ This package is a portable Agent Plugins package: three data files and no code. 
 
     hermes plugins install jfarcand/mirroir-mcp/plugins/hermes --enable
 
-Start a new chat afterwards. Needs Hermes 0.21.6 or later with its MCP support installed (the `mcp` extra: without it Hermes lists the skill but starts no MCP server), macOS 15 or later with iPhone Mirroring connected, and Node.js (the server starts with `npx`). Grant Screen Recording and Accessibility to the app that runs Hermes; `npx -y mirroir-mcp doctor` names the app and the pane.
+Start a new chat afterwards. Needs Hermes 0.21.6 or later with its MCP support installed (the `mcp` extra: without it Hermes lists the skill but starts no MCP server), an Apple Silicon Mac on macOS 15 or later with iPhone Mirroring connected, and Node.js (the server starts with `npx`). Grant Screen Recording and Accessibility to the app that runs Hermes; `npx -y mirroir-mcp doctor` names the app and the pane.
 
 ## What you get
 

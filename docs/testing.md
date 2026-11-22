@@ -33,13 +33,13 @@ A `## Simulator` block in APP.md is parsed by `SimulatorSpecParser` into a typed
 
 ### How Targeting Works
 
-The MCP server discovers the mirroring app by bundle ID and process name. Two environment variables control this:
+The MCP server discovers the mirroring app by bundle ID. One environment variable controls this:
 
 ```
 MIRROIR_BUNDLE_ID=com.jfarcand.FakeMirroring
 ```
 
-When unset, they default to `com.apple.ScreenContinuity` and `iPhone Mirroring` — the real app. This is the same `EnvConfig` system used for all runtime configuration (timing constants, keyboard parameters, etc.), so there is no test-only code path in production.
+When unset, it defaults to `com.apple.ScreenContinuity` — the real app. This is the same `EnvConfig` system used for all runtime configuration (timing constants, keyboard parameters, etc.), so there is no test-only code path in production.
 
 **Ref:** `Sources/HelperLib/EnvConfig.swift`
 
@@ -65,7 +65,7 @@ What appears on screen depends on which `## Simulator` scene is foreground. The 
   410pt × 898pt, white text on dark bg
 ```
 
-Element labels, rows, and navigation come from the loaded `SimulatorSpec`; the renderer draws whatever scene the foreground `AppPack` declares. Labels are rendered at 18pt medium weight on a dark background — high enough contrast for reliable Vision OCR detection across macOS versions.
+Element labels, rows, and navigation come from the loaded `SimulatorSpec`; the renderer draws whatever scene the foreground `AppPack` declares. Row labels are rendered at 18pt regular weight on a dark background — high enough contrast for reliable Vision OCR detection across macOS versions.
 
 **Ref:** `Sources/FakeMirroring/main.swift`, `Sources/FakeMirroring/SceneRenderer.swift`
 
@@ -99,7 +99,7 @@ Unit tests use **protocol-based dependency injection** — protocols (`WindowBri
 
 ### Integration Tests (`swift test --filter IntegrationTests`)
 
-All require FakeMirroring to be running. The filter runs the entire `IntegrationTests` target — roughly 60 test functions across 14+ files, not just the FakeMirroring smoke tests. They exercise real macOS APIs end-to-end against the simulator:
+All require FakeMirroring to be running. The filter runs the entire `IntegrationTests` target — roughly 80 test functions across 14+ files, not just the FakeMirroring smoke tests. They exercise real macOS APIs end-to-end against the simulator:
 
 | Suite | What It Validates |
 |-------|-------------------|

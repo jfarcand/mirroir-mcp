@@ -72,7 +72,7 @@ Each setting also has a `MIRROIR_`-prefixed environment-variable form (e.g. `MIR
 
 When YOLO is enabled (`"auto"`, `"yolo"`, or `"both"`), `ModelDownloadManager.resolveModelURL()` resolves a compiled `.mlmodelc` in this order:
 
-1. `yoloModelPath` — an explicit local path, if set and it exists.
+1. `yoloModelPath` — an explicit local path, if set. A set path that does not exist resolves to no model; steps 2 and 3 are not tried.
 2. A cached `.mlmodelc` in `~/.mirroir-mcp/models/` — e.g. one produced by the [Convert to CoreML](#convert-to-coreml) steps above.
 3. `yoloModelURL` — downloaded, compiled if needed, and cached for subsequent runs.
 

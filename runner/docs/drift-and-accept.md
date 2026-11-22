@@ -31,7 +31,7 @@ Exit code 65 comes from the `sysexits.h` band this runner reserves (64-71);
 
 ## What DRIFT actually measures
 
-Four metrics, each compared against `.harness/last-green.json` — the store the
+Six metrics, each compared against `.harness/last-green.json` — the store the
 previous `PASS` run wrote. A scenario with no baseline yet **cannot** drift: it
 records what it saw and passes. That is why a first run is always green and the
 second is the one with an opinion.
@@ -42,6 +42,8 @@ second is the one with an opinion.
 | `judge_score_swing` | ceiling (`max_delta`) | absolute change in the judge's score |
 | `response_levenshtein_pct` | ceiling (`max`) | normalized Levenshtein distance of the judged response |
 | `step_latency_pct_increase` | ceiling (`max`) | fractional growth of a `measure:` latency |
+| `scene_tokens_pct_increase` | ceiling (`max`) | fractional growth of a passing `scene:` step's total tokens, against runs of the same model |
+| `scene_frames_pct_increase` | ceiling (`max`) | fractional growth of the frames a passing `scene:` took to see its success predicate, same model |
 
 A scenario can also declare the verdict itself with `- report: drift`. That
 finding carries no measurement, so the log renders its observed/threshold cells
@@ -72,7 +74,7 @@ recorded but never compared. Neither is the home screen a `reset_app:` or
 app does.
 
 The reference those screens are held to is a file next to the scenario:
-`world-clock.ios.yaml` → `world-clock.ios.compiled.json`, a version-5 compiled
+`world-clock.ios.yaml` → `world-clock.ios.compiled.json`, a version-6 compiled
 skill as mirroir-mcp writes it. It is committed like any other baseline.
 
 | The run sees | Finding |

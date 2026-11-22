@@ -312,7 +312,7 @@ const actionSnippet = `- uses: jfarcand/mirroir-mcp/actions/setup-mirroir-run@ma
       <div class="tool-category cat-input">
         <h3>Input</h3>
         <ul>
-          <li><code>type_text</code> <span>Type text via virtual keyboard</span></li>
+          <li><code>type_text</code> <span>Type text into the focused field as keystrokes</span></li>
           <li><code>press_key</code> <span>Send special keys with modifiers</span></li>
           <li><code>shake</code> <span>Shake gesture for undo or dev menus</span></li>
           <li><code>hold_keys</code> <span>Hold keys during a mouse drag for keyboard-and-mouse games</span></li>
@@ -354,7 +354,7 @@ const actionSnippet = `- uses: jfarcand/mirroir-mcp/actions/setup-mirroir-run@ma
           <li><code>get_notes</code> <span>Read what an agent learned about an app in earlier sessions</span></li>
           <li><code>save_note</code> <span>Keep one line about an app for the next session</span></li>
           <li><code>record_step</code> <span>Record a compiled step during execution</span></li>
-          <li><code>save_compiled</code> <span>Save compiled .json for zero-OCR replay</span></li>
+          <li><code>save_compiled</code> <span>Save compiled .json for replay without an LLM</span></li>
           <li><code>switch_target</code> <span>Switch active automation target</span></li>
         </ul>
       </div>
@@ -373,7 +373,7 @@ const actionSnippet = `- uses: jfarcand/mirroir-mcp/actions/setup-mirroir-run@ma
   <section id="serve">
     <h2>Drive the phone from an agent on another machine</h2>
     <p>
-      By default mirroir-mcp talks to one MCP client over standard input and output and opens no network port. <code>mirroir-mcp serve</code> speaks MCP over HTTP instead, on 127.0.0.1 only, behind a bearer token, with browsers refused and the same <code>permissions.json</code>. <code>install-agent</code> keeps it running as a LaunchAgent from its own app bundle, "mirroir serve", signed with a certificate kept in your login keychain, so its Accessibility and Screen Recording grants survive upgrades. It needs the Homebrew install.
+      By default mirroir-mcp talks to one MCP client over standard input and output and opens no network port. <code>mirroir-mcp serve</code> speaks MCP over HTTP instead, on 127.0.0.1 only, behind a bearer token, with browsers refused and the same <code>permissions.json</code>. <code>install-agent</code> keeps it running as a LaunchAgent from its own app bundle, "mirroir serve", signed with a certificate kept in your login keychain, so its Accessibility and Screen Recording grants survive upgrades. It refuses a copy run through npx: install with Homebrew first.
     </p>
     <pre class="snippet"><code>{installAgentSnippet}</code></pre>
     <p>From the other machine, forward the port and point the client at the forward:</p>

@@ -206,7 +206,7 @@ steps before it are pre-hooks and runner-side steps after it are post-hooks.
 That model requires the web steps to form **one adjacent run**. A scenario that
 resumes web work after a runner-side step (`web → http → web`) is rejected by
 `--validate` and by the run, naming the offending step index
-(`WebBlockNotContiguous`). The shape cannot mean what it reads: the trailing
+(`BlockNotContiguous`). The shape cannot mean what it reads: the trailing
 web steps would execute in the same browser context as the leading ones,
 before the step the file puts between them. A second `target:` to force a
 second invocation is worse — a fresh context silently discards cookies,
@@ -410,7 +410,7 @@ is `RunnerError::BlockNotContiguous`. Move the step inside the block, after its
 - home: null
 - shake: null
 - reset_app: "com.example.app"
-- set_network: "airplane"
+- set_network: "airplane_on"
 ```
 
 ---
@@ -444,7 +444,7 @@ takes to appear:
     max_seconds: 5
 ```
 
-Any other verb omitting `until` is a compile-time `PlaywrightUnsupported`: a
+Any other verb omitting `until` is a compile-time `PlaywrightError::Unsupported`: a
 `tap` has nothing to stop the clock, and guessing a stop condition would time
 the wrong thing. A verb with no web equivalent is likewise a compile-time
 failure, not a silently skipped step.
@@ -686,7 +686,7 @@ Errors (`CrossSurfaceError`): `TooFewFiles`, `CaptureTargetNotListed`,
 | `target` (kind=web), `tap`, `type`, `wait_for`, `assert_visible`, `assert_not_visible`, `screenshot`, `press_key`, `swipe`, `scroll_to`, `long_press`, `drag`, `open_url`, `measure` — inside a web block | `compile::playwright` + `compile::invoke` | One spec, one `npx playwright test` per web block |
 | `target` (kind=ios), the same interaction verbs, `launch`, `home`, `shake`, `reset_app`, `set_network`, `scene` — inside an ios block | `compile::mirroir_block` + `target::ios` | One `mirroir-mcp test` per ios block, macOS host only |
 | `remember` | annotation | Neither surface: a comment in the spec when it sits inside the web run, a logged note when it sits outside, refused inside an ios block. Never splits the run. |
-| `judge` | `oracle::judge` | OpenAI-compatible chat completions |
+| `judge` | `oracle::judge` | OpenAI, Anthropic or Ollama client, per the profile's `api_target` |
 | `cross_surface` | `oracle::drift` | Jaccard over `Fingerprint` |
 | `report` | `replay_step` | Applies the declared verdict to the scenario. |
 | `launch`, `home`, `shake`, `reset_app`, `set_network`, `scene` outside an ios block, `condition` | none | Refused at plan time: `DeviceStepOutsideIosBlock` (before the ios block), `BlockNotContiguous` (after it ended), `ConditionHasNoEvaluator` (`condition`). |

@@ -38,6 +38,7 @@ Minimal viable APP.md:
 ```markdown
 ---
 app: HelixVideotron       # must match what launch_app finds (see step 1)
+version: 1                # required; a file without it is refused
 archetype: media          # see APP.md.spec for the list
 reset_before_explore: true   # set true if app retains overlays / login state on relaunch
 ---
@@ -70,7 +71,7 @@ Short prose — what region the user sees first, what an edge-control cluster lo
 - Delete recording
 ```
 
-What each field actually does — see [APP.md.spec.md § "Field-by-Field Behavior"](APP.md.spec.md). Both `## Credentials` and `## Tips` are consumed: declared credential keys (never values) surface as a "## Required Credentials" section in the generated SKILL.md, and `## Tips` entries surface as a "## Tips" section. Check the spec for which fields are read by the explorer versus only the generator.
+What each field actually does — see [APP.md.spec.md § "Consumers"](APP.md.spec.md#consumers-what-todays-code-actually-uses). Both `## Credentials` and `## Tips` are consumed: declared credential keys (never values) surface as a "## Required Credentials" section in the generated SKILL.md, and `## Tips` entries surface as a "## Tips" section. Check the spec for which fields are read by the explorer versus only the generator.
 
 Tip: if you're unsure about Tabs, run `describe_screen` on the app's home, write down the bottom-edge labels exactly as OCR returns them, and use those.
 

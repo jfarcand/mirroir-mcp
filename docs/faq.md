@@ -17,7 +17,7 @@ See [Security](security.md) for the full threat model and recommendations.
 
 ## Why does my cursor jump when the AI is working?
 
-On iPhone Mirroring it only jumps for some gestures. Taps, typing and swipes (`tap`, `double_tap`, `long_press`, `type_text`, `press_key`, `launch_app`, `swipe`, `scroll_to`) are sent straight to the iPhone Mirroring window: your front app keeps focus and the cursor stays where it is. `drag`, `pinch` and `rotate` use HID input: they bring iPhone Mirroring forward for their duration, then return the front and the pointer. `hold_keys` and `touch` bring it to the front and leave it there.
+On iPhone Mirroring it only jumps for some gestures. Taps, typing and swipes (`tap`, `double_tap`, `long_press`, `type_text`, `press_key`, `launch_app`, `swipe`, `scroll_to`) are sent straight to the iPhone Mirroring window: your front app keeps focus and the cursor stays where it is. That holds through macOS 26; on a later macOS they are HID input too, unless `windowInput` is `on`. `drag`, `pinch` and `rotate` use HID input: they bring iPhone Mirroring forward for their duration, then return the front and the pointer. `hold_keys` and `touch` bring it to the front and leave it there.
 
 **Mitigations for gestures:**
 
@@ -35,13 +35,11 @@ Yes. The MCP server operates at the screen level through macOS iPhone Mirroring 
 
 ## Can it paste text from my Mac clipboard?
 
-No. iPhone Mirroring does not bridge the Mac clipboard when paste is triggered programmatically. This was tested extensively with HID keystrokes (`Cmd+V`), AppleScript, `CGEvent`, and Accessibility API actions — none work. The clipboard bridge relies on the Continuity/Handoff stack which only responds to physical user input.
-
-Text is typed character-by-character through CGEvent key events instead.
+Only through Universal Clipboard. `Cmd+V` pastes the iPhone's clipboard, and the Mac's pasteboard reaches it through Handoff, asynchronously. `type_text` types every character it has a key for and pastes only the runs it has none for (emoji, CJK), confirming each paste by OCR. See [limitations](limitations.md#clipboard-paste-is-confirmed-by-ocr).
 
 ## How does input reach the iPhone?
 
-All input (touch and keyboard) is delivered via the macOS CGEvent API. CGEvent posts go through the system HID path, which the iPhone Mirroring app (`com.apple.ScreenContinuity`) picks up and relays to the connected iPhone. No kernel extensions, no root privileges, no helper daemons.
+Through macOS 26, taps, keys and swipes are events addressed to the iPhone Mirroring window; drags and two-finger gestures, and all input on a later macOS, are CGEvent posts on the system HID path. The iPhone Mirroring app (`com.apple.ScreenContinuity`) relays both to the connected iPhone. No kernel extensions, no root privileges, no helper daemons.
 
 ## Does it work with non-US keyboard layouts?
 
@@ -89,7 +87,7 @@ No. The MCP server communicates via stdin/stdout, so each MCP client session con
 
 ## What is embacle and do I need it?
 
-[embacle](https://github.com/dravr-ai/dravr-embacle) is an optional AI vision runtime that can be embedded into mirroir-mcp via Rust FFI. When installed, `describe_screen` uses an AI vision model instead of local OCR, producing richer semantic descriptions of UI elements (buttons, cards, tabs, navigation structure) rather than raw text fragments.
+[embacle](https://github.com/dravr-ai/dravr-embacle) is an optional AI vision runtime that can be embedded into mirroir-mcp via Rust FFI. With it installed and `screenDescriberMode` set to `"vision"`, `describe_screen` uses an AI vision model instead of local OCR, producing richer semantic descriptions of UI elements (buttons, cards, tabs, navigation structure) rather than raw text fragments.
 
 embacle routes requests through already-authenticated CLI tools (GitHub Copilot, Claude Code) — no separate API key needed. It is **not required** — local OCR works without it and is the default.
 
@@ -127,4 +125,4 @@ If you want to do it manually with the lower-level tools, the gesture must be **
 - `swipe` posts a CGEvent **scroll wheel** event — iOS reads that as scrolling, not as a touch swipe.
 - `drag` posts a CGEvent **mouse-down → move → up** sequence — iPhone Mirroring relays it as a touch gesture, which the App Switcher's card-dismiss interaction accepts. (Note: the one gesture iPhone Mirroring cannot relay is the iOS edge-swipe-back — neither `swipe` nor `drag` triggers `UIScreenEdgePanGestureRecognizer`, which is why back navigation relies on OCR-tapping the `<` chevron instead.)
 
-Manual sequence: `press_app_switcher` → wait briefly → `drag(fromX: <half_width>, fromY: <half_height>, toX: <half_width>, toY: 0, durationMs: 200)` → `press_home`.
+Manual sequence: `press_app_switcher` → wait briefly → `drag(from_x: <half_width>, from_y: <half_height>, to_x: <half_width>, to_y: 80, duration_ms: 200)` → `press_home`.

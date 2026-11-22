@@ -32,11 +32,11 @@ echo 'export MIRROIR_PLAYWRIGHT_HOME=$HOME/.cache/mirroir-playwright' >> ~/.zshr
 
 When the runner is about to invoke `npx playwright test`, it:
 
-1. Creates a temporary workspace via `TempDir::new()`.
-2. Writes the emitted `playwright.config.ts` + `scenario.spec.ts` into it.
+1. Recreates the scenario's workspace, `target/playwright/<sample>/<scenario>/`.
+2. Writes the emitted `playwright.config.ts` + `<scenario>.spec.ts` into it.
 3. If `MIRROIR_PLAYWRIGHT_HOME` is set and points at a directory containing
    `node_modules/`, **symlinks** that `node_modules/` into the workspace.
-4. Spawns `npx playwright test --config=… scenario.spec.ts` with `cwd` set
+4. Spawns `npx playwright test --config … <scenario>.spec.ts` with `cwd` set
    to the workspace.
 
 Result: Node's module resolution from the workspace's `playwright.config.ts`
@@ -161,13 +161,13 @@ reads is the spec Playwright executes.
 both an aggregate verdict and the values the spec attached:
 
 ```rust
-pub struct PlaywrightOutcome {
-    pub verdict: PlaywrightVerdict,     // passed / failed / skipped / flaky
-    pub captures: PlaywrightCaptures,   // metrics / judge / cross_surface
+pub struct ReporterOutcome {
+    pub verdict: ReporterVerdict,       // passed / failed / skipped / flaky
+    pub captures: RunCaptures,          // metrics / judge / cross_surface
 }
 ```
 
-A non-zero `failed` count maps to `PlaywrightError::TestFailures`, which
+A non-zero `failed` count maps to `ReportError::TestFailures`, which
 carries each failing test's title and the reporter's own error message — the
 strict-mode locator text, the timeout, the assertion diff — so `samples[].error`
 in the run summary names what failed instead of counting it. In `--sample` mode
