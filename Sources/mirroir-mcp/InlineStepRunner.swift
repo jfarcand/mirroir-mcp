@@ -29,8 +29,8 @@ enum InlineStepRunner {
     struct Report {
         let results: [StepResult]
         let screenText: String?
-        /// The label of a final text tap after which the screen read the same
-        /// as just before it, or nil.
+        /// How a final tap after which the screen read the same as just before
+        /// it is named (its text quoted, or "the point (x, y)"), or nil.
         var unchangedTap: String?
 
         var failed: Bool { results.contains { $0.status.isFailure } }
@@ -44,9 +44,7 @@ enum InlineStepRunner {
             }
             if let unchangedTap {
                 lines.append("")
-                lines.append("The screen read the same before and after tapping \"\(unchangedTap)\". "
-                    + "If the tap should change it, describe the screen again; if it still has not "
-                    + "changed, the tap did not reach the iPhone.")
+                lines.append(InlineStepRunner.unchangedNotice(tapped: unchangedTap))
             }
             if let screenText {
                 lines.append("")
@@ -111,6 +109,7 @@ enum InlineStepRunner {
         let reads = executor.describer as? RecordingDescriber
         var results: [StepResult] = []
         var tapRead: (label: String, elements: [TapPoint])?
+        var pointBefore: [Int: (label: String, elements: [TapPoint])] = [:]
         for (index, step) in steps.enumerated() {
             if results.last?.status.isFailure == true {
                 results.append(StepResult(step: step, status: .skipped,
@@ -118,14 +117,23 @@ enum InlineStepRunner {
                                           durationSeconds: 0))
                 continue
             }
+            // A point tap is found in no read, so the screen is read (as it
+            // is, no wait) just before it, to compare with the read after.
+            if case .tap(let label) = step, let point = TapStepPoint.parse(label),
+               let before = executor.ocrDescriber.describe(settleTimeoutUs: 0) {
+                pointBefore[index] = (pointName(point), before.elements)
+            }
             let result = drivingStop(step, executor: executor, policy: policy)
                 ?? blockedTap(step, executor: executor, policy: policy)
                 ?? executor.execute(step: step, stepIndex: index, skillName: runName)
             results.append(result)
             tapRead = nil
-            if case .tap(let label) = step, TapStepPoint.parse(label) == nil,
-               result.status == .passed, let before = reads?.lastResult {
-                tapRead = (label, before.elements)
+            if case .tap(let label) = step, result.status == .passed {
+                if let point = pointBefore[index] {
+                    tapRead = point
+                } else if TapStepPoint.parse(label) == nil, let before = reads?.lastResult {
+                    tapRead = ("\"\(label)\"", before.elements)
+                }
             }
         }
         let after = executor.describer.describe()
@@ -134,6 +142,19 @@ enum InlineStepRunner {
             report.unchangedTap = tapRead.label
         }
         return report
+    }
+
+    /// What the reply says when the screen read the same before and after a
+    /// tap on `tapped` (a quoted label, or "the point (x, y)").
+    static func unchangedNotice(tapped: String) -> String {
+        "The screen read the same before and after tapping \(tapped). If the tap should "
+            + "change it, describe the screen again; if it still has not changed, the tap did "
+            + "not reach the iPhone."
+    }
+
+    /// How a point tap is named in a reply.
+    static func pointName(_ point: (x: Double, y: Double)) -> String {
+        "the point (\(ScreenshotGeometry.whole(point.x)), \(ScreenshotGeometry.whole(point.y)))"
     }
 
     /// Whether two reads show the same screen: the same structural text, with
@@ -174,7 +195,7 @@ enum InlineStepRunner {
 
     /// The text a read shows. Unlabeled icons carry a placeholder name, not
     /// text the screen shows, so they are left out.
-    private static func screenText(_ result: ScreenDescriber.DescribeResult) -> String {
+    static func screenText(_ result: ScreenDescriber.DescribeResult) -> String {
         ScenarioStepFormatter.screenText(
             elements: result.elements.filter { $0.text != CoreMLElementDetector.iconLabel })
             .trimmingCharacters(in: .whitespacesAndNewlines)

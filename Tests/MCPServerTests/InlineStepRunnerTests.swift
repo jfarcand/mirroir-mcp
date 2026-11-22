@@ -96,7 +96,7 @@ final class InlineStepRunnerTests: XCTestCase {
         XCTAssertEqual(input.tapCalls.first?.x, 324)
         XCTAssertEqual(input.tapCalls.first?.y, 113)
         XCTAssertEqual(input.typeCalls, ["weather"])
-        XCTAssertEqual(describer.describeCallCount, 1, "only the final read: a point needs no OCR")
+        XCTAssertEqual(describer.describeCallCount, 2, "a read just before the point, and the final one")
     }
 
     // MARK: - A tap the screen did not answer
@@ -138,12 +138,42 @@ final class InlineStepRunnerTests: XCTestCase {
         XCTAssertFalse(InlineStepRunner.readsTheSame(before, opened))
     }
 
-    func testOnlyAFinalTextTapIsCompared() {
+    func testOnlyAFinalTapIsCompared() {
         let typed = call(makeServer(policy: allowAll), "run_steps",
                          steps(["tap: Search", "type: calculator"]))
         XCTAssertFalse(typed.text.contains("read the same"), typed.text)
-        let point = call(makeServer(policy: allowAll), "run_steps", steps(["tap: @324,113"]))
-        XCTAssertFalse(point.text.contains("read the same"), "a point tap has no read before it")
+        let pointThenType = call(makeServer(policy: allowAll), "run_steps",
+                                 steps(["tap: @324,113", "type: weather"]))
+        XCTAssertFalse(pointThenType.text.contains("read the same"), pointThenType.text)
+    }
+
+    /// carnet#91: an unlabeled close ✕ is tapped by point, which had no read to
+    /// compare, so a tap that never arrived passed in silence.
+    func testAFinalPointTapOnAnUnchangedScreenSaysSo() {
+        let result = call(makeServer(policy: allowAll), "run_steps", steps(["tap: @324,113"]))
+        XCTAssertFalse(result.isError, result.text)
+        XCTAssertTrue(result.text.contains(
+            "The screen read the same before and after tapping the point (324, 113)"), result.text)
+    }
+
+    func testATapAtAPointOnAnUnchangedScreenSaysSo() {
+        let result = call(makeServer(policy: allowAll), "tap", ["x": .number(198), "y": .number(56)])
+        XCTAssertFalse(result.isError, "an unchanged screen is a hint, not a failure: \(result.text)")
+        XCTAssertTrue(result.text.hasPrefix("Tapped at (198, 56)"), result.text)
+        XCTAssertTrue(result.text.contains(
+            "The screen read the same before and after tapping the point (198, 56)"), result.text)
+        XCTAssertTrue(result.text.hasSuffix("Screen now: Search Today"), result.text)
+    }
+
+    func testATapAtAPointThatChangesTheScreenSaysNothingMore() {
+        let after = ScreenDescriber.DescribeResult(
+            elements: [TapPoint(text: "Games", tapX: 60, tapY: 100, confidence: 0.99)],
+            screenshotBase64: "")
+        describer.describeResults = [describer.describeResult, after]
+        let result = call(makeServer(policy: allowAll), "tap", ["x": .number(198), "y": .number(56)])
+        XCTAssertFalse(result.isError, result.text)
+        XCTAssertFalse(result.text.contains("read the same"), result.text)
+        XCTAssertEqual(result.text, "Tapped at (198, 56)\n\nScreen now: Games")
     }
 
     // MARK: - Blocked apps (carnet#78)

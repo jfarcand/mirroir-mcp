@@ -110,11 +110,16 @@ extension MirroirMCP {
                 if let refusal = BlockedAppTapGuard.refusal(at: point, ctx: ctx, policy: policy) {
                     return .error(refusal)
                 }
-                if let error = input.tap(x: point.x, y: point.y, cursorMode: cursorMode) {
-                    return .error(error)
+                let outcome = PointTapReport.run(
+                    described: "Tapped at (\(ScreenshotGeometry.whole(point.x)), "
+                        + "\(ScreenshotGeometry.whole(point.y)))\(origin)",
+                    tapped: InlineStepRunner.pointName((Double(point.x), Double(point.y))),
+                    read: { ctx.ocrDescriber.describe(settleTimeoutUs: $0) },
+                    tap: { input.tap(x: point.x, y: point.y, cursorMode: cursorMode) })
+                switch outcome {
+                case .success(let reply): return .text(reply)
+                case .failure(let error): return .error(error.message)
                 }
-                return .text("Tapped at (\(ScreenshotGeometry.whole(point.x)), "
-                    + "\(ScreenshotGeometry.whole(point.y)))\(origin)")
             }
         ))
     }
