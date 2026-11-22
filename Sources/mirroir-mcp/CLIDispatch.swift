@@ -102,6 +102,12 @@ enum CLIDispatch {
             validate: { _ = try AXCaptureCommand.parseArguments($0) },
             run: AXCaptureCommand.run(arguments:)),
         CLISubcommand(
+            name: RecognizeTextCommand.commandName,
+            summary: "Print the text in an image as JSON (mirroir's own OCR recovery)",
+            usage: { RecognizeTextCommand.usage },
+            validate: { _ = try RecognizeTextCommand.parseArguments($0) },
+            run: RecognizeTextCommand.run(arguments:)),
+        CLISubcommand(
             name: ServeCommand.commandName,
             summary: "Serve the MCP tools over HTTP on loopback, behind a bearer token",
             usage: { ServeCommand.usage },

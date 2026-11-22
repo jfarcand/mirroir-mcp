@@ -31,6 +31,9 @@ struct MirroirMCP {
         // two do not take screen capture from each other (carnet#58).
         ExecutablePathIsolation.isolateIfShared()
 
+        // The binary a stuck text recognizer re-runs to read in a fresh process.
+        FreshProcessTextReader.executablePath = Bundle.main.executablePath
+
         // Parse CLI flags. `--debug` is global: the server and every
         // subcommand honor it, so it is removed before a subcommand parses.
         // MIRROIR_DEBUG turns it on for a host that cannot add arguments.

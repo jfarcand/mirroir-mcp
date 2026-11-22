@@ -76,6 +76,10 @@ A character the layout types with a dead key (`ê` is `^` then `e` on Canadian-C
 
 `mirroir-mcp ax-capture <name> [--out <dir>] [--watch <seconds>]` saves what Accessibility reports for the iPhone Mirroring window as a tagged test fixture. It reads only; nothing is pressed. See [Testing](testing.md#capturing-the-mirroring-window) for when to use it and what to check before committing a capture.
 
+### Recognize text
+
+`mirroir-mcp recognize-text <image>` reads the text in a PNG or JPEG with Apple Vision, using your OCR settings, and prints the lines as JSON (text, normalized bounding box with a bottom-left origin, confidence). mirroir runs it itself to read a frame in a fresh process when its own Vision reads keep failing ([Troubleshooting](troubleshooting.md)).
+
 ### Serve
 
 By default mirroir-mcp talks to one MCP client on standard input and output and opens no network port. `mirroir-mcp serve` is for the other case: the agent runs on another machine and the phone is next to your Mac.
