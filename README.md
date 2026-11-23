@@ -59,6 +59,19 @@ OpenClaw, Hermes Agent, Claude Desktop, Cursor, VS Code and the other clients: [
 </p>
 <p align="center"><em>Chess against Chess.com's strongest bot: the model reads the board, Stockfish picks, mirroir plays. See <a href="docs/games.md">Games</a>. Sped up.</em></p>
 
+<table align="center">
+  <tr>
+    <td align="center" width="50%">
+      <img src="website/public/video2-waze-slack.gif" alt="An agent reads the commute time in Waze on a real iPhone, then posts it in a Slack channel" width="340" /><br />
+      <em>Reads the ETA in Waze, posts it in Slack.</em>
+    </td>
+    <td align="center" width="50%">
+      <img src="website/public/video1-expo-login.gif" alt="An agent tests a login screen in Expo Go on a real iPhone" width="340" /><br />
+      <em>Tests a login screen in Expo Go.</em>
+    </td>
+  </tr>
+</table>
+
 ## What you get
 
 - **Any app.** If iPhone Mirroring shows it, mirroir can drive it, App Store apps included.
