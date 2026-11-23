@@ -71,12 +71,27 @@ final class MCPServer: Sendable {
                 continue
             }
 
+            let parsed: Any
+            do {
+                parsed = try JSONSerialization.jsonObject(with: data, options: [.fragmentsAllowed])
+            } catch {
+                writeError(id: nil, code: -32700, message: "Parse error: the line is not JSON")
+                continue
+            }
+            // A client's answer to a server request arriving after the request
+            // that asked for it gave up: nothing waits for it any more.
+            if let object = parsed as? [String: Any], object["method"] == nil,
+               object["result"] != nil || object["error"] != nil {
+                DebugLog.log("MCPServer", "Ignoring a response no request is waiting for")
+                continue
+            }
+
             let request: JSONRPCRequest
             do {
                 request = try decoder.decode(JSONRPCRequest.self, from: data)
             } catch {
                 DebugLog.log("MCPServer", "JSON-RPC decode failed: \(error)")
-                writeError(id: nil, code: -32700, message: "Parse error: \(error.localizedDescription)")
+                writeError(id: nil, code: -32600, message: "Invalid request: \(error.localizedDescription)")
                 continue
             }
 
@@ -159,13 +174,13 @@ final class MCPServer: Sendable {
             // negotiation at a revision that cannot do it. The error names the
             // revisions that can, and the legacy ones it can fall back to.
             if !Self.modernProtocolVersions.contains(requested) {
-                return unsupportedVersionError(id: request.id, requested: requested)
+                return Self.unsupportedVersionError(id: request.id, requested: requested)
             }
-            if let missing = missingRequiredMetaField(request) {
+            if let missing = Self.missingRequiredMetaField(request) {
                 return JSONRPCResponse(
                     id: request.id, result: nil,
                     error: JSONRPCError(
-                        code: -32602,
+                        code: Self.invalidParamsCode,
                         message: "Invalid params: missing required _meta field '\(missing)'"
                     )
                 )
@@ -239,14 +254,14 @@ final class MCPServer: Sendable {
     /// The revision requires only `protocolVersion` (already established by the
     /// time this runs) and `clientCapabilities` — `clientInfo` is optional, so
     /// rejecting a request that omits it would turn away conformant clients.
-    private func missingRequiredMetaField(_ request: JSONRPCRequest) -> String? {
+    static func missingRequiredMetaField(_ request: JSONRPCRequest) -> String? {
         let meta = request.params?.member("_meta")
         if meta?.member(MetaKey.clientCapabilities) == nil { return MetaKey.clientCapabilities }
         return nil
     }
 
     /// `UnsupportedProtocolVersionError` with the versions we support.
-    private func unsupportedVersionError(id: RequestID?, requested: String) -> JSONRPCResponse {
+    static func unsupportedVersionError(id: RequestID?, requested: String) -> JSONRPCResponse {
         let supported = Self.supportedProtocolVersions.map { JSONValue.string($0) }
         let data: JSONValue = .object([
             "supported": .array(supported),
@@ -266,6 +281,14 @@ final class MCPServer: Sendable {
     /// across implementations and a client cannot recognise the version
     /// mismatch it signals.
     static let unsupportedProtocolVersionCode = -32022
+
+    /// Spec-allocated code for `MissingRequiredClientCapabilityError`: the
+    /// request needs a capability the client did not declare.
+    static let missingClientCapabilityCode = -32021
+
+    /// JSON-RPC `Invalid params`, which the revision also uses for a request
+    /// missing a required `_meta` field.
+    static let invalidParamsCode = -32602
 
     /// Modern `server/discover` — advertise supported versions, capabilities,
     /// and identity so a client can pick a version without a round-trip error.
@@ -324,8 +347,10 @@ final class MCPServer: Sendable {
 
     private func handleToolsList(_ request: JSONRPCRequest, modern: Bool) -> JSONRPCResponse {
         let toolList: [JSONValue] = tools.withLock { snapshot in
+            // Sorted by name, so every call lists the tools in the same order.
             snapshot.values
                 .filter { policy.isToolVisible($0.name) }
+                .sorted { $0.name < $1.name }
                 .map { tool in
                     var entry: [String: JSONValue] = [
                         "name": .string(tool.name),
@@ -395,6 +420,9 @@ final class MCPServer: Sendable {
         // Synthetic input does not reset the idle timer: keep the screen saver off the mirror.
         let toolResult = DisplayAwake.shared.during("mirroir-mcp \(toolName)") { tool.handler(arguments, context) }
 
+        if let required = toolResult.missingClientCapabilities {
+            return missingCapabilityResponse(request, toolResult: toolResult, required: required, modern: modern)
+        }
         if !toolResult.inputRequests.isEmpty || toolResult.requestState != nil {
             return inputRequiredResponse(request, toolResult: toolResult, modern: modern)
         }

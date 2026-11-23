@@ -135,34 +135,43 @@ enum MCPHTTPEndpoint {
         if let mismatch = headerMismatch(request, rpc: rpc, modernVersion: modernVersion) {
             return rpcError(400, code: ErrorCode.headerMismatch, message: mismatch, id: rpc.id)
         }
+        // An `initialize`-era request may send the version header; a version
+        // not served here gets the list a client can retry with.
+        if modernVersion == nil, let versionHeader = request.headers[Header.protocolVersion],
+           !MCPServer.supportedProtocolVersions.contains(versionHeader) {
+            return encoded(MCPServer.unsupportedVersionError(id: rpc.id, requested: versionHeader), status: 400)
+        }
 
         guard let response = dispatch(rpc) else { return HTTPResponse(status: 202) }
-        let body: Data
+        return encoded(response, status: status(for: response, rpc: rpc, modern: modernVersion != nil))
+    }
+
+    /// A JSON-RPC response as an HTTP response with `status`.
+    private static func encoded(_ response: JSONRPCResponse, status: Int) -> HTTPResponse {
         do {
-            body = try JSONEncoder().encode(response)
+            return .json(status, try JSONEncoder().encode(response))
         } catch {
             DebugLog.log("serve", "Failed to encode response: \(error)")
             return rpcError(500, code: ErrorCode.internalError, message: "Internal error: response encoding failed",
-                            id: rpc.id)
+                            id: response.id)
         }
-        return .json(status(for: response, modern: modernVersion != nil), body)
     }
 
     /// The reason a request's MCP headers are refused, or nil when they agree
     /// with its body. A stateless-era request must repeat its version, its
     /// method and, for a tool call, the tool's name in headers, so a proxy can
-    /// route without reading the body. An `initialize`-era request may send
-    /// the version header; when it does, the version must be one served here.
+    /// route without reading the body. Every MCP header must hold only what a
+    /// header value may: visible ASCII, space and tab.
     static func headerMismatch(
         _ request: HTTPRequest, rpc: JSONRPCRequest, modernVersion: String?
     ) -> String? {
-        let versionHeader = request.headers[Header.protocolVersion]
-        guard let modernVersion else {
-            if let versionHeader, !MCPServer.supportedProtocolVersions.contains(versionHeader) {
-                return "MCP-Protocol-Version '\(versionHeader)' is not supported"
+        for header in [Header.protocolVersion, Header.method, Header.name] {
+            if let value = request.headers[header], !isValidHeaderValue(value) {
+                return "\(header) holds characters a header value may not: encode it as \(base64Prefix)…\(base64Suffix)"
             }
-            return nil
         }
+        let versionHeader = request.headers[Header.protocolVersion]
+        guard let modernVersion else { return nil }
         guard versionHeader == modernVersion else {
             return "MCP-Protocol-Version must be '\(modernVersion)', the version in _meta"
         }
@@ -175,6 +184,15 @@ enum MCPHTTPEndpoint {
             }
         }
         return nil
+    }
+
+    /// Whether `value` holds only visible ASCII (0x21-0x7E), space and tab,
+    /// the characters an HTTP header value may carry. Anything else travels in
+    /// the Base64 form.
+    static func isValidHeaderValue(_ value: String) -> Bool {
+        value.unicodeScalars.allSatisfy { scalar in
+            scalar == " " || scalar == "\t" || (0x21...0x7E).contains(scalar.value)
+        }
     }
 
     /// A header value with the Base64 form decoded; any other value unchanged.
@@ -223,10 +241,15 @@ enum MCPHTTPEndpoint {
 
     /// The HTTP status of a JSON-RPC response: errors a client must tell apart
     /// before parsing the body get their own status, everything else is 200.
-    private static func status(for response: JSONRPCResponse, modern: Bool) -> Int {
+    /// A stateless-era request missing a required `_meta` field is malformed,
+    /// and one needing a capability the client did not declare cannot run:
+    /// the revision makes both 400.
+    private static func status(for response: JSONRPCResponse, rpc: JSONRPCRequest, modern: Bool) -> Int {
         guard let code = response.error?.code else { return 200 }
         switch code {
-        case MCPServer.unsupportedProtocolVersionCode:
+        case MCPServer.unsupportedProtocolVersionCode, MCPServer.missingClientCapabilityCode:
+            return 400
+        case MCPServer.invalidParamsCode where modern && MCPServer.missingRequiredMetaField(rpc) != nil:
             return 400
         case ErrorCode.methodNotFound where modern:
             return 404

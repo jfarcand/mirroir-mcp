@@ -67,6 +67,36 @@ extension MCPServer {
         return JSONRPCResponse(id: request.id, result: .object(fields), error: nil)
     }
 
+    /// The response for a tool that needed a client capability the client did
+    /// not declare. The stateless revision defines
+    /// `MissingRequiredClientCapabilityError` for it; a legacy client has no
+    /// such error, so it gets the tool's own message as a failed result.
+    func missingCapabilityResponse(
+        _ request: JSONRPCRequest, toolResult: MCPToolResult, required: JSONValue, modern: Bool
+    ) -> JSONRPCResponse {
+        guard modern else {
+            let result: JSONValue = .object([
+                "content": .array(toolResult.content.map { $0.toJSON() }),
+                "isError": .bool(true),
+            ])
+            return JSONRPCResponse(id: request.id, result: result, error: nil)
+        }
+        let message = toolResult.content.compactMap { content -> String? in
+            if case .text(let text) = content { return text }
+            return nil
+        }.joined(separator: "\n")
+        return JSONRPCResponse(
+            id: request.id, result: nil,
+            error: JSONRPCError(
+                code: Self.missingClientCapabilityCode, message: message,
+                data: .object(["requiredCapabilities": required])))
+    }
+
+    /// Whether the request being served carries the `2026-07-28` `_meta`.
+    func isServingModernRequest() -> Bool {
+        servingModernRequest.withLock { $0 }
+    }
+
     /// Answers the client supplied when retrying a call that asked for input,
     /// keyed by the identifiers the previous `inputRequests` used.
     static func inputResponses(in request: JSONRPCRequest) -> [String: JSONValue] {

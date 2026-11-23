@@ -138,23 +138,30 @@ check_mcp_compliance() {
             return 0
         fi
 
-        # Quick MCP protocol version check
-        local INIT_RESULT
-        INIT_RESULT=$(echo '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}' \
-            | $BINARY 2>/dev/null | head -1)
+        # Quick MCP protocol version check, both eras: server/discover leads with
+        # the newest (stateless) revision; initialize negotiates the newest
+        # initialize-era one.
+        local VERSION_RESULT
+        VERSION_RESULT=$(printf '%s\n' \
+            '{"jsonrpc":"2.0","id":1,"method":"server/discover","params":{}}' \
+            '{"jsonrpc":"2.0","id":2,"method":"initialize","params":{}}' \
+            | $BINARY 2>/dev/null | head -2)
 
-        if ! echo "$INIT_RESULT" | python3 -c "
+        if ! echo "$VERSION_RESULT" | python3 -c "
 import sys, json
-obj = json.loads(sys.stdin.readline())
-assert obj['result']['protocolVersion'] == '2025-11-25', \
-    f'Protocol version must be 2025-11-25, got: {obj[\"result\"][\"protocolVersion\"]}'
-assert obj['result']['serverInfo']['name'] == 'mirroir-mcp'
-assert obj.get('jsonrpc') == '2.0'
+discover = json.loads(sys.stdin.readline())
+initialize = json.loads(sys.stdin.readline())
+assert discover['result']['supportedVersions'][0] == '2026-07-28', \
+    f'server/discover must lead with 2026-07-28, got: {discover[\"result\"][\"supportedVersions\"]}'
+assert initialize['result']['protocolVersion'] == '2025-11-25', \
+    f'initialize must negotiate 2025-11-25, got: {initialize[\"result\"][\"protocolVersion\"]}'
+assert initialize['result']['serverInfo']['name'] == 'mirroir-mcp'
+assert initialize.get('jsonrpc') == '2.0'
 print('OK')
 " 2>&1 | grep -q "OK"; then
             echo ""
             echo "ERROR: Commit blocked - MCP protocol compliance failed!"
-            echo "The server must report protocolVersion 2025-11-25 (latest MCP spec)."
+            echo "server/discover must lead with 2026-07-28 (latest MCP spec), and initialize must negotiate 2025-11-25."
             return 1
         fi
 

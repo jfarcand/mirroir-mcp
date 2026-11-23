@@ -84,16 +84,23 @@ jobs:
           test -x .build/release/mirroir-mcp || { echo "Binary not found"; exit 1; }
           file .build/release/mirroir-mcp
 
-      - name: Validate MCP protocol version is latest
+      # Both eras: server/discover leads with the newest (stateless) revision,
+      # and initialize negotiates the newest initialize-era one.
+      - name: Validate MCP protocol versions
         run: |
-          echo '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}' \
+          printf '%s\n' \
+            '{"jsonrpc":"2.0","id":1,"method":"server/discover","params":{}}' \
+            '{"jsonrpc":"2.0","id":2,"method":"initialize","params":{}}' \
             | .build/release/mirroir-mcp 2>/dev/null \
             | python3 -c "
           import sys, json
-          obj = json.loads(sys.stdin.readline())
-          version = obj['result']['protocolVersion']
-          assert version == '2025-11-25', f'Protocol version must be 2025-11-25 (latest), got: {version}'
-          print(f'MCP protocol version: {version} (latest)')
+          discover = json.loads(sys.stdin.readline())
+          initialize = json.loads(sys.stdin.readline())
+          versions = discover['result']['supportedVersions']
+          assert versions[0] == '2026-07-28', f'server/discover must lead with 2026-07-28 (latest), got: {versions}'
+          legacy = initialize['result']['protocolVersion']
+          assert legacy == '2025-11-25', f'initialize must negotiate 2025-11-25 (newest initialize-era), got: {legacy}'
+          print(f'MCP protocol versions: {versions}; initialize negotiates {legacy}')
           "
 
       - name: Run MCP compliance validation

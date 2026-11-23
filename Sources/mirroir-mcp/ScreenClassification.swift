@@ -41,6 +41,34 @@ enum ScreenClassification {
         let screenHeight: Double
     }
 
+    /// Which model classifies the screen.
+    enum ModelRoute: Equatable {
+        /// The client's model, over the `2026-07-28` round trip.
+        case askClient
+        /// The client's model, over a stdio `sampling/createMessage` request.
+        case samplingRequest
+        /// The AI agent configured on this machine.
+        case agent
+        /// The client declared sampling, but it cannot be reached here, and no
+        /// agent is configured.
+        case unreachableSampling
+        /// The client declared no sampling and no agent is configured.
+        case missingSampling
+    }
+
+    /// The model to ask. The client's own model is preferred whenever it
+    /// declared `sampling`, reached the way the request's revision allows:
+    /// the round trip for a `2026-07-28` request, a stdio sampling request for
+    /// a legacy one. Otherwise the configured agent answers.
+    static func route(
+        samplingDeclared: Bool, modernRequest: Bool, mayInitiateRequest: Bool, agentConfigured: Bool
+    ) -> ModelRoute {
+        if samplingDeclared, modernRequest { return .askClient }
+        if samplingDeclared, mayInitiateRequest { return .samplingRequest }
+        if agentConfigured { return .agent }
+        return samplingDeclared ? .unreachableSampling : .missingSampling
+    }
+
     /// Build the `input_required` result asking the client's model to classify
     /// `screen`, carrying the screen forward in signed state.
     static func askClient(

@@ -218,24 +218,39 @@ extension MirroirMCP {
                     return .error("No elements on screen to classify")
                 }
 
-                // The client's own model answers over the round trip; otherwise
-                // the agent configured here answers inline.
-                if server.clientSupportsSampling() {
+                let agentConfig = AIAgentRegistry.resolveConfigured()
+                let classifier: any ComponentClassifying
+                switch ScreenClassification.route(
+                    samplingDeclared: server.clientSupportsSampling(),
+                    modernRequest: server.isServingModernRequest(),
+                    mayInitiateRequest: server.mayInitiateRequest(),
+                    agentConfigured: agentConfig != nil
+                ) {
+                case .askClient:
                     return ScreenClassification.askClient(
                         screen, definitions: definitions, maxTokens: maxTokens)
-                }
-                guard let agentConfig = AIAgentRegistry.resolveConfigured() else {
+                case .samplingRequest:
+                    classifier = SamplingClassifier(server: server)
+                case .agent:
+                    guard let agentConfig else { return .error("No AI agent is configured here") }
+                    classifier = AgentClassifier(agentConfig: agentConfig)
+                case .unreachableSampling:
                     return .error(
-                        "No model available: the client offers no sampling capability and "
-                        + "no AI agent is configured here")
+                        "No model available: the client's sampling cannot be reached on this "
+                        + "transport and no AI agent is configured here")
+                case .missingSampling:
+                    return .missingClientCapability(
+                        .object(["sampling": .object([:])]),
+                        message: "No model available: the client offers no sampling capability and "
+                            + "no AI agent is configured here")
                 }
                 let classified = ElementClassifier.classify(
                     screen.elements, screenHeight: screen.screenHeight)
-                guard let components = AgentClassifier(agentConfig: agentConfig).classify(
+                guard let components = classifier.classify(
                     classified: classified, definitions: definitions,
                     screenHeight: screen.screenHeight
                 ) else {
-                    return .error("The agent did not return a usable classification")
+                    return .error("The model did not return a usable classification")
                 }
                 return .text(ScreenClassificationReport.format(
                     components: components, elementCount: screen.elements.count))

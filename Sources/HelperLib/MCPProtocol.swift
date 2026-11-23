@@ -353,17 +353,33 @@ public struct MCPToolResult: Sendable {
     /// Opaque state echoed back on the retry, carrying whatever the tool needs
     /// to resume. Meaningless to the client, which must not inspect it.
     public let requestState: String?
+    /// Client capabilities the tool needed and the client did not declare, as a
+    /// `ClientCapabilities` object. Set, the call fails with
+    /// `MissingRequiredClientCapabilityError`; `content` says what is missing.
+    public let missingClientCapabilities: JSONValue?
 
     public init(
         content: [MCPContent],
         isError: Bool,
         inputRequests: [String: MCPInputRequest] = [:],
-        requestState: String? = nil
+        requestState: String? = nil,
+        missingClientCapabilities: JSONValue? = nil
     ) {
         self.content = content
         self.isError = isError
         self.inputRequests = inputRequests
         self.requestState = requestState
+        self.missingClientCapabilities = missingClientCapabilities
+    }
+
+    /// A call that cannot run without `capabilities`, which the client did not
+    /// declare. `message` names the shortfall and what would fix it.
+    public static func missingClientCapability(
+        _ capabilities: JSONValue, message: String
+    ) -> MCPToolResult {
+        MCPToolResult(
+            content: [.text(message)], isError: true,
+            missingClientCapabilities: capabilities)
     }
 
     /// A result asking the client to fulfil `inputRequests` and retry, carrying

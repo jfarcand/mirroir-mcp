@@ -332,11 +332,53 @@ final class MCPHTTPEndpointTests: XCTestCase {
                        "there is no session to name")
     }
 
-    func testLegacyRequestWithUnknownVersionHeaderIs400() throws {
+    func testLegacyRequestWithUnknownVersionHeaderIs400With32022() throws {
         let harness = harness()
         let list = #"{"jsonrpc":"2.0","id":2,"method":"tools/list"}"#
-        XCTAssertEqual(harness.respond(post(list, headers: ["mcp-protocol-version": "1999-01-01"])).status, 400)
+        let refused = harness.respond(post(list, headers: ["mcp-protocol-version": "1999-01-01"]))
+        XCTAssertEqual(refused.status, 400)
+        XCTAssertEqual(try errorCode(refused), -32022)
+        let data = try XCTUnwrap((try json(refused)["error"] as? [String: Any])?["data"] as? [String: Any])
+        XCTAssertEqual(data["requested"] as? String, "1999-01-01")
+        XCTAssertEqual(data["supported"] as? [String], MCPServer.supportedProtocolVersions,
+                       "the client learns what it can retry with")
         XCTAssertEqual(harness.respond(post(list, headers: ["mcp-protocol-version": "2025-11-25"])).status, 200)
+    }
+
+    // MARK: - Malformed requests
+
+    func testModernRequestMissingClientCapabilitiesIs400() throws {
+        let harness = harness()
+        let body = """
+            {"jsonrpc":"2.0","id":1,"method":"tools/list","params":{"_meta":{\
+            "io.modelcontextprotocol/protocolVersion":"\(Self.modernVersion)"}}}
+            """
+        let response = harness.respond(post(body, headers: modernHeaders(method: "tools/list")))
+        XCTAssertEqual(response.status, 400, "a request missing a required _meta field is malformed")
+        XCTAssertEqual(try errorCode(response), -32602)
+    }
+
+    func testUnknownToolStaysA200() throws {
+        let harness = harness()
+        let response = harness.respond(post(
+            modernBody(method: "tools/call", extraParams: #""name":"no_such_tool","arguments":{},"#),
+            headers: modernHeaders(method: "tools/call", name: "no_such_tool")))
+        XCTAssertEqual(response.status, 200, "only a missing _meta field turns -32602 into a 400")
+        XCTAssertEqual(try errorCode(response), -32602)
+    }
+
+    func testHeaderWithInvalidCharactersIs400With32020() throws {
+        let harness = harness()
+        let body = modernBody(method: "tools/call", extraParams: listSkillsCall)
+        for name in ["list_skills\u{7F}", "list_skillé", "list\u{01}skills"] {
+            let response = harness.respond(post(body, headers: modernHeaders(method: "tools/call", name: name)))
+            XCTAssertEqual(response.status, 400, name)
+            XCTAssertEqual(try errorCode(response), -32020, name)
+        }
+        XCTAssertEqual(harness.dispatched, 0)
+        XCTAssertTrue(MCPHTTPEndpoint.isValidHeaderValue("tools/call"))
+        XCTAssertTrue(MCPHTTPEndpoint.isValidHeaderValue("a b\tc"))
+        XCTAssertFalse(MCPHTTPEndpoint.isValidHeaderValue("caf\u{E9}"))
     }
 
     // MARK: - Permissions
