@@ -29,6 +29,20 @@ enum ExplorationLoopRunner {
     /// self-re-arming screen (e.g. the Story camera) before giving up.
     private static let maxTrapRecoveries = 3
 
+    /// One explorer step through the strategy detected for the app.
+    private static func step(
+        _ explorer: any Exploring, strategyChoice: StrategyChoice, ctx: TargetContext
+    ) -> ExploreStepResult {
+        switch strategyChoice {
+        case .social:
+            return explorer.step(describer: ctx.describer, input: ctx.input, strategy: SocialAppStrategy.self)
+        case .desktop:
+            return explorer.step(describer: ctx.describer, input: ctx.input, strategy: DesktopAppStrategy.self)
+        case .mobile:
+            return explorer.step(describer: ctx.describer, input: ctx.input, strategy: MobileAppStrategy.self)
+        }
+    }
+
     static func run(
         explorer: any Exploring,
         strategyChoice: StrategyChoice,
@@ -36,6 +50,7 @@ enum ExplorationLoopRunner {
         appName: String,
         emit: Bool,
         outputDir: String?,
+        call: MCPCallControl = MCPCallControl(),
         initialLines: [String]
     ) -> MCPToolResult {
         var stepResults = initialLines
@@ -47,25 +62,20 @@ enum ExplorationLoopRunner {
         // Run exploration loop using detected strategy
         while !explorer.completed {
             let result: ExploreStepResult
-            switch strategyChoice {
-            case .social:
-                result = explorer.step(
-                    describer: ctx.describer, input: ctx.input,
-                    strategy: SocialAppStrategy.self)
-            case .desktop:
-                result = explorer.step(
-                    describer: ctx.describer, input: ctx.input,
-                    strategy: DesktopAppStrategy.self)
-            case .mobile:
-                result = explorer.step(
-                    describer: ctx.describer, input: ctx.input,
-                    strategy: MobileAppStrategy.self)
+            // A cancel pauses the run between steps, which keeps the graph so far.
+            if call.isCancelled {
+                result = .paused(reason: StepExecutor.cancelledMessage)
+            } else {
+                result = step(explorer, strategyChoice: strategyChoice, ctx: ctx)
             }
 
             switch result {
             case .continue(let desc):
                 stepResults.append(desc)
                 DebugLog.log("explore", "step \(stepResults.count): \(desc)")
+                let stats = explorer.stats
+                call.report(progress: Double(stats.actionCount),
+                            message: "\(stats.nodeCount) screens, \(stats.actionCount) actions")
             case .backtracked(_, _):
                 stepResults.append("Backtracked to parent screen.")
                 DebugLog.log("explore", "step \(stepResults.count): backtracked")

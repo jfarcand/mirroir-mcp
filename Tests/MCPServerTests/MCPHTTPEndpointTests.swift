@@ -38,11 +38,23 @@ final class MCPHTTPEndpointTests: XCTestCase {
                 policy: policy)
         }
 
+        /// The reply as one response; a streamed reply fails the test.
         func respond(_ request: HTTPRequest, origins: Set<String> = []) -> HTTPResponse {
+            let reply = stream(request, origins: origins, channel: RecordingExchangeChannel())
+            guard let response = reply.whole else {
+                XCTFail("expected one whole response, got a stream")
+                return HTTPResponse(status: 500)
+            }
+            return response
+        }
+
+        /// The reply as the endpoint gives it, events going to `channel`.
+        func stream(_ request: HTTPRequest, origins: Set<String> = [],
+                    channel: RecordingExchangeChannel) -> HTTPReply {
             let config = MCPHTTPEndpoint.Config(token: MCPHTTPEndpointTests.token, allowedOrigins: origins)
-            return MCPHTTPEndpoint.respond(to: request, config: config) { rpc in
+            return MCPHTTPEndpoint.respond(to: request, config: config, channel: channel) { rpc, call in
                 self.dispatched += 1
-                return self.server.handleRequest(rpc)
+                return self.server.handleRequest(rpc, call: call)
             }
         }
     }

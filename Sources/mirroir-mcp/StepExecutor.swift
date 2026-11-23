@@ -97,6 +97,13 @@ final class StepExecutor {
     /// The model a `scene:` step plays with; nil when none is configured, and a
     /// scene step then fails.
     let vision: (any VisionCompleting)?
+    /// The MCP call these steps run under, when one does (`run_steps`): its
+    /// cancel ends a wait or a scroll at the next poll. Runs outside a call
+    /// (the CLI test runner) keep the inert control nothing cancels.
+    var call = MCPCallControl()
+
+    /// What a step stopped by that cancel reports.
+    static let cancelledMessage = "the call was cancelled"
 
     init(bridge: any WindowBridging,
          input: InputProviding,

@@ -31,7 +31,7 @@ extension StepExecutor {
         let outcome = ScrollSeeker.seek(
             label: label, toward: direction, maxScrolls: maxScrolls, anchor: nil,
             band: ScrollSeeker.band(for: profile, orientation: bridge.getOrientation()),
-            bridge: bridge, input: input, describer: describer)
+            bridge: bridge, input: input, describer: describer, call: call)
         let result = outcome.stepResult
         return StepResult(step: step, status: result.passed ? .passed : .failed,
                           message: result.message, durationSeconds: elapsed(startTime))

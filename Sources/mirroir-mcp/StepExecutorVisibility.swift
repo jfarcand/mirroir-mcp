@@ -32,6 +32,10 @@ extension StepExecutor {
         var currentPollUs = initialPollUs
 
         while CFAbsoluteTimeGetCurrent() < deadline {
+            if call.isCancelled {
+                return StepResult(step: step, status: .failed, message: StepExecutor.cancelledMessage,
+                                  durationSeconds: elapsed(startTime))
+            }
             if let describeResult = describer.describe(),
                ElementMatcher.isVisible(label: label, in: describeResult.elements) {
                 return StepResult(step: step, status: .passed, message: nil,

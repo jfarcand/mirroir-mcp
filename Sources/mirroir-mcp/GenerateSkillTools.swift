@@ -171,7 +171,7 @@ extension MirroirMCP {
                 ]),
                 "required": .array([.string("action")]),
             ],
-            handler: { args in
+            contextualHandler: { args, context in
                 guard let action = args["action"]?.asString() else {
                     return .error("Missing required parameter: action")
                 }
@@ -188,7 +188,7 @@ extension MirroirMCP {
                 case "explore":
                     return handleExplore(
                         args: args, session: session,
-                        registry: registry, server: server, policy: policy
+                        registry: registry, server: server, policy: policy, call: context.call
                     )
                 default:
                     return .error("Unknown action '\(action)'. Use: start, capture, finish, explore.")

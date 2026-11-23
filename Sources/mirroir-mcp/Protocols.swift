@@ -62,3 +62,16 @@ protocol HTTPServing: Sendable {
     var boundPort: UInt16? { get }
     func stop()
 }
+
+/// The connection a request arrived on, as the responder sees it while it
+/// works: whether the client is still there, and a way to stream events to it.
+protocol HTTPExchangeChannel: AnyObject, Sendable {
+    /// Whether the client has closed its connection.
+    var isAbandoned: Bool { get }
+    /// Run `hook` when the client closes its connection, or at once if it has.
+    func onAbandon(_ hook: @escaping @Sendable () -> Void)
+    /// Send one server-sent event carrying `json`. The first event turns the
+    /// reply into a `text/event-stream`; the responder then ends it with
+    /// `HTTPReply.streamEnded`.
+    func sendEvent(_ json: Data)
+}

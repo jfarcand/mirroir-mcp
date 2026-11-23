@@ -34,7 +34,7 @@ public struct JSONRPCRequest: Decodable, Sendable {
     }
 }
 
-public enum RequestID: Codable, Sendable {
+public enum RequestID: Codable, Sendable, Hashable {
     case string(String)
     case number(Int)
 
@@ -301,10 +301,17 @@ public struct MCPToolCallContext: Sendable {
     public let inputResponses: [String: JSONValue]
     /// The opaque state this tool issued alongside those requests.
     public let requestState: String?
+    /// This call's cancellation and progress: a long tool checks it between
+    /// device actions and reports how far it got.
+    public let call: MCPCallControl
 
-    public init(inputResponses: [String: JSONValue] = [:], requestState: String? = nil) {
+    public init(
+        inputResponses: [String: JSONValue] = [:], requestState: String? = nil,
+        call: MCPCallControl = MCPCallControl()
+    ) {
         self.inputResponses = inputResponses
         self.requestState = requestState
+        self.call = call
     }
 }
 

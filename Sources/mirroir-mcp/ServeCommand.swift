@@ -170,61 +170,17 @@ enum ServeCommand {
     /// a body is read. A request that passes waits its turn on `loop`'s
     /// thread: one tool call at a time, in arrival order, as on stdio. A call
     /// whose client has gone by the time its turn comes is not run: the screen
-    /// it was meant for is no longer the screen showing.
+    /// it was meant for is no longer the screen showing. A client that leaves
+    /// while its call runs cancels it, and the tool stops at its next check.
     static func responder(
         for server: MCPServer, endpoint: MCPHTTPEndpoint.Config, on loop: SerialJobLoop
     ) -> HTTPResponder {
         HTTPResponder(
             refuse: { MCPHTTPEndpoint.refusalBeforeBody($0, config: endpoint) },
-            respond: { request, isAbandoned in
-                MCPHTTPEndpoint.respond(to: request, config: endpoint) { rpc in
-                    loop.perform { isAbandoned() ? nil : server.handleRequest(rpc) }
+            respond: { request, channel in
+                MCPHTTPEndpoint.respond(to: request, config: endpoint, channel: channel) { rpc, call in
+                    loop.perform { call.isCancelled ? nil : server.handleRequest(rpc, call: call) }
                 }
             })
-    }
-}
-
-/// Runs jobs one at a time, in the order they were handed over, on the thread
-/// that calls `run()`. `serve` calls it on the main thread, so a tool handler
-/// runs where it runs under stdio while requests arrive on other threads.
-final class SerialJobLoop: @unchecked Sendable {
-    private let condition = NSCondition()
-    private var jobs: [@Sendable () -> Void] = []
-
-    /// Hand `work` to the loop's thread and wait for what it returns.
-    func perform<Value: Sendable>(_ work: @escaping @Sendable () -> Value?) -> Value? {
-        let done = DispatchSemaphore(value: 0)
-        let box = ResultBox<Value>()
-        enqueue {
-            box.value = work()
-            done.signal()
-        }
-        done.wait()
-        return box.value
-    }
-
-    /// Run jobs on the calling thread until the process exits.
-    func run() -> Never {
-        while true { next()() }
-    }
-
-    private func enqueue(_ job: @escaping @Sendable () -> Void) {
-        condition.lock()
-        jobs.append(job)
-        condition.signal()
-        condition.unlock()
-    }
-
-    /// Wait for the oldest job.
-    private func next() -> @Sendable () -> Void {
-        condition.lock()
-        defer { condition.unlock() }
-        while jobs.isEmpty { condition.wait() }
-        return jobs.removeFirst()
-    }
-
-    /// Carries one result from the loop's thread to the thread that asked.
-    private final class ResultBox<Value>: @unchecked Sendable {
-        var value: Value?
     }
 }

@@ -82,9 +82,17 @@ struct HTTPResponder: Sendable {
     /// Called once, when the headers are in and before any body is read, with
     /// an empty body. A response here refuses the request and closes.
     let refuse: @Sendable (HTTPRequest) -> HTTPResponse?
-    /// Called with the whole request. `isAbandoned` turns true once the client
-    /// has closed its connection, so work it no longer waits for can be skipped.
-    let respond: @Sendable (HTTPRequest, _ isAbandoned: @escaping @Sendable () -> Bool) -> HTTPResponse
+    /// Called with the whole request and the connection it came on, which says
+    /// when the client leaves and can stream events before the reply ends.
+    let respond: @Sendable (HTTPRequest, any HTTPExchangeChannel) -> HTTPReply
+}
+
+/// How a responder ends its reply.
+enum HTTPReply: Sendable, Equatable {
+    /// One response, written whole.
+    case whole(HTTPResponse)
+    /// The events already sent were the reply: close the stream.
+    case streamEnded
 }
 
 /// The request line and headers of a request, and where its body lies.

@@ -110,9 +110,9 @@ extension MCPServer {
 
     /// Send a sampling/createMessage request to the MCP client and wait for the response.
     ///
-    /// This is a server-initiated request: we write a JSON-RPC request to stdout and read
-    /// the client's response from stdin. Safe to call from within a tool handler because
-    /// the server's main loop is blocked waiting for the handler to return.
+    /// This is a server-initiated request: we write a JSON-RPC request to stdout, and
+    /// the stdin reader thread hands back the client's answer with the same id. Safe to
+    /// call from within a tool handler: the reader keeps reading while the tool waits.
     ///
     /// Two conditions gate it. `mayInitiateRequest()` must hold: the transport
     /// is stdio, and the request being served is not from the `2026-07-28`
@@ -149,26 +149,25 @@ extension MCPServer {
             "params": encodeSamplingParams(params),
         ]
 
-        guard let data = try? JSONSerialization.data(withJSONObject: request),
-              let jsonString = String(data: data, encoding: .utf8) else {
+        guard let session = stdioSession.withLock({ $0 }) else {
+            DebugLog.log("sampling", "No stdio connection to send the sampling request on")
+            return nil
+        }
+        guard let data = try? JSONSerialization.data(withJSONObject: request) else {
             DebugLog.log("sampling", "Failed to encode sampling request")
             return nil
         }
 
-        // Send request to client
-        print(jsonString)
-        fflush(stdout)
-
-        // Read response from client
-        guard let responseLine = readLine(strippingNewline: true),
-              let responseData = responseLine.data(using: .utf8) else {
+        // Wait for the answer carrying this id; the stdin reader delivers it.
+        // The wait ends without one when the client leaves or cancels the call.
+        let waiter = session.expect(.number(requestId))
+        session.write(data)
+        guard let json = waiter.wait() else {
             DebugLog.log("sampling", "No response from client for sampling request")
             return nil
         }
 
-        // Parse JSON-RPC response
-        guard let json = try? JSONSerialization.jsonObject(with: responseData) as? [String: Any],
-              let result = json["result"] as? [String: Any],
+        guard let result = json["result"] as? [String: Any],
               let content = result["content"] as? [String: Any],
               let text = content["text"] as? String else {
             DebugLog.log("sampling", "Failed to parse sampling response")

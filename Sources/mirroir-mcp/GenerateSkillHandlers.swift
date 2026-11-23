@@ -263,6 +263,7 @@ extension MirroirMCP {
         registry: TargetRegistry,
         server: MCPServer,
         policy: PermissionPolicy,
+        call: MCPCallControl = MCPCallControl(),
         appMdSearchPaths: [String] = AppDescriptionLoader.searchPaths()
     ) -> MCPToolResult {
         guard let appName = args["app_name"]?.asString(), !appName.isEmpty else {
@@ -464,6 +465,7 @@ extension MirroirMCP {
             appName: appName,
             emit: emit,
             outputDir: outputDir,
+            call: call,
             initialLines: [
                 "Autonomous \(explorerChoice.uppercased()) exploration started for '\(appName)'.",
                 "Budget: depth=\(maxDepth), screens=\(maxScreens), time=\(maxTime)s",

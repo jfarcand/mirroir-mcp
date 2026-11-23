@@ -25,8 +25,6 @@ import os
 final class MCPServer: Sendable {
     private let tools = OSAllocatedUnfairLock(initialState: [String: MCPToolDefinition]())
     private let sequenceAdvisor = RepeatedSequenceAdvisor()
-    private let encoder: JSONEncoder
-    private let decoder: JSONDecoder
     private let policy: PermissionPolicy
     /// Reads the screen of the target a tool call names, for the driving check
     /// (`DrivingGuard`) in front of every input. Nil until tools are registered.
@@ -44,11 +42,11 @@ final class MCPServer: Sendable {
     let currentScope = OSAllocatedUnfairLock(initialState: RequestScope.none)
     /// How requests reach this server, which decides whether it may send its own.
     let transport: MCPTransport
+    /// The stdio connection while `run(input:output:)` serves it; nil over HTTP.
+    let stdioSession = OSAllocatedUnfairLock(initialState: StdioSession?.none)
     init(policy: PermissionPolicy, transport: MCPTransport) {
         self.policy = policy
         self.transport = transport
-        encoder = JSONEncoder()
-        decoder = JSONDecoder()
     }
 
     func registerTool(_ tool: MCPToolDefinition) {
@@ -58,49 +56,6 @@ final class MCPServer: Sendable {
     /// Set how the driving check reads the screen of the target a call names.
     func setScreenReader(_ reader: @escaping @Sendable ([String: JSONValue]) -> ScreenDescriber.DescribeResult?) {
         screenReader.withLock { $0 = reader }
-    }
-
-    /// Run the MCP server, reading JSON-RPC from stdin and writing to stdout.
-    func run() {
-        // Use line-delimited JSON (one JSON object per line)
-        while true {
-            guard let line = readLine(strippingNewline: true) else { break }
-            if line.isEmpty { continue }
-
-            guard let data = line.data(using: .utf8) else {
-                writeError(id: nil, code: -32700, message: "Parse error: invalid UTF-8")
-                continue
-            }
-
-            let parsed: Any
-            do {
-                parsed = try JSONSerialization.jsonObject(with: data, options: [.fragmentsAllowed])
-            } catch {
-                writeError(id: nil, code: -32700, message: "Parse error: the line is not JSON")
-                continue
-            }
-            // A client's answer to a server request arriving after the request
-            // that asked for it gave up: nothing waits for it any more.
-            if let object = parsed as? [String: Any], object["method"] == nil,
-               object["result"] != nil || object["error"] != nil {
-                DebugLog.log("MCPServer", "Ignoring a response no request is waiting for")
-                continue
-            }
-
-            let request: JSONRPCRequest
-            do {
-                request = try decoder.decode(JSONRPCRequest.self, from: data)
-            } catch {
-                DebugLog.log("MCPServer", "JSON-RPC decode failed: \(error)")
-                writeError(id: nil, code: -32600, message: "Invalid request: \(error.localizedDescription)")
-                continue
-            }
-
-            guard let response = handleRequest(request) else {
-                continue  // Notifications produce no response per JSON-RPC 2.0
-            }
-            writeResponse(response)
-        }
     }
 
     /// Revisions that negotiate statelessly, carrying the protocol version in
@@ -150,7 +105,9 @@ final class MCPServer: Sendable {
     /// The `_meta` key Claude Code (2.1.285 and later) reads on a tools/list entry.
     static let alwaysLoadKey = "anthropic/alwaysLoad"
 
-    func handleRequest(_ request: JSONRPCRequest) -> JSONRPCResponse? {
+    /// Serve one request. `call` carries a tool call's cancellation and
+    /// progress from the transport that received it.
+    func handleRequest(_ request: JSONRPCRequest, call: MCPCallControl = MCPCallControl()) -> JSONRPCResponse? {
         // Notifications have no id — the spec says receivers MUST NOT respond
         if request.id == nil {
             return nil
@@ -198,7 +155,7 @@ final class MCPServer: Sendable {
         case "tools/list":
             return handleToolsList(request, modern: isModern)
         case "tools/call":
-            return handleToolsCall(request, modern: isModern)
+            return handleToolsCall(request, modern: isModern, call: call)
         case "ping":
             return JSONRPCResponse(id: request.id, result: completeResult([:], modern: isModern), error: nil)
         default:
@@ -367,7 +324,7 @@ final class MCPServer: Sendable {
         return JSONRPCResponse(id: request.id, result: result, error: nil)
     }
 
-    private func handleToolsCall(_ request: JSONRPCRequest, modern: Bool) -> JSONRPCResponse {
+    private func handleToolsCall(_ request: JSONRPCRequest, modern: Bool, call: MCPCallControl) -> JSONRPCResponse {
         guard let toolName = request.params?.getToolName() else {
             return JSONRPCResponse(
                 id: request.id,
@@ -409,7 +366,8 @@ final class MCPServer: Sendable {
         }
         let context = MCPToolCallContext(
             inputResponses: Self.inputResponses(in: request),
-            requestState: Self.requestState(in: request))
+            requestState: Self.requestState(in: request),
+            call: call)
         // Synthetic input does not reset the idle timer: keep the screen saver off the mirror.
         let toolResult = DisplayAwake.shared.during("mirroir-mcp \(toolName)") { tool.handler(arguments, context) }
 
@@ -434,34 +392,4 @@ final class MCPServer: Sendable {
         return JSONRPCResponse(id: request.id, result: result, error: nil)
     }
 
-
-
-    private func writeResponse(_ response: JSONRPCResponse) {
-        let data: Data
-        do {
-            data = try encoder.encode(response)
-        } catch {
-            DebugLog.log("MCPServer", "Failed to encode response: \(error)")
-            // Send a minimal error response as a fallback
-            let fallback = #"{"jsonrpc":"2.0","id":null,"error":{"code":-32603,"message":"Internal error: response encoding failed"}}"#
-            print(fallback)
-            fflush(stdout)
-            return
-        }
-        guard let jsonString = String(data: data, encoding: .utf8) else {
-            DebugLog.log("MCPServer", "Response data is not valid UTF-8")
-            return
-        }
-        print(jsonString)
-        fflush(stdout)
-    }
-
-    private func writeError(id: RequestID?, code: Int, message: String) {
-        let response = JSONRPCResponse(
-            id: id,
-            result: nil,
-            error: JSONRPCError(code: code, message: message)
-        )
-        writeResponse(response)
-    }
 }

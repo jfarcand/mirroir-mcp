@@ -55,7 +55,7 @@ extension MirroirMCP {
                 ]),
                 "required": .array([.string("steps")]),
             ],
-            handler: { args in
+            contextualHandler: { args, context in
                 let (ctx, err) = registry.resolveForTool(args)
                 guard let ctx else { return err! }
                 guard case .array(let values) = args["steps"] else {
@@ -69,7 +69,7 @@ extension MirroirMCP {
                 case .failure(let refusal):
                     return .error(refusal.message)
                 case .success(let steps):
-                    let executor = InlineStepRunner.executor(for: ctx, registry: registry)
+                    let executor = InlineStepRunner.executor(for: ctx, registry: registry, call: context.call)
                     let report = InlineStepRunner.run(steps, executor: executor, policy: policy)
                     return report.failed ? .error(report.text) : .text(report.text)
                 }

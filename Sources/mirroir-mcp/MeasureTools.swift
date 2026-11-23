@@ -58,7 +58,7 @@ extension MirroirMCP {
                 ]),
                 "required": .array([.string("action"), .string("until")]),
             ],
-            handler: { args in
+            contextualHandler: { args, context in
                 let (ctx, err) = registry.resolveForTool(args)
                 guard let ctx else { return err! }
                 let bridge = ctx.bridge
@@ -95,7 +95,11 @@ extension MirroirMCP {
                 let pollIntervalUs: useconds_t = EnvConfig.measurePollIntervalUs
 
                 let maxPolls = Int(timeout * 2)
-                for _ in 0..<maxPolls {
+                for poll in 0..<maxPolls {
+                    if context.call.isCancelled {
+                        return .error("\(name): \(StepExecutor.cancelledMessage)")
+                    }
+                    context.call.report(progress: Double(poll + 1), total: Double(maxPolls))
                     if let describeResult = describer.describe(),
                        ElementMatcher.isVisible(label: until, in: describeResult.elements) {
                         let measured = CFAbsoluteTimeGetCurrent() - measureStart

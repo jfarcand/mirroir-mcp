@@ -64,7 +64,7 @@ extension MirroirMCP {
                 ]),
                 "required": .array([.string("label")]),
             ],
-            handler: { args in
+            contextualHandler: { args, context in
                 let (ctx, err) = registry.resolveForTool(args)
                 guard let ctx else { return err! }
                 let bridge = ctx.bridge
@@ -98,7 +98,7 @@ extension MirroirMCP {
                 let outcome = ScrollSeeker.seek(
                     label: label, toward: direction, maxScrolls: maxScrolls, anchor: anchor,
                     band: ScrollSeeker.band(for: ctx.profile, orientation: bridge.getOrientation()),
-                    bridge: bridge, input: input, describer: describer)
+                    bridge: bridge, input: input, describer: describer, call: context.call)
                 let reply = outcome.toolReply(label: label)
                 return reply.isError ? .error(reply.text) : .text(reply.text)
             }

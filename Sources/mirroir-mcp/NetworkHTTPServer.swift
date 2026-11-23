@@ -39,8 +39,9 @@ enum HTTPServerError: LocalizedError, Equatable {
 /// text, which is safe on loopback and nowhere else.
 ///
 /// Requests are answered one at a time, in the order their last byte arrived.
-/// A request whose client closes the connection while it waits is marked
-/// abandoned, so the responder can skip work nobody is waiting for.
+/// A request whose client closes the connection while it waits or runs is
+/// marked abandoned, which cancels its call: work nobody waits for stops. A
+/// reply can stream server-sent events before it ends.
 final class NetworkHTTPServer: HTTPServing, @unchecked Sendable {
 
     /// The only address the listener binds.
@@ -149,7 +150,7 @@ final class NetworkHTTPServer: HTTPServing, @unchecked Sendable {
         }
     }
 
-    /// One connection's request as it arrives. Every field but `abandoned` is
+    /// One connection's request as it arrives. Every field but `departure` is
     /// touched on `queue` only.
     private final class Exchange: @unchecked Sendable {
         let connection: NWConnection
@@ -160,10 +161,55 @@ final class NetworkHTTPServer: HTTPServing, @unchecked Sendable {
         var requestComplete = false
         /// Nothing more is read or answered: refused, timed out, or closed.
         var closed = false
-        /// The client closed before its answer; read by the responder's thread.
-        let abandoned = OSAllocatedUnfairLock(initialState: false)
+        /// The event stream's head has been sent.
+        var streaming = false
+        /// Whether the client closed before its answer, and what runs when it
+        /// does; read and set from the responder's thread too.
+        let departure = OSAllocatedUnfairLock(initialState: Departure())
+
+        struct Departure {
+            var departed = false
+            var hooks: [@Sendable () -> Void] = []
+        }
 
         init(_ connection: NWConnection) { self.connection = connection }
+
+        /// The client left: run what waits on that, once.
+        func markDeparted() {
+            let hooks = departure.withLock { state -> [@Sendable () -> Void] in
+                guard !state.departed else { return [] }
+                state.departed = true
+                defer { state.hooks = [] }
+                return state.hooks
+            }
+            hooks.forEach { $0() }
+        }
+    }
+
+    /// The responder's view of one exchange.
+    private final class Channel: HTTPExchangeChannel, @unchecked Sendable {
+        private let exchange: Exchange
+        private weak var server: NetworkHTTPServer?
+
+        init(_ exchange: Exchange, server: NetworkHTTPServer) {
+            self.exchange = exchange
+            self.server = server
+        }
+
+        var isAbandoned: Bool { exchange.departure.withLock { $0.departed } }
+
+        func onAbandon(_ hook: @escaping @Sendable () -> Void) {
+            let runNow = exchange.departure.withLock { state -> Bool in
+                if state.departed { return true }
+                state.hooks.append(hook)
+                return false
+            }
+            if runNow { hook() }
+        }
+
+        func sendEvent(_ json: Data) {
+            server?.queue.async { [exchange, weak server] in server?.stream(SSEFrame.event(json), on: exchange) }
+        }
     }
 
     /// Runs on `queue`.
@@ -176,7 +222,7 @@ final class NetworkHTTPServer: HTTPServing, @unchecked Sendable {
             case .cancelled:
                 self?.openConnections -= 1
                 exchange.closed = true
-                exchange.abandoned.withLock { $0 = true }
+                exchange.markDeparted()
                 connection.stateUpdateHandler = nil
             default:
                 break
@@ -240,13 +286,48 @@ final class NetworkHTTPServer: HTTPServing, @unchecked Sendable {
 
     /// Runs on `queue`. Hands the request to the responder, in arrival order.
     private func answer(_ request: HTTPRequest, on exchange: Exchange, responder: HTTPResponder) {
+        let channel = Channel(exchange, server: self)
         responderQueue.async {
-            let response = responder.respond(request) { exchange.abandoned.withLock { $0 } }
+            let reply = responder.respond(request, channel)
             self.queue.async {
                 guard !exchange.closed else { return }
-                self.finish(exchange, with: response)
+                switch reply {
+                case .whole(let response):
+                    self.finish(exchange, with: response)
+                case .streamEnded:
+                    self.endStream(exchange)
+                }
             }
         }
+    }
+
+    /// Runs on `queue`. Sends `bytes` on the event stream, opening it with its
+    /// head first and keeping it alive while it is quiet.
+    private func stream(_ bytes: Data, on exchange: Exchange) {
+        guard !exchange.closed else { return }
+        if !exchange.streaming {
+            exchange.streaming = true
+            exchange.connection.send(content: SSEFrame.head, completion: .contentProcessed { _ in })
+            keepAlive(exchange)
+        }
+        exchange.connection.send(content: bytes, completion: .contentProcessed { _ in })
+    }
+
+    /// Runs on `queue`. A comment on the stream every interval while it is open.
+    private func keepAlive(_ exchange: Exchange) {
+        queue.asyncAfter(deadline: .now() + SSEFrame.keepAliveInterval) { [weak self] in
+            guard let self, !exchange.closed else { return }
+            exchange.connection.send(content: SSEFrame.keepAlive, completion: .contentProcessed { _ in })
+            self.keepAlive(exchange)
+        }
+    }
+
+    /// Runs on `queue`. The last event is out: close the stream once it is sent.
+    private func endStream(_ exchange: Exchange) {
+        exchange.closed = true
+        let connection = exchange.connection
+        connection.send(content: nil, contentContext: .finalMessage, isComplete: true,
+                        completion: .contentProcessed { _ in connection.cancel() })
     }
 
     /// Runs on `queue`. While a request waits for its answer, the only thing
@@ -270,8 +351,8 @@ final class NetworkHTTPServer: HTTPServing, @unchecked Sendable {
     /// handed to the responder in turn, which is told nobody is waiting.
     private func abandon(_ exchange: Exchange) {
         exchange.closed = true
-        exchange.abandoned.withLock { $0 = true }
         exchange.connection.cancel()
+        exchange.markDeparted()
     }
 
     /// Runs on `queue`. Writes the response and closes the connection.

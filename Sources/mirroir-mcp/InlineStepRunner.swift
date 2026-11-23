@@ -105,12 +105,21 @@ enum InlineStepRunner {
     /// then read the screen once. When the last step is a passing text tap
     /// and the executor reads through a `RecordingDescriber`, the read the
     /// tap was found in is compared with the read after it.
+    ///
+    /// The executor's call is checked before each step, so a cancel stops the
+    /// run between steps and never inside one; progress is reported after each.
     static func run(_ steps: [SkillStep], executor: StepExecutor, policy: PermissionPolicy) -> Report {
+        let call = executor.call
         let reads = executor.describer as? RecordingDescriber
         var results: [StepResult] = []
         var tapRead: (label: String, elements: [TapPoint])?
         var pointBefore: [Int: (label: String, elements: [TapPoint])] = [:]
         for (index, step) in steps.enumerated() {
+            if call.isCancelled {
+                results.append(StepResult(step: step, status: .skipped,
+                                          message: StepExecutor.cancelledMessage, durationSeconds: 0))
+                continue
+            }
             if results.last?.status.isFailure == true {
                 results.append(StepResult(step: step, status: .skipped,
                                           message: "skipped after the failure above",
@@ -135,8 +144,10 @@ enum InlineStepRunner {
                     tapRead = ("\"\(label)\"", before.elements)
                 }
             }
+            call.report(progress: Double(index + 1), total: Double(steps.count), message: step.displayName)
         }
-        let after = executor.describer.describe()
+        // A cancelled run answers nobody: the closing read is not taken.
+        let after = call.isCancelled ? nil : executor.describer.describe()
         var report = Report(results: results, screenText: after.map(screenText))
         if let tapRead, let after, readsTheSame(tapRead.elements, after.elements) {
             report.unchangedTap = tapRead.label
@@ -203,7 +214,9 @@ enum InlineStepRunner {
 
     /// The executor for a run on `ctx`: the target's own input and OCR, with
     /// failure screenshots kept out of the server's working directory.
-    static func executor(for ctx: TargetContext, registry: TargetRegistry) -> StepExecutor {
+    static func executor(
+        for ctx: TargetContext, registry: TargetRegistry, call: MCPCallControl = MCPCallControl()
+    ) -> StepExecutor {
         let defaults = StepExecutorConfig.default
         let config = StepExecutorConfig(
             waitForTimeoutSeconds: defaults.waitForTimeoutSeconds,
@@ -211,10 +224,12 @@ enum InlineStepRunner {
             screenshotDir: (NSTemporaryDirectory() as NSString).appendingPathComponent(runName),
             dryRun: false)
         // Recorded so a final text tap can be compared with the read it was found in.
-        return StepExecutor(bridge: ctx.bridge, input: ctx.input,
-                            describer: RecordingDescriber(wrapping: ctx.describer), capture: ctx.capture,
-                            config: config, registry: registry,
-                            ocrDescriber: ctx.ocrDescriber, profile: ctx.profile)
+        let executor = StepExecutor(bridge: ctx.bridge, input: ctx.input,
+                                    describer: RecordingDescriber(wrapping: ctx.describer), capture: ctx.capture,
+                                    config: config, registry: registry,
+                                    ocrDescriber: ctx.ocrDescriber, profile: ctx.profile)
+        executor.call = call
+        return executor
     }
 
     /// The name failure screenshots are filed under.

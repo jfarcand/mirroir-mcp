@@ -33,7 +33,7 @@ final class NetworkHTTPServerTests: XCTestCase {
     private func start(
         readTimeout: TimeInterval = NetworkHTTPServer.readTimeout,
         refuse: @escaping @Sendable (HTTPRequest) -> HTTPResponse? = { _ in nil },
-        respond: @escaping @Sendable (HTTPRequest, @escaping @Sendable () -> Bool) -> HTTPResponse
+        respond: @escaping @Sendable (HTTPRequest, any HTTPExchangeChannel) -> HTTPReply
     ) throws -> UInt16 {
         let server = NetworkHTTPServer(port: 0, readTimeout: readTimeout) { _ in }
         servers.append(server)
@@ -42,7 +42,7 @@ final class NetworkHTTPServerTests: XCTestCase {
     }
 
     private func start(handler: @escaping @Sendable (HTTPRequest) -> HTTPResponse) throws -> UInt16 {
-        try start(respond: { request, _ in handler(request) })
+        try start(respond: { request, _ in .whole(handler(request)) })
     }
 
     private func post(_ body: String, port: UInt16) -> (status: Int?, body: String) {
@@ -98,7 +98,7 @@ final class NetworkHTTPServerTests: XCTestCase {
     }
 
     func testClosesAConnectionThatSendsNothing() throws {
-        let port = try start(readTimeout: 0.3, respond: { _, _ in .text(200, "never") })
+        let port = try start(readTimeout: 0.3, respond: { _, _ in .whole(.text(200, "never")) })
         let closed = expectation(description: "closed by the server")
         let connection = NWConnection(
             host: "127.0.0.1", port: try XCTUnwrap(NWEndpoint.Port(rawValue: port)), using: .tcp)
@@ -115,7 +115,7 @@ final class NetworkHTTPServerTests: XCTestCase {
     func testASecondListenerOnTheSamePortIsRefused() throws {
         let port = try start { _ in .text(200, "first") }
         let second = NetworkHTTPServer(port: port) { _ in }
-        let responder = HTTPResponder(refuse: { _ in nil }, respond: { _, _ in .text(200, "second") })
+        let responder = HTTPResponder(refuse: { _ in nil }, respond: { _, _ in .whole(.text(200, "second")) })
         XCTAssertThrowsError(try second.start(responder: responder)) {
             XCTAssertEqual($0 as? HTTPServerError, .portInUse(port))
             XCTAssertEqual($0.localizedDescription, "Port \(port) is in use. Pass --port.")
@@ -192,6 +192,41 @@ final class NetworkHTTPServerTests: XCTestCase {
         return String(decoding: received.value, as: UTF8.self)
     }
 
+    /// Events a responder streams reach the client as one `text/event-stream`
+    /// reply, with no length, ended by closing the connection.
+    func testAStreamedReplyIsAnEventStream() throws {
+        let port = try start(respond: { _, channel in
+            channel.sendEvent(Data(#"{"n":1}"#.utf8))
+            channel.sendEvent(Data(#"{"n":2}"#.utf8))
+            return .streamEnded
+        })
+        let answer = try exchange("POST /mcp HTTP/1.1\r\nContent-Length: 2\r\n\r\n{}", port: port)
+        XCTAssertTrue(answer.hasPrefix("HTTP/1.1 200 OK\r\n"), answer)
+        XCTAssertTrue(answer.contains("Content-Type: text/event-stream\r\n"), answer)
+        XCTAssertFalse(answer.contains("Content-Length"), answer)
+        XCTAssertTrue(answer.hasSuffix("\r\n\r\nevent: message\ndata: {\"n\":1}\n\nevent: message\ndata: {\"n\":2}\n\n"),
+                      answer)
+    }
+
+    /// A client that closes while its call runs fires the call's abandon hook
+    /// during the call, not after it.
+    func testAClientLeavingDuringACallRunsTheAbandonHook() throws {
+        let running = expectation(description: "call running")
+        let hookRan = expectation(description: "abandon hook ran")
+        let release = DispatchSemaphore(value: 0)
+        let port = try start(respond: { _, channel in
+            channel.onAbandon {
+                hookRan.fulfill()
+                release.signal()
+            }
+            running.fulfill()
+            _ = release.wait(timeout: .now() + 10)
+            return .whole(.text(200, "late"))
+        })
+        _ = try exchange("POST /mcp HTTP/1.1\r\nContent-Length: 2\r\n\r\n{}", port: port, thenClose: true)
+        wait(for: [running, hookRan], timeout: 10)
+    }
+
     /// A request refused on its headers is answered before its body is sent:
     /// the client here announces a megabyte and sends none of it.
     func testARefusalFromTheHeadersDoesNotWaitForTheBody() throws {
@@ -200,7 +235,7 @@ final class NetworkHTTPServerTests: XCTestCase {
             refuse: { $0.headers["authorization"] == nil ? .text(401, "no token") : nil },
             respond: { _, _ in
                 reachedResponder.value = true
-                return .text(200, "ok")
+                return .whole(.text(200, "ok"))
             })
         let answer = try exchange(
             "POST /mcp HTTP/1.1\r\nContent-Length: 1000000\r\n\r\n", port: port)
@@ -216,15 +251,15 @@ final class NetworkHTTPServerTests: XCTestCase {
         let secondSeen = expectation(description: "second call reached")
         let abandonedFlags = Box<[String: Bool]>([:])
         let lock = NSLock()
-        let port = try start(respond: { request, isAbandoned in
+        let port = try start(respond: { request, channel in
             let name = String(decoding: request.body, as: UTF8.self)
             if name == "first" {
                 firstStarted.fulfill()
                 release.wait()
             }
-            lock.withLock { abandonedFlags.value[name] = isAbandoned() }
+            lock.withLock { abandonedFlags.value[name] = channel.isAbandoned }
             if name == "second" { secondSeen.fulfill() }
-            return .text(200, name)
+            return .whole(.text(200, name))
         })
 
         let first = expectation(description: "first answered")
@@ -248,7 +283,7 @@ final class NetworkHTTPServerTests: XCTestCase {
     func testAListenerThatStopsItselfDoesNotReportAFailure() throws {
         let failures = Box<[String]>([])
         let server = NetworkHTTPServer(port: 0) { failures.value.append($0) }
-        try server.start(responder: HTTPResponder(refuse: { _ in nil }, respond: { _, _ in .text(200, "ok") }))
+        try server.start(responder: HTTPResponder(refuse: { _ in nil }, respond: { _, _ in .whole(.text(200, "ok")) }))
         server.stop()
         Thread.sleep(forTimeInterval: 0.2)
         XCTAssertEqual(failures.value, [], "stopping on purpose is not a failure")

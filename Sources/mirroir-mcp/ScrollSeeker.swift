@@ -48,6 +48,8 @@ enum ScrollStopReason: String, Sendable {
     case endOfContent = "end_of_content"
     /// The scroll budget ran out while the content was still moving.
     case maxScrolls = "max_scrolls"
+    /// The MCP call asking for the seek was cancelled.
+    case cancelled
 }
 
 /// How a seek ended.
@@ -94,7 +96,8 @@ enum ScrollSeeker {
         band: ClosedRange<Double>, bridge: any WindowBridging, input: any InputProviding,
         describer: any ScreenDescribing,
         settleUs: UInt32 = EnvConfig.frameSettleTimeoutUs,
-        confirmations: Int = EnvConfig.scrollEndConfirmations
+        confirmations: Int = EnvConfig.scrollEndConfirmations,
+        call: MCPCallControl = MCPCallControl()
     ) -> ScrollSeekOutcome {
         let first = describer.describe(settleTimeoutUs: settleUs)
         if let first, ElementMatcher.isVisible(label: label, in: first.elements) {
@@ -117,6 +120,9 @@ enum ScrollSeeker {
         // first time the text stays the same while the pixels change.
         var holdsStillAtRest: Bool?
         for scroll in 1 ... maxScrolls {
+            // Checked before each swipe, so a cancel never cuts one short.
+            if call.isCancelled { return .stopped(.cancelled, scrolls: scroll - 1) }
+            call.report(progress: Double(scroll), total: Double(maxScrolls), message: "scroll \(scroll)")
             if let error = input.swipe(fromX: swipe.fromX, fromY: swipe.fromY,
                                        toX: swipe.toX, toY: swipe.toY,
                                        durationMs: EnvConfig.defaultSwipeDurationMs) {
@@ -309,6 +315,9 @@ extension ScrollSeekOutcome {
         case .stopped(.maxScrolls, let scrolls):
             return ("'\(label)' not found after \(scrolls) scroll(s) "
                 + "(stop_reason=\(ScrollStopReason.maxScrolls.rawValue))", true)
+        case .stopped(.cancelled, let scrolls):
+            return ("Cancelled after \(scrolls) scroll(s) "
+                + "(stop_reason=\(ScrollStopReason.cancelled.rawValue))", true)
         case .failed(let message):
             return (message, true)
         }
@@ -327,6 +336,8 @@ extension ScrollSeekOutcome {
                 + "(\(ScrollStopReason.endOfContent.rawValue))", false)
         case .stopped(.maxScrolls, let scrolls):
             return ("Not found after \(scrolls) scroll(s) (\(ScrollStopReason.maxScrolls.rawValue))", false)
+        case .stopped(.cancelled, let scrolls):
+            return ("Cancelled after \(scrolls) scroll(s) (\(ScrollStopReason.cancelled.rawValue))", false)
         case .failed(let message):
             return (message, false)
         }

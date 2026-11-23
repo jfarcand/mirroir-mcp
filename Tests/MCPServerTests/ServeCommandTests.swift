@@ -95,9 +95,9 @@ final class ServeCommandTests: XCTestCase {
             body: Data(#"{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"probe","arguments":{}}}"#.utf8))
 
         XCTAssertNil(responder.refuse(request))
-        _ = responder.respond(request) { true }
+        _ = responder.respond(request, RecordingExchangeChannel(departed: true))
         XCTAssertEqual(calls.withLock { $0 }, 0, "nobody is waiting, so the phone is not touched")
-        XCTAssertEqual(responder.respond(request) { false }.status, 200)
+        XCTAssertEqual(responder.respond(request, RecordingExchangeChannel()).whole?.status, 200)
         XCTAssertEqual(calls.withLock { $0 }, 1)
 
         let unauthenticated = HTTPRequest(method: "POST", path: "/mcp", headers: [:], body: Data())
