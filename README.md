@@ -65,7 +65,7 @@ OpenClaw, Hermes Agent, Claude Desktop, Cursor, VS Code and the other clients: [
 - **Replays in one call.** [`run_steps`](docs/tools.md#tool-list) repeats a sequence that already worked.
 - **Skills.** `generate_skill` explores an app and writes [SKILL.md](docs/skills-and-ci.md#skills) files your agent follows.
 - **Tests without AI.** `mirroir test` replays a skill in CI; [`mirroir-run`](docs/mirroir-run.md) runs one test across iPhone, web and HTTP.
-- **Agents on another machine.** [`mirroir-mcp serve`](docs/cli.md#serve) shares the phone over HTTP.
+- **Agents on another machine.** [`mirroir-mcp serve`](https://mirroir.dev/docs/#serve) shares the phone over HTTP.
 
 ## Safety
 
