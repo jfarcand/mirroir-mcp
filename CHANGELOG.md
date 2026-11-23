@@ -8,6 +8,10 @@ What changed for you in each release. Full notes, with every commit, are on [Git
 
 - **Opening an app from its Home Screen icon no longer opens its neighbour.** When the icon above a name went undetected, the tap could take the icon of the app above it: "App Store" opened Camera. An icon now counts only when no other app's name sits between it and the name tapped.
 
+- **`npx` on an Intel Mac says why it stops.** Releases ship an Apple Silicon binary only; the npm installer used to fail on a download that does not exist, and now names the gap and points to the source install ([install](docs/install.md)).
+
+- **Two unused App Switcher settings are gone.** `appSwitcherCardOffset` and `appSwitcherCardXFraction` no longer did anything since the card is found by its label; a `settings.json` that still names them is ignored, as with any unknown key.
+
 - **Screen reads recover on macOS 27 when Vision's model cache goes away.** A server running for a while could end up failing every read with `e5rtError … 13` until it was restarted. When every read in the server fails, mirroir now reads the screen in a fresh process. The first read after an upgrade or reinstall still takes about 50 s while macOS compiles the model ([troubleshooting](docs/troubleshooting.md)).
 
 - **`mirroir-mcp recognize-text <image>`** prints the text in a PNG or JPEG as JSON. mirroir runs it itself for the recovery above.
