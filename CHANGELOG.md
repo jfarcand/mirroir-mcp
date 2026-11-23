@@ -2,7 +2,11 @@
 
 What changed for you in each release. Full notes, with every commit, are on [GitHub Releases](https://github.com/jfarcand/mirroir-mcp/releases).
 
-## 0.50.4 (2026-11-22)
+## 0.51.0 (2026-11-22)
+
+- **A tap at a point says when the screen did not change.** Text taps already did; a tap at x and y (an unlabeled ✕, an icon) and `tap: @x,y` in `run_steps` now read the screen before and after, end with "Screen now: …", and say so when nothing changed, so a tap that never reached the iPhone no longer passes in silence.
+
+- **Opening an app from its Home Screen icon no longer opens its neighbour.** When the icon above a name went undetected, the tap could take the icon of the app above it: "App Store" opened Camera. An icon now counts only when no other app's name sits between it and the name tapped.
 
 - **Screen reads recover on macOS 27 when Vision's model cache goes away.** A server running for a while could end up failing every read with `e5rtError … 13` until it was restarted. When every read in the server fails, mirroir now reads the screen in a fresh process. The first read after an upgrade or reinstall still takes about 50 s while macOS compiles the model ([troubleshooting](docs/troubleshooting.md)).
 
