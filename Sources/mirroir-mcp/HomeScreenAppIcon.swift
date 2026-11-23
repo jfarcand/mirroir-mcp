@@ -48,14 +48,27 @@ enum HomeScreenAppIcon {
     /// `TapPointCalculator` lifts labels only in rows of three or more, so a
     /// label beside a widget keeps its own point. A label it already lifted
     /// ends `2 * iconTapLift` above its text, still inside the icon.
+    ///
+    /// An icon with another label between it and `label` belongs to that
+    /// label's app: with the App Store icon undetected, the nearest icon above
+    /// "App Store" was Camera's, above the "Camera" label (XR at 334x735,
+    /// 2026-11-22, carnet#93).
     static func tapPoint(for label: TapPoint, in elements: [TapPoint]) -> (x: Double, y: Double) {
+        let labels = elements.filter { $0.text != CoreMLElementDetector.iconLabel }
         let icon = elements
             .filter { $0.text == CoreMLElementDetector.iconLabel }
             .filter { abs($0.tapX - label.tapX) <= SpotlightAppTile.maxCenterOffset
                 && SpotlightAppTile.iconAboveLabel.contains(label.tapY - $0.tapY) }
+            .filter { icon in !labels.contains { isBetween($0, icon, label) } }
             .min { abs($0.tapX - label.tapX) < abs($1.tapX - label.tapX) }
         if let icon { return (icon.tapX, icon.tapY) }
         return SpotlightAppTile.tapPoint(for: label)
+    }
+
+    /// Whether `other` is a label in `label`'s column, below `icon` and above `label`.
+    private static func isBetween(_ other: TapPoint, _ icon: TapPoint, _ label: TapPoint) -> Bool {
+        abs(other.tapX - label.tapX) <= SpotlightAppTile.maxCenterOffset
+            && other.tapY > icon.tapY && other.tapY < label.tapY
     }
 
     /// `text` trimmed, without case or accents.

@@ -104,6 +104,25 @@ final class HomeScreenLaunchTests: XCTestCase {
         XCTAssertEqual(point.y, 290 - SpotlightAppTile.iconTapLift, "App Store's icon is not Horloge's")
     }
 
+    /// carnet#93, XR at 334x735: App Store's icon went undetected and the
+    /// nearest icon above its label was Camera's, so the tap opened Camera.
+    func testAnIconAboveAnotherAppsLabelIsNotItsIcon() {
+        let label = el("App Store", 275, 232)
+        let screen = [el(CoreMLElementDetector.iconLabel, 283, 129), el("Camera", 275, 151), label]
+        let point = HomeScreenAppIcon.tapPoint(for: label, in: screen)
+        XCTAssertEqual(point.x, 275)
+        XCTAssertEqual(point.y, 232 - SpotlightAppTile.iconTapLift, "Camera's icon is not App Store's")
+    }
+
+    func testAnIconRightAboveItsLabelIsStillFoundBelowAnotherRow() {
+        let label = el("App Store", 275, 232)
+        let screen = [el(CoreMLElementDetector.iconLabel, 283, 129), el("Camera", 275, 151),
+                      el(CoreMLElementDetector.iconLabel, 276, 195), label]
+        let point = HomeScreenAppIcon.tapPoint(for: label, in: screen)
+        XCTAssertEqual(point.x, 276)
+        XCTAssertEqual(point.y, 195)
+    }
+
     func testAHomeScreenThatNeverShowsFailsWithTheSpotlightOnceExplanation() {
         let front = clock
         let run = launch(name: "Rappels") { _ in front }
