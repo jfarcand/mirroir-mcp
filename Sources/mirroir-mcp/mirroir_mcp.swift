@@ -142,11 +142,35 @@ struct MirroirMCP {
         DebugLog.persist("startup", "Targets: \(targetNames) (active: \(registry.activeTargetName))")
 
         registerTools(server: server, registry: registry, policy: policy)
+        warmUpTextRecognition()
 
         // A touch, key, button or gesture left held would break input for the
         // whole Mac, so every way out of the server releases it.
         HeldInputReleaseOnExit.install()
         return server
+    }
+
+    /// Read a known word once, in the background, as the server starts. On
+    /// macOS 27 the first read by a new build compiles Vision's text model,
+    /// which takes close to a minute; done here, that compile usually ends
+    /// before the agent's first screen read instead of during it.
+    @discardableResult
+    static func warmUpTextRecognition(
+        using makeRecognizer: @escaping @Sendable () -> any TextRecognizing = { buildTextRecognizer() },
+        report: @escaping @Sendable (String) -> Void = { DebugLog.persist("startup", $0) }
+    ) -> Thread {
+        let warmUp = Thread {
+            switch TextRecognitionSelfTest.run(using: makeRecognizer()) {
+            case .passed(let milliseconds):
+                report("OCR warm-up read the probe in \(milliseconds) ms")
+            case .failed(let reason):
+                report("OCR warm-up failed: \(reason)")
+            }
+        }
+        warmUp.name = "mirroir-mcp OCR warm-up"
+        warmUp.qualityOfService = .utility
+        warmUp.start()
+        return warmUp
     }
 
     /// Build a TargetRegistry from targets.json or fall back to a single iPhone target.

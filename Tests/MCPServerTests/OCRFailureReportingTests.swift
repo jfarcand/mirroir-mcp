@@ -171,6 +171,43 @@ struct OCRFailureReportingTests {
         }
     }
 
+    @Test("The startup warm-up reports how long the probe took")
+    func warmUpReportsAPassingRead() {
+        let lines = WarmUpLines()
+        MirroirMCP.warmUpTextRecognition(using: {
+            let recognizer = StubTextRecognizer()
+            recognizer.elements = [RawTextElement(
+                text: TextRecognitionSelfTest.probeText, tapX: 10, textTopY: 10,
+                textBottomY: 30, bboxWidth: 100, confidence: 0.99)]
+            return recognizer
+        }, report: lines.append)
+        #expect(lines.waitForOne()?.hasPrefix("OCR warm-up read the probe in") == true)
+    }
+
+    @Test("The startup warm-up reports a broken engine instead of hiding it")
+    func warmUpReportsAFailure() {
+        let lines = WarmUpLines()
+        MirroirMCP.warmUpTextRecognition(using: { StubTextRecognizer() }, report: lines.append)
+        #expect(lines.waitForOne()?.hasPrefix("OCR warm-up failed:") == true)
+    }
+
+    /// The lines a warm-up reports from its own thread.
+    private final class WarmUpLines: @unchecked Sendable {
+        private let lock = NSLock()
+        private var lines: [String] = []
+        private let arrived = DispatchSemaphore(value: 0)
+
+        func append(_ line: String) {
+            lock.withLock { lines.append(line) }
+            arrived.signal()
+        }
+
+        func waitForOne() -> String? {
+            guard arrived.wait(timeout: .now() + 10) == .success else { return nil }
+            return lock.withLock { lines.first }
+        }
+    }
+
     private func makeImage() -> CGImage {
         let context = CGContext(
             data: nil, width: 10, height: 10, bitsPerComponent: 8, bytesPerRow: 0,
