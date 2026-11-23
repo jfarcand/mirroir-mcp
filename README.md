@@ -8,6 +8,7 @@
 [![Build](https://github.com/jfarcand/mirroir-mcp/actions/workflows/build.yml/badge.svg)](https://github.com/jfarcand/mirroir-mcp/actions/workflows/build.yml)
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue)](LICENSE)
 [![macOS 15+](https://img.shields.io/badge/macOS-15%2B-black?logo=apple)](https://support.apple.com/en-us/120421)
+[![Rust 1.99+](https://img.shields.io/badge/Rust-1.99%2B-orange?logo=rust)](runner/README.md)
 [![Discord](https://img.shields.io/discord/1481795325953048627?logo=discord&label=Discord)](https://discord.gg/u8ug9QCSqF)
 
 ### Let your agent use your real iPhone: errands across your apps, automations, even games.
