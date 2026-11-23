@@ -13,6 +13,8 @@
 
 ### Let your agent use your real iPhone: errands across your apps, automations, even games.
 
+**Your phone. Your apps. Your agent.** Cloud phone services rent you a phone. mirroir drives the one in your pocket, and turns what your agent does once into skills and tests you keep.
+
 <p align="center">
   <a href="https://mirroir.dev/?utm_source=github&utm_medium=readme&utm_campaign=header">Website</a> ·
   <a href="https://mirroir.dev/?utm_source=github&utm_medium=readme&utm_campaign=header#demo">Demos</a> ·
@@ -28,8 +30,6 @@
 <p align="center"><em>"Be my DJ": the agent asks for a vibe, builds a Gui Boratto-style playlist in Spotify and starts it. A real iPhone, sped up.</em></p>
 
 No Developer Mode, no Xcode, nothing installed on the phone. mirroir-mcp drives your iPhone through macOS iPhone Mirroring, with the apps already signed in on it: no connector, no OAuth, no password handed to anyone. It works with Claude, Codex, Cursor and other AI apps that support MCP, through [42 tools](docs/tools.md).
-
-It is also a framework for what comes next: a run your agent made once becomes a [skill](docs/skills-and-ci.md#skills) and a test that replay without AI.
 
 ## Quick start
 
@@ -47,6 +47,25 @@ npx -y mirroir-mcp doctor     # names anything left to fix
 ```
 
 OpenClaw, Hermes Agent, Claude Desktop, Cursor, VS Code and the other clients: [Install](docs/install.md).
+
+## How it works
+
+```text
+your agent ──MCP──▶ mirroir ──iPhone Mirroring──▶ your iPhone
+                       │
+   explore ──▶ SKILL.md ──▶ compile ──▶ replay, no LLM ──▶ CI: pass · fail · DRIFT
+```
+
+Your agent drives the phone through mirroir's tools. What it learns stays: an exploration becomes a skill, a skill compiles to a replay that needs no model, and the replay runs in CI.
+
+## The framework
+
+- **[Tools](docs/tools.md).** 42 MCP tools: tap, type, swipe, read the screen, listen, launch, and [`run_steps`](docs/tools.md#tool-list) to repeat a sequence in one call.
+- **[Skills](docs/skills-and-ci.md#skills).** `generate_skill` explores an app and writes SKILL.md files your agent follows.
+- **[Compiled replay](docs/compiled-skills.md).** `mirroir test` replays a skill from the CLI with no AI in the loop: deterministic, no tokens.
+- **[App knowledge](docs/APP.md.spec.md).** APP.md files and [screen recipes](docs/components.md#screen-patterns-recipes) describe an app's screens once, for every agent.
+- **[mirroir-run](docs/mirroir-run.md).** One YAML scenario drives the iPhone, a browser, HTTP and subprocesses, with a third verdict beside pass and fail: `DRIFT` (exit 65), when the output moved past its baseline.
+- **Notes and sharing.** `save_note` keeps one lesson per app for the next session; [`mirroir-mcp serve`](docs/cli.md#serve) shares the phone over HTTP.
 
 ## More demos
 
@@ -73,27 +92,11 @@ OpenClaw, Hermes Agent, Claude Desktop, Cursor, VS Code and the other clients: [
   </tr>
 </table>
 
-## What you get
-
-- **Any app.** If iPhone Mirroring shows it, mirroir can drive it, App Store apps included.
-- **Replays in one call.** [`run_steps`](docs/tools.md#tool-list) repeats a sequence that already worked.
-- **Skills.** `generate_skill` explores an app and writes [SKILL.md](docs/skills-and-ci.md#skills) files your agent follows.
-- **Agents keep notes.** `save_note` keeps one line per lesson per app, and `get_notes` gives it to the next session.
-- **Agents on another machine.** [`mirroir-mcp serve`](docs/cli.md#serve) shares the phone over HTTP.
-
 ## Why mirroir
 
 - **Nothing to install on the phone.** The iPhone stays stock: no signing, no provisioning profile, no on-device agent.
 - **Your Mac stays yours.** Through macOS 26, taps, typing and swipes reach the mirror without bringing it to the front, so you can keep working; on later macOS they bring it forward.
 - **It hears the phone, too.** [`listen`](docs/tools.md#listening) turns what the phone plays, a reel's narration or a voice message, into text. macOS transcribes it on the Mac: the audio never leaves it. Needs macOS 26.
-
-## Testing and CI
-
-The run an agent makes once can become a test that runs without it.
-
-- **Replay without an LLM.** A compiled skill replays from the CLI with no AI in the loop (`mirroir test`), so CI runs are deterministic and cost no tokens.
-- **One test across phone, web and backend.** [`mirroir-run`](docs/mirroir-run.md), our companion test runner, drives the iPhone, a browser, HTTP endpoints and subprocesses from one YAML scenario. See [Web and iOS in one scenario](docs/web-and-ios.md).
-- **Drift fails loudly.** Beside pass and fail, `mirroir-run` has a third verdict, `DRIFT` (exit code 65): every assertion held, but the output moved past its baseline.
 
 ## Safety
 

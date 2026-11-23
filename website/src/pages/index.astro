@@ -19,6 +19,10 @@ const curlCmd = '/bin/bash -c "$(curl -fsSL https://mirroir.dev/get-mirroir.sh)"
 const brewCmd = "brew tap jfarcand/tap && brew install mirroir-mcp";
 const setupPrompt = "Set up mirroir-mcp so you can drive my iPhone: follow https://github.com/jfarcand/mirroir-mcp/blob/main/docs/onboarding.md step by step, and finish by reading back what my iPhone screen shows.";
 const docs = `${import.meta.env.BASE_URL}docs/`;
+const pipeline = `your agent ──MCP──▶ mirroir ──iPhone Mirroring──▶ your iPhone
+                       │
+   explore ──▶ SKILL.md ──▶ compile ──▶ replay, no LLM ──▶ CI: pass · fail · DRIFT`;
+const repoDocs = "https://github.com/jfarcand/mirroir-mcp/blob/main/docs/";
 // GitHub serves the newest release asset at this fixed path.
 const mcpbUrl = "https://github.com/jfarcand/mirroir-mcp/releases/latest/download/mirroir-mcp.mcpb";
 const skillTimer = `---
@@ -55,7 +59,7 @@ app: Clock
       <a class="btn-secondary" href="https://github.com/jfarcand/mirroir-mcp" rel="noopener noreferrer">View on GitHub</a>
     </div>
     <p class="hero-requirements">
-      An MCP server, with a framework on top: a run becomes a skill and a test that replay without an LLM.
+      <strong>Your phone. Your apps. Your agent.</strong> Cloud phone services rent you a phone. mirroir drives the one in your pocket, and turns what your agent does once into skills and tests you keep.
     </p>
     <p class="hero-requirements">
       Needs macOS 15 or later and <a href="https://support.apple.com/en-us/120421" rel="noopener noreferrer">iPhone Mirroring</a>.
@@ -236,7 +240,7 @@ app: Clock
       <div class="example-card">
         <p class="example-prompt">Your personal agent</p>
         <p class="example-steps">Errands across the apps already signed in on your phone. It reads the screen and listens: a saved recipe reel becomes a grocery list. No connector, no password handed to anyone.</p>
-        <p class="example-steps"><a href="https://github.com/jfarcand/mirroir-mcp#what-people-build" rel="noopener noreferrer">Details on GitHub</a></p>
+        <p class="example-steps"><a href="https://github.com/jfarcand/mirroir-mcp#more-demos" rel="noopener noreferrer">Details on GitHub</a></p>
       </div>
       <div class="example-card">
         <p class="example-prompt">Games</p>
@@ -246,7 +250,7 @@ app: Clock
       <div class="example-card">
         <p class="example-prompt">Automation</p>
         <p class="example-steps">A flow that worked becomes a skill that replays without an LLM. <code>mirroir-run</code> runs it in CI with the web and your API, and flags drift.</p>
-        <p class="example-steps"><a href="https://github.com/jfarcand/mirroir-mcp#testing-and-ci" rel="noopener noreferrer">Details on GitHub</a></p>
+        <p class="example-steps"><a href="https://github.com/jfarcand/mirroir-mcp#the-framework" rel="noopener noreferrer">Details on GitHub</a></p>
       </div>
     </div>
     <h3 class="compare-title">A skill is a short Markdown file</h3>
@@ -254,6 +258,18 @@ app: Clock
     <p class="alt-install">Steps match text on screen, not coordinates. Once compiled, <code>mirroir test</code> replays it without an LLM. <a href="https://github.com/jfarcand/mirroir-skills/blob/main/skills/apps/clock/set-timer.md" rel="noopener noreferrer">The full skill</a> &middot; <a href={`${docs}#skills`}>More skills</a></p>
   </section>
 
+  <!-- How it works -->
+  <section id="how-it-works">
+    <h2>How it works</h2>
+    <Code code={pipeline} lang="text" theme="github-dark" />
+    <p>Your agent drives the phone through mirroir's tools. What it learns stays: an exploration becomes a skill, a skill compiles to a replay that needs no model, and the replay runs in CI.</p>
+    <ul class="short-list">
+      <li><strong><a href={`${repoDocs}tools.md`} rel="noopener noreferrer">Tools.</a></strong> 42 MCP tools to tap, type, swipe, read the screen and listen.</li>
+      <li><strong><a href={`${repoDocs}skills-and-ci.md`} rel="noopener noreferrer">Skills.</a></strong> <code>generate_skill</code> explores an app and writes SKILL.md files.</li>
+      <li><strong><a href={`${repoDocs}compiled-skills.md`} rel="noopener noreferrer">Compiled replay.</a></strong> <code>mirroir test</code> replays a skill with no AI in the loop.</li>
+      <li><strong><a href={`${repoDocs}mirroir-run.md`} rel="noopener noreferrer">mirroir-run.</a></strong> One scenario across iPhone, browser and HTTP, with a <code>DRIFT</code> verdict.</li>
+    </ul>
+  </section>
   <!-- Install -->
   <section id="install">
     <h2>Install <span class="version-badge">v{version}</span></h2>
