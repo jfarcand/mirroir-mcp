@@ -608,7 +608,7 @@ Every Swift and Rust file must have:
 
 ### Git Workflow
 
-- **Contributors:** open a pull request from a branch in your fork; it lands on `main` as one squashed commit
+- **Contributors:** open a pull request from a branch in your fork (or in a clone of this repository, if you have write access); it lands on `main` as one squashed commit
 - **Maintainers:** create a branch (`feature/my-feature`) and squash merge locally to main; bug fixes are committed directly to main
 - **Commit messages must use conventional commit format:** `type(scope): description`
   - Types: `feat`, `fix`, `chore`, `docs`, `test`, `refactor`, `ci`, `style`, `perf`, `build`, `revert`

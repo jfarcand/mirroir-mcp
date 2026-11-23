@@ -93,6 +93,8 @@ Setup is finished at step 3. Offer one thing more, once, and take no for an answ
 
 Only if the user says yes:
 
+`open_url` and `tap` change the phone, so they stay hidden until [`permissions.json`](permissions.md) allows them. If you do not have them, tell the user, and with their yes write `{"allow": ["open_url", "tap"]}` to `~/.mirroir-mcp/permissions.json` (add to the `allow` list of a file that exists; never replace it). The server reads the file when it starts: ask the user to reconnect mirroir in their client, then go on.
+
 1. Call `open_url` with `https://mirroir.dev/?utm_source=onboarding&utm_medium=agent&utm_campaign=first-errand`. Say what you are doing in one line first.
 2. Call `describe_screen(omit_screenshot: true)` and tell the user the headline the page shows. That is the errand: the phone did something they watched.
 3. The page has a "Star on GitHub" banner. Ask whether they want you to tap it, and tap it only on a second yes. If GitHub asks to sign in, stop: never type a password or a code. Give them the link instead: `https://github.com/jfarcand/mirroir-mcp`.

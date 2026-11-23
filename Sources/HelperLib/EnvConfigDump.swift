@@ -146,8 +146,6 @@ extension EnvConfig {
                 ("settingsLoadUs", "\(settingsLoadUs)"),
             ]),
             ("App Switcher", [
-                ("appSwitcherCardOffset", "\(appSwitcherCardOffset)"),
-                ("appSwitcherCardXFraction", "\(appSwitcherCardXFraction)"),
                 ("appSwitcherCardYFraction", "\(appSwitcherCardYFraction)"),
                 ("appSwitcherSwipeDistance", "\(appSwitcherSwipeDistance)"),
                 ("appSwitcherSwipeDurationMs", "\(appSwitcherSwipeDurationMs)"),

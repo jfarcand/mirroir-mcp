@@ -14,7 +14,7 @@
  * the License.
  */
 // ABOUTME: Locates a specific app's card in iPhone Mirroring's App Switcher by matching its preview text against the foreground app's OCR.
-// ABOUTME: Eliminates the brittleness of hard-coded `appSwitcherCardXFraction` whose correct value depends on how many apps are in the switcher.
+// ABOUTME: A fixed horizontal fraction would be brittle: the card's position depends on how many apps are in the switcher.
 
 import Foundation
 import HelperLib

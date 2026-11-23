@@ -46,14 +46,6 @@ extension EnvConfig {
         readUInt32("settingsLoadUs", default: TimingConstants.settingsLoadUs)
     }
 
-    public static var appSwitcherCardOffset: Double {
-        readDouble("appSwitcherCardOffset", default: TimingConstants.appSwitcherCardOffset)
-    }
-
-    public static var appSwitcherCardXFraction: Double {
-        readDouble("appSwitcherCardXFraction", default: TimingConstants.appSwitcherCardXFraction)
-    }
-
     public static var appSwitcherCardYFraction: Double {
         readDouble("appSwitcherCardYFraction", default: TimingConstants.appSwitcherCardYFraction)
     }

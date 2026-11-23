@@ -197,19 +197,6 @@ public enum TimingConstants {
     /// Delay for Settings app to load (microseconds).
     public static let settingsLoadUs: UInt32 = 1_500_000
 
-    /// Vertical offset from the app name label to the card body center in the App Switcher (points).
-    /// OCR detects the label above the card preview; this offset moves the swipe start point
-    /// down into the card so the dismiss gesture registers reliably.
-    public static let appSwitcherCardOffset: Double = 250.0
-
-    /// Horizontal position of the current app card in the App Switcher, as a fraction
-    /// of window width. Empirically tuned — in the iPhone Mirroring window, after
-    /// Spotlight-launching an app then opening App Switcher, the just-launched
-    /// card sits at ~75% from the left edge, not visually centered. Do not
-    /// "correct" this to 0.5 without testing on a real device — value was
-    /// reverted from 0.5 → 0.75 after a regression closed the wrong app.
-    public static let appSwitcherCardXFraction: Double = 0.75
-
     /// Vertical position for the drag start point in the App Switcher, as a fraction
     /// of window height. Targets the middle of the card body.
     public static let appSwitcherCardYFraction: Double = 0.55
