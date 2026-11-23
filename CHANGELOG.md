@@ -2,6 +2,16 @@
 
 What changed for you in each release. Full notes, with every commit, are on [GitHub Releases](https://github.com/jfarcand/mirroir-mcp/releases).
 
+## Unreleased
+
+- **Stop a long call.** Press Esc in your client (it sends `notifications/cancelled`), or close the connection to `mirroir-mcp serve`: `run_steps`, `scroll_to`, `measure` and `generate_skill` explore stop at their next check, between two actions on the phone, never during one. A cancelled explore keeps the screens it mapped.
+
+- **Progress on long calls.** A client that asks for progress (`progressToken`) sees each step of `run_steps`, each scroll of `scroll_to`, and explore's screens and actions as they happen. Over `serve`, the reply becomes an event stream when the client accepts one.
+
+- **MCP 2026-07-28 rules, followed closely.** Over HTTP, a malformed request and a missing client capability are a 400; an unsupported `MCP-Protocol-Version` lists the versions to retry with (-32022); header values with characters a header cannot hold are refused. `tools/list` comes back sorted by name.
+
+- **One `serve` client no longer speaks for another.** Each request relies only on the capabilities it declared; an `initialize` from one HTTP client is no longer applied to the next. `classify_screen` works again for clients on the `initialize` handshake.
+
 ## 0.51.0 (2026-11-22)
 
 - **A tap at a point says when the screen did not change.** Text taps already did; a tap at x and y (an unlabeled ✕, an icon) and `tap: @x,y` in `run_steps` now read the screen before and after, end with "Screen now: …", and say so when nothing changed, so a tap that never reached the iPhone no longer passes in silence.
