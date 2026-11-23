@@ -103,22 +103,6 @@ The run an agent makes once can become a test that runs without it.
 - **One test across phone, web and backend.** [`mirroir-run`](docs/mirroir-run.md) is our companion test runner, a separate binary. One YAML scenario can drive the iPhone, a browser, HTTP endpoints and subprocesses, then compare what the page and the phone showed. See [Web and iOS in one scenario](docs/web-and-ios.md).
 - **Drift fails loudly.** `mirroir-run` has a third verdict beside pass and fail: `DRIFT`, exit code **65**, when every assertion held but the output moved past its baseline. Your CI lane decides whether drift blocks a merge.
 
-### How it compares
-
-| | mirroir | [phone-harness](https://github.com/phone-harness/phone-harness) | [mobile-mcp](https://github.com/mobile-next/mobile-mcp) | [Appium](https://github.com/appium/appium) |
-|---|---|---|---|---|
-| Physical iPhone, no Developer Mode or signing | Yes — stock phone via iPhone Mirroring | Yes — stock phone via iPhone Mirroring | USB-connected, trusted device (see its README) | No — WebDriverAgent via Xcode, Developer Mode |
-| App Store apps you can't build | Yes | Yes | Yes | Yes, on a provisioned device |
-| Your own iPhone from any MCP client | Yes | No — its MCP server is cloud-only; local phones use its CLI | Yes | Through the separate [appium-mcp](https://github.com/appium/appium-mcp) |
-| Replay without an LLM | Yes — compiled skills, `mirroir test` | Python scripts you write; no recorder or compiled replay | No — the agent drives every run | Yes — test code |
-| Distinct drift verdict | Yes — `DRIFT`, exit 65 | No | No | No — pass / fail |
-| One scenario across iPhone + web + HTTP | Yes — `mirroir-run` | No | No | Via your own test code |
-| Android | No — an emulator window can be driven only as a generic macOS window | Yes | Yes | Yes |
-| iOS Simulator | No | No | Yes | Yes |
-| Hosted cloud phones | No | Yes — Phone Harness Cloud | Yes — Mobile Next Cloud | Via third-party device clouds |
-
-phone-harness is the closest tool here: it also drives a stock iPhone through iPhone Mirroring, and it adds Android and hosted phones, which mirroir doesn't have. mobile-mcp and Appium cover Android and simulators too. mirroir goes further after the agent's first run: that run becomes a replay that needs no LLM, and a test that tells you when the output moves.
-
 ## Safety
 
 Giving an AI access to your phone demands defense in depth, so mirroir-mcp is **fail-closed**.
