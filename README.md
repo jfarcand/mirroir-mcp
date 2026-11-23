@@ -26,19 +26,9 @@
 </p>
 <p align="center"><em>"Be my DJ": the agent asks for a vibe, builds a Gui Boratto-style playlist in Spotify and starts it. A real iPhone, sped up.</em></p>
 
-No Developer Mode, no Xcode, no WebDriverAgent, no jailbreak. mirroir-mcp drives your iPhone through macOS iPhone Mirroring, with the apps already signed in on it, from any MCP client: [42 tools](docs/tools.md).
+No Developer Mode, no Xcode, nothing installed on the phone. mirroir-mcp drives your iPhone through macOS iPhone Mirroring, with the apps already signed in on it. It works with Claude, Codex, Cursor and other AI apps that support MCP, through [42 tools](docs/tools.md).
 
-mirroir-mcp is an MCP server, with a framework on top: what an agent does once becomes a [skill](docs/skills-and-ci.md#skills) and a test that replay without an LLM.
-
-<p align="center">
-  <img src="website/public/recipe-grocery-list.gif" alt="The Claude app and a real iPhone side by side: the agent opens a saved Instagram recipe reel, listens to it, then writes an eleven-item grocery list in Reminders" width="720" />
-</p>
-<p align="center"><em>A saved recipe reel becomes a grocery list: the agent <a href="docs/tools.md#listening">listens</a> to the video and reads its frames. Sped up.</em></p>
-
-<p align="center">
-  <img src="website/public/chess-vs-maximum.gif" alt="The console and a real iPhone side by side during a full chess game: each move is logged as it is played, ending in checkmate against the Maximum bot on Chess.com" width="720" />
-</p>
-<p align="center"><em>Chess against Chess.com's strongest bot: the model reads the board, Stockfish picks, mirroir plays. See <a href="docs/games.md">Games</a>. Sped up.</em></p>
+It is also a framework for what comes next: a run your agent made once becomes a [skill](docs/skills-and-ci.md#skills) and a test that replay without AI.
 
 ## Quick start
 
@@ -57,12 +47,25 @@ npx -y mirroir-mcp doctor     # names anything left to fix
 
 OpenClaw, Hermes Agent, Claude Desktop, Cursor, VS Code and the other clients: [Install](docs/install.md).
 
+## More demos
+
+<p align="center">
+  <img src="website/public/recipe-grocery-list.gif" alt="The Claude app and a real iPhone side by side: the agent opens a saved Instagram recipe reel, listens to it, then writes an eleven-item grocery list in Reminders" width="720" />
+</p>
+<p align="center"><em>A saved recipe reel becomes a grocery list: the agent <a href="docs/tools.md#listening">listens</a> to the video and reads its frames. Sped up.</em></p>
+
+<p align="center">
+  <img src="website/public/chess-vs-maximum.gif" alt="The console and a real iPhone side by side during a full chess game: each move is logged as it is played, ending in checkmate against the Maximum bot on Chess.com" width="720" />
+</p>
+<p align="center"><em>Chess against Chess.com's strongest bot: the model reads the board, Stockfish picks, mirroir plays. See <a href="docs/games.md">Games</a>. Sped up.</em></p>
+
 ## What you get
 
-- **Any app, nothing on the phone.** If iPhone Mirroring shows it, mirroir can drive it. The phone stays stock.
-- **Proven steps in one call.** [`run_steps`](docs/tools.md#tool-list) replays a sequence that worked, checked against the permission policy first.
-- **Skills and tests without an LLM.** `generate_skill` explores an app and writes [SKILL.md](docs/skills-and-ci.md#skills) files; `mirroir test` replays them in CI. [`mirroir-run`](docs/mirroir-run.md) runs one scenario across iPhone, web and HTTP, with a `DRIFT` verdict (exit 65).
-- **Remote agents.** [`mirroir-mcp serve`](docs/cli.md#serve) speaks MCP over HTTP on loopback, behind a bearer token.
+- **Any app.** If iPhone Mirroring shows it, mirroir can drive it, App Store apps included.
+- **Replays in one call.** [`run_steps`](docs/tools.md#tool-list) repeats a sequence that already worked.
+- **Skills.** `generate_skill` explores an app and writes [SKILL.md](docs/skills-and-ci.md#skills) files your agent follows.
+- **Tests without AI.** `mirroir test` replays a skill in CI; [`mirroir-run`](docs/mirroir-run.md) runs one test across iPhone, web and HTTP.
+- **Agents on another machine.** [`mirroir-mcp serve`](docs/cli.md#serve) shares the phone over HTTP.
 
 ## Safety
 
@@ -77,34 +80,18 @@ See [Security](docs/security.md) and [SECURITY.md](SECURITY.md).
 
 | | |
 |---|---|
-| [Install](docs/install.md) | Every install path, per-client setup, updating, uninstalling |
-| [Onboarding](docs/onboarding.md) | Setup written for the agent: prerequisites, install, doctor, a read-only proof, and an optional first errand |
-| [Tools Reference](docs/tools.md) | All 42 tools, parameters, and input workflows |
-| [How mirroir sees the screen](docs/screen-intelligence.md) | The observe, reason, act loop; OCR, icon detection, AI vision |
-| [Skills, exploration and CI](docs/skills-and-ci.md) | APP.md, skills, `generate_skill`, `mirroir test`, compiled replay, AI diagnosis, patterns |
-| [`mirroir-run`](docs/mirroir-run.md) | Replay across iPhone, web, HTTP and subprocesses; GitHub Actions; Maestro import |
-| [Games](docs/games.md) | Shell and scene, the `scene:` step, game controls |
-| [CLI Tools](docs/cli.md) | Recorder, doctor, keyboard layout, `serve` over HTTP |
-| [Configuration](docs/configuration.md) | All settings: screen intelligence, input timing, exploration, AI providers |
-| [FAQ](docs/faq.md) | Security, focus stealing, keyboard layouts, embacle/vision mode |
-| [Security](docs/security.md) | Threat model, kill switch, and recommendations |
-| [Privacy](docs/privacy.md) | What mirroir reads, sends and stores |
-| [Permissions](docs/permissions.md) | Fail-closed permission model and config file |
-| [Known Limitations](docs/limitations.md) | Focus stealing, keyboard layout gaps, autocorrect |
-| [Patterns & Skills](docs/components.md) | Element patterns, screen recipes, APP.md app descriptions, and the detection pipeline |
-| [Exploring a New App](docs/exploring-a-new-app.md) | Step-by-step playbook for onboarding a new app — APP.md, permissions, components, exploration goal |
-| [YOLO Icon Detection](docs/yolo-models.md) | Recommended YOLO models, CoreML setup, and configuration |
-| [Compiled Skills](docs/compiled-skills.md) | Skill replay without AI |
-| [Testing](docs/testing.md) | FakeMirroring, integration tests, and CI strategy |
-| [Web and iOS in one scenario](docs/web-and-ios.md) | How `mirroir-run` hands iOS blocks to `mirroir-mcp`, and how `cross_surface` compares a browser with a phone |
-| [Cross-surface replay](runner/docs/) | `mirroir-run` scenario grammar, `.mirroir/` plan, `SAMPLE.md`, judge profiles, CI |
+| [Install](docs/install.md) | Every install path and per-client setup |
+| [Tools](docs/tools.md) | What each tool does, with its parameters |
+| [Skills and CI](docs/skills-and-ci.md) | Skills, `generate_skill`, `mirroir test` |
+| [Games](docs/games.md) | Playing games, frame by frame |
+| [Security](docs/security.md) and [permissions](docs/permissions.md) | What mirroir can do, and how to limit it |
 | [Troubleshooting](docs/troubleshooting.md) | Debug mode and common issues |
-| [Contributing](CONTRIBUTING.md) | How to add tools, commands, and tests |
-| [Skills Marketplace](docs/skills-marketplace.md) | Skill format, plugin discovery, and authoring |
+
+Everything else: [docs/](docs/).
 
 ## Community
 
-Join the [Discord server](https://discord.gg/u8ug9QCSqF) to ask questions, share skills, and discuss ideas. Pull requests are welcome: see [CONTRIBUTING.md](CONTRIBUTING.md). Report a vulnerability privately: see [SECURITY.md](SECURITY.md). By submitting a patch, you agree to the [Contributor License Agreement](CLA.md); your Git commit metadata serves as your electronic signature.
+Join the [Discord server](https://discord.gg/u8ug9QCSqF) to ask questions and share skills. Pull requests are welcome: see [CONTRIBUTING.md](CONTRIBUTING.md). Report a vulnerability privately: see [SECURITY.md](SECURITY.md).
 
 ## License
 
