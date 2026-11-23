@@ -415,7 +415,8 @@ final class MCPHTTPEndpointTests: XCTestCase {
 
         let overHTTP = MCPServer(policy: policy, transport: .http)
         _ = overHTTP.handleRequest(declaresSampling)
-        XCTAssertTrue(overHTTP.clientSupportsSampling(), "precondition: the client offered sampling")
+        XCTAssertFalse(overHTTP.clientSupportsSampling(),
+                       "HTTP keeps no session, so a handshake's capabilities are not kept")
         XCTAssertFalse(overHTTP.mayInitiateRequest(), "there is no channel to write a request on")
         let params = SamplingParams(
             messages: [SamplingMessage(role: "user", content: .text("classify"))],

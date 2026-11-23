@@ -92,11 +92,6 @@ extension MCPServer {
                 data: .object(["requiredCapabilities": required])))
     }
 
-    /// Whether the request being served carries the `2026-07-28` `_meta`.
-    func isServingModernRequest() -> Bool {
-        servingModernRequest.withLock { $0 }
-    }
-
     /// Answers the client supplied when retrying a call that asked for input,
     /// keyed by the identifiers the previous `inputRequests` used.
     static func inputResponses(in request: JSONRPCRequest) -> [String: JSONValue] {
@@ -112,20 +107,6 @@ extension MCPServer {
     }
 
     // MARK: - Server-to-Client Sampling
-
-    /// Whether the client declared the `sampling` capability when it connected.
-    func clientSupportsSampling() -> Bool {
-        clientCapabilities.withLock { $0?.member("sampling") != nil }
-    }
-
-    /// Whether a server-initiated request may be written to stdout right now.
-    /// Only on stdio, where stdout reaches the client: over HTTP there is no
-    /// channel to write one on. And never while serving a `2026-07-28`
-    /// request: that revision's server writes only responses and
-    /// notifications, and reaches the client through `InputRequiredResult`.
-    func mayInitiateRequest() -> Bool {
-        transport == .stdio && !servingModernRequest.withLock { $0 }
-    }
 
     /// Send a sampling/createMessage request to the MCP client and wait for the response.
     ///

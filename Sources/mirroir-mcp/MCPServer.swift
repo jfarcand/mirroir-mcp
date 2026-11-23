@@ -34,13 +34,14 @@ final class MCPServer: Sendable {
         initialState: (@Sendable ([String: JSONValue]) -> ScreenDescriber.DescribeResult?)?.none)
     /// Counter for server-initiated request IDs (sampling, etc.).
     let requestCounter = OSAllocatedUnfairLock(initialState: 0)
-    /// Capabilities the client declared in its `initialize` handshake, which
-    /// tell us which server-initiated requests it can answer.
-    let clientCapabilities = OSAllocatedUnfairLock(initialState: JSONValue?.none)
-    /// Whether the request being served right now came from a stateless-era
-    /// client. The run loop serves one request at a time, so this describes the
-    /// request a tool handler is running under.
-    let servingModernRequest = OSAllocatedUnfairLock(initialState: false)
+    /// Capabilities the stdio client declared in its `initialize` handshake.
+    /// Only stdio keeps them: its process serves one client for its whole
+    /// life. Over HTTP there is no session to keep them in.
+    let handshakeCapabilities = OSAllocatedUnfairLock(initialState: JSONValue?.none)
+    /// The revision and declared capabilities of the request being served.
+    /// Both transports serve one request at a time, so this describes the
+    /// request a tool handler is running under, and no other.
+    let currentScope = OSAllocatedUnfairLock(initialState: RequestScope.none)
     /// How requests reach this server, which decides whether it may send its own.
     let transport: MCPTransport
     init(policy: PermissionPolicy, transport: MCPTransport) {
@@ -187,17 +188,9 @@ final class MCPServer: Sendable {
             }
         }
 
-        // Tool handlers consult this to know whether server-initiated requests
-        // are permitted while this request is in flight.
-        servingModernRequest.withLock { $0 = isModern }
-
-        // The stateless revision has no handshake to record capabilities from —
-        // every request carries them instead, so they are read here rather than
-        // in `initialize`.
-        if isModern, let declared = request.params?.member("_meta")?
-            .member(MetaKey.clientCapabilities) {
-            clientCapabilities.withLock { $0 = declared }
-        }
+        // Tool handlers read the revision and capabilities of this request, and
+        // of no other, from here.
+        currentScope.withLock { $0 = scope(for: request, modern: isModern) }
 
         switch request.method {
         case "initialize":
@@ -327,7 +320,7 @@ final class MCPServer: Sendable {
 
         // Remember what the client can do — sampling is a client capability,
         // and we may only ask for it if the client offered it.
-        clientCapabilities.withLock { $0 = request.params?.member("capabilities") }
+        recordHandshake(request.params?.member("capabilities"))
 
         let result: JSONValue = .object([
             "protocolVersion": .string(negotiatedVersion),

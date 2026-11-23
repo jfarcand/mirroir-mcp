@@ -34,7 +34,8 @@ enum ComponentDetectionMode: String, Sendable {
     /// - **Sampling** asks the client's own model. Nothing needs configuring on
     ///   this machine, so it is preferred whenever the client declares the
     ///   capability — that declaration is the client volunteering to serve these
-    ///   requests.
+    ///   requests — and a sampling request can reach it (a legacy request over
+    ///   stdio; a 2026-07-28 request or HTTP cannot carry one).
     /// - **Agent** asks the model configured here, reaching every client
     ///   including those that cannot sample.
     ///
@@ -50,7 +51,7 @@ enum ComponentDetectionMode: String, Sendable {
     ) -> any ComponentClassifying {
         let heuristic = HeuristicClassifier()
         let model: (() -> any ComponentClassifying)?
-        if let server, server.clientSupportsSampling() {
+        if let server, server.maySendSamplingRequest() {
             model = { SamplingClassifier(server: server) }
         } else if let agentConfig {
             model = { AgentClassifier(agentConfig: agentConfig) }
