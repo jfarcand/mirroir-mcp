@@ -14,6 +14,8 @@ What changed for you in each release. Full notes, with every commit, are on [Git
 
 - **The first screen read after an upgrade no longer waits for macOS.** On macOS 27, the first text read by a new build compiles Vision's model, which took close to a minute. The server now does that read in the background as it starts.
 
+- **Every tool has a title, and says whether it reaches beyond the Mac.** `tools/list` gives each tool a display name (`Describe Screen`) and an `openWorldHint`: false only for the tools that read or write local files (skills, notes, targets).
+
 ## 0.51.0 (2026-11-22)
 
 - **A tap at a point says when the screen did not change.** Text taps already did; a tap at x and y (an unlabeled ✕, an icon) and `tap: @x,y` in `run_steps` now read the screen before and after, end with "Screen now: …", and say so when nothing changed, so a tap that never reached the iPhone no longer passes in silence.

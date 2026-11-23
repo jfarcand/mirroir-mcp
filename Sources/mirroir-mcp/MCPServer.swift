@@ -102,6 +102,12 @@ final class MCPServer: Sendable {
     /// to use; measured on the iPhone, it never loaded run_steps by itself.
     static let alwaysLoadedTools: Set<String> = ["run_steps"]
 
+    /// A tool's display name: its words capitalized, `describe_screen` as
+    /// "Describe Screen". Derived from the name, so the two never disagree.
+    static func title(for name: String) -> String {
+        name.split(separator: "_").map { $0.prefix(1).uppercased() + $0.dropFirst() }.joined(separator: " ")
+    }
+
     /// The `_meta` key Claude Code (2.1.285 and later) reads on a tools/list entry.
     static let alwaysLoadKey = "anthropic/alwaysLoad"
 
@@ -304,6 +310,7 @@ final class MCPServer: Sendable {
                 .map { tool in
                     var entry: [String: JSONValue] = [
                         "name": .string(tool.name),
+                        "title": .string(Self.title(for: tool.name)),
                         "description": .string(tool.description),
                         "inputSchema": .object(tool.inputSchema),
                         "annotations": .object(PermissionPolicy.annotations(for: tool.name)),

@@ -200,18 +200,31 @@ public struct PermissionPolicy: Sendable {
         "switch_target",
     ]
 
+    /// Tools that touch only files on this Mac, never the phone or another
+    /// target: their world is closed (`openWorldHint: false`). Every other
+    /// tool reads or drives a device the agent does not control alone.
+    public static let closedWorldTools: Set<String> = [
+        "list_targets",
+        "list_skills",
+        "get_skill",
+        "get_notes",
+        "save_note",
+    ]
+
     /// The MCP tool annotations for `name`, so a host can run observation
     /// without asking and ask before anything that changes the iPhone. A tool
     /// in neither set is annotated as destructive: an unknown tool is assumed
-    /// to change something.
+    /// to change something, and to act on the outside world.
     public static func annotations(for name: String) -> [String: JSONValue] {
+        let openWorld: JSONValue = .bool(!closedWorldTools.contains(name))
         if readonlyTools.contains(name) {
-            return ["readOnlyHint": .bool(true)]
+            return ["readOnlyHint": .bool(true), "openWorldHint": openWorld]
         }
         return [
             "readOnlyHint": .bool(false),
             "destructiveHint": .bool(!nonDestructiveTools.contains(name)),
             "idempotentHint": .bool(idempotentTools.contains(name)),
+            "openWorldHint": openWorld,
         ]
     }
 

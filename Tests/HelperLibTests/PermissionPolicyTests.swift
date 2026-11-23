@@ -70,7 +70,19 @@ struct PermissionClassificationTests {
 
     @Test("observation is annotated read-only")
     func readonlyAnnotations() {
-        #expect(PermissionPolicy.annotations(for: "describe_screen") == ["readOnlyHint": .bool(true)])
+        #expect(PermissionPolicy.annotations(for: "describe_screen") == [
+            "readOnlyHint": .bool(true), "openWorldHint": .bool(true),
+        ])
+    }
+
+    @Test("only tools that touch local files are closed-world")
+    func openWorldAnnotations() {
+        #expect(PermissionPolicy.annotations(for: "get_skill")["openWorldHint"] == .bool(false))
+        #expect(PermissionPolicy.annotations(for: "save_note")["openWorldHint"] == .bool(false))
+        #expect(PermissionPolicy.annotations(for: "tap")["openWorldHint"] == .bool(true))
+        #expect(PermissionPolicy.annotations(for: "an_unknown_tool")["openWorldHint"] == .bool(true))
+        #expect(PermissionPolicy.closedWorldTools.isSubset(
+            of: PermissionPolicy.readonlyTools.union(PermissionPolicy.mutatingTools)))
     }
 
     @Test("a tap may destroy, going home may not")
@@ -79,6 +91,7 @@ struct PermissionClassificationTests {
         #expect(PermissionPolicy.annotations(for: "reset_app")["destructiveHint"] == .bool(true))
         #expect(PermissionPolicy.annotations(for: "press_home") == [
             "readOnlyHint": .bool(false), "destructiveHint": .bool(false), "idempotentHint": .bool(true),
+            "openWorldHint": .bool(true),
         ])
     }
 

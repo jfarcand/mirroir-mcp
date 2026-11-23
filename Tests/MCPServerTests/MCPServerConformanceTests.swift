@@ -59,6 +59,17 @@ final class MCPServerConformanceTests: XCTestCase {
         XCTAssertEqual(names, ["alpha", "beta", "mu", "zeta"])
     }
 
+    func testEveryToolHasATitleFromItsName() {
+        let server = makeServer()
+        register(["describe_screen", "run_steps", "tap"], on: server)
+        guard case .object(let result)? = server.handleRequest(legacyRequest(method: "tools/list"))?.result,
+              case .array(let tools)? = result["tools"] else {
+            return XCTFail("Expected a tools array")
+        }
+        let titles = tools.compactMap { $0.member("title")?.asString() }
+        XCTAssertEqual(titles, ["Describe Screen", "Run Steps", "Tap"])
+    }
+
     // MARK: - Missing client capability
 
     private func registerNeedsSampling(on server: MCPServer) {
