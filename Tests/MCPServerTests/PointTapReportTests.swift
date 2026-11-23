@@ -29,21 +29,22 @@ final class PointTapReportTests: XCTestCase {
             screenshotBase64: "")
     }
 
-    func testTheScreenIsReadAsItIsBeforeAndSettledAfter() {
+    func testTheScreenIsReadBeforeTheTapAndAfterTheWait() {
         var events: [String] = []
         _ = PointTapReport.run(
             described: "Tapped at (198, 56)", tapped: "the point (198, 56)",
-            read: { settle in events.append("read \(settle)"); return self.read(["Share"]) },
-            tap: { events.append("tap"); return nil })
-        XCTAssertEqual(events, ["read 0", "tap", "read \(EnvConfig.frameSettleTimeoutUs)"])
+            read: { events.append("read"); return self.read(["Share"]) },
+            tap: { events.append("tap"); return nil },
+            wait: { events.append("wait") })
+        XCTAssertEqual(events, ["read", "tap", "wait", "read"])
     }
 
     func testATapThatFailsIsReportedAndNotReadAfter() {
         var reads = 0
         let outcome = PointTapReport.run(
             described: "Tapped at (1, 1)", tapped: "the point (1, 1)",
-            read: { _ in reads += 1; return self.read(["Share"]) },
-            tap: { "the window is gone" })
+            read: { reads += 1; return self.read(["Share"]) },
+            tap: { "the window is gone" }, wait: { XCTFail("no wait after a failed tap") })
         XCTAssertEqual(outcome, .failure(PointTapError(message: "the window is gone")))
         XCTAssertEqual(reads, 1)
     }

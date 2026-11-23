@@ -114,7 +114,7 @@ extension MirroirMCP {
                     described: "Tapped at (\(ScreenshotGeometry.whole(point.x)), "
                         + "\(ScreenshotGeometry.whole(point.y)))\(origin)",
                     tapped: InlineStepRunner.pointName((Double(point.x), Double(point.y))),
-                    read: { ctx.ocrDescriber.describe(settleTimeoutUs: $0) },
+                    read: { ctx.ocrDescriber.describe(settleTimeoutUs: 0) },
                     tap: { input.tap(x: point.x, y: point.y, cursorMode: cursorMode) })
                 switch outcome {
                 case .success(let reply): return .text(reply)

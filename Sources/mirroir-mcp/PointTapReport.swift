@@ -25,28 +25,33 @@ import HelperLib
 /// An unlabeled control (a close ✕, an icon) is tapped by point. A text tap is
 /// found in a read and compared with the read after it (`InlineStepRunner`);
 /// a point tap had nothing to compare, so a tap the iPhone never received
-/// came back as "Tapped at". This reads the screen just before the tap (the
-/// frame as it is, no wait) and once it settles after, with local OCR only:
-/// a vision describer would bill a model call for each read.
+/// came back as "Tapped at". This reads the screen just before the tap and,
+/// after the same settling delay a step gets, just after it: both frames as
+/// they are, because a screen that never stops moving (an animated ad, a game)
+/// would hold each tap for the whole settle timeout. Local OCR only: a vision
+/// describer would bill a model call for each read.
 enum PointTapReport {
 
-    /// Tap with `tap`, between `read(0)` before and `read(settle)` after.
+    /// Read, tap with `tap`, `wait`, read again.
     ///
     /// - Parameters:
     ///   - described: The reply's first line, e.g. "Tapped at (198, 56)".
     ///   - tapped: How the unchanged-screen note names the tap, e.g. "the point (198, 56)".
-    ///   - read: Reads the screen; the argument is the settle timeout in µs.
+    ///   - read: Reads the screen as it is.
     ///   - tap: Sends the tap; returns an error message, or nil once sent.
+    ///   - wait: Lets the screen answer the tap; a step's settling delay by default.
     /// - Returns: The reply, or the tap's error.
     static func run(
         described: String,
         tapped: String,
-        read: (UInt32) -> ScreenDescriber.DescribeResult?,
-        tap: () -> String?
+        read: () -> ScreenDescriber.DescribeResult?,
+        tap: () -> String?,
+        wait: () -> Void = { usleep(EnvConfig.stepSettlingDelayMs * 1000) }
     ) -> Result<String, PointTapError> {
-        let before = read(0)
+        let before = read()
         if let error = tap() { return .failure(PointTapError(message: error)) }
-        let after = read(EnvConfig.frameSettleTimeoutUs)
+        wait()
+        let after = read()
         return .success(reply(described: described, tapped: tapped, before: before, after: after))
     }
 
