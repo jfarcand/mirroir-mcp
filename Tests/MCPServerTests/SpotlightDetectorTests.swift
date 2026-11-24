@@ -137,6 +137,30 @@ final class SpotlightDetectorTests: XCTestCase {
         XCTAssertTrue(SpotlightDetector.returnOpensApp(elements: screen, name: "Horloge"))
     }
 
+    /// XR, iOS 18, 2026-11-24 (carnet#99): "google classroom" in Spotlight. The
+    /// field says "Open" over an App Store card and a Brave web suggestion.
+    private var googleClassroomScreen: [TapPoint] {
+        [
+            point("Top Hit", 45, 96), point("Google Classroom", 161, 132), point("Get", 285, 148),
+            point("Education", 130, 149), point(icon, 187, 151), point("Suggestions", 61, 216),
+            point("google classroom", 115, 253), point("Siri Knowledge", 68, 298),
+            point("Search in Apps", 68, 661), point("• google classroom - Open", 144, 731),
+        ]
+    }
+
+    func testAFieldOpeningAnotherQueryIsNotTheNamedApp() {
+        XCTAssertFalse(SpotlightDetector.returnOpensApp(elements: googleClassroomScreen, name: "Settings"))
+        let prefixed = googleClassroomScreen.map {
+            $0.text.hasSuffix("- Open") ? point("Q settingsgoogle classroomgoogl - Open", 144, 731) : $0
+        }
+        XCTAssertFalse(SpotlightDetector.returnOpensApp(elements: prefixed, name: "Settings"),
+                       "typing added to a held query names another search")
+    }
+
+    func testAFieldOpeningAnAppStoreCardIsNoApp() {
+        XCTAssertFalse(SpotlightDetector.returnOpensApp(elements: googleClassroomScreen, name: "Google Classroom"))
+    }
+
     func testAFieldNamingAnotherResultWithoutAHeadingIsNoApp() {
         let screen = [point("M/t/o - Clinique dentaire St-Sauve", 189, 101), point(icon, 168, 166),
                       point("Horloge", 79, 266)]

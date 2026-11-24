@@ -66,9 +66,17 @@ enum SpotlightDetector {
     /// Neither counts when the first result named `name` is an App Store card:
     /// the field says it opens that card too. Looks at the screen before Return
     /// because nothing afterwards names the app in front.
+    ///
+    /// A field that says it opens a result must hold `name` itself: Spotlight
+    /// says "Open" over a web suggestion too, and a held query the typing was
+    /// added to reads as another query (XR, iOS 18, carnet#99: "settingsgoogle
+    /// classroomgoogle… — Open" opened a Brave search and launch_app reported
+    /// Settings launched). The tile under the heading counts only while no such
+    /// field is read: its label can be the app's name in the iPhone's language.
     static func returnOpensApp(elements: [TapPoint], name: String) -> Bool {
         if firstResultIsStoreCard(elements: elements, name: name) { return false }
-        if elements.contains(where: fieldSaysOpen) { return true }
+        let openQueries = elements.compactMap(openFieldQuery)
+        if !openQueries.isEmpty { return openQueries.contains(normalize(name)) }
         return holdsQuery(elements: elements) && SpotlightAppTile.topHit(in: elements) != nil
     }
 
@@ -86,13 +94,16 @@ enum SpotlightDetector {
         }
     }
 
-    /// Whether `element` reads as the field's completion: the query, a dash, then
-    /// the word for open ("Q Horloge - Ouvrir").
-    private static func fieldSaysOpen(_ element: TapPoint) -> Bool {
+    /// The query of the field's completion, normalized: `element` reads as the
+    /// query, a dash, then the word for open ("Q Horloge - Ouvrir" holds
+    /// "horloge"). Nil for any other text.
+    private static func openFieldQuery(_ element: TapPoint) -> String? {
         let parts = element.text.split(whereSeparator: { "-–—".contains($0) })
-        guard parts.count >= 2, let last = parts.last else { return false }
-        let word = SystemPhrases.fold(last.trimmingCharacters(in: .whitespaces))
-        return openWords.contains(word)
+        guard parts.count >= 2, let last = parts.last,
+              openWords.contains(SystemPhrases.fold(last.trimmingCharacters(in: .whitespaces)))
+        else { return nil }
+        let query = parts.dropLast().joined(separator: "-")
+        return normalize(searchFieldText(query) ?? query)
     }
 
     /// Text that indicates Spotlight search overlay is still visible: the

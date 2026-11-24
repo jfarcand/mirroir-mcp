@@ -168,6 +168,22 @@ final class SpotlightLaunchTests: XCTestCase {
         XCTAssertEqual(run.keys.keycodes, [UInt16(0)], "Cmd+A, then the tile is tapped")
     }
 
+    /// carnet#99, XR, iOS 18: Spotlight reopened holding "google classroom" and
+    /// the typed name landed in front of it. Its field said "Open" over a web
+    /// search; Return opened that search and the launch was reported.
+    func testTypingAddedToAHeldQueryIsNotLaunchedWithReturn() {
+        let idle = screen([el("Siri Suggestions", 72, 96), el("Q Search", 73, 728)])
+        let mixed = screen([
+            el("Top Hit", 45, 96), el("Suggestions", 61, 216), el(CoreMLElementDetector.iconLabel, 36, 253),
+            el("settingsgoogle classroomgoogle", 140, 253),
+            el("Q settingsgoogle classroomgoogl - Open", 144, 731),
+        ])
+        let run = launch(name: "Settings", screens: [clock, idle, mixed])
+        XCTAssertNotNil(run.error)
+        XCTAssertFalse(run.keys.keycodes.contains(Self.returnKey), "Return is not pressed")
+        XCTAssertTrue(run.poster.buttons.isEmpty, "nothing is tapped")
+    }
+
     /// 18:35 on an XR: Spotlight holding "Photos" has an "App Store" section
     /// heading with a result's icon above it, which opens nothing when tapped.
     func testASectionHeadingIsNotATile() {
