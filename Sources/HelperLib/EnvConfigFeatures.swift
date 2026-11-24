@@ -86,6 +86,10 @@ extension EnvConfig {
         readUInt32("toolSettlingDelayUs", default: TimingConstants.toolSettlingDelayUs)
     }
 
+    public static var networkChangeTimeoutUs: UInt32 {
+        readUInt32("networkChangeTimeoutUs", default: TimingConstants.networkChangeTimeoutUs)
+    }
+
     // MARK: - Focus Recovery
 
     /// Y coordinate in window-relative points for the status bar engagement tap.

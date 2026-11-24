@@ -254,6 +254,11 @@ public enum TimingConstants {
     /// UI settling delay after App Switcher or network toggle operations (microseconds).
     public static let toolSettlingDelayUs: UInt32 = 500_000
 
+    /// Longest wait after a network tile or switch tap for it to read the
+    /// asked state (microseconds). Cellular reads its new state at once; Wi-Fi
+    /// first disconnects, and its tile shows the network name a moment longer.
+    public static let networkChangeTimeoutUs: UInt32 = 5_000_000
+
     // MARK: - Focus Recovery
 
     /// Y coordinate in window-relative points for the status bar engagement tap.

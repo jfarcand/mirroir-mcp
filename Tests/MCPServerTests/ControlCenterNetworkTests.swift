@@ -174,9 +174,10 @@ final class ControlCenterNetworkTests: XCTestCase {
     /// iOS 27.2.1, window 359x790, 2026-11-24 (the network and accessory names
     /// are made up; the icon is placed from the label, not from them). The icons were measured on the same capture at
     /// Airplane Mode (71, 157), Wi-Fi (71, 229) and cellular data (71, 374).
-    private func ocrConnectivity(cellular: String = "Principale") -> ScreenDescriber.DescribeResult {
+    private func ocrConnectivity(cellular: String = "Principale",
+                                 wifi: String = "Maison") -> ScreenDescriber.DescribeResult {
         measured([("Mode Avion", 126, 150, 74), ("Non", 104, 165, 30),
-                  ("Wi-Fi", 72, 294, 32), ("AirDrop", 223, 294, 46), ("Maison", 77, 309, 42),
+                  ("Wi-Fi", 72, 294, 32), ("AirDrop", 223, 294, 46), (wifi, 77, 309, 42),
                   ("Contacts uniquement", 255, 310, 108),
                   ("Données", 82, 424, 52), ("cellulaires", 86, 440, 60), ("Bluetooth", 229, 440, 56),
                   (cellular, 84, 455, 56), ("Montre", 223, 454, 46),
@@ -237,6 +238,39 @@ final class ControlCenterNetworkTests: XCTestCase {
         XCTAssertTrue(input.swipeCalls.isEmpty)
     }
 
+    /// iPhone 16, iOS 27, 2026-11-24: read 0.85 s after the tap, the Wi-Fi tile
+    /// still showed its network while disconnecting, and wifi_off reported a
+    /// tap that had taken as one that had not. The tile is read again until it
+    /// changes.
+    func testATileIsReadAgainUntilItChanges() {
+        bridge.menuItemResult = true
+        bridge.windowInfo = WindowInfo(windowID: 1, position: .zero,
+                                       size: CGSize(width: 359, height: 790), pid: 1)
+        describer.describeResults = [ocrConnectivity(), ocrConnectivity(), ocrConnectivity(),  // open, read twice
+                                     ocrConnectivity(),                                       // place the icon
+                                     ocrConnectivity(),                                       // still the network
+                                     ocrConnectivity(wifi: "Non connecté")]                   // dropped
+        let result = NetworkToggle.toggle(mode: "wifi_off", input: input, describer: describer,
+                                          menuBridge: bridge, settleUs: 1, changeTimeoutUs: 3, loadUs: 0)
+        guard case .success(let message) = result else { return XCTFail("\(result)") }
+        XCTAssertTrue(message.hasPrefix("Turned Wi-Fi off: the tile now reads off."), message)
+        XCTAssertEqual(input.tapCalls.count, 1)
+        XCTAssertEqual(describer.describeCallCount, 6, "no read after the tile changed")
+    }
+
+    /// A tile that never changes is read once per settle until the deadline,
+    /// then reported, and tapped only once.
+    func testATileThatNeverChangesIsReadUntilTheDeadline() {
+        bridge.menuItemResult = true
+        describer.describeResult = ocrConnectivity()
+        let result = NetworkToggle.toggle(mode: "cellular_off", input: input, describer: describer,
+                                          menuBridge: bridge, settleUs: 1, changeTimeoutUs: 3, loadUs: 0)
+        guard case .failure(let error) = result else { return XCTFail("passed") }
+        XCTAssertTrue(error.message.contains("still reads on"), error.message)
+        XCTAssertEqual(input.tapCalls.count, 1)
+        XCTAssertEqual(describer.describeCallCount, 4 + 3, "open, two reads, the icon, then three reads")
+    }
+
     func testATileTapThatDidNotTakeFails() {
         bridge.menuItemResult = true
         describer.describeResult = ocrConnectivity()
@@ -254,7 +288,8 @@ final class ControlCenterNetworkTests: XCTestCase {
         describer.describeResult = screen([("Mode Avion", 126, 150), ("Non", 104, 165)])
         let result = NetworkToggle.toggle(
             mode: "cellular_off", input: input, describer: describer,
-            controlCenterDescriber: tileReader, menuBridge: bridge, settleUs: 0, loadUs: 0)
+            controlCenterDescriber: tileReader, menuBridge: bridge, settleUs: 0, changeTimeoutUs: 0,
+            loadUs: 0)
         guard case .failure(let error) = result else { return XCTFail("passed") }
         XCTAssertTrue(error.message.contains("nothing was tapped"), error.message)
         XCTAssertTrue(input.tapCalls.isEmpty)
@@ -272,7 +307,8 @@ final class ControlCenterNetworkTests: XCTestCase {
     private func toggle(_ mode: String, settingsRefusal: String? = nil)
         -> Result<String, NetworkToggle.ToggleError> {
         NetworkToggle.toggle(mode: mode, input: input, describer: describer, menuBridge: bridge,
-                             settleUs: 0, loadUs: 0, settingsRefusal: { settingsRefusal })
+                             settleUs: 0, changeTimeoutUs: 0, loadUs: 0,
+                             settingsRefusal: { settingsRefusal })
     }
 
     private var wentHome: Bool {

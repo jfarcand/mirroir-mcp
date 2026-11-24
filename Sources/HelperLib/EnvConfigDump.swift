@@ -151,6 +151,7 @@ extension EnvConfig {
                 ("appSwitcherSwipeDurationMs", "\(appSwitcherSwipeDurationMs)"),
                 ("appSwitcherMaxSwipes", "\(appSwitcherMaxSwipes)"),
                 ("toolSettlingDelayUs", "\(toolSettlingDelayUs)"),
+                ("networkChangeTimeoutUs", "\(networkChangeTimeoutUs)"),
             ]),
             ("Icon Detection", [
                 ("iconOcrProximityFilter", "\(iconOcrProximityFilter)"),

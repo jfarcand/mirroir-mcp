@@ -69,7 +69,7 @@ final class NetworkToggleTests: XCTestCase {
             return .init(state: state, center: CGPoint(x: switchX, y: rowY))
         }
         return NetworkToggle.toggle(mode: mode, input: input, describer: describer, menuBridge: bridge,
-                                    settleUs: 0, loadUs: 0, read: read)
+                                    settleUs: 0, changeTimeoutUs: 0, loadUs: 0, read: read)
     }
 
     private var wentHome: Bool {

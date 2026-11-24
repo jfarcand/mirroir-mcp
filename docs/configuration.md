@@ -47,6 +47,7 @@ Env-var names are derived from the camelCase key by inserting `_` before every u
 | `pasteVerifyTimeoutUs` | `2000000` | Longest wait after Cmd+V for a pasted run to appear on screen; past it `type_text` fails instead of reporting success (microseconds) |
 | `pasteVerifyPollUs` | `250000` | Gap between OCR reads while waiting for a pasted run (microseconds) |
 | `pasteVerifyWindowChars` | `6` | Trailing OCR-readable characters of the entered line, ending with the pasted run, that must appear on screen to count a paste as delivered |
+| `networkChangeTimeoutUs` | `5000000` | Longest wait after `set_network` taps a tile or switch for it to read the asked state; it is read again every `toolSettlingDelayUs` until then. Wi-Fi's tile keeps showing the network a moment while it disconnects (microseconds) |
 | `clickHoldUs` | `80000` | Click hold duration in microseconds |
 | `doubleTapHoldUs` | `40000` | Hold duration per tap in a double-tap gesture (microseconds) |
 | `doubleTapGapUs` | `50000` | Gap between taps in a double-tap (microseconds) |

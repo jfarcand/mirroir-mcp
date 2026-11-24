@@ -107,7 +107,10 @@ enum NetworkToggle {
 
     /// Set `mode`. Returns the result to report or the failure.
     /// - Parameters:
-    ///   - settleUs: How long to wait after the switch tap before reading it again.
+    ///   - settleUs: How long to wait after the switch tap before reading it
+    ///     again, and between reads while it has not changed yet.
+    ///   - changeTimeoutUs: How long the tapped control may take to read the
+    ///     asked state.
     ///   - loadUs: How long Settings or a page takes to load before it is read.
     ///   - phrases: Where the labels come from; the shipped file by default.
     ///   - read: Reads a row's switch; the screenshot's pixels by default.
@@ -120,6 +123,7 @@ enum NetworkToggle {
         mode modeName: String, input: any InputProviding, describer: any ScreenDescribing,
         controlCenterDescriber: (any ScreenDescribing)? = nil,
         menuBridge: any MenuActionCapable, settleUs: UInt32,
+        changeTimeoutUs: UInt32 = EnvConfig.networkChangeTimeoutUs,
         loadUs: UInt32 = EnvConfig.settingsLoadUs, phrases: SystemPhrases = .live,
         read: @escaping SwitchRead = pixelRead,
         settingsRefusal: () -> String? = { nil }
@@ -138,14 +142,16 @@ enum NetworkToggle {
         case .opened:
             outcome = controlCenterSet(mode: mode, input: input, describer: tileDescriber,
                                        locator: describer, size: size,
-                                       settleUs: settleUs, phrases: phrases)
+                                       settleUs: settleUs, changeTimeoutUs: changeTimeoutUs,
+                                       phrases: phrases)
         case .failed(let reason):
             outcome = .failure(ToggleError(reason))
         case .unavailable(let reason):
             DebugLog.log("set_network", "Control Center unavailable (\(reason)); using Settings")
             if let refusal = settingsRefusal() { return .failure(ToggleError(refusal)) }
             let session = Session(mode: mode, input: input, describer: describer, size: size,
-                                  settleUs: settleUs, loadUs: loadUs, phrases: phrases, read: read)
+                                  settleUs: settleUs, changeTimeoutUs: changeTimeoutUs,
+                                  loadUs: loadUs, phrases: phrases, read: read)
             outcome = session.run()
         }
         _ = menuBridge.triggerMenuAction(
@@ -160,6 +166,7 @@ enum NetworkToggle {
         let describer: any ScreenDescribing
         let size: CGSize
         let settleUs: UInt32
+        let changeTimeoutUs: UInt32
         let loadUs: UInt32
         let phrases: SystemPhrases
         let read: SwitchRead
@@ -215,7 +222,7 @@ enum NetworkToggle {
         /// in the asked state, then read it again.
         private func setSwitch(labels: [String]) -> Result<String, ToggleError> {
             NetworkToggle.apply(
-                mode: mode, control: "switch", settleUs: settleUs,
+                mode: mode, control: "switch", settleUs: settleUs, changeTimeoutUs: changeTimeoutUs,
                 notFound: "No \(mode.switchName) switch was found: the row is a menu on "
                     + "this iPhone (with two SIMs, cellular data is), or the switch could not be read "
                     + "(only the light appearance is measured). Nothing was tapped.",
@@ -249,10 +256,11 @@ enum NetworkToggle {
     /// there, placed from `locator`'s OCR text (`ControlCenterNetwork.tapIcon`).
     private static func controlCenterSet(
         mode: Mode, input: any InputProviding, describer: any ScreenDescribing,
-        locator: any ScreenDescribing, size: CGSize, settleUs: UInt32, phrases: SystemPhrases
+        locator: any ScreenDescribing, size: CGSize, settleUs: UInt32, changeTimeoutUs: UInt32,
+        phrases: SystemPhrases
     ) -> Result<String, ToggleError> {
         apply(
-            mode: mode, control: "tile", settleUs: settleUs,
+            mode: mode, control: "tile", settleUs: settleUs, changeTimeoutUs: changeTimeoutUs,
             notFound: "No \(mode.switchName) tile with a readable state was found in Control Center "
                 + "(system-phrases.md, \(mode.controlCenterTile.rawValue)). Nothing was tapped.",
             read: {
@@ -270,10 +278,13 @@ enum NetworkToggle {
     }
 
     /// Read the control twice; tap it if it is not in the asked state, then
-    /// read it again. `control` names it in results ("switch", "tile"); `tap`
-    /// taps it, given where it was read.
+    /// read it again, every `settleUs` until it reads that state or
+    /// `changeTimeoutUs` has passed: Wi-Fi's tile keeps showing the network a
+    /// moment after the tap while it disconnects (iPhone 16, iOS 27). `control`
+    /// names it in results ("switch", "tile"); `tap` taps it, given where it
+    /// was read.
     static func apply(
-        mode: Mode, control: String, settleUs: UInt32,
+        mode: Mode, control: String, settleUs: UInt32, changeTimeoutUs: UInt32,
         notFound: String, read: () -> SettingsSwitchReader.Reading?,
         tap: (CGPoint) -> String?
     ) -> Result<String, ToggleError> {
@@ -292,12 +303,17 @@ enum NetworkToggle {
         if let error = tap(center) {
             return .failure(ToggleError("Failed to tap the \(name): \(error)"))
         }
-        usleep(settleUs)
+        var after: SettingsSwitchReader.Reading?
+        for _ in 0 ..< max(1, Int(changeTimeoutUs / max(settleUs, 1))) {
+            usleep(settleUs)
+            after = read()
+            if after?.state == wanted { break }
+        }
         let warning = mode.cutsMirroring
             ? " Turning \(mode.switchName) \(word(wanted)) can cut iPhone Mirroring's connection; "
                 + "only the iPhone can turn it back."
             : ""
-        guard let after = read() else {
+        guard let after else {
             return .success("Tapped the \(name), which read \(word(first.state)); "
                 + "it could not be read afterwards.\(warning)")
         }
