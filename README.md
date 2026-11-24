@@ -58,6 +58,19 @@ your agent ──MCP──▶ mirroir ──iPhone Mirroring──▶ your iPhon
 
 Your agent drives the phone through mirroir's tools. What it learns stays: an exploration becomes a skill, a skill compiles to a replay that needs no model, and the replay runs in CI.
 
+## How it reads the screen
+
+`describe_screen` is the agent's eyes, and it has two modes. One setting, `screenDescriberMode` in [`settings.json`](docs/configuration.md), picks between them.
+
+| | Local OCR (default) | AI vision |
+|---|---|---|
+| What it reads | Text, with exact tap points ([Apple Vision OCR](docs/screen-intelligence.md#apple-vision-ocr-default)); icons through an on-device [YOLO model](docs/yolo-models.md) | Text and icons by name ("Wi-Fi", "Spotify"), including faint labels and on/off states OCR can miss |
+| Where it runs | On your Mac, free | Through your agent ([`embacle`](docs/screen-intelligence.md#ai-vision-mode-embacle) by default), about 25k tokens and a few seconds per read |
+| Tap points | Exact | Approximate, so check before tapping near the bottom of the screen |
+| Setting | `"screenDescriberMode": "ocr"` | `"screenDescriberMode": "vision"` |
+
+Start with OCR. Switch to vision when the screen is mostly icons, or its text is too faint for OCR.
+
 ## The framework
 
 - **[Tools](docs/tools.md).** 42 MCP tools: tap, type, swipe, read the screen, listen, launch, and [`run_steps`](docs/tools.md#tool-list) to repeat a sequence in one call.
