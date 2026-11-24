@@ -264,7 +264,19 @@ enum ControlCenterNetwork {
     /// other line, unreadable when there is none.
     static func state(of tile: Tile, phrases: SystemPhrases) -> SettingsSwitchReader.State {
         guard let status = tile.status else { return .none }
-        return phrases.phrases(.controlCenterOffState).contains(fold(status)) ? .off : .on
+        let offWords = phrases.phrases(.controlCenterOffState)
+        return offWords.contains(fold(status)) || offWords.contains(fold(withoutMenuChevron(status)))
+            ? .off : .on
+    }
+
+    /// `status` without the one-character word OCR makes of the ⌃⌄ menu
+    /// chevron a Wi-Fi, AirDrop or Bluetooth tile draws after its state line.
+    /// iPhone 16, iOS 27, 2026-11-24: "Non connecté s", "Treberden C",
+    /// "Recherche •"; wifi_off read a dropped network as on.
+    static func withoutMenuChevron(_ status: String) -> String {
+        let words = status.split(separator: " ")
+        guard words.count > 1, let last = words.last, last.count == 1 else { return status }
+        return words.dropLast().joined(separator: " ")
     }
 
     /// The next line of text under `element` in the same column. An icon the

@@ -102,6 +102,20 @@ final class ControlCenterNetworkTests: XCTestCase {
         XCTAssertEqual(state(.controlCenterWiFiTile, english), .off)
     }
 
+    /// iPhone 16, iOS 27, 2026-11-24: OCR read the tile's ⌃⌄ menu chevron as
+    /// a stray letter after "Non connecté", and wifi_off reported the dropped
+    /// network as still on.
+    func testTheMenuChevronAfterTheStateLineIsNotPartOfIt() {
+        for misread in ["Non connecté s", "Non connecté *", "Non connecté C", "Non connecté •"] {
+            let dropped = screen([("Wi-Fi", 71, 330), (misread, 100, 345)])
+            XCTAssertEqual(state(.controlCenterWiFiTile, dropped), .off, misread)
+        }
+        let joined = screen([("Wi-Fi", 71, 330), ("Treberden *", 91, 345)])
+        XCTAssertEqual(state(.controlCenterWiFiTile, joined), .on)
+        XCTAssertEqual(state(.controlCenterAirplaneTile, connectivity()), .off, "a lone off word stays")
+        XCTAssertEqual(ControlCenterNetwork.withoutMenuChevron("Non"), "Non")
+    }
+
     func testALabelWithNoLineUnderItIsUnreadable() {
         let lone = screen([("Wi-Fi", 85, 343)])
         XCTAssertEqual(state(.controlCenterWiFiTile, lone), SettingsSwitchReader.State.none)

@@ -268,6 +268,9 @@ enum NetworkToggle {
                       let tile = ControlCenterNetwork.tile(mode.controlCenterTile, in: screen.elements,
                                                            phrases: phrases) else { return nil }
                 let state = ControlCenterNetwork.state(of: tile, phrases: phrases)
+                DebugLog.log("set_network", "\(mode.switchName) tile \"\(tile.label.text)\" at "
+                    + "(\(Int(tile.label.tapX)),\(Int(tile.label.tapY))) reads \"\(tile.status ?? "")\" "
+                    + "(\(word(state))) among \(screen.elements.count) elements")
                 guard state != .none else { return nil }
                 return .init(state: state, center: CGPoint(x: tile.label.tapX, y: tile.label.tapY))
             },
