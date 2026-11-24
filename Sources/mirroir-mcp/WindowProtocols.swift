@@ -54,6 +54,11 @@ extension WindowBridging {
 /// Extends WindowBridging with menu bar actions available on iPhone Mirroring.
 protocol MenuActionCapable: WindowBridging {
     func triggerMenuAction(menu: String, item: String) -> Bool
+    /// Press the enabled menu item whose key equivalent is Cmd+`commandKey`,
+    /// found by that key rather than its title, so the Mac's language does
+    /// not matter. Returns false, sending nothing, when no such item exists
+    /// (an older iPhone Mirroring) or it is disabled.
+    func pressMenuItem(commandKey: String) -> Bool
     func pressResume() -> Bool
     /// Screen-coordinate center of the dismiss button on a Continuity interruption
     /// overlay (e.g. the "iPhone camera is not available from Mac" OK dialog, or
@@ -76,6 +81,8 @@ extension MenuActionCapable {
     func sessionBlock() -> SessionBlock? { nil }
     /// Default: nothing to launch (non-mirroring bridges are started by the user).
     func launchInBackground() -> Bool { false }
+    /// Default: no menu item (non-mirroring bridges have no iPhone menu commands).
+    func pressMenuItem(commandKey: String) -> Bool { false }
 }
 
 /// Live reads of the iPhone Mirroring process and window from macOS: Launch

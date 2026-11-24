@@ -77,7 +77,7 @@ Requires macOS 15+ and an iPhone connected via iPhone Mirroring.
 
 ### Measurement & Network
 - `measure` — Time screen transitions: perform action, poll OCR until target appears
-- `set_network` — Toggle airplane/Wi-Fi/cellular via Settings app navigation
+- `set_network` — Toggle airplane/Wi-Fi/cellular via Control Center (macOS 27 + iOS 27) or the Settings app
 
 ### Info (read-only, always available)
 - `status` — Connection state, window geometry, device readiness

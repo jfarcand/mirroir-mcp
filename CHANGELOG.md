@@ -15,6 +15,7 @@ What changed for you in each release. Full notes, with every commit, are on [Git
 - **The first screen read after an upgrade no longer waits for macOS.** On macOS 27, the first text read by a new build compiles Vision's model, which took close to a minute. The server now does that read in the background as it starts.
 
 - **Every tool has a title, and says whether it reaches beyond the Mac.** `tools/list` gives each tool a display name (`Describe Screen`) and an `openWorldHint`: false only for the tools that read or write local files (skills, notes, targets).
+- **`set_network` uses Control Center on iOS 27.** On macOS 27 with an iPhone on iOS 27, it opens Control Center from iPhone Mirroring and sets the Airplane Mode, Wi-Fi or cellular data tile there, without opening the Settings app; that also covers cellular data on an iPhone with two SIMs, which Settings shows as a menu. Older iPhones and macOS 26 still go through Settings ([tools](docs/tools.md#set-network)).
 
 ## 0.51.0 (2026-11-22)
 

@@ -273,6 +273,45 @@ final class MirroringBridge: Sendable {
         return false
     }
 
+    func pressMenuItem(commandKey: String) -> Bool {
+        guard let app = findProcess() else { return false }
+        let appRef = AXUIElementCreateApplication(app.processIdentifier)
+        var menuBarValue: CFTypeRef?
+        guard AXUIElementCopyAttributeValue(
+                  appRef, kAXMenuBarAttribute as CFString, &menuBarValue) == .success,
+              let menuBarRef = menuBarValue,
+              CFGetTypeID(menuBarRef) == AXUIElementGetTypeID()
+        else { return false }
+        let menuBar = unsafeDowncast(menuBarRef, to: AXUIElement.self)
+        for menuBarItem in Self.axChildren(menuBar) {
+            for submenu in Self.axChildren(menuBarItem) {
+                for item in Self.axChildren(submenu) where Self.isEnabledCommand(item, key: commandKey) {
+                    return AXUIElementPerformAction(item, kAXPressAction as CFString) == .success
+                }
+            }
+        }
+        DebugLog.log("menu", "no enabled menu item with Cmd+\(commandKey)")
+        return false
+    }
+
+    private static func axChildren(_ element: AXUIElement) -> [AXUIElement] {
+        var value: CFTypeRef?
+        AXUIElementCopyAttributeValue(element, kAXChildrenAttribute as CFString, &value)
+        return value as? [AXUIElement] ?? []
+    }
+
+    /// Whether `item` is an enabled menu item whose key equivalent is Cmd+`key`
+    /// alone: modifiers 0 means Command with no other modifier.
+    private static func isEnabledCommand(_ item: AXUIElement, key: String) -> Bool {
+        var char: CFTypeRef?
+        var modifiers: CFTypeRef?
+        var enabled: CFTypeRef?
+        AXUIElementCopyAttributeValue(item, kAXMenuItemCmdCharAttribute as CFString, &char)
+        AXUIElementCopyAttributeValue(item, kAXMenuItemCmdModifiersAttribute as CFString, &modifiers)
+        AXUIElementCopyAttributeValue(item, kAXEnabledAttribute as CFString, &enabled)
+        return (char as? String) == key && (modifiers as? Int) == 0 && (enabled as? Bool) == true
+    }
+
     /// Send a Cmd+<key> keyboard shortcut to iPhone Mirroring via CGEvent.
     /// Activates the app first so the event reaches the right window.
     private func triggerKeyboardShortcut(keycode: UInt16) -> Bool {

@@ -33,7 +33,7 @@ All 42 tools exposed by the MCP server. Mutating tools require [permission](perm
 | `reset_app` | `name` | Force-quit an app via the App Switcher |
 | `measure` | `action`, `until`, `max_seconds`?, `name`? | Time a screen transition after an action |
 | `run_steps` | `steps` | Run several proven steps in one call, in the [step grammar](#step-types) (`"tap: <text on screen>"`, `"tap: @324,113"` for a point, `"type: calculator"`, `"wait_for: Get"`, `"home"`). Every step is checked against the permission policy before the first runs; the run stops at the first failure and the reply ends with the text on screen |
-| `set_network` | `mode` | Toggle network settings (airplane, Wi-Fi, cellular) via Settings |
+| `set_network` | `mode` | Toggle network settings (airplane, Wi-Fi, cellular) via Control Center on iOS 27, else Settings |
 | `get_orientation` | — | Report portrait/landscape and window dimensions |
 | `status` | — | Connection state, window geometry, and device readiness |
 | `check_health` | — | Comprehensive setup diagnostic: mirroring, accessibility, screen capture |
@@ -149,11 +149,15 @@ emitted `.ios.yaml` flow opens with. Tunable via `appSwitcherCardYFraction`, `ap
 
 ## Set Network
 
-`set_network` toggles network settings on the iPhone by navigating the Settings app. After toggling, it returns to the home screen. It finds the row by its label, read from the Settings Row sections of [`system-phrases.md`](../Sources/mirroir-mcp/Resources/system-phrases.md), which list the English labels (Airplane, Wi-Fi, Cellular); on a phone in another language, add the row's label there.
+`set_network` toggles network settings on the iPhone, then returns to the home screen. It reads the switch first, taps only when it is not already in the asked state, and reads it again.
+
+When iPhone Mirroring gives Control Center (View > Control Centre, Cmd-4, on macOS 27 with an iPhone on iOS 27), the switch is a tile on Control Center's connectivity page, and the Settings app is not opened. Each tile has a label and one line under it: the line reads `Off` (`Non`) when the tile is off, and a network or SIM name when it is on. The state is read with the configured screen describer. Only the tile's round icon toggles it (a tap on the tile's body does nothing, and on Control Center's first page the connectivity tiles are one button that opens the connectivity page), so the tap goes to the icon, placed from the tile's label and state line as local OCR reads them. When either the state or the tile's text cannot be read, the tool refuses without a tap. Mirroring refuses Control Center to an iPhone before iOS 27 ("Update Required"), and macOS 26 has no such command; the Settings app is used then.
+
+Both paths find their labels in [`system-phrases.md`](../Sources/mirroir-mcp/Resources/system-phrases.md): the Control Center Tile sections and the Settings Row sections list the English and French labels; on a phone in another language, add the label there. In Settings, cellular data on an iPhone with two SIMs is a menu, not a switch, and is refused; its Control Center tile is a plain switch.
 
 Supported modes: `airplane_on`, `airplane_off`, `wifi_on`, `wifi_off`, `cellular_on`, `cellular_off`.
 
-This is the most environment-dependent tool — it relies on the Settings app UI layout, which varies by locale and iOS version.
+This is the most environment-dependent tool: it relies on the Control Center and Settings layouts, which vary by locale and iOS version.
 
 ## Skills
 

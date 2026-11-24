@@ -25,16 +25,17 @@ extension MirroirMCP {
         registry: TargetRegistry,
         policy: PermissionPolicy
     ) {
-        // set_network — toggle network settings via the Settings app
+        // set_network — toggle network settings via Control Center or the Settings app
         server.registerTool(MCPToolDefinition(
             name: "set_network",
             description: """
-                Set Airplane Mode, Wi-Fi or cellular data on the mirrored iPhone in \
-                the Settings app. The switch is read first and tapped only when it \
-                is not already in the asked state, then read again; the result says \
-                what it shows. A switch that cannot be read (a menu, as cellular \
-                data is with two SIMs, or the dark appearance) is refused without a \
-                tap. airplane_on and wifi_off can cut iPhone Mirroring's connection, \
+                Set Airplane Mode, Wi-Fi or cellular data on the mirrored iPhone: in \
+                Control Center when iPhone Mirroring gives it (macOS 27 with an iPhone \
+                on iOS 27), otherwise in the Settings app. The switch is read first and \
+                tapped only when it is not already in the asked state, then read again; \
+                the result says what it shows. A switch that cannot be read (in \
+                Settings, a menu, as cellular data is with two SIMs, or the dark \
+                appearance) is refused without a tap. airplane_on and wifi_off can cut iPhone Mirroring's connection, \
                 and only the iPhone can then turn them back. Modes: airplane_on, \
                 airplane_off, wifi_on, wifi_off, cellular_on, cellular_off. Returns to \
                 the home screen afterwards.
@@ -60,13 +61,14 @@ extension MirroirMCP {
                 guard let mode = args["mode"]?.asString() else {
                     return .error("Missing required parameter: mode (string)")
                 }
-                if case .denied(let reason) = policy.checkAppLaunch(NetworkToggle.settingsAppName) {
-                    return .error(reason)
-                }
-
                 switch NetworkToggle.toggle(
                     mode: mode, input: ctx.input, describer: ctx.ocrDescriber,
-                    menuBridge: menuBridge, settleUs: EnvConfig.toolSettlingDelayUs
+                    controlCenterDescriber: ctx.describer, menuBridge: menuBridge, settleUs: EnvConfig.toolSettlingDelayUs,
+                    settingsRefusal: {
+                        guard case .denied(let reason) = policy.checkAppLaunch(
+                            NetworkToggle.settingsAppName) else { return nil }
+                        return reason
+                    }
                 ) {
                 case .success(let message): return .text(message)
                 case .failure(let error): return .error(error.message)

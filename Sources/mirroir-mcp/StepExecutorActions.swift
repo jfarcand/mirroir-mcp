@@ -151,7 +151,7 @@ extension StepExecutor {
         }
 
         switch NetworkToggle.toggle(
-            mode: mode, input: input, describer: describer,
+            mode: mode, input: input, describer: ocrDescriber, controlCenterDescriber: describer,
             menuBridge: menuBridge, settleUs: UInt32(config.settlingDelayMs * 1000)
         ) {
         case .success(let message):

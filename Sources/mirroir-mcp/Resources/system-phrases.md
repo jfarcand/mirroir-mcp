@@ -172,3 +172,36 @@ Principale >`), which `set_network` refuses rather than guesses.
 - cellular data
 - mobile data
 - données cellulaires
+
+## Control Center Airplane Tile
+
+The whole label of Airplane Mode's tile on Control Center's connectivity page
+(iOS 27), which `set_network` reads and taps for `airplane_on` and
+`airplane_off`. OCR may split a label over two lines; the lines are joined.
+
+- airplane mode
+- mode avion
+
+## Control Center Wi-Fi Tile
+
+The whole label of the Wi-Fi tile on Control Center's connectivity page.
+
+- wi-fi
+
+## Control Center Cellular Tile
+
+The whole label of the cellular data tile on Control Center's connectivity
+page. With two SIMs the line under it names the line in use (`Principale`).
+
+- cellular data
+- mobile data
+- données cellulaires
+
+## Control Center Off State
+
+The whole line under a Control Center connectivity tile's label when it is
+off. Any other line under the label (a network name, a SIM line, `on`) reads
+as on.
+
+- off
+- non

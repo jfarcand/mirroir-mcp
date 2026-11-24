@@ -28,6 +28,12 @@ import HelperLib
 /// A switch that cannot be read, or reads differently twice, is never
 /// tapped. Turning Airplane Mode on or Wi-Fi off can cut iPhone Mirroring's
 /// connection, after which nothing here can turn it back.
+///
+/// When iPhone Mirroring gives Control Center (macOS 27 with an iPhone on
+/// iOS 27), the switch is its connectivity tile instead and Settings is not
+/// opened (`ControlCenterNetwork`); Mirroring refuses Control Center to an
+/// older iPhone, which then goes through Settings. Both paths read, tap only
+/// when needed, and read again the same way (`apply`).
 enum NetworkToggle {
 
     /// A `set_network` mode: which switch, and the state asked for.
@@ -68,6 +74,15 @@ enum NetworkToggle {
             }
         }
 
+        /// The mode's tile on Control Center's connectivity page.
+        var controlCenterTile: SystemPhrases.Section {
+            switch self {
+            case .airplaneOn, .airplaneOff: return .controlCenterAirplaneTile
+            case .wifiOn, .wifiOff: return .controlCenterWiFiTile
+            case .cellularOn, .cellularOff: return .controlCenterCellularTile
+            }
+        }
+
         /// Whether the asked state can cut iPhone Mirroring's connection.
         var cutsMirroring: Bool { self == .airplaneOn || self == .wifiOff }
 
@@ -96,11 +111,18 @@ enum NetworkToggle {
     ///   - loadUs: How long Settings or a page takes to load before it is read.
     ///   - phrases: Where the labels come from; the shipped file by default.
     ///   - read: Reads a row's switch; the screenshot's pixels by default.
+    ///   - settingsRefusal: Why the Settings app may not be opened (the
+    ///     permission policy), checked only when the Settings path is taken.
+    ///   - controlCenterDescriber: Reads Control Center's tiles; `describer` by
+    ///     default. The configured describer: a vision model reads the faint
+    ///     state lines OCR can miss. `describer` (OCR) locates the icon to tap.
     static func toggle(
         mode modeName: String, input: any InputProviding, describer: any ScreenDescribing,
+        controlCenterDescriber: (any ScreenDescribing)? = nil,
         menuBridge: any MenuActionCapable, settleUs: UInt32,
         loadUs: UInt32 = EnvConfig.settingsLoadUs, phrases: SystemPhrases = .live,
-        read: @escaping SwitchRead = pixelRead
+        read: @escaping SwitchRead = pixelRead,
+        settingsRefusal: () -> String? = { nil }
     ) -> Result<String, ToggleError> {
         guard let mode = Mode(rawValue: modeName) else {
             return .failure(ToggleError(
@@ -109,9 +131,23 @@ enum NetworkToggle {
         guard let size = menuBridge.getWindowInfo()?.size else {
             return .failure(ToggleError("The '\(menuBridge.targetName)' window is not available"))
         }
-        let session = Session(mode: mode, input: input, describer: describer, size: size,
-                              settleUs: settleUs, loadUs: loadUs, phrases: phrases, read: read)
-        let outcome = session.run()
+        let outcome: Result<String, ToggleError>
+        let tileDescriber = controlCenterDescriber ?? describer
+        switch ControlCenterNetwork.open(menuBridge: menuBridge, input: input, describer: tileDescriber,
+                                         size: size, loadUs: loadUs, phrases: phrases) {
+        case .opened:
+            outcome = controlCenterSet(mode: mode, input: input, describer: tileDescriber,
+                                       locator: describer, size: size,
+                                       settleUs: settleUs, phrases: phrases)
+        case .failed(let reason):
+            outcome = .failure(ToggleError(reason))
+        case .unavailable(let reason):
+            DebugLog.log("set_network", "Control Center unavailable (\(reason)); using Settings")
+            if let refusal = settingsRefusal() { return .failure(ToggleError(refusal)) }
+            let session = Session(mode: mode, input: input, describer: describer, size: size,
+                                  settleUs: settleUs, loadUs: loadUs, phrases: phrases, read: read)
+            outcome = session.run()
+        }
         _ = menuBridge.triggerMenuAction(
             menu: MirroringMenuCommand.menu, item: MirroringMenuCommand.homeScreen.rawValue)
         return outcome
@@ -178,40 +214,13 @@ enum NetworkToggle {
         /// Read the switch beside one of `labels`, twice; tap it if it is not
         /// in the asked state, then read it again.
         private func setSwitch(labels: [String]) -> Result<String, ToggleError> {
-            guard let first = switchRow(labels: labels) else {
-                return .failure(ToggleError("No \(mode.switchName) switch was found: the row is a menu on "
+            NetworkToggle.apply(
+                mode: mode, control: "switch", settleUs: settleUs,
+                notFound: "No \(mode.switchName) switch was found: the row is a menu on "
                     + "this iPhone (with two SIMs, cellular data is), or the switch could not be read "
-                    + "(only the light appearance is measured). Nothing was tapped."))
-            }
-            guard let second = switchRow(labels: labels), second.reading.state == first.reading.state else {
-                return .failure(ToggleError("The \(mode.switchName) switch read differently twice; "
-                    + "nothing was tapped."))
-            }
-            let wanted: SettingsSwitchReader.State = mode.wantsOn ? .on : .off
-            if first.reading.state == wanted {
-                return .success("\(mode.switchName) is already \(word(wanted)): nothing was tapped.")
-            }
-            guard let center = second.reading.center else {
-                return .failure(ToggleError("The \(mode.switchName) switch has no tap point; nothing was tapped."))
-            }
-            if let error = input.tap(x: center.x, y: center.y) {
-                return .failure(ToggleError("Failed to tap the \(mode.switchName) switch: \(error)"))
-            }
-            usleep(settleUs)
-            let warning = mode.cutsMirroring
-                ? " Turning \(mode.switchName) \(word(wanted)) can cut iPhone Mirroring's connection; "
-                    + "only the iPhone can turn it back."
-                : ""
-            guard let after = switchRow(labels: labels) else {
-                return .success("Tapped the \(mode.switchName) switch, which read \(word(first.reading.state)); "
-                    + "it could not be read afterwards.\(warning)")
-            }
-            guard after.reading.state == wanted else {
-                return .failure(ToggleError("Tapped the \(mode.switchName) switch, but it still reads "
-                    + "\(word(after.reading.state)).\(warning)"))
-            }
-            return .success("Turned \(mode.switchName) \(word(wanted)): the switch now reads "
-                + "\(word(wanted)).\(warning)")
+                    + "(only the light appearance is measured). Nothing was tapped.",
+                read: { switchRow(labels: labels)?.reading },
+                tap: { input.tap(x: $0.x, y: $0.y) })
         }
 
         /// The first row labelled with one of `labels` whose switch reads.
@@ -233,12 +242,78 @@ enum NetworkToggle {
             }
         }
 
-        private func word(_ state: SettingsSwitchReader.State) -> String {
-            switch state {
-            case .on: return "on"
-            case .off: return "off"
-            case .none: return "unreadable"
-            }
+    }
+
+    /// Set `mode` on Control Center's connectivity page, already open: the
+    /// state is read there with `describer`, and the tile's icon is tapped
+    /// there, placed from `locator`'s OCR text (`ControlCenterNetwork.tapIcon`).
+    private static func controlCenterSet(
+        mode: Mode, input: any InputProviding, describer: any ScreenDescribing,
+        locator: any ScreenDescribing, size: CGSize, settleUs: UInt32, phrases: SystemPhrases
+    ) -> Result<String, ToggleError> {
+        apply(
+            mode: mode, control: "tile", settleUs: settleUs,
+            notFound: "No \(mode.switchName) tile with a readable state was found in Control Center "
+                + "(system-phrases.md, \(mode.controlCenterTile.rawValue)). Nothing was tapped.",
+            read: {
+                guard let screen = describer.describe(),
+                      let tile = ControlCenterNetwork.tile(mode.controlCenterTile, in: screen.elements,
+                                                           phrases: phrases) else { return nil }
+                let state = ControlCenterNetwork.state(of: tile, phrases: phrases)
+                guard state != .none else { return nil }
+                return .init(state: state, center: CGPoint(x: tile.label.tapX, y: tile.label.tapY))
+            },
+            tap: { _ in
+                ControlCenterNetwork.tapIcon(mode.controlCenterTile, input: input,
+                                             locator: locator, size: size, phrases: phrases)
+            })
+    }
+
+    /// Read the control twice; tap it if it is not in the asked state, then
+    /// read it again. `control` names it in results ("switch", "tile"); `tap`
+    /// taps it, given where it was read.
+    static func apply(
+        mode: Mode, control: String, settleUs: UInt32,
+        notFound: String, read: () -> SettingsSwitchReader.Reading?,
+        tap: (CGPoint) -> String?
+    ) -> Result<String, ToggleError> {
+        let name = "\(mode.switchName) \(control)"
+        guard let first = read() else { return .failure(ToggleError(notFound)) }
+        guard let second = read(), second.state == first.state else {
+            return .failure(ToggleError("The \(name) read differently twice; nothing was tapped."))
+        }
+        let wanted: SettingsSwitchReader.State = mode.wantsOn ? .on : .off
+        if first.state == wanted {
+            return .success("\(mode.switchName) is already \(word(wanted)): nothing was tapped.")
+        }
+        guard let center = second.center else {
+            return .failure(ToggleError("The \(name) has no tap point; nothing was tapped."))
+        }
+        if let error = tap(center) {
+            return .failure(ToggleError("Failed to tap the \(name): \(error)"))
+        }
+        usleep(settleUs)
+        let warning = mode.cutsMirroring
+            ? " Turning \(mode.switchName) \(word(wanted)) can cut iPhone Mirroring's connection; "
+                + "only the iPhone can turn it back."
+            : ""
+        guard let after = read() else {
+            return .success("Tapped the \(name), which read \(word(first.state)); "
+                + "it could not be read afterwards.\(warning)")
+        }
+        guard after.state == wanted else {
+            return .failure(ToggleError("Tapped the \(name), but it still reads "
+                + "\(word(after.state)).\(warning)"))
+        }
+        return .success("Turned \(mode.switchName) \(word(wanted)): the \(control) now reads "
+            + "\(word(wanted)).\(warning)")
+    }
+
+    private static func word(_ state: SettingsSwitchReader.State) -> String {
+        switch state {
+        case .on: return "on"
+        case .off: return "off"
+        case .none: return "unreadable"
         }
     }
 

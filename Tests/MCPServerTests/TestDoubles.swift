@@ -79,6 +79,21 @@ final class StubBridge: MenuActionCapable, @unchecked Sendable {
         return menuActionResult
     }
 
+    /// What `pressMenuItem(commandKey:)` answers; false = no such item, as on
+    /// an iPhone Mirroring without Control Centre.
+    var menuItemResult = false
+    /// The state the session is in after a pressed menu item (nil = unchanged);
+    /// `.paused` stands for Mirroring's "Update Required" refusal.
+    var stateAfterMenuItem: WindowState?
+    /// Records the key equivalents pressed.
+    var menuItemCalls: [String] = []
+
+    func pressMenuItem(commandKey: String) -> Bool {
+        menuItemCalls.append(commandKey)
+        if menuItemResult, let stateAfterMenuItem { state = stateAfterMenuItem }
+        return menuItemResult
+    }
+
     /// Successive `pressResume()` results; when empty, `pressResumeResult` answers.
     var pressResumeResults: [Bool] = []
 

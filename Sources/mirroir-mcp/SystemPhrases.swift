@@ -62,6 +62,14 @@ struct SystemPhrases: Sendable, Equatable {
         case settingsCellularRow = "Settings Cellular Row"
         /// The row on the cellular page holding the cellular data switch.
         case settingsCellularSwitch = "Settings Cellular Switch"
+        /// The whole label of Airplane Mode's Control Center tile.
+        case controlCenterAirplaneTile = "Control Center Airplane Tile"
+        /// The whole label of the Wi-Fi Control Center tile.
+        case controlCenterWiFiTile = "Control Center Wi-Fi Tile"
+        /// The whole label of the cellular data Control Center tile.
+        case controlCenterCellularTile = "Control Center Cellular Tile"
+        /// The whole line under a Control Center tile's label when it is off.
+        case controlCenterOffState = "Control Center Off State"
     }
 
     /// Each section's bullets, folded with `fold`, in file order.

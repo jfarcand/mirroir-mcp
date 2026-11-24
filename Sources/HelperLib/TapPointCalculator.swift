@@ -70,10 +70,14 @@ public struct TapPoint: Sendable, Codable, Equatable {
     /// Where the text came from. In a saved file the key is written only for
     /// text that did not come from pixels, and absent means pixels.
     public let source: TextSource
+    /// The text's width in window points, when the recognizer measured it
+    /// (OCR does; a vision model does not). Not written to saved files.
+    public let width: Double?
 
     public init(text: String, tapX: Double, tapY: Double, confidence: Float, pageY: Double? = nil,
-                source: TextSource = .pixels) {
+                source: TextSource = .pixels, width: Double? = nil) {
         self.text = text
+        self.width = width
         self.tapX = tapX
         self.tapY = tapY
         self.pageY = pageY ?? tapY
@@ -93,6 +97,7 @@ public struct TapPoint: Sendable, Codable, Equatable {
         pageY = try container.decode(Double.self, forKey: .pageY)
         confidence = try container.decode(Float.self, forKey: .confidence)
         source = try container.decodeIfPresent(TextSource.self, forKey: .source) ?? .pixels
+        width = nil
     }
 
     public func encode(to encoder: Encoder) throws {
@@ -289,7 +294,8 @@ public enum TapPointCalculator {
                     text: element.text,
                     tapX: element.tapX,
                     tapY: tapY,
-                    confidence: element.confidence
+                    confidence: element.confidence,
+                    width: element.bboxWidth
                 ))
             }
         }
