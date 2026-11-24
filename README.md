@@ -10,6 +10,7 @@
 [![macOS 15+](https://img.shields.io/badge/macOS-15%2B-black?logo=apple)](https://support.apple.com/en-us/120421)
 [![Rust 1.99+](https://img.shields.io/badge/Rust-1.99%2B-orange?logo=rust)](runner/README.md)
 [![Discord](https://img.shields.io/discord/1481795325953048627?logo=discord&label=Discord)](https://discord.gg/u8ug9QCSqF)
+[![jfarcand/mirroir-mcp MCP server](https://glama.ai/mcp/servers/jfarcand/mirroir-mcp/badges/score.svg)](https://glama.ai/mcp/servers/jfarcand/mirroir-mcp)
 
 ### Let your agent use your real iPhone: errands across your apps, automations, even games.
 
