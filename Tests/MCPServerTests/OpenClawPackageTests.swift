@@ -62,6 +62,10 @@ final class OpenClawPackageTests: XCTestCase {
         XCTAssertEqual(server["transport"] as? String, "stdio")
         XCTAssertEqual(server["command"] as? String, "npx")
         XCTAssertEqual(server["args"] as? [String], ["-y", "mirroir-mcp@\(MirroirVersion.current)"])
+        // OpenClaw's defaults are 30s to start and 60s per call. A first npx run downloads the
+        // package and the binary and missed the 30s on a Gateway, and one screen read took 47s.
+        XCTAssertGreaterThanOrEqual(server["connectionTimeoutMs"] as? Int ?? 0, 180_000)
+        XCTAssertGreaterThanOrEqual(server["requestTimeoutMs"] as? Int ?? 0, 600_000)
     }
 
     func testThePackageVersionAndEntryMatch() throws {

@@ -8,7 +8,9 @@ This package is an OpenClaw plugin: it brings the mirroir MCP server, the operat
 
 From a checkout of this repository:
 
-    openclaw plugins install --link ./plugins/openclaw
+    openclaw plugins install --link --force --accept-capabilities ./plugins/openclaw
+
+OpenClaw installs a plugin from a local path only with `--force`, and asks consent to this plugin's capabilities, given with `--accept-capabilities`; without them, a non-interactive install cancels. Restart the Gateway afterwards: it reads the plugin when it starts.
 
 Needs OpenClaw 2026.10.9 or later, an Apple Silicon Mac on macOS 15 or later with iPhone Mirroring connected, and Node.js (the server starts with `npx`). Grant Screen Recording and Accessibility to the app that runs the OpenClaw Gateway; `npx -y mirroir-mcp doctor` names the app and the pane.
 

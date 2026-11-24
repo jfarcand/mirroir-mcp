@@ -52,10 +52,12 @@ openclaw mcp add mirroir --command mirroir-mcp
 or, with an approval prompt before every call that can change the phone, as an OpenClaw plugin from a checkout of this repository (OpenClaw 2026.10.9 or later):
 
 ```bash
-openclaw plugins install --link ./plugins/openclaw
+openclaw plugins install --link --force --accept-capabilities ./plugins/openclaw
 ```
 
-The package is [plugins/openclaw](../plugins/openclaw/README.md): the server, the operating manual as a skill, and a `before_tool_call` gate. Read-only tools run unasked, every other mirroir call asks the owner first, and a sender OpenClaw knows is not the owner is refused. Its gate is tested in CI with `node --test`; it has not yet been installed on a running OpenClaw Gateway.
+`--force` confirms the local source and `--accept-capabilities` gives the capability consent OpenClaw asks for; a non-interactive install cancels without them. Restart the Gateway afterwards.
+
+The package is [plugins/openclaw](../plugins/openclaw/README.md): the server, the operating manual as a skill, and a `before_tool_call` gate. Read-only tools run unasked, every other mirroir call asks the owner first, and a sender OpenClaw knows is not the owner is refused. Its gate is tested in CI with `node --test`. On OpenClaw 2026.11.8, a Gateway started the server and gave its tools to an agent turn through Tool Search: a read-only call ran unasked, a call that can change the phone waited for the owner in the Control UI and ran after **Allow once**, and with no approval surface connected it was refused.
 
 or from [Hermes Agent](https://github.com/NousResearch/hermes-agent) 0.21.6 or later, as a plugin that brings the server, the operating manual as a skill, and an approval prompt before every call that can change the phone:
 
