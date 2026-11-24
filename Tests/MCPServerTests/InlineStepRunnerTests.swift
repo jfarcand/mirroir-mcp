@@ -214,6 +214,36 @@ final class InlineStepRunnerTests: XCTestCase {
                        "only the allowed Horloge tap was sent, to its icon")
     }
 
+    /// The action a condition gates passes the same blocked-app check a
+    /// top-level tap does: the condition holds, the tap is still refused.
+    func testATapOnABlockedAppsIconInsideAConditionSendsNothing() {
+        describer.describeResult = ScreenDescriber.DescribeResult(
+            elements: [TapPoint(text: "Horloge", tapX: 263, tapY: 289, confidence: 0.9),
+                       TapPoint(text: "Réglages", tapX: 263, tapY: 394, confidence: 0.9),
+                       TapPoint(text: "Q Rechercher", tapX: 215, tapY: 784, confidence: 0.9)],
+            screenshotBase64: "")
+        let policy = PermissionPolicy(skipPermissions: false, config: PermissionConfig(
+            allow: ["*"], blockedApps: ["Réglages"]))
+        let result = call(makeServer(policy: policy), "run_steps",
+                          steps([#"condition: visible "Réglages" -> tap: Réglages"#]))
+        XCTAssertTrue(result.isError, result.text)
+        XCTAssertTrue(result.text.contains("'Réglages' icon"), result.text)
+        XCTAssertTrue(input.tapCalls.isEmpty)
+    }
+
+    /// A condition needs the permission of the action it may run, so a denied
+    /// action refuses the list before anything runs.
+    func testAConditionIsCheckedForTheActionItRuns() {
+        let policy = PermissionPolicy(skipPermissions: false,
+                                      config: PermissionConfig(allow: ["run_steps", "tap"]))
+        let refusal = InlineStepRunner.prepare(
+            ["tap: Search", #"condition: visible "Search" -> type: calculator"#], policy: policy)
+        guard case .failure(.denied(let index, _, _)) = refusal else {
+            return XCTFail("a gated type needs type_text's permission, got \(refusal)")
+        }
+        XCTAssertEqual(index, 1)
+    }
+
     func testTextThatLooksLikeNumbersIsStillText() {
         XCTAssertNil(TapStepPoint.parse("12,41"))
         XCTAssertNil(TapStepPoint.parse("@12"))

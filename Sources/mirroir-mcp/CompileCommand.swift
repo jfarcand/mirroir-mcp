@@ -354,6 +354,10 @@ enum CompileCommand {
             // Replayed live: a sleep would pass without running the action or the check.
             return .passthrough()
 
+        case .condition, .repeatUntil:
+            // Replayed live: whether the action runs depends on the screen at replay time.
+            return .passthrough()
+
         case .skipped, .invalid:
             // AI-only steps cannot be compiled
             return nil

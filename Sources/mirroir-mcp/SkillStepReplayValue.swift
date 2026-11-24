@@ -65,6 +65,13 @@ extension SkillStep {
             }
             parts.append("name: \(name)")
             return "{ " + parts.joined(separator: ", ") + " }"
+        case .condition(let check, let action):
+            guard let label = Self.quoted(check.label), let action = action.nestedText else { return nil }
+            return "\(check.written(quotedLabel: label)) \(ControlFlowSteps.arrow) \(action)"
+        case .repeatUntil(let check, let maxIterations, let body):
+            guard let label = Self.quoted(check.label), let body = body.nestedText else { return nil }
+            return "until \(check.written(quotedLabel: label)), max \(maxIterations) "
+                + "\(ControlFlowSteps.arrow) \(body)"
         case .launch, .tap, .type, .swipe, .assertVisible, .assertNotVisible, .screenshot,
              .openURL, .resetApp, .setNetwork, .scrollTo, .waitFor, .longPress, .pressKey,
              .home, .shake, .clearField, .skipped, .invalid:
@@ -91,7 +98,8 @@ extension SkillStep {
             return ([key] + modifiers).joined(separator: "+")
         case .waitFor(let label, _), .longPress(let label, _):
             return label
-        case .drag, .switchTarget, .measure, .scene, .home, .shake, .clearField, .skipped, .invalid:
+        case .drag, .switchTarget, .measure, .scene, .condition, .repeatUntil, .home, .shake,
+             .clearField, .skipped, .invalid:
             return nil
         }
     }
@@ -103,7 +111,7 @@ extension SkillStep {
         switch self {
         case .waitFor(_, let timeout): return timeout != nil
         case .longPress(_, let durationMs): return durationMs != nil
-        case .drag, .switchTarget, .measure: return true
+        case .drag, .switchTarget, .measure, .condition, .repeatUntil: return true
         default: return false
         }
     }
@@ -136,9 +144,26 @@ extension SkillStep {
                             until: transform(until), maxSeconds: maxSeconds)
         case .pressKey(let key, let modifiers):
             return .pressKey(keyName: transform(key), modifiers: modifiers)
+        case .condition(let check, let action):
+            return .condition(check: ScreenCheck(label: transform(check.label), visible: check.visible),
+                              then: action.mappingValues(transform))
+        case .repeatUntil(let check, let maxIterations, let body):
+            return .repeatUntil(check: ScreenCheck(label: transform(check.label), visible: check.visible),
+                                maxIterations: maxIterations, body: body.mappingValues(transform))
         case .home, .shake, .clearField, .switchTarget, .scene, .skipped, .invalid:
             return self
         }
+    }
+
+    /// A step written whole, `type: value`, as the action of a condition or repeat:
+    /// a plain value quoted once, a structured one as it replays, a bare type for a
+    /// step with no value (`home`). Nil when the value cannot be written back.
+    var nestedText: String? {
+        if hasStructuredReplayValue {
+            return replayValue.map { "\(typeKey): \($0)" }
+        }
+        guard let plain = plainValue else { return typeKey }
+        return Self.quoted(plain).map { "\(typeKey): \($0)" }
     }
 
     /// A value quoted for a structured replay value: in double quotes, or in single

@@ -74,6 +74,10 @@ enum SkillStep {
     /// scenario's move-picker command `decider` when the skill needs one. Never
     /// compiled: a scene is a model loop, not a replayable action.
     case scene(skill: String, budget: SceneBudget, decider: String? = nil)
+    /// Run `then` only when `check` holds on the screen read just before it.
+    indirect case condition(check: ScreenCheck, then: SkillStep)
+    /// Run `body` until `check` holds, at most `maxIterations` times.
+    indirect case repeatUntil(check: ScreenCheck, maxIterations: Int, body: SkillStep)
     case skipped(stepType: String, reason: String)
     /// A step the parser could not turn into an action: an unknown verb or a
     /// malformed value. A skill holding one is refused before it runs.
@@ -103,6 +107,8 @@ enum SkillStep {
         case .drag: return "drag"
         case .switchTarget: return "target"
         case .scene: return "scene"
+        case .condition: return "condition"
+        case .repeatUntil: return "repeat"
         case .skipped(let stepType, _): return stepType
         case .invalid(let stepType, _): return stepType
         }
@@ -140,6 +146,7 @@ enum SkillStep {
         case .drag(let fromLabel, _): return fromLabel
         case .switchTarget(let selector): return selector.labelValue
         case .scene(let skill, _, _): return skill
+        case .condition(let check, _), .repeatUntil(let check, _, _): return check.label
         case .skipped, .invalid: return nil
         }
     }
@@ -170,6 +177,10 @@ enum SkillStep {
         case .drag(let from, let to): return "drag: \"\(from)\" -> \"\(to)\""
         case .switchTarget(let selector): return "target: \(selector.displayName)"
         case .scene(let skill, _, _): return "scene: \"\(skill)\""
+        case .condition(let check, let action):
+            return "condition: \(check.displayName) -> \(action.displayName)"
+        case .repeatUntil(let check, let max, let body):
+            return "repeat: until \(check.displayName), max \(max) -> \(body.displayName)"
         case .skipped(let type, _): return "\(type) (skipped)"
         case .invalid(let type, _): return "\(type) (invalid)"
         }
@@ -340,6 +351,10 @@ enum SkillParser {
     /// `key: value`. Also rebuilds a step from a compiled step's type and label.
     static func parseStep(key: String, rawValue: String) -> SkillStep {
         let value = stripQuotes(rawValue)
+
+        // The structured condition and repeat run on their own; free text stays AI-only.
+        if key == "condition", let step = ControlFlowSteps.parseCondition(value) { return step }
+        if key == "repeat", let step = ControlFlowSteps.parseRepeat(value) { return step }
 
         switch key {
         case "launch":

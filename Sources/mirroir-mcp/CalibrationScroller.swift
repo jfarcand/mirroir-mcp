@@ -31,6 +31,20 @@ enum CalibrationScroller {
         let elements: [TapPoint]
     }
 
+    /// Why a full-page collection stopped scrolling.
+    enum StopReason: String, Equatable, Sendable {
+        /// A scroll revealed (almost) nothing new: the content ended.
+        case endOfContent = "end_of_content"
+        /// The scroll budget ran out while content was still arriving.
+        case maxScrolls = "max_scrolls"
+        /// A scroll gesture could not be sent.
+        case scrollFailed = "scroll_failed"
+        /// The screen could not be read after a scroll.
+        case readFailed = "read_failed"
+        /// The window size is unknown, so nothing was scrolled.
+        case noWindow = "no_window"
+    }
+
     /// Result of a full-page scroll collection.
     struct ScrollResult {
         /// All unique elements found across all viewports.
@@ -49,6 +63,8 @@ enum CalibrationScroller {
         /// Whether the screen appears to have infinite scroll (every scroll revealed
         /// substantial new content and we hit the max scroll limit).
         let isInfiniteScroll: Bool
+        /// Why the scrolling stopped.
+        let stopReason: StopReason
     }
 
     /// Minimum novelty ratio (new elements / total current elements) to continue scrolling.
@@ -65,12 +81,15 @@ enum CalibrationScroller {
     ///   - input: Input provider for swipe gestures.
     ///   - bridge: Window bridge for getting window dimensions.
     ///   - maxScrolls: Maximum number of scroll attempts.
+    ///   - anchor: The point to scroll at, for a list inside the screen; nil
+    ///     scrolls the page at the window's configured swipe positions.
     /// - Returns: Aggregated scroll result, or nil if initial OCR fails.
     static func collectFullPage(
         describer: any ScreenDescribing,
         input: any InputProviding,
         bridge: any WindowBridging,
-        maxScrolls: Int = EnvConfig.defaultScrollMaxAttempts
+        maxScrolls: Int = EnvConfig.defaultScrollMaxAttempts,
+        anchor: CGPoint? = nil
     ) -> ScrollResult? {
         // Start with the current viewport
         guard let firstResult = describer.describe() else {
@@ -91,14 +110,21 @@ enum CalibrationScroller {
                 screenshotBase64: lastScreenshot,
                 totalScrollOffset: 0.0,
                 scrollExhausted: true,
-                isInfiniteScroll: false
+                isInfiniteScroll: false,
+                stopReason: .noWindow
             )
         }
 
         let windowHeight = Double(windowInfo.size.height)
         let centerX = Double(windowInfo.size.width) / 2.0
-        let scrollFromY = windowHeight * EnvConfig.scrollSwipeFromYFraction
-        let scrollToY = windowHeight * EnvConfig.scrollSwipeToYFraction
+        // At an anchor, the same swipe scroll_to sends there; otherwise the page swipe.
+        let anchored = anchor.flatMap {
+            ScrollSeeker.endpoints(fingerDirection: "up", window: windowInfo.size, around: $0)
+        }
+        let swipeX = anchored?.fromX ?? centerX
+        let scrollFromY = anchored?.fromY ?? windowHeight * EnvConfig.scrollSwipeFromYFraction
+        let scrollToY = anchored?.toY ?? windowHeight * EnvConfig.scrollSwipeToYFraction
+        var stopReason = StopReason.maxScrolls
         let dedupStrategy = ScrollDedupStrategy(rawValue: EnvConfig.scrollDedupStrategy) ?? .exact
 
         // Start with first viewport elements (page-absolute Y = viewport Y for first frame)
@@ -121,14 +147,15 @@ enum CalibrationScroller {
             // Swipe up (scroll content down) using configurable Y positions.
             // The midpoint must land in the upper content area of the window
             // for iPhone Mirroring to accept scroll wheel events.
-            let fromX = centerX
+            let fromX = swipeX
             let fromY = scrollFromY
-            let toX = centerX
+            let toX = swipeX
             let toY = scrollToY
 
             if input.swipe(fromX: fromX, fromY: fromY,
                            toX: toX, toY: toY,
                            durationMs: EnvConfig.defaultSwipeDurationMs) != nil {
+                stopReason = .scrollFailed
                 break
             }
 
@@ -136,6 +163,7 @@ enum CalibrationScroller {
             scrollCount += 1
 
             guard let result = describer.describe() else {
+                stopReason = .readFailed
                 break
             }
 
@@ -147,12 +175,14 @@ enum CalibrationScroller {
             let newTexts = currentTexts.subtracting(previousTexts)
             if newTexts.isEmpty {
                 exhaustionReached = true
+                stopReason = .endOfContent
                 break
             }
             let noveltyRatio = currentTexts.isEmpty ? 0.0
                 : Double(newTexts.count) / Double(currentTexts.count)
             if noveltyRatio < exhaustionThreshold {
                 exhaustionReached = true
+                stopReason = .endOfContent
                 DebugLog.persist("ScrollExhaustion", "novelty=\(Int(noveltyRatio * 100))% " +
                     "(\(newTexts.count)/\(currentTexts.count)) — exhausted")
                 break
@@ -235,7 +265,8 @@ enum CalibrationScroller {
             screenshotBase64: lastScreenshot,
             totalScrollOffset: cumulativeOffset,
             scrollExhausted: exhaustionReached,
-            isInfiniteScroll: infiniteScroll
+            isInfiniteScroll: infiniteScroll,
+            stopReason: stopReason
         )
     }
 

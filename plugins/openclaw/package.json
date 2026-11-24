@@ -1,0 +1,36 @@
+{
+  "name": "mirroir-openclaw",
+  "version": "0.51.0",
+  "description": "OpenClaw plugin for mirroir: the mirroir MCP server, its operating manual, and an owner approval before every call that can change the iPhone.",
+  "type": "module",
+  "license": "Apache-2.0",
+  "homepage": "https://mirroir.dev",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/jfarcand/mirroir-mcp.git",
+    "directory": "plugins/openclaw"
+  },
+  "files": [
+    "index.js",
+    "approval.js",
+    "read-only-tools.json",
+    "openclaw.plugin.json",
+    "skills",
+    "README.md"
+  ],
+  "scripts": {
+    "test": "node --test"
+  },
+  "peerDependencies": {
+    "openclaw": ">=2026.10.9"
+  },
+  "openclaw": {
+    "extensions": ["./index.js"],
+    "compat": {
+      "pluginApi": ">=2026.10.9"
+    },
+    "install": {
+      "minHostVersion": ">=2026.10.9"
+    }
+  }
+}

@@ -109,14 +109,14 @@ jobs:
           sed -i '' "s/const VERSION = \"$OLD_VERSION\"/const VERSION = \"$VERSION\"/" npm/install.js
           sed -i '' "s/\"version\": \"$OLD_VERSION\"/\"version\": \"$VERSION\"/g" server.json
           sed -i '' "s/static let current = \"$OLD_VERSION\"/static let current = \"$VERSION\"/" Sources/mirroir-mcp/Version.swift
-          sed -i '' "s/\"version\": \"$OLD_VERSION\"/\"version\": \"$VERSION\"/" mcpb/manifest.json plugins/mirroir/.claude-plugin/plugin.json plugins/hermes/plugin.json
-          sed -i '' "s/mirroir-mcp@$OLD_VERSION/mirroir-mcp@$VERSION/" plugins/mirroir/.claude-plugin/plugin.json plugins/hermes/mcp.json
+          sed -i '' "s/\"version\": \"$OLD_VERSION\"/\"version\": \"$VERSION\"/" mcpb/manifest.json plugins/mirroir/.claude-plugin/plugin.json plugins/hermes/plugin.json plugins/openclaw/openclaw.plugin.json plugins/openclaw/package.json
+          sed -i '' "s/mirroir-mcp@$OLD_VERSION/mirroir-mcp@$VERSION/" plugins/mirroir/.claude-plugin/plugin.json plugins/hermes/mcp.json plugins/openclaw/openclaw.plugin.json
 
       - name: Verify no stale version references
         env:
           OLD_VERSION: ${{ steps.current.outputs.version }}
         run: |
-          FILES="npm/package.json npm/install.js server.json Sources/mirroir-mcp/Version.swift mcpb/manifest.json plugins/mirroir/.claude-plugin/plugin.json plugins/hermes/plugin.json plugins/hermes/mcp.json"
+          FILES="npm/package.json npm/install.js server.json Sources/mirroir-mcp/Version.swift mcpb/manifest.json plugins/mirroir/.claude-plugin/plugin.json plugins/hermes/plugin.json plugins/hermes/mcp.json plugins/openclaw/openclaw.plugin.json plugins/openclaw/package.json"
           if grep -l "$OLD_VERSION" $FILES; then
             echo "ERROR: Stale version references remain in the files above"
             exit 1
@@ -153,7 +153,8 @@ jobs:
           git add npm/package.json npm/install.js server.json \
             Sources/mirroir-mcp/Version.swift \
             mcpb/manifest.json plugins/mirroir/.claude-plugin/plugin.json \
-            plugins/hermes/plugin.json plugins/hermes/mcp.json
+            plugins/hermes/plugin.json plugins/hermes/mcp.json \
+            plugins/openclaw/openclaw.plugin.json plugins/openclaw/package.json
           git commit -m "chore: bump version to $VERSION"
           git push origin "HEAD:refs/tags/v$VERSION"
 

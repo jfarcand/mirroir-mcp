@@ -165,7 +165,20 @@ extension MirroirMCP {
                     "scroll": .object([
                         "type": .string("boolean"),
                         "description": .string(
-                            "Scroll through the full page to collect all elements with page-absolute Y coordinates (default: false)"),
+                            "Scroll through the full page to collect all elements with page-absolute Y coordinates (default: false). "
+                            + "The reply's _meta says why the scrolling stopped: stop_reason=end_of_content when the list ended, "
+                            + "max_scrolls when it was still going"),
+                    ]),
+                    "max_scrolls": .object([
+                        "type": .string("integer"),
+                        "description": .string(
+                            "With scroll: true, the most scrolls to make (default: \(EnvConfig.defaultScrollMaxAttempts))"),
+                    ]),
+                    "at": .object([
+                        "type": .string("array"),
+                        "description": .string(
+                            "With scroll: true, the point [x, y] in window points to scroll at, for a list inside the "
+                            + "screen (a carousel, a sheet). Default: the page."),
                     ]),
                     "omit_screenshot": .object([
                         "type": .string("boolean"),
@@ -214,8 +227,18 @@ extension MirroirMCP {
                 // Full-page scroll mode: collect all elements across viewports
                 if scrollEnabled {
                     let input = ctx.input
+                    let maxScrolls = args["max_scrolls"]?.asInt() ?? EnvConfig.defaultScrollMaxAttempts
+                    guard maxScrolls >= 1 else {
+                        return .error("max_scrolls must be at least 1, got \(maxScrolls)")
+                    }
+                    let anchor: CGPoint?
+                    switch ScrollAnchorArgument.parse(args["at"], bridge: bridge) {
+                    case .absent: anchor = nil
+                    case .point(let point): anchor = point
+                    case .invalid(let message): return .error(message)
+                    }
                     guard let scrollResult = describer.describeFullPage(
-                        input: input, bridge: bridge
+                        input: input, bridge: bridge, maxScrolls: maxScrolls, anchor: anchor
                     ) else {
                         return .error(ScreenReadFailure.message(
                             "Failed to capture/analyze screen.", targetName: ctx.name,
@@ -234,7 +257,8 @@ extension MirroirMCP {
                             query: query, onScreen: scrollResult.elements.count))
                     }
                     lines.append("")
-                    lines.append("_meta: scroll_count=\(scrollResult.scrollCount) total_offset=\(Int(scrollResult.totalScrollOffset)) element_count=\(scrollResult.elements.count)"
+                    lines.append("_meta: scroll_count=\(scrollResult.scrollCount) "
+                        + "stop_reason=\(scrollResult.stopReason.rawValue) total_offset=\(Int(scrollResult.totalScrollOffset)) element_count=\(scrollResult.elements.count)"
                         + DescribeScreenFilter.sourceCounts(scrollResult.elements, truncated: false))
                     let description = lines.joined(separator: "\n")
 

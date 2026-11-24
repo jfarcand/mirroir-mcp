@@ -181,11 +181,13 @@ protocol ScreenDescribing: Sendable {
     ///   - input: Input provider for scroll gestures.
     ///   - bridge: Window bridge for getting window dimensions.
     ///   - maxScrolls: Maximum number of scroll attempts.
+    ///   - anchor: The point to scroll at, for a list inside the screen; nil scrolls the page.
     /// - Returns: The scroll result with all unique elements, or nil if OCR failed.
     func describeFullPage(
         input: any InputProviding,
         bridge: any WindowBridging,
-        maxScrolls: Int
+        maxScrolls: Int,
+        anchor: CGPoint?
     ) -> CalibrationScroller.ScrollResult?
 }
 
@@ -198,11 +200,12 @@ extension ScreenDescribing {
     func describeFullPage(
         input: any InputProviding,
         bridge: any WindowBridging,
-        maxScrolls: Int = EnvConfig.defaultScrollMaxAttempts
+        maxScrolls: Int = EnvConfig.defaultScrollMaxAttempts,
+        anchor: CGPoint? = nil
     ) -> CalibrationScroller.ScrollResult? {
         CalibrationScroller.collectFullPage(
             describer: self, input: input,
-            bridge: bridge, maxScrolls: maxScrolls
+            bridge: bridge, maxScrolls: maxScrolls, anchor: anchor
         )
     }
 }

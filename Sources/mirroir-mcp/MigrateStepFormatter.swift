@@ -95,12 +95,34 @@ enum MigrateStepFormatter {
             return "Remember: \(value)"
         case "measure":
             return formatMeasure(value)
+        case "condition", "repeat":
+            return formatControlFlow(key: key, value: value)
         default:
             // Unknown step — preserve as-is
             if value.isEmpty {
                 return key
             }
             return "\(key): \"\(value)\""
+        }
+    }
+
+    /// Format a one-line condition or repeat (`visible "X" -> tap: X`) as one
+    /// sentence; any other value is free text, written as any other step is.
+    static func formatControlFlow(key: String, value: String) -> String {
+        func action(_ step: SkillStep) -> String {
+            let raw = step.hasStructuredReplayValue ? (step.replayValue ?? "") : (step.plainValue ?? "")
+            return formatSimpleStep(key: step.typeKey, value: raw)
+        }
+        func check(_ check: ScreenCheck) -> String {
+            "\"\(check.label)\" is " + (check.visible ? "visible" : "not visible")
+        }
+        switch SkillParser.parseStep(key: key, rawValue: value) {
+        case .condition(let screenCheck, let then):
+            return "If \(check(screenCheck)): \(action(then))"
+        case .repeatUntil(let screenCheck, let maxIterations, let body):
+            return "Repeat until \(check(screenCheck)) (max \(maxIterations)): \(action(body))"
+        default:
+            return value.isEmpty ? key : "\(key): \"\(value)\""
         }
     }
 

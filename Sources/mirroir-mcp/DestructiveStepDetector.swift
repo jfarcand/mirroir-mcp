@@ -141,6 +141,9 @@ enum DestructiveStepDetector {
         // Times an inner action; the inner action carries the consequence.
         case .measure(_, let action, _, _):
             return consequentialText(of: action)
+        // Gates or repeats an inner action; the inner action carries the consequence.
+        case .condition(_, let action), .repeatUntil(_, _, let action):
+            return consequentialText(of: action)
         // Observation, navigation, and device-level steps carry no target text.
         case .launch, .clearField, .pressKey, .swipe, .waitFor, .assertVisible, .assertNotVisible,
              .screenshot, .home, .shake, .scrollTo, .resetApp, .setNetwork,

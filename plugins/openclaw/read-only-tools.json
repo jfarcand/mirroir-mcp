@@ -1,0 +1,16 @@
+[
+  "calibrate_component",
+  "check_health",
+  "classify_screen",
+  "describe_screen",
+  "get_notes",
+  "get_orientation",
+  "get_skill",
+  "list_skills",
+  "list_targets",
+  "listen",
+  "screenshot",
+  "start_recording",
+  "status",
+  "stop_recording"
+]

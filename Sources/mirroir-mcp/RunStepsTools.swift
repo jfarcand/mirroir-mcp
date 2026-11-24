@@ -25,6 +25,8 @@ extension MirroirMCP {
         registry: TargetRegistry,
         policy: PermissionPolicy
     ) {
+        // The passing runs of this server's session, by task label.
+        let drafts = TaskDraft()
         server.registerTool(MCPToolDefinition(
             name: "run_steps",
             description: """
@@ -37,7 +39,10 @@ extension MirroirMCP {
                 "type: calculator", "clear_field" (empties the focused field before \
                 a type), "press_key: return", \
                 "wait_for: Get", "assert_visible: Results", "swipe: up", \
-                "scroll_to: Privacy", "home". Every step must be allowed by the \
+                "scroll_to: Privacy", "home", and a checked action: \
+                "condition: visible \"Allow\" -> tap: Allow" (runs only when the element \
+                shows) or "repeat: until visible \"Done\", max 8 -> swipe: up" (runs until it \
+                shows, at most max times). Every step must be allowed by the \
                 permission policy, or nothing runs. The run stops at the first \
                 failed step and reports why; the reply ends with the text the \
                 screen shows afterwards, so one describe_screen confirms the result.
@@ -52,6 +57,13 @@ extension MirroirMCP {
                             "Steps in order, e.g. [\"tap: @324,113\", \"type: calculator\", "
                             + "\"press_key: return\", \"wait_for: Get\"]"),
                     ]),
+                    "task": .object([
+                        "type": .string("string"),
+                        "description": .string(
+                            "The task these steps do, in a few words, e.g. \"order a coffee\". When every "
+                            + "step passes, the reply ends with a SKILL.md draft of all the passing runs "
+                            + "given this task in this session, ready to save as a skill."),
+                    ]),
                 ]),
                 "required": .array([.string("steps")]),
             ],
@@ -65,13 +77,19 @@ extension MirroirMCP {
                 guard raw.count == values.count else {
                     return .error("Every step must be a string such as \"type: calculator\".")
                 }
+                let task = args["task"]?.asString()?.trimmingCharacters(in: .whitespaces)
+                if let task, let refusal = TaskDraft.refusal(of: task) {
+                    return .error("\(refusal). Nothing was run.")
+                }
                 switch InlineStepRunner.prepare(raw, policy: policy) {
                 case .failure(let refusal):
                     return .error(refusal.message)
                 case .success(let steps):
                     let executor = InlineStepRunner.executor(for: ctx, registry: registry, call: context.call)
                     let report = InlineStepRunner.run(steps, executor: executor, policy: policy)
-                    return report.failed ? .error(report.text) : .text(report.text)
+                    let text = task.map { report.text + "\n\n" + drafts.note(task: $0, report: report, steps: steps) }
+                        ?? report.text
+                    return report.failed ? .error(text) : .text(text)
                 }
             }
         ))

@@ -49,6 +49,14 @@ brew tap jfarcand/tap && brew install mirroir-mcp
 openclaw mcp add mirroir --command mirroir-mcp
 ```
 
+or, with an approval prompt before every call that can change the phone, as an OpenClaw plugin from a checkout of this repository (OpenClaw 2026.10.9 or later):
+
+```bash
+openclaw plugins install --link ./plugins/openclaw
+```
+
+The package is [plugins/openclaw](../plugins/openclaw/README.md): the server, the operating manual as a skill, and a `before_tool_call` gate. Read-only tools run unasked, every other mirroir call asks the owner first, and a sender OpenClaw knows is not the owner is refused. Its gate is tested in CI with `node --test`; it has not yet been installed on a running OpenClaw Gateway.
+
 or from [Hermes Agent](https://github.com/NousResearch/hermes-agent) 0.21.6 or later, as a plugin that brings the server, the operating manual as a skill, and an approval prompt before every call that can change the phone:
 
 ```bash

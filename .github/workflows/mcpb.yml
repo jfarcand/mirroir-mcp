@@ -45,7 +45,7 @@ jobs:
 
       - name: Manifests parse as JSON
         run: |
-          for f in .claude-plugin/marketplace.json plugins/mirroir/.claude-plugin/plugin.json mcpb/manifest.json plugins/hermes/plugin.json plugins/hermes/mcp.json; do
+          for f in .claude-plugin/marketplace.json plugins/mirroir/.claude-plugin/plugin.json mcpb/manifest.json plugins/hermes/plugin.json plugins/hermes/mcp.json plugins/openclaw/openclaw.plugin.json plugins/openclaw/package.json plugins/openclaw/read-only-tools.json; do
             python3 -I -m json.tool "$f" > /dev/null
             echo "ok: $f"
           done
@@ -71,7 +71,20 @@ jobs:
           if pin not in hermes_args:
               sys.exit(f"plugins/hermes/mcp.json args {hermes_args} do not pin {pin}")
           print(f"plugins/hermes version and npx pin match {expected}")
+          claw = json.load(open("plugins/openclaw/openclaw.plugin.json"))
+          claw_package = json.load(open("plugins/openclaw/package.json"))
+          for name, found in (("openclaw.plugin.json", claw["version"]), ("package.json", claw_package["version"])):
+              if found != expected:
+                  sys.exit(f"plugins/openclaw/{name} version {found} != server.json version {expected}")
+          claw_args = claw["mcpServers"]["mirroir"]["args"]
+          if pin not in claw_args:
+              sys.exit(f"plugins/openclaw/openclaw.plugin.json args {claw_args} do not pin {pin}")
+          print(f"plugins/openclaw version and npx pin match {expected}")
           EOF
+
+      - name: OpenClaw approval gate tests
+        working-directory: plugins/openclaw
+        run: node --test
 
       - name: MCPB manifest validates
         run: mcpb/build-mcpb.sh --check

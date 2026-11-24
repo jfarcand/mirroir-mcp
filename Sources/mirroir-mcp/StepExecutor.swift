@@ -105,6 +105,11 @@ final class StepExecutor {
     /// What a step stopped by that cancel reports.
     static let cancelledMessage = "the call was cancelled"
 
+    /// The checks a caller puts in front of each action a `condition` or
+    /// `repeat` runs (`run_steps` puts its driving and blocked-app checks
+    /// here): a result stops the action, nil lets it run.
+    var actionGuard: ((SkillStep) -> StepResult?)?
+
     init(bridge: any WindowBridging,
          input: InputProviding,
          describer: ScreenDescribing,
@@ -227,6 +232,12 @@ final class StepExecutor {
                                      skillName: skillName, startTime: startTime)
         case .switchTarget(let selector):
             result = executeSwitchTarget(selector: selector, startTime: startTime)
+        case .condition(let check, let action):
+            result = executeCondition(check: check, action: action, stepIndex: stepIndex,
+                                      skillName: skillName, startTime: startTime)
+        case .repeatUntil(let check, let maxIterations, let body):
+            result = executeRepeat(check: check, maxIterations: maxIterations, body: body,
+                                   stepIndex: stepIndex, skillName: skillName, startTime: startTime)
         case .scene(let skill, let budget, let decider):
             result = executeScene(skill: skill, budget: budget, decider: decider, stepIndex: stepIndex,
                                   skillName: skillName, startTime: startTime)

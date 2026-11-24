@@ -7,7 +7,7 @@ All 42 tools exposed by the MCP server. Mutating tools require [permission](perm
 | Tool | Parameters | Description |
 |------|-----------|-------------|
 | `screenshot` | `settle_ms`?, `scale`?, `region`? | Capture the iPhone screen as a PNG, with a line stating its pixel size, the window points it shows, and the pixels-per-point factor |
-| `describe_screen` | `scroll`?, `omit_screenshot`?, `query`?, `text_only`?, `settle_ms`? | Analyze the screen and return UI elements with tap coordinates plus a grid-overlaid screenshot. Uses local OCR or AI vision depending on `screenDescriberMode`. `scroll: true` does a full-page scroll to capture all elements. `omit_screenshot: true` returns text only (no image). `query` lists only elements whose text contains it (case- and accent-insensitive; icons omitted), and `text_only: true` drops the coordinates, so reading one value costs a line or two. `settle_ms` sets how long to wait for the screen to stop changing first. |
+| `describe_screen` | `scroll`?, `max_scrolls`?, `at`?, `omit_screenshot`?, `query`?, `text_only`?, `settle_ms`? | Analyze the screen and return UI elements with tap coordinates plus a grid-overlaid screenshot. Uses local OCR or AI vision depending on `screenDescriberMode`. `scroll: true` does a full-page scroll to capture all elements, up to `max_scrolls` scrolls, at the point `at` for a list inside the screen, and says why it stopped. `omit_screenshot: true` returns text only (no image). `query` lists only elements whose text contains it (case- and accent-insensitive; icons omitted), and `text_only: true` drops the coordinates, so reading one value costs a line or two. `settle_ms` sets how long to wait for the screen to stop changing first. |
 | `listen` | `seconds`?, `language`? | Hear what the phone plays, as text: records the sound iPhone Mirroring plays for up to `seconds` (1 to 60, default 10; it stops early when nothing plays from the start or once the sound has ended) and transcribes it on the Mac in `language` (BCP-47, default the Mac's). Read-only; needs macOS 26. See [Listening](#listening). |
 | `start_recording` | `output_path`? | Start video recording of the mirrored screen |
 | `stop_recording` | — | Stop recording and return the .mov file path. A recording that already ended on its own (display sleep can end it) still returns its file, with a note that the video stops early; `start_recording` refuses to start another until that file is collected |
@@ -32,7 +32,7 @@ All 42 tools exposed by the MCP server. Mutating tools require [permission](perm
 | `scroll_to` | `label`, `direction`?, `at`?, `max_scrolls`? | Scroll until a text element becomes visible via OCR; reports why it stopped when the text never shows |
 | `reset_app` | `name` | Force-quit an app via the App Switcher |
 | `measure` | `action`, `until`, `max_seconds`?, `name`? | Time a screen transition after an action |
-| `run_steps` | `steps` | Run several proven steps in one call, in the [step grammar](#step-types) (`"tap: <text on screen>"`, `"tap: @324,113"` for a point, `"type: calculator"`, `"wait_for: Get"`, `"home"`). Every step is checked against the permission policy before the first runs; the run stops at the first failure and the reply ends with the text on screen |
+| `run_steps` | `steps`, `task`? | Run several proven steps in one call, in the [step grammar](#step-types) (`"tap: <text on screen>"`, `"tap: @324,113"` for a point, `"type: calculator"`, `"wait_for: Get"`, `"home"`). Every step is checked against the permission policy before the first runs; the run stops at the first failure and the reply ends with the text on screen With `task` (a few words, one line, no double quotes), a run whose every step passed is added to that task, and the reply ends with a SKILL.md draft of every passing run given the same `task` since the server started, ready to save under `~/.mirroir-mcp/skills/`. A failed run is not added. The server keeps 20 tasks and 200 steps per task, in memory only. |
 | `set_network` | `mode` | Toggle network settings (airplane, Wi-Fi, cellular) via Control Center on iOS 27, else Settings |
 | `get_orientation` | — | Report portrait/landscape and window dimensions |
 | `status` | — | Connection state, window geometry, and device readiness |
@@ -61,6 +61,10 @@ Coordinates are in points relative to the mirroring window's top-left corner. Us
 - **AI Vision** — When `screenDescriberMode` is `"vision"`, the screenshot is sent to an AI vision model that identifies UI elements semantically — cards, tabs, buttons, navigation structure — instead of raw text fragments. See [AI Vision Mode](screen-intelligence.md#ai-vision-mode-embacle) for setup.
 
 Set `scroll: true` to perform a full-page scroll before returning results. The server scrolls through the entire page, deduplicates elements across viewports, and returns all detected elements — not just those visible in the initial viewport.
+
+- `max_scrolls` (default: 10, the `defaultScrollMaxAttempts` setting): the most scrolls to make.
+- `at`: the point `[x, y]` to scroll at, for a list inside the screen such as a carousel or a sheet. The swipe is the one `scroll_to` sends there. Default: the page.
+- The reply's `_meta` line says why the scrolling stopped. `stop_reason=end_of_content` means a scroll revealed nothing new, or less than a tenth of what it showed, so the list is read to its end. `max_scrolls` means content was still arriving when the budget ran out: read more with a larger `max_scrolls`. `scroll_failed` and `read_failed` mean a gesture could not be sent or the screen could not be read after one, and `no_window` that the window size is unknown, so nothing was scrolled.
 
 Set `omit_screenshot: true` to return only the text description without the base64 PNG image. This saves context window space during long automation sessions where screenshots aren't needed. The `MIRROIR_OMIT_SCREENSHOT` environment variable (or `describeScreenOmitScreenshot` setting) controls the default; the tool parameter overrides it per-call.
 
@@ -319,10 +323,30 @@ Steps are intents — the AI maps each to the appropriate MCP tool calls:
 | `scene: { skill, max_frames, max_tokens, max_seconds, decider }` | plays a `kind: game` skill under a hard budget; `decider` names the move picker a `decider: required` skill needs — see [Scenes](skills-marketplace.md#scenes) |
 | `target: { kind: ios }` / `target: { kind: macos, name: "…" }` | calls `switch_target` — switch to the iPhone or to a configured desktop window |
 | `remember: "instruction"` | AI reads dynamic data from screen and holds it for later steps |
+| `condition: visible "Label" -> tap: Label` | runs the action only when the element is visible (`not visible` for absent); runs in `mirroir test` and `run_steps` — see below |
+| `repeat: until visible "Label", max 8 -> swipe: up` | runs the action until the element is visible, at most `max` times (1 to 50); runs in `mirroir test` and `run_steps` — see below |
 | `condition:` | Branch based on screen state — see below |
 | `repeat:` | Loop over steps until a screen condition is met — see below |
 | `verify: "instruction"` | AI-only step — the AI interprets the instruction against the current screen |
 | `summarize: "instruction"` | AI-only step — the AI interprets the instruction against the current screen |
+
+### Conditions and repeats that run without an AI
+
+A `condition` or `repeat` written on one line, as one visibility check and one action, runs in `mirroir test`, in a compiled replay and in `run_steps`:
+
+```yaml
+- condition: visible "Allow" -> tap: Allow
+- condition: not visible "Signed in" -> tap: "Sign In"
+- repeat: until visible "Done", max 8 -> swipe: up
+- repeat: until not visible "Loading", max 5 -> wait_for: "Ready" timeout: 2
+```
+
+- The screen is read just before the check. A condition whose check does not hold passes without running its action.
+- A repeat reads the screen before each run and passes as soon as its check holds, without running the action again. It fails when the check still does not hold after `max` runs, when a run fails, or when the call is cancelled between runs. `max` is required, from 1 to 50.
+- The action is one plain step: not another `condition` or `repeat`, not a `measure`, `scene`, `target` or AI-only step. It needs the same permission as when it runs on its own, and in `run_steps` it passes the same blocked-app and driving-mode checks.
+- The check is replayed live from a compiled skill: the recorded run says nothing about what the screen will show next time.
+
+Any other `condition` or `repeat` value is read by the AI, as described next, and `mirroir test` reports it not evaluated.
 
 ### Conditions
 

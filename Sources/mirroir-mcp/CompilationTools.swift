@@ -325,6 +325,8 @@ extension MirroirMCP {
             return recordProblem(action).map { "its action: \($0)" }
         case .scene:
             return "a scene step is a model loop and is never compiled"
+        case .condition(_, let action), .repeatUntil(_, _, let action):
+            return recordProblem(action).map { "its action: \($0)" }
         default:
             return nil
         }

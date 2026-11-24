@@ -111,6 +111,11 @@ enum InlineStepRunner {
     static func run(_ steps: [SkillStep], executor: StepExecutor, policy: PermissionPolicy) -> Report {
         let call = executor.call
         let reads = executor.describer as? RecordingDescriber
+        // The actions a condition or repeat runs pass the checks a top-level step does.
+        executor.actionGuard = { action in
+            drivingStop(action, executor: executor, policy: policy)
+                ?? blockedTap(action, executor: executor, policy: policy)
+        }
         var results: [StepResult] = []
         var tapRead: (label: String, elements: [TapPoint])?
         var pointBefore: [Int: (label: String, elements: [TapPoint])] = [:]
@@ -248,7 +253,7 @@ enum InlineStepRunner {
             if case .denied(let reason) = policy.checkAppLaunch(InputSimulation.openURLAppName) { return reason }
         case .setNetwork:
             if case .denied(let reason) = policy.checkAppLaunch(NetworkToggle.settingsAppName) { return reason }
-        case .measure(_, let action, _, _):
+        case .measure(_, let action, _, _), .condition(_, let action), .repeatUntil(_, _, let action):
             return denial(for: action, policy: policy)
         default:
             break
@@ -277,6 +282,8 @@ enum InlineStepRunner {
         case .longPress: return "long_press"
         case .drag: return "drag"
         case .switchTarget: return "switch_target"
+        // Reading the screen is always allowed; the action is what needs permission.
+        case .condition(_, let action), .repeatUntil(_, _, let action): return toolName(of: action)
         case .scene, .skipped, .invalid: return "run_steps"
         }
     }

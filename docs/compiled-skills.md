@@ -232,7 +232,7 @@ Compiled files are device-specific (coordinates depend on window dimensions). If
 
 ## What Cannot Be Compiled
 
-AI-only steps (`remember`, `condition`, `repeat`, `verify`, `summarize`) need an AI to interpret them and cannot be compiled. They are recorded with `hints: null`. `mirroir test` has no AI client, so it reports each one as `NOT EVALUATED` (`not evaluated: <step> needs an AI client`) and the skill fails, live or compiled; the steps after it still run.
+AI-only steps (`remember`, `verify`, `summarize`, and a `condition` or `repeat` written as free text or as a block) need an AI to interpret them and cannot be compiled. They are recorded with `hints: null`. `mirroir test` has no AI client, so it reports each one as `NOT EVALUATED` (`not evaluated: <step> needs an AI client`) and the skill fails, live or compiled; the steps after it still run.
 
 ## Architecture
 

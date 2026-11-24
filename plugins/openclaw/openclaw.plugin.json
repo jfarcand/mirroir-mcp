@@ -1,0 +1,21 @@
+{
+  "id": "mirroir",
+  "name": "mirroir",
+  "description": "Drive a real iPhone through macOS iPhone Mirroring: read the screen, tap, type, swipe, open apps and replay skills. Every call that can change the phone asks the owner first. Needs macOS 15 or later with iPhone Mirroring connected.",
+  "version": "0.51.0",
+  "categories": ["computer-use"],
+  "skills": ["skills/mirroir"],
+  "activation": { "onStartup": true },
+  "mcpServers": {
+    "mirroir": {
+      "transport": "stdio",
+      "command": "npx",
+      "args": ["-y", "mirroir-mcp@0.51.0"]
+    }
+  },
+  "configSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {}
+  }
+}
