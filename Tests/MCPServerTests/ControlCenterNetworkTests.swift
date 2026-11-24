@@ -92,6 +92,16 @@ final class ControlCenterNetworkTests: XCTestCase {
         XCTAssertEqual(state(.controlCenterCellularTile, connectivity(cellular: "Non")), .off)
     }
 
+    /// iPhone 16, iOS 27, 2026-11-24: Control Center's Wi-Fi tap drops the
+    /// network, keeps the radio on, and says "Non connecté". wifi_off read
+    /// that as on and reported the tap had not taken.
+    func testAWiFiTileWithNoNetworkReadsOff() {
+        let dropped = screen([("Wi-Fi", 72, 291), ("Non connecté", 100, 307)])
+        XCTAssertEqual(state(.controlCenterWiFiTile, dropped), .off)
+        let english = screen([("Wi-Fi", 72, 291), ("Not Connected", 100, 307)])
+        XCTAssertEqual(state(.controlCenterWiFiTile, english), .off)
+    }
+
     func testALabelWithNoLineUnderItIsUnreadable() {
         let lone = screen([("Wi-Fi", 85, 343)])
         XCTAssertEqual(state(.controlCenterWiFiTile, lone), SettingsSwitchReader.State.none)

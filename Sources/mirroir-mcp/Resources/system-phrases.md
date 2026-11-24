@@ -201,7 +201,11 @@ page. With two SIMs the line under it names the line in use (`Principale`).
 
 The whole line under a Control Center connectivity tile's label when it is
 off. Any other line under the label (a network name, a SIM line, `on`) reads
-as on.
+as on. Control Center never turns the Wi-Fi radio off: its tap drops the
+network until the next day and the line says so ("Non connecté", iPhone 16,
+iOS 27, 2026-11-24), which is the off that `wifi_off` reaches.
 
 - off
 - non
+- not connected
+- non connecté
