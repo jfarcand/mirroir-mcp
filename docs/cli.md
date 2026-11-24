@@ -4,7 +4,7 @@ The recorder, doctor and keyboard configuration commands, and the HTTP server fo
 
 ### Conventions
 
-`mirroir-mcp` with no command is the MCP server. `mirroir-mcp --help` lists the commands, and `mirroir-mcp --version` prints the version. Every command behaves the same way:
+`mirroir-mcp` with no command is the MCP server. `mirroir-mcp --help` lists the commands, and `mirroir-mcp --version` prints the version. Every install (npm, Homebrew, the install script) also adds `mirroir`, the same program under a shorter name, so `mirroir doctor` and `mirroir-mcp doctor` are one command. Every command behaves the same way:
 
 - `--help` or `-h`, anywhere on the line, prints that command's usage and exits 0 without running anything.
 - An option the command does not define is refused by name with exit code **2**, and nothing runs. Options are never abbreviated: `--dry-ru` is refused, not read as `--dry-run`.
