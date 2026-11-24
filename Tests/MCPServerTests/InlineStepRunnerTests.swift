@@ -87,6 +87,20 @@ final class InlineStepRunnerTests: XCTestCase {
         XCTAssertTrue(result.text.contains("2. SKIP type: \"never typed\""), result.text)
     }
 
+    /// XR, 2026-11-24: a timed-out wait_for, one skipped step, then "type" and
+    /// Return ran on whatever screen was up.
+    func testEveryStepAfterAFailureIsSkipped() {
+        let result = call(makeServer(policy: allowAll), "run_steps",
+                          steps(["tap: Purchase", "tap: Search", "type: never typed", "press_key: return"]))
+        XCTAssertTrue(result.isError)
+        XCTAssertTrue(input.tapCalls.isEmpty, "nothing is tapped after the failure")
+        XCTAssertTrue(input.typeCalls.isEmpty, "nothing is typed after the failure")
+        XCTAssertFalse(input.keyboardLog.contains { $0.hasPrefix("key:") }, "no key is pressed after the failure")
+        XCTAssertTrue(result.text.contains("2. SKIP tap: \"Search\""), result.text)
+        XCTAssertTrue(result.text.contains("3. SKIP type: \"never typed\""), result.text)
+        XCTAssertTrue(result.text.contains("4. SKIP press_key: \"return\""), result.text)
+    }
+
     /// A search field showing its query has no text to name it by (App Store,
     /// measured on an XR): a point is the only way to reach it from a step.
     func testATapStepCanNameAPoint() {

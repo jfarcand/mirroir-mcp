@@ -120,7 +120,10 @@ enum InlineStepRunner {
                                           message: StepExecutor.cancelledMessage, durationSeconds: 0))
                 continue
             }
-            if results.last?.status.isFailure == true {
+            // Any earlier failure stops the run, not only the step just before:
+            // a skipped step is no failure, and the step after it must not run
+            // on a screen the failed step never reached.
+            if results.contains(where: { $0.status.isFailure }) {
                 results.append(StepResult(step: step, status: .skipped,
                                           message: "skipped after the failure above",
                                           durationSeconds: 0))
