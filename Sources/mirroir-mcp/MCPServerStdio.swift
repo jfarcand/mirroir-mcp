@@ -49,8 +49,12 @@ extension MCPServer {
         case .ignored:
             return
         case .malformed(let code, let message):
-            write(JSONRPCResponse(id: nil, result: nil, error: JSONRPCError(code: code, message: message)),
-                  to: session)
+            // Answered in turn, so the error does not overtake the replies to
+            // requests that arrived before the line.
+            loop.submit { [self] in
+                write(JSONRPCResponse(id: nil, result: nil, error: JSONRPCError(code: code, message: message)),
+                      to: session)
+            }
         case .clientResponse(let id, let answer):
             session.deliver(id, answer)
         case .cancel(let id, let reason):

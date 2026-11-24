@@ -198,6 +198,19 @@ final class MCPServerStdioTests: XCTestCase {
         XCTAssertNotNil(connection.waitFor { self.id($0) == 1 }, "requests already received still run")
     }
 
+    func testAParseErrorDoesNotOvertakeAnEarlierRequest() {
+        let connection = Connection(server: makeServer())
+        connection.send(#"{"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}"#)
+        connection.send("this is not json")
+        connection.close()
+        XCTAssertTrue(connection.waitForEnd())
+        XCTAssertNotNil(connection.waitFor { $0["error"] != nil })
+        let lines = connection.received
+        XCTAssertEqual(lines.count, 2)
+        XCTAssertEqual(lines.first.flatMap(id), 1, "the initialize reply comes first")
+        XCTAssertEqual((lines.last?["error"] as? [String: Any])?["code"] as? Int, -32700)
+    }
+
     // MARK: - Line classifier
 
     func testLinesAreSortedBeforeDecoding() {
