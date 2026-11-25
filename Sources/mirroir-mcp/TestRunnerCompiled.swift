@@ -196,6 +196,15 @@ extension TestRunner {
                 compiled: compiled, skillPath: skill.filePath,
                 windowWidth: windowWidth, windowHeight: windowHeight) {
             case .fresh:
+                // Replay pairs steps by position. A compiled file holding more steps than
+                // the skill parses to was written from another reading of it (before
+                // carnet#100, the steps nested in a multi-line block were steps of their own).
+                let recorded = (compiled.steps.map(\.index).max() ?? -1) + 1
+                guard recorded <= skill.steps.count else {
+                    warn(staleWarning(skill.name, reason: "compiled \(recorded) steps, "
+                        + "the skill has \(skill.steps.count)"))
+                    continue
+                }
                 compiledMap[skill.filePath] = compiled
             case .stale(let reason):
                 warn(staleWarning(skill.name, reason: reason))

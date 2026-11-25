@@ -122,6 +122,38 @@ final class TestRunnerHonestyTests: XCTestCase {
         ])
     }
 
+    func testACompiledFileWithMoreStepsThanTheSkillIsReportedStale() throws {
+        // Compiled before carnet#100: the tap nested in the condition was a step of its own.
+        let skill = try write("nested.yaml", """
+            name: Nested
+            steps:
+              - condition:
+                  if_visible: "Unread"
+                  then:
+                    - tap: "Archive"
+              - home
+            """)
+        let compiled = CompiledSkill(
+            version: CompiledSkill.currentVersion,
+            source: SourceInfo(sha256: try CompiledSkillIO.sha256(of: skill),
+                               compiledAt: "2026-11-01T00:00:00Z"),
+            device: DeviceInfo(windowWidth: 430, windowHeight: 942, orientation: "portrait"),
+            steps: [
+                CompiledStep(index: 0, type: "condition", label: nil, hints: .passthrough()),
+                CompiledStep(index: 1, type: "tap", label: "Archive", hints: .passthrough()),
+                CompiledStep(index: 2, type: "home", label: nil, hints: .passthrough()),
+            ])
+        try CompiledSkillIO.save(compiled, for: skill)
+
+        var warnings: [String] = []
+        let selected = TestRunner.freshCompiledSkills(
+            for: [try SkillFileLoader.load(filePath: skill)],
+            windowWidth: 430, windowHeight: 942, warn: { warnings.append($0) })
+
+        XCTAssertNil(selected[skill], "the skill runs on live OCR, never pairing home with the tap")
+        XCTAssertEqual(warnings, ["Warning: compiled skill stale for Nested: compiled 3 steps, the skill has 2\n"])
+    }
+
     func testACurrentVersionFileThatDoesNotDecodeIsReportedStale() throws {
         let skill = try write("broken.yaml", "name: Broken\nsteps:\n  - home\n")
         try writeCompiled("{\"version\": \(CompiledSkill.currentVersion), \"steps\": 7}", for: skill)
