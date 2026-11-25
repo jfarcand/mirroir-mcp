@@ -283,16 +283,23 @@ enum SkillParser {
         let lines = content.components(separatedBy: .newlines)
         var inSteps = false
         var steps: [SkillStep] = []
+        // The indentation of the last step item. A line indented deeper belongs to that
+        // step: the branches of a multi-line condition or the body of a repeat are never
+        // steps of their own, or they would run whatever the check says.
+        var stepIndent: Int?
 
         for line in lines {
             let trimmed = line.trimmingCharacters(in: .whitespaces)
 
-            if trimmed == "steps:" {
+            if !inSteps, trimmed == "steps:" {
                 inSteps = true
                 continue
             }
 
             guard inSteps else { continue }
+
+            let indent = line.prefix { $0 == " " || $0 == "\t" }.count
+            if let stepIndent, !trimmed.isEmpty, indent > stepIndent { continue }
 
             // Steps are list items starting with "- "
             guard trimmed.hasPrefix("- ") else {
@@ -303,6 +310,7 @@ enum SkillParser {
                 continue
             }
 
+            stepIndent = indent
             let stepContent = String(trimmed.dropFirst(2))
             if let step = parseStep(stepContent) {
                 steps.append(step)

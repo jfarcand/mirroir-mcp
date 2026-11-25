@@ -346,4 +346,49 @@ final class SkillParserTests: XCTestCase {
         XCTAssertEqual(step.displayName, "press_key: \"l\" [command]")
     }
 
+
+    // MARK: - Multi-line blocks
+
+    /// carnet#100: the steps nested in a multi-line condition or repeat belong to the block.
+    /// Read as steps of their own, they ran whatever the check said.
+    func testNestedBranchAndBodyStepsAreNeverStepsOfTheirOwn() {
+        let yaml = """
+        name: Nested
+        steps:
+          - launch: "Mail"
+          - condition:
+              if_visible: "Unread"
+              then:
+                - tap: "Archive"
+              else:
+                - tap: "Delete"
+          - repeat:
+              while_visible: "Unread"
+              max: 3
+              steps:
+                - tap: "Archive"
+          - home
+        """
+        let steps = SkillParser.parse(content: yaml).steps
+        XCTAssertEqual(steps.map(\.typeKey), ["launch", "condition", "repeat", "home"])
+        guard case .skipped = steps[1], case .skipped = steps[2] else {
+            return XCTFail("a block form is read by the AI, got \(steps)")
+        }
+    }
+
+    func testAOneLineConditionStillParsesAfterABlock() {
+        let yaml = """
+        name: Mixed
+        steps:
+          - condition:
+              if_visible: "Unread"
+              then:
+                - tap: "Archive"
+          - condition: visible "Allow" -> tap: Allow
+        """
+        let steps = SkillParser.parse(content: yaml).steps
+        XCTAssertEqual(steps.count, 2)
+        guard case .condition = steps[1] else { return XCTFail("got \(steps[1])") }
+    }
+
 }

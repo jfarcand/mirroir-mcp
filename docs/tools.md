@@ -347,7 +347,7 @@ A `condition` or `repeat` written on one line, as one visibility check and one a
 - The action is one plain step: not another `condition` or `repeat`, not a `measure`, `scene`, `target` or AI-only step. It needs the same permission as when it runs on its own, and in `run_steps` it passes the same blocked-app and driving-mode checks.
 - The check is replayed live from a compiled skill: the recorded run says nothing about what the screen will show next time.
 
-Any other `condition` or `repeat` value is read by the AI, as described next, and `mirroir test` reports it not evaluated.
+Any other `condition` or `repeat` value is read by the AI, as described next, and `mirroir test` reports it not evaluated. The steps nested in a multi-line block belong to it: `mirroir test` and a compiled replay never run them on their own.
 
 ### Conditions
 
