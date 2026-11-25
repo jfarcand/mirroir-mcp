@@ -224,6 +224,16 @@ extension MirroirMCP {
                     .flatMap { $0.trimmingCharacters(in: .whitespaces).isEmpty ? nil : $0 }
                 let textOnly = args["text_only"]?.asBool() ?? false
 
+                // max_scrolls and at only shape a scrolling read: refuse them alone
+                // rather than read one screen and drop them unsaid.
+                if !scrollEnabled {
+                    let scrollOnly = ["max_scrolls", "at"].filter { args[$0] != nil }
+                    if !scrollOnly.isEmpty {
+                        let verb = scrollOnly.count == 1 ? "applies" : "apply"
+                        return .error("\(scrollOnly.joined(separator: " and ")) \(verb) only with scroll: true")
+                    }
+                }
+
                 // Full-page scroll mode: collect all elements across viewports
                 if scrollEnabled {
                     let input = ctx.input

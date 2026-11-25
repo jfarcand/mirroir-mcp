@@ -146,4 +146,16 @@ final class FullPageReadTests: XCTestCase {
         XCTAssertTrue(outside.text.contains("at must be [x, y] inside the"), outside.text)
         XCTAssertTrue(input.swipeCalls.isEmpty)
     }
+
+    func testScrollArgumentsWithoutScrollAreRefusedNotDropped() {
+        describer.describeResult = screen("Row 1")
+        let budget = describeScreen(["max_scrolls": .number(2), "omit_screenshot": .bool(true)])
+        XCTAssertTrue(budget.isError, budget.text)
+        XCTAssertEqual(budget.text, "max_scrolls applies only with scroll: true")
+        let both = describeScreen(["scroll": .bool(false), "max_scrolls": .number(2),
+                                   "at": .array([.number(10), .number(10)])])
+        XCTAssertTrue(both.isError, both.text)
+        XCTAssertEqual(both.text, "max_scrolls and at apply only with scroll: true")
+        XCTAssertTrue(input.swipeCalls.isEmpty)
+    }
 }

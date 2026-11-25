@@ -64,6 +64,7 @@ Set `scroll: true` to perform a full-page scroll before returning results. The s
 
 - `max_scrolls` (default: 10, the `defaultScrollMaxAttempts` setting): the most scrolls to make.
 - `at`: the point `[x, y]` to scroll at, for a list inside the screen such as a carousel or a sheet. The swipe is the one `scroll_to` sends there. Default: the page.
+- Both apply only with `scroll: true`: passed without it, the call is refused rather than read one screen and drop them.
 - The reply's `_meta` line says why the scrolling stopped. `stop_reason=end_of_content` means a scroll revealed nothing new, or less than a tenth of what it showed, so the list is read to its end. `max_scrolls` means content was still arriving when the budget ran out: read more with a larger `max_scrolls`. `scroll_failed` and `read_failed` mean a gesture could not be sent or the screen could not be read after one, and `no_window` that the window size is unknown, so nothing was scrolled.
 
 Set `omit_screenshot: true` to return only the text description without the base64 PNG image. This saves context window space during long automation sessions where screenshots aren't needed. The `MIRROIR_OMIT_SCREENSHOT` environment variable (or `describeScreenOmitScreenshot` setting) controls the default; the tool parameter overrides it per-call.
