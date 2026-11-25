@@ -40,10 +40,9 @@ struct CoreMLElementDetectorTests {
             bbox: bbox,
             label: "Button",
             confidence: 0.95,
-            windowSize: windowSize,
-            contentBounds: contentBounds,
-            imageWidth: 820
-        )
+            mapping: WindowPointMapping(
+                imageWidth: 820, imageHeight: 1796, windowSize: windowSize, contentBounds: contentBounds)
+        )!
 
         // tapX should be at the horizontal center of the window
         #expect(element.text == "Button")
@@ -70,10 +69,9 @@ struct CoreMLElementDetectorTests {
             bbox: bbox,
             label: "Icon",
             confidence: 0.8,
-            windowSize: windowSize,
-            contentBounds: contentBounds,
-            imageWidth: 820
-        )
+            mapping: WindowPointMapping(
+                imageWidth: 820, imageHeight: 1796, windowSize: windowSize, contentBounds: contentBounds)
+        )!
 
         // Top-left of screen: small tapX, small textTopY
         #expect(element.tapX < Double(windowSize.width) / 2)
@@ -88,15 +86,17 @@ struct CoreMLElementDetectorTests {
         let fullBounds = CGRect(x: 0, y: 0, width: 820, height: 1796)
         let fullElement = CoreMLElementDetector.convertBoundingBox(
             bbox: bbox, label: "A", confidence: 0.9,
-            windowSize: windowSize, contentBounds: fullBounds, imageWidth: 820
-        )
+            mapping: WindowPointMapping(
+            imageWidth: 820, imageHeight: 1796, windowSize: windowSize, contentBounds: fullBounds)
+        )!
 
         // Reduced content bounds (simulates Larger display mode)
         let reducedBounds = CGRect(x: 0, y: 0, width: 600, height: 1400)
         let scaledElement = CoreMLElementDetector.convertBoundingBox(
             bbox: bbox, label: "A", confidence: 0.9,
-            windowSize: windowSize, contentBounds: reducedBounds, imageWidth: 820
-        )
+            mapping: WindowPointMapping(
+            imageWidth: 820, imageHeight: 1796, windowSize: windowSize, contentBounds: reducedBounds)
+        )!
 
         // With reduced content bounds, coordinates should be scaled outward
         #expect(scaledElement.tapX > fullElement.tapX,
@@ -113,11 +113,55 @@ struct CoreMLElementDetectorTests {
 
         let element = CoreMLElementDetector.convertBoundingBox(
             bbox: bbox, label: "TextField", confidence: 0.75,
-            windowSize: windowSize, contentBounds: contentBounds, imageWidth: 820
-        )
+            mapping: WindowPointMapping(
+            imageWidth: 820, imageHeight: 1796, windowSize: windowSize, contentBounds: contentBounds)
+        )!
 
         #expect(element.text == "TextField")
         #expect(element.confidence == 0.75)
+    }
+
+    @Test("A dark app narrowing the content bounds on one axis is not scaled (carnet#103)")
+    func testOneAxisNarrowedBoundsAreNotScaled() {
+        // Clock on a 357x786 window: its black background narrowed the detected
+        // bounds in width only, and icons on the right edge came out at x 790-808.
+        let windowSize = CGSize(width: 357, height: 786)
+        let darkBounds = CGRect(x: 0, y: 0, width: 300, height: 1572)
+        let mapping = WindowPointMapping(
+            imageWidth: 714, imageHeight: 1572, windowSize: windowSize, contentBounds: darkBounds)
+        let toggle = CoreMLElementDetector.convertBoundingBox(
+            bbox: CGRect(x: 0.82, y: 0.35, width: 0.12, height: 0.04),
+            label: "icon", confidence: 0.9, mapping: mapping)
+        #expect(mapping.bordersDetected == false)
+        #expect(toggle != nil)
+        #expect(abs((toggle?.tapX ?? 0) - 0.88 * 357) < 1.0)
+    }
+
+    @Test("A detection outside the window is dropped")
+    func testDetectionOutsideTheWindowIsDropped() {
+        let windowSize = CGSize(width: 357, height: 786)
+        // Larger mode: content inside borders on both axes, scaled outward.
+        let mapping = WindowPointMapping(
+            imageWidth: 714, imageHeight: 1572, windowSize: windowSize,
+            contentBounds: CGRect(x: 0, y: 0, width: 500, height: 1100))
+        let edge = CoreMLElementDetector.convertBoundingBox(
+            bbox: CGRect(x: 0.9, y: 0.5, width: 0.08, height: 0.04),
+            label: "icon", confidence: 0.9, mapping: mapping)
+        #expect(edge == nil, "scaled past the right edge, no tap there reaches the phone")
+    }
+
+    @Test("Icons and text at the same place map to the same point")
+    func testIconAndTextShareOneMapping() {
+        let windowSize = CGSize(width: 410, height: 898)
+        let mapping = WindowPointMapping(
+            imageWidth: 820, imageHeight: 1900, windowSize: windowSize,
+            contentBounds: CGRect(x: 0, y: 0, width: 820, height: 1900))
+        let bbox = CGRect(x: 0.4, y: 0.2, width: 0.2, height: 0.05)
+        let icon = CoreMLElementDetector.convertBoundingBox(
+            bbox: bbox, label: "icon", confidence: 0.9, mapping: mapping)
+        let text = mapping.element(text: "Label", bbox: bbox, confidence: 0.9)
+        #expect(icon?.tapX == text.tapX)
+        #expect(icon?.textTopY == text.textTopY)
     }
 
     // MARK: - Model Loading Error Tests

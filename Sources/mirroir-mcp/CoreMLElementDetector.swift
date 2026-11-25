@@ -65,6 +65,9 @@ struct CoreMLElementDetector: Sendable {
             return []
         }
 
+        let mapping = WindowPointMapping(
+            imageWidth: image.width, imageHeight: image.height,
+            windowSize: windowSize, contentBounds: contentBounds)
         return results.compactMap { observation in
             guard let topLabel = observation.labels.first,
                   topLabel.confidence >= confidenceThreshold
@@ -74,48 +77,29 @@ struct CoreMLElementDetector: Sendable {
                 bbox: observation.boundingBox,
                 label: topLabel.identifier,
                 confidence: topLabel.confidence,
-                windowSize: windowSize,
-                contentBounds: contentBounds,
-                imageWidth: image.width
+                mapping: mapping
             )
         }
     }
 
-    /// Convert a Vision normalized bounding box to a `RawTextElement` in window-point space.
-    ///
-    /// Uses the same coordinate transform as `AppleVisionTextRecognizer`:
-    /// Vision bounding boxes are normalized with origin at bottom-left;
-    /// we convert to window-point coordinates with origin at top-left,
-    /// applying content-bounds scaling for "Larger" display modes.
+    /// Convert a Vision normalized bounding box to a `RawTextElement` in window-point space,
+    /// through the same `WindowPointMapping` as `AppleVisionTextRecognizer`, so an icon lands
+    /// where text at the same place does. A detection whose point falls outside the window
+    /// is dropped: no tap there reaches the phone.
     ///
     /// Extracted as a static method for unit-testability without a real model.
     static func convertBoundingBox(
         bbox: CGRect,
         label: String,
         confidence: Float,
-        windowSize: CGSize,
-        contentBounds: CGRect,
-        imageWidth: Int
-    ) -> RawTextElement {
-        let windowWidth = Double(windowSize.width)
-        let windowHeight = Double(windowSize.height)
-
-        let displayScale = Double(imageWidth) / windowWidth
-        let contentOriginX = Double(contentBounds.minX) / displayScale
-        let contentOriginY = Double(contentBounds.minY) / displayScale
-        let contentWidth = Double(contentBounds.width) / displayScale
-        let contentHeight = Double(contentBounds.height) / displayScale
-        let xScale = windowWidth / max(contentWidth, 1.0)
-        let yScale = windowHeight / max(contentHeight, 1.0)
-
-        return RawTextElement(
-            text: label,
-            tapX: (bbox.midX * windowWidth - contentOriginX) * xScale,
-            textTopY: ((1.0 - bbox.maxY) * windowHeight - contentOriginY) * yScale,
-            textBottomY: ((1.0 - bbox.minY) * windowHeight - contentOriginY) * yScale,
-            bboxWidth: bbox.width * windowWidth * xScale,
-            confidence: confidence
-        )
+        mapping: WindowPointMapping
+    ) -> RawTextElement? {
+        let element = mapping.element(text: label, bbox: bbox, confidence: confidence)
+        guard mapping.contains(element) else {
+            DebugLog.log("YOLO", "Dropped '\(label)' at (\(Int(element.tapX)), \(Int(element.textTopY))) outside the \(Int(mapping.windowWidth))x\(Int(mapping.windowHeight)) window")
+            return nil
+        }
+        return element
     }
 
     // MARK: - Private
