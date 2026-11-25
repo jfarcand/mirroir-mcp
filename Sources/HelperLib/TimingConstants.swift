@@ -127,6 +127,15 @@ public enum TimingConstants {
     /// Fixed upward offset applied to short labels when a gap is detected.
     public static let tapIconOffset: Double = 30.0
 
+    /// Upward offset from a tab-bar label's top to its icon, in points of a 410-point-wide
+    /// window, scaled with the window's width. Smaller than `tapIconOffset`: a floating
+    /// tab bar (iOS 26 and later) ends about 30 points above its labels, so the
+    /// home-screen offset tapped above the bar (carnet#104).
+    public static let tapTabBarIconOffset: Double = 22.0
+
+    /// The window width `tapTabBarIconOffset` is measured in.
+    public static let tapReferenceWindowWidth: Double = 410.0
+
     /// Elements within this vertical distance are treated as the same row.
     public static let tapRowTolerance: Double = 10.0
 

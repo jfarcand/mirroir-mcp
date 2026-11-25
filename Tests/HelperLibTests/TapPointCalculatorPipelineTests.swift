@@ -124,11 +124,11 @@ extension TapPointCalculatorTests {
 
     // MARK: - Bottom zone (tab bar) tests
 
-    @Test("tab bar gets same 30pt iconOffset via bottom zone")
+    @Test("tab bar labels get the tab-bar offset via bottom zone")
     func tabBarGetsBottomZoneOffset() {
         // Reddit-style layout: two-column content at y=826, tab bar labels at y=856.
-        // y=856 is in bottom zone (808.2). Bottom zone now uses the same iconOffset
-        // (30pt) as regular icon rows. tapY = 856 - 30 = 826.
+        // y=856 is in bottom zone (808.2). A 410-point window takes the tab-bar
+        // offset as is: tapY = 856 - 22 = 834.
         let elements = [
             element(text: "Left col", tapX: 100, textTopY: 826, textBottomY: 840),
             element(text: "Right col", tapX: 300, textTopY: 826, textBottomY: 840),
@@ -144,11 +144,10 @@ extension TapPointCalculatorTests {
         )
 
         let home = results.first { $0.text == "Home" }!
-        // Bottom zone: iconOffset = 30. tapY = 856 - 30 = 826
-        #expect(home.tapY == 826.0, "Tab bar should get 30pt iconOffset")
+        #expect(home.tapY == 834.0, "Tab bar should get the 22pt tab-bar offset")
 
         let chat = results.first { $0.text == "Chat" }!
-        #expect(chat.tapY == 826.0, "All tab bar labels should get same offset")
+        #expect(chat.tapY == 834.0, "All tab bar labels should get same offset")
     }
 
     @Test("icon row mid-screen with small gap does not get offset")
@@ -214,11 +213,11 @@ extension TapPointCalculatorTests {
             elements: elements, windowWidth: windowWidth, windowHeight: windowHeight
         )
 
-        // y=860 is in bottom zone. offset = 30 (iconOffset). tapY = 860 - 30 = 830.
-        #expect(results[0].tapY == 830.0, "Bottom zone should get 30pt iconOffset")
+        // y=860 is in bottom zone. offset = 22 (tab-bar offset). tapY = 860 - 22 = 838.
+        #expect(results[0].tapY == 838.0, "Bottom zone should get the 22pt tab-bar offset")
     }
 
-    @Test("applyOffsets uses iconOffset for bottom zone")
+    @Test("applyOffsets uses the row's tab-bar offset for bottom zone")
     func applyOffsetsBottomZone() {
         let elements = [
             element(text: "Home", tapX: 56, textTopY: 856, textBottomY: 870),
@@ -227,15 +226,45 @@ extension TapPointCalculatorTests {
         ]
         let row = TapPointCalculator.Row(elements: elements, bottomY: 870)
         // isInBottomZone=true, small gap — but bottom zone triggers offset regardless.
-        // Uses iconOffset (30pt). tapY = 856 - 30 = 826.
+        // Uses the row's tab-bar offset (22pt). tapY = 856 - 22 = 834.
         let classified = [TapPointCalculator.ClassifiedRow(
             row: row, isIconRow: true, gap: 30, isInBottomZone: true
         )]
         let points = TapPointCalculator.applyOffsets(classified)
         #expect(points.count == 3)
         for point in points {
-            #expect(point.tapY == 826.0, "\(point.text) should get 30pt iconOffset")
+            #expect(point.tapY == 834.0, "\(point.text) should get the 22pt tab-bar offset")
         }
+    }
+
+    /// carnet#104: Clock's floating tab bar on a 424x782 window, read 2026-11-25. Its labels
+    /// span y 740-750, the bar 712-762, the icons about 717-741. The 30pt home-screen offset
+    /// tapped at 710, above the bar, and nothing happened.
+    @Test("a floating tab bar is tapped inside the bar, on the icon")
+    func floatingTabBarIsTappedInsideTheBar() {
+        let labels = [("Horloges", 76.0), ("Alarmes", 167.0), ("Chronomètre", 257.0), ("Minuteurs", 347.0)]
+        let elements = [element(text: "1 min et 2 s", tapX: 61, textTopY: 669, textBottomY: 679)]
+            + labels.map { element(text: $0.0, tapX: $0.1, textTopY: 740, textBottomY: 750) }
+        let results = TapPointCalculator.computeTapPoints(
+            elements: elements, windowWidth: 424, windowHeight: 782)
+        let minuteurs = results.first { $0.text == "Minuteurs" }!
+        #expect(minuteurs.tapY > 712 && minuteurs.tapY < 741,
+                "inside the bar and above the label, got \(minuteurs.tapY)")
+    }
+
+    /// GitHub issue #15: TikTok's tab bar sits on the window's bottom edge. A tap on the
+    /// label (y 718) did nothing; the icon is centred at y 680, about 28 points tall.
+    /// The y values are the issue's; the window size and the x positions are not in it.
+    @Test("an edge tab bar is still tapped on its icon")
+    func edgeTabBarIsTappedOnItsIcon() {
+        let labels = [("Home", 40.0), ("Friends", 133.0), ("Inbox", 226.0), ("Profile", 319.0)]
+        let elements = [element(text: "Caption", tapX: 100, textTopY: 600, textBottomY: 614)]
+            + labels.map { element(text: $0.0, tapX: $0.1, textTopY: 712, textBottomY: 724) }
+        let results = TapPointCalculator.computeTapPoints(
+            elements: elements, windowWidth: 357, windowHeight: 786)
+        let inbox = results.first { $0.text == "Inbox" }!
+        #expect(inbox.tapY >= 666 && inbox.tapY <= 694,
+                "on the icon (666-694), got \(inbox.tapY)")
     }
 
     // MARK: - Spacing uniformity (issue #24: Chrome download bar)

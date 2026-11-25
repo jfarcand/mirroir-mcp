@@ -251,6 +251,10 @@ public enum EnvConfig {
         readDouble("tapIconOffset", default: TimingConstants.tapIconOffset)
     }
 
+    public static var tapTabBarIconOffset: Double {
+        readDouble("tapTabBarIconOffset", default: TimingConstants.tapTabBarIconOffset)
+    }
+
     public static var tapRowTolerance: Double {
         readDouble("tapRowTolerance", default: TimingConstants.tapRowTolerance)
     }

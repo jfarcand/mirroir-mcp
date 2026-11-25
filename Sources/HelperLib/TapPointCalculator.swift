@@ -165,8 +165,11 @@ public enum TapPointCalculator {
         /// Vertical gap from the bottom of the reference row above.
         public let gap: Double
         /// Whether this icon row is in the bottom zone of the window (e.g. tab bar).
-        /// When true, the upward offset is applied regardless of gap size.
+        /// When true, the tab-bar offset is applied regardless of gap size.
         public let isInBottomZone: Bool
+        /// The upward offset of a bottom-zone row: `tapTabBarIconOffset` scaled to the
+        /// window's width.
+        public var tabBarOffset: Double = EnvConfig.tapTabBarIconOffset
     }
 
     // MARK: - Stage 1: Group into rows
@@ -233,7 +236,9 @@ public enum TapPointCalculator {
 
             classified.append(ClassifiedRow(
                 row: row, isIconRow: isIconRow, gap: gap,
-                isInBottomZone: isInBottomZone
+                isInBottomZone: isInBottomZone,
+                tabBarOffset: EnvConfig.tapTabBarIconOffset
+                    * windowWidth / TimingConstants.tapReferenceWindowWidth
             ))
 
             previousRowBottomY = max(previousRowBottomY, row.bottomY)
@@ -282,10 +287,11 @@ public enum TapPointCalculator {
             for element in classified.row.elements {
                 let tapY: Double
                 let textCenterY = (element.textTopY + element.textBottomY) / 2.0
-                if classified.isIconRow
-                    && (classified.gap > minGapForOffset || classified.isInBottomZone) {
-                    let offset = iconOffset
-                    tapY = max(element.textTopY - offset, 0.0)
+                if classified.isIconRow && classified.isInBottomZone {
+                    // A tab bar: the icon sits just above its label, inside the bar.
+                    tapY = max(element.textTopY - classified.tabBarOffset, 0.0)
+                } else if classified.isIconRow && classified.gap > minGapForOffset {
+                    tapY = max(element.textTopY - iconOffset, 0.0)
                 } else {
                     tapY = textCenterY
                 }

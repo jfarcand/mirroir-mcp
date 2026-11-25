@@ -118,6 +118,7 @@ extension EnvConfig {
                 ("tapMinGapForOffset", "\(tapMinGapForOffset)"),
                 ("tapIconRowMinLabels", "\(tapIconRowMinLabels)"),
                 ("tapIconOffset", "\(tapIconOffset)"),
+                ("tapTabBarIconOffset", "\(tapTabBarIconOffset)"),
                 ("tapRowTolerance", "\(tapRowTolerance)"),
                 ("tapBottomZoneFraction", "\(tapBottomZoneFraction)"),
             ]),
