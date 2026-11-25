@@ -25,6 +25,9 @@ extension MirroirMCP {
         registry: TargetRegistry,
         policy: PermissionPolicy
     ) {
+        server.setRemoteRoute { tool, arguments in
+            registry.remoteTarget(tool: tool, arguments: arguments)
+        }
         server.setScreenReader { arguments in
             registry.resolveForTool(arguments).0?.ocrDescriber.describe()
         }

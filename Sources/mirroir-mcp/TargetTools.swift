@@ -38,7 +38,7 @@ extension MirroirMCP {
                 "properties": .object([:]),
             ],
             handler: { _ in
-                let active = registry.activeTargetName
+                let active = registry.activeRemoteName ?? registry.activeTargetName
                 var lines: [String] = []
 
                 for ctx in registry.allTargets {
@@ -56,6 +56,12 @@ extension MirroirMCP {
                         : "unsupported here: \(unsupported.joined(separator: ", "))"
                     lines.append("- \(ctx.name)\(isActive): \(state) (\(sizeDesc)) "
                         + "[\(ctx.profile.displayName); \(tools)]")
+                }
+
+                for remote in registry.remotes.values.sorted(by: { $0.name < $1.name }) {
+                    let isActive = remote.name == active ? " (active)" : ""
+                    lines.append("- \(remote.name)\(isActive): remote at \(remote.url.absoluteString) "
+                        + "[another Mac's mirroir-mcp serve; its own tools and state]")
                 }
 
                 return .text(lines.joined(separator: "\n"))
@@ -85,6 +91,10 @@ extension MirroirMCP {
                 }
 
                 if registry.switchActive(to: name) {
+                    if let remote = registry.remotes[name] {
+                        return .text("Switched active target to '\(name)': calls now go to the "
+                            + "mirroir-mcp serve at \(remote.url.absoluteString)")
+                    }
                     return .text("Switched active target to '\(name)'")
                 }
 

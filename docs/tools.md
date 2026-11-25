@@ -272,6 +272,25 @@ Those eight tools drive something only the iPhone has: Spotlight, the Home Scree
 
 `switch_target` changes the active target for all subsequent tool calls. Use it in skills with the `target:` step to automate workflows that span multiple devices or windows: `target: { kind: ios }` selects the iPhone Mirroring target, and `target: { kind: macos, name: "<targets.json name>" }` selects a configured desktop window. The map is the same shape `mirroir-run` parses, so one scenario file reads the same on both sides.
 
+### A phone on another Mac
+
+A `mirroir-remote` target is another Mac's `mirroir-mcp serve` (see [CLI](cli.md)), so the phone paired with that Mac is a target of this server:
+
+```json
+{
+  "targets": {
+    "iphone": { "type": "iphone-mirroring" },
+    "xr": { "type": "mirroir-remote", "url": "http://127.0.0.1:7457/mcp", "token_env": "XR_SERVE_TOKEN" }
+  }
+}
+```
+
+- **Calls are forwarded.** Once `switch_target` makes it active, or when a call names it in `target`, every tool call goes to that serve after this Mac's own permissions allowed it. The screen is read there, its own permissions and driving check apply, and its reply comes back as it wrote it. `target` is not forwarded: the remote answers for its own active target.
+- **Some tools stay here.** `list_targets`, `switch_target` and the tools that only read or write files on this Mac (`list_skills`, `get_skill`, `get_notes`, `save_note`) never leave it.
+- **The token is not in the file.** `token_env` names the environment variable this server reads the serve's token from at each call; the call is refused, and nothing is sent, when it is not set.
+- **Plain HTTP only to this Mac.** `serve` listens on loopback, so reach the other Mac with an SSH port forward (`ssh -N -L 7457:127.0.0.1:7457 other-mac`) and point `url` at `127.0.0.1`. Any other host needs `https`: a token sent in the clear to another machine is refused when the config is read.
+- **Not yet:** `mirroir test`, compiled replay and a skill's `target:` step run on this Mac's targets only.
+
 ## Calibrate Component
 
 `calibrate_component` tests a [component definition](components.md) against the current live screen. It OCRs the screen, runs the full detection pipeline against your definition, and returns a diagnostic report showing which rows matched, which didn't, and why.

@@ -29,12 +29,18 @@ struct TargetConfig: Codable, Sendable {
     let processName: String?
     /// Substring match against window title to disambiguate multiple windows.
     let windowTitleContains: String?
+    /// For a `mirroir-remote` target: the URL of another Mac's `mirroir-mcp serve`.
+    var url: String? = nil
+    /// For a `mirroir-remote` target: the environment variable holding that serve's token.
+    var tokenEnv: String? = nil
 
     enum CodingKeys: String, CodingKey {
         case type
         case bundleID = "bundle_id"
         case processName = "process_name"
         case windowTitleContains = "window_title_contains"
+        case url
+        case tokenEnv = "token_env"
     }
 }
 

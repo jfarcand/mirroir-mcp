@@ -192,8 +192,20 @@ struct MirroirMCP {
         defaultName: String?
     ) -> TargetRegistry {
         var targets = [String: TargetContext]()
+        var remotes = [String: RemoteTarget]()
 
         for (name, config) in configs {
+            if config.type == RemoteTarget.configTypeName {
+                switch RemoteTarget.make(config: config, name: name) {
+                case .success(let remote):
+                    remotes[name] = remote
+                case .failure(let error):
+                    let message = "target '\(name)' is skipped: \(error.message)"
+                    DebugLog.persist("TargetRegistry", message)
+                    fputs("mirroir-mcp: \(message)\n", stderr)
+                }
+                continue
+            }
             guard let ctx = TargetKind.build(config: config, name: name) else {
                 let message = TargetKind.unknownTypeMessage(type: config.type, name: name)
                 DebugLog.persist("TargetRegistry", message)
@@ -203,20 +215,29 @@ struct MirroirMCP {
             targets[name] = ctx
         }
 
+        // Remote targets need a local one beside them: the default iPhone.
+        if targets.isEmpty {
+            targets["iphone"] = IPhoneMirroringTarget.build(config: nil)
+        }
+
         // Resolve default: use specified default if it exists, otherwise first alphabetical.
         let sortedNames = targets.keys.sorted()
         let resolvedDefault: String
         if let specified = defaultName, targets[specified] != nil {
             resolvedDefault = specified
         } else {
-            if let specified = defaultName {
+            if let specified = defaultName, remotes[specified] == nil {
                 DebugLog.log("TargetRegistry",
                     "Configured default '\(specified)' not found in targets \(sortedNames), "
                     + "falling back to '\(sortedNames.first ?? "")'")
             }
             resolvedDefault = sortedNames.first!  // Safe: configs was checked !isEmpty above
         }
-        return TargetRegistry(targets: targets, defaultName: resolvedDefault)
+        let registry = TargetRegistry(targets: targets, defaultName: resolvedDefault, remotes: remotes)
+        if let specified = defaultName, remotes[specified] != nil {
+            _ = registry.switchActive(to: specified)
+        }
+        return registry
     }
 
     /// Build the appropriate TextRecognizing backend based on configuration.

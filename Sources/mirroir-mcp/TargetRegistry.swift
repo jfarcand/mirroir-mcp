@@ -110,8 +110,14 @@ struct TargetContext: Target, Sendable {
 final class TargetRegistry: @unchecked Sendable {
     private let targets: [String: TargetContext]
     private let lock = OSAllocatedUnfairLock(initialState: "")
+    /// Other Macs' serves (carnet#102), by target name. Immutable after construction.
+    let remotes: [String: RemoteTarget]
+    /// The remote target `switch_target` made active, if any. Local tools keep using the
+    /// active local target, so `resolve()` never answers with a remote one.
+    private let activeRemote = OSAllocatedUnfairLock(initialState: String?.none)
 
-    init(targets: [String: TargetContext], defaultName: String) {
+    init(targets: [String: TargetContext], defaultName: String, remotes: [String: RemoteTarget] = [:]) {
+        self.remotes = remotes
         precondition(!targets.isEmpty, "TargetRegistry requires at least one target")
         precondition(
             targets[defaultName] != nil,
@@ -127,11 +133,30 @@ final class TargetRegistry: @unchecked Sendable {
         return targets[resolved]
     }
 
-    /// Switch the active target. Returns false if the name is unknown.
+    /// Switch the active target, local or remote. Returns false if the name is unknown.
     func switchActive(to name: String) -> Bool {
+        if remotes[name] != nil {
+            activeRemote.withLock { $0 = name }
+            return true
+        }
         guard targets[name] != nil else { return false }
         lock.withLock { $0 = name }
+        activeRemote.withLock { $0 = nil }
         return true
+    }
+
+    /// The name of the active remote target, or nil while a local one is active.
+    var activeRemoteName: String? { activeRemote.withLock { $0 } }
+
+    /// The remote target a call of `tool` with `arguments` goes to: the one its `target`
+    /// names, or the active remote one when it names none. Nil for a local target, and
+    /// for a tool that only reads or writes files on this Mac.
+    func remoteTarget(tool: String, arguments: [String: JSONValue]) -> RemoteTarget? {
+        guard !RemoteTarget.localTools.contains(tool) else { return nil }
+        if let named = arguments["target"]?.asString() {
+            return remotes[named]
+        }
+        return activeRemoteName.flatMap { remotes[$0] }
     }
 
     /// The currently active target context.
@@ -152,9 +177,9 @@ final class TargetRegistry: @unchecked Sendable {
         targets.values.sorted { $0.name < $1.name }
     }
 
-    /// All configured target names.
+    /// All configured target names, local and remote.
     var allTargetNames: [String] {
-        targets.keys.sorted()
+        (Array(targets.keys) + Array(remotes.keys)).sorted()
     }
 
     /// Number of configured targets.

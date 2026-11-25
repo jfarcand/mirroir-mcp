@@ -30,6 +30,9 @@ final class MCPServer: Sendable {
     /// (`DrivingGuard`) in front of every input. Nil until tools are registered.
     private let screenReader = OSAllocatedUnfairLock(
         initialState: (@Sendable ([String: JSONValue]) -> ScreenDescriber.DescribeResult?)?.none)
+    /// The remote target a tool call goes to, if any (carnet#102). Nil until tools are registered.
+    private let remoteRoute = OSAllocatedUnfairLock(
+        initialState: (@Sendable (String, [String: JSONValue]) -> RemoteTarget?)?.none)
     /// Counter for server-initiated request IDs (sampling, etc.).
     let requestCounter = OSAllocatedUnfairLock(initialState: 0)
     /// Capabilities the stdio client declared in its `initialize` handshake.
@@ -51,6 +54,11 @@ final class MCPServer: Sendable {
 
     func registerTool(_ tool: MCPToolDefinition) {
         tools.withLock { $0[tool.name] = tool }
+    }
+
+    /// Set how a tool call finds the remote target it goes to.
+    func setRemoteRoute(_ route: @escaping @Sendable (String, [String: JSONValue]) -> RemoteTarget?) {
+        remoteRoute.withLock { $0 = route }
     }
 
     /// Set how the driving check reads the screen of the target a call names.
@@ -362,6 +370,19 @@ final class MCPServer: Sendable {
         }
 
         let arguments = request.params?.getArguments() ?? [:]
+        // A call aimed at another Mac's serve goes there once this Mac's policy allowed it.
+        // That server reads its own screen for its own driving check.
+        if let route = remoteRoute.withLock({ $0 }), let remote = route(toolName, arguments) {
+            DebugLog.log("remote", "\(toolName) -> \(remote.name) at \(remote.url.absoluteString)")
+            let fields: [String: JSONValue]
+            switch remote.call(tool: toolName, arguments: arguments) {
+            case .success(let result):
+                fields = result
+            case .failure(let error):
+                fields = ["content": .array([MCPContent.text(error.message).toJSON()]), "isError": .bool(true)]
+            }
+            return JSONRPCResponse(id: request.id, result: completeResult(fields, modern: modern), error: nil)
+        }
         let reader = screenReader.withLock { $0 }
         if let refusal = DrivingGuard.refusal(tool: toolName, policy: policy, read: { reader?(arguments) }) {
             DebugLog.log("permission", "driving refused \(toolName)")
