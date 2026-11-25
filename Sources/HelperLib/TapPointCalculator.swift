@@ -221,9 +221,13 @@ public enum TapPointCalculator {
                     && $0.bboxWidth < windowWidth * maxLabelWidthFraction
             }.count
             let allShortLabels = shortLabelsInRow == row.elements.count
+            // A tab bar may hold a button with no label (TikTok's "+"): its labels then
+            // keep one spacing with a double gap where that button sits (carnet#105).
+            let spaced = hasUniformSpacing(row.elements)
+                || (rowTopY >= bottomZoneY && hasTabBarSpacing(row.elements))
             let isIconRow = allShortLabels
                 && shortLabelsInRow >= iconRowMinLabels
-                && hasUniformSpacing(row.elements)
+                && spaced
 
             let gap: Double
             if isIconRow {
@@ -274,6 +278,20 @@ public enum TapPointCalculator {
               let maxGap = spacings.max(),
               minGap > 0 else { return true }
         return maxGap / minGap <= iconRowMaxSpacingRatio
+    }
+
+    /// Returns true when every gap between adjacent label centres is one or two times
+    /// the smallest, within 15%: an evenly spaced tab bar whose labels skip one button
+    /// that has none. An in-content toolbar's gaps are no such multiples.
+    public static func hasTabBarSpacing(_ elements: [RawTextElement]) -> Bool {
+        let xs = elements.map(\.tapX).sorted()
+        guard xs.count >= 3 else { return true }
+        let spacings = zip(xs.dropFirst(), xs).map { $0 - $1 }
+        guard let unit = spacings.min(), unit > 0 else { return false }
+        return spacings.allSatisfy { spacing in
+            let multiple = (spacing / unit).rounded()
+            return (1...2).contains(multiple) && abs(spacing - multiple * unit) <= unit * 0.15
+        }
     }
 
     // MARK: - Stage 3: Apply offsets

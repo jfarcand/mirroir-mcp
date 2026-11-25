@@ -334,6 +334,32 @@ extension TapPointCalculatorTests {
         #expect(TapPointCalculator.hasUniformSpacing(elements) == true)
     }
 
+    /// carnet#105: TikTok's tab bar, Home Friends [+] Inbox Profile, with no label under
+    /// "+". The double gap kept the row from being a tab bar, and its labels were tapped
+    /// on the text at the window's bottom edge (GitHub issue #15).
+    @Test("a tab bar skipping an unlabeled button still gets the tab-bar offset")
+    func tabBarWithAnUnlabeledButtonIsLifted() {
+        let labels = [("Home", 40.0), ("Friends", 110.0), ("Inbox", 250.0), ("Profile", 320.0)]
+        let elements = [element(text: "Caption", tapX: 100, textTopY: 600, textBottomY: 614)]
+            + labels.map { element(text: $0.0, tapX: $0.1, textTopY: 712, textBottomY: 724) }
+        let results = TapPointCalculator.computeTapPoints(
+            elements: elements, windowWidth: 357, windowHeight: 786)
+        let inbox = results.first { $0.text == "Inbox" }!
+        #expect(inbox.tapY < 712, "lifted toward the icon, got \(inbox.tapY)")
+        #expect(TapPointCalculator.hasTabBarSpacing(
+            labels.map { element(text: $0.0, tapX: $0.1, textTopY: 712, textBottomY: 724) }))
+    }
+
+    @Test("a toolbar's uneven gaps are no tab bar, even at the bottom")
+    func unevenBottomToolbarIsNotATabBar() {
+        let elements = [
+            element(text: "A", tapX: 54, textTopY: 760, textBottomY: 770),
+            element(text: "B", tapX: 252, textTopY: 760, textBottomY: 770),
+            element(text: "C", tapX: 298, textTopY: 760, textBottomY: 770),
+        ]
+        #expect(TapPointCalculator.hasTabBarSpacing(elements) == false)
+    }
+
     @Test("hasUniformSpacing tolerates minor jitter from OCR")
     func uniformSpacingWithJitter() {
         // Real-world icon grid OCR centers may shift a few px; 83/98/91
