@@ -49,6 +49,7 @@ The harness reports what it saw and did; you decide what it means. A tool that s
 - `tap(text:)` finds text that describe_screen listed and taps it; a miss lists the text that is on screen. `tap(x:, y:)` takes a point from describe_screen.
 - `launch_app(name:)` opens an app through Spotlight. `open_url` opens a link in Safari.
 - `press_back` taps the back chevron; `press_home` goes to the Home Screen; `press_app_switcher` shows open apps; `reset_app` force-quits one.
+- When typed keys or taps stop landing while the screen still reads, `restart_mirroring` quits and reopens iPhone Mirroring. It ends the session: ask the user first.
 - Scrolling: content follows the finger. `swipe` from bottom to top shows what is below. To page a video feed, flick: about 75% of the screen height with `duration_ms` 150. A long `duration_ms` scrolls slowly without inertia.
 - `long_press` opens context menus; `double_tap` zooms or selects; `drag` moves icons and sliders.
 - `run_steps` runs a list of steps you have already seen work, such as `["tap: @324,113", "type: calculator", "press_key: return"]`. A control with no readable text is named by its point: `"tap: @324,113"`. Text must be what the screen shows, in the iPhone's language. Every step is checked against the permissions before any runs, and the run stops at the first failure. The reply ends with the text on screen.

@@ -166,6 +166,7 @@ public struct PermissionPolicy: Sendable {
         "spotlight",
         "scroll_to",
         "reset_app",
+        "restart_mirroring",
         "measure",
         "set_network",
         "switch_target",

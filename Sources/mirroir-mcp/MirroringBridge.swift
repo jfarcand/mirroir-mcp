@@ -70,8 +70,8 @@ struct WindowInfo: Sendable {
 /// Mirroring restart under a new PID.
 final class MirroringBridge: Sendable {
     let targetName: String
-    private let bundleIdentifier: String
-    private let probe: any MirroringSystemProbing
+    let bundleIdentifier: String
+    let probe: any MirroringSystemProbing
     /// Whether the app has been seen running since this server started. Once
     /// it has, its absence means someone quit it, and a quit is honoured.
     private let hasBeenRunning = OSAllocatedUnfairLock(initialState: false)

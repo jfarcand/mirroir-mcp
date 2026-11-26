@@ -103,6 +103,10 @@ struct LiveMirroringProbe: MirroringSystemProbing {
 
     /// `open -g -b`: Launch Services starts the app hidden behind the front
     /// app, which keeps the focus.
+    func quit(pid: pid_t) -> Bool {
+        NSRunningApplication(processIdentifier: pid)?.terminate() ?? false
+    }
+
     func launchInBackground(bundleID: String) -> Bool {
         let open = Process()
         open.executableURL = URL(fileURLWithPath: "/usr/bin/open")

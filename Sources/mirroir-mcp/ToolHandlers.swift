@@ -45,6 +45,7 @@ extension MirroirMCP {
         registerSkillTools(server: server, registry: registry, session: compilationSession)
         registerScrollToTools(server: server, registry: registry)
         registerAppManagementTools(server: server, registry: registry)
+        registerRestartMirroringTools(server: server, registry: registry)
         registerMeasureTools(server: server, registry: registry)
         registerNetworkTools(server: server, registry: registry, policy: policy)
         registerTargetTools(server: server, registry: registry)

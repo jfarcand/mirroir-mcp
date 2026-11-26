@@ -120,6 +120,9 @@ protocol MirroringSystemProbing: Sendable {
     /// Launch the app with `bundleID` without activating it. Returns whether
     /// Launch Services accepted the request.
     func launchInBackground(bundleID: String) -> Bool
+    /// Ask the app `pid` to quit, as its Quit menu item would. Returns whether the
+    /// request was sent; the process may take a moment to go.
+    func quit(pid: pid_t) -> Bool
 }
 
 /// A pluggable strategy for clearing a target interruption that blocks input —

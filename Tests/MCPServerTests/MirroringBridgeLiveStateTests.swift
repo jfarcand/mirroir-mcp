@@ -111,10 +111,35 @@ final class ScriptedMirroringProbe: MirroringSystemProbing, @unchecked Sendable 
     var launchedBundleIDs: [String] { lock.withLock { launches } }
 
     func launchInBackground(bundleID: String) -> Bool {
-        lock.withLock {
+        let (accepted, launched) = lock.withLock {
             launches.append(bundleID)
-            return true
+            return (launchAccepted, onLaunch)
         }
+        if accepted { launched?() }
+        return accepted
+    }
+
+    /// Whether a background launch is accepted, and what it does to the scripted app.
+    private var launchAccepted = true
+    private var onLaunch: (() -> Void)?
+    func set(launchAccepted: Bool) { lock.withLock { self.launchAccepted = launchAccepted } }
+    func set(onLaunch: (() -> Void)?) { lock.withLock { self.onLaunch = onLaunch } }
+
+    /// The PIDs a quit was requested for, whether it is accepted, and what it does.
+    private var quits: [pid_t] = []
+    private var quitAccepted = true
+    private var onQuit: (() -> Void)?
+    var quitPIDs: [pid_t] { lock.withLock { quits } }
+    func set(quitAccepted: Bool) { lock.withLock { self.quitAccepted = quitAccepted } }
+    func set(onQuit: (() -> Void)?) { lock.withLock { self.onQuit = onQuit } }
+
+    func quit(pid requested: pid_t) -> Bool {
+        let (accepted, quitting) = lock.withLock {
+            quits.append(requested)
+            return (quitAccepted, onQuit)
+        }
+        if accepted { quitting?() }
+        return accepted
     }
 }
 

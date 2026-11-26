@@ -1,6 +1,6 @@
 # Tools Reference
 
-All 42 tools exposed by the MCP server. Mutating tools require [permission](permissions.md) to appear in `tools/list`.
+All 43 tools exposed by the MCP server. Mutating tools require [permission](permissions.md) to appear in `tools/list`.
 
 ## Tool List
 
@@ -31,6 +31,7 @@ All 42 tools exposed by the MCP server. Mutating tools require [permission](perm
 | `spotlight` | — | Open Spotlight search |
 | `scroll_to` | `label`, `direction`?, `at`?, `max_scrolls`? | Scroll until a text element becomes visible via OCR; reports why it stopped when the text never shows |
 | `reset_app` | `name` | Force-quit an app via the App Switcher |
+| `restart_mirroring` | `timeout`? | Quit iPhone Mirroring on the Mac, open it again and wait until it is connected (default 60 s). For input that stops landing. It ends the session, so ask the user first. An app that is not running is not opened; when it opens without connecting, the reply says what its window asks for |
 | `measure` | `action`, `until`, `max_seconds`?, `name`? | Time a screen transition after an action |
 | `run_steps` | `steps`, `task`? | Run several proven steps in one call, in the [step grammar](#step-types) (`"tap: <text on screen>"`, `"tap: @324,113"` for a point, `"type: calculator"`, `"wait_for: Get"`, `"home"`). Every step is checked against the permission policy before the first runs; the run stops at the first failure and the reply ends with the text on screen With `task` (a few words, one line, no double quotes), a run whose every step passed is added to that task, and the reply ends with a SKILL.md draft of every passing run given the same `task` since the server started, ready to save under `~/.mirroir-mcp/skills/`. A failed run is not added. The server keeps 20 tasks and 200 steps per task, in memory only. |
 | `set_network` | `mode` | Toggle network settings (airplane, Wi-Fi, cellular) via Control Center on iOS 27, else Settings |

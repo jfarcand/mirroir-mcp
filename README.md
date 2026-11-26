@@ -30,7 +30,7 @@
 </p>
 <p align="center"><em>"Be my DJ": the agent asks for a vibe, builds a Gui Boratto-style playlist in Spotify and starts it. A real iPhone, sped up.</em></p>
 
-No Developer Mode, no Xcode, nothing installed on the phone. mirroir-mcp drives your iPhone through macOS iPhone Mirroring, with the apps already signed in on it: no connector, no OAuth, no password handed to anyone. It works with Claude, Codex, Cursor and other AI apps that support MCP, through [42 tools](docs/tools.md).
+No Developer Mode, no Xcode, nothing installed on the phone. mirroir-mcp drives your iPhone through macOS iPhone Mirroring, with the apps already signed in on it: no connector, no OAuth, no password handed to anyone. It works with Claude, Codex, Cursor and other AI apps that support MCP, through [43 tools](docs/tools.md).
 
 ## Quick start
 
@@ -74,7 +74,7 @@ Start with OCR. Switch to vision when the screen is mostly icons, or its text is
 
 ## The framework
 
-- **[Tools](docs/tools.md).** 42 MCP tools: tap, type, swipe, read the screen, listen, launch, and [`run_steps`](docs/tools.md#tool-list) to repeat a sequence in one call.
+- **[Tools](docs/tools.md).** 43 MCP tools: tap, type, swipe, read the screen, listen, launch, and [`run_steps`](docs/tools.md#tool-list) to repeat a sequence in one call.
 - **[Skills](docs/skills-and-ci.md#skills).** `generate_skill` explores an app and writes SKILL.md files your agent follows.
 - **[Compiled replay](docs/compiled-skills.md).** `mirroir test` replays a skill from the CLI with no AI in the loop: deterministic, no tokens.
 - **[App knowledge](docs/APP.md.spec.md).** APP.md files and [screen recipes](docs/components.md#screen-patterns-recipes) describe an app's screens once, for every agent.

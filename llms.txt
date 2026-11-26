@@ -1,6 +1,6 @@
 # mirroir-mcp
 
-> Give your AI eyes, hands, and a real iPhone. An MCP server that lets any AI agent see the screen, tap what it needs, and figure the rest out — through macOS iPhone Mirroring. Also supports macOS windows. 42 tools, any MCP client (Claude Code, Cursor, Copilot, ChatGPT, Codex). Written in Swift. Apache 2.0 licensed.
+> Give your AI eyes, hands, and a real iPhone. An MCP server that lets any AI agent see the screen, tap what it needs, and figure the rest out — through macOS iPhone Mirroring. Also supports macOS windows. 43 tools, any MCP client (Claude Code, Cursor, Copilot, ChatGPT, Codex). Written in Swift. Apache 2.0 licensed.
 
 ## Overview
 
@@ -73,6 +73,7 @@ Requires macOS 15+ and an iPhone connected via iPhone Mirroring.
 - `spotlight` — Open Spotlight search
 - `scroll_to` — Scroll until a text element becomes visible via OCR. `direction` says where that text is (`down` by default, for what is below; it is not the finger's motion, which is `swipe`); `at` scrolls a list inside the screen. When the text never shows, the error carries `stop_reason=end_of_content` (the content read the same two scrolls in a row) or `stop_reason=max_scrolls`.
 - `reset_app` — Force-quit app via App Switcher (swipes through carousel to find off-screen cards)
+- `restart_mirroring` — Quit iPhone Mirroring and open it again, waiting until it connects (for input that stops landing; ends the session)
 - `run_steps` — Run several steps in one call (`"tap: <text on screen>"`, `"type: calculator"`), stopping at the first failure
 
 ### Measurement & Network
@@ -351,7 +352,7 @@ Multi-target configuration via `targets.json` for controlling multiple windows s
 
 - [README](README.md) — Installation, examples, quick start
 - [Onboarding](docs/onboarding.md) — Setup written for the agent: prerequisites, install, doctor, read-only proof
-- [Tools Reference](docs/tools.md) — All 42 tools with parameters
+- [Tools Reference](docs/tools.md) — All 43 tools with parameters
 - [Security](docs/security.md) — Threat model, kill switch, recommendations
 - [Permissions](docs/permissions.md) — Fail-closed permission model
 - [Component Detection](docs/components.md) — Component definitions, calibration, detection pipeline

@@ -165,6 +165,8 @@ enum OperatingManual {
         - `launch_app(name:)` opens an app through Spotlight. `open_url` opens a link in Safari.
         - `press_back` taps the back chevron; `press_home` goes to the Home Screen; \
         `press_app_switcher` shows open apps; `reset_app` force-quits one.
+        - When typed keys or taps stop landing while the screen still reads, `restart_mirroring` \
+        quits and reopens iPhone Mirroring. It ends the session: ask the user first.
         - Scrolling: content follows the finger. `swipe` from bottom to top shows what is \
         below. To page a video feed, flick: about 75% of the screen height with `duration_ms` 150. \
         A long `duration_ms` scrolls slowly without inertia.
