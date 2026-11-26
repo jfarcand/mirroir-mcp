@@ -38,11 +38,13 @@ extension MirroirMCP {
                 from describe_screen, which reports each element's tap point. \
                 For something only a screenshot shows, give its position in that \
                 image as `x` and `y` with `image_size`: the point is converted to \
-                window points for you.
+                window points for you. \
+                Give `expect` with the text the tap should lead to: the call waits for it \
+                and fails when it never shows.
                 """,
             inputSchema: [
                 "type": .string("object"),
-                "properties": .object([
+                "properties": .object(ActionExpectation.properties.merging([
                     "x": .object([
                         "type": .string("number"),
                         "description": .string(
@@ -72,19 +74,25 @@ extension MirroirMCP {
                             + "that screenshot was taken with. Omit for a full-frame screenshot."),
                     ]),
                     "cursor_mode": cursorModeSchema,
-                ]),
+                ]) { $1 }),
             ],
             handler: { args in
                 let (ctx, err) = registry.resolveForTool(args)
                 guard let ctx else { return err! }
                 let input = ctx.input
+                let expectation: ActionExpectation?
+                switch ActionExpectation.parse(args) {
+                case .success(let parsed): expectation = parsed
+                case .failure(let refusal): return .error(refusal.message)
+                }
 
                 if let text = args["text"]?.asString() {
                     guard args["image_size"] == nil, args["image_region"] == nil else {
                         return .error("image_size needs x and y: it converts a point, not text")
                     }
                     let executor = InlineStepRunner.executor(for: ctx, registry: registry)
-                    let report = InlineStepRunner.run([.tap(label: text)], executor: executor, policy: policy)
+                    let steps: [SkillStep] = [.tap(label: text)] + (expectation.map { [$0.step] } ?? [])
+                    let report = InlineStepRunner.run(steps, executor: executor, policy: policy)
                     return report.failed ? .error(report.text) : .text(report.text)
                 }
                 guard let x = args["x"]?.asNumber(), let y = args["y"]?.asNumber() else {
@@ -117,7 +125,10 @@ extension MirroirMCP {
                     read: { ctx.ocrDescriber.describe(settleTimeoutUs: 0) },
                     tap: { input.tap(x: point.x, y: point.y, cursorMode: cursorMode) })
                 switch outcome {
-                case .success(let reply): return .text(reply)
+                case .success(let reply):
+                    guard let expectation else { return .text(reply) }
+                    return ActionExpectation.check(
+                        expectation, after: reply, ctx: ctx, registry: registry, policy: policy)
                 case .failure(let error): return .error(error.message)
                 }
             }
