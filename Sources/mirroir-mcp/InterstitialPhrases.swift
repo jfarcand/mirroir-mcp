@@ -40,10 +40,11 @@ enum SessionBlockMove: String, Sendable, CaseIterable, Codable {
 
     /// Whether only the user can make this move. The agent has no tool for the
     /// Mac's own windows, settings or prompts, nor for the iPhone's side button;
-    /// it can only wait out a connection that is still forming.
+    /// it can only wait out a connection that is still forming, or restart iPhone
+    /// Mirroring when a plain "Connection Paused" outlasts Resume.
     var needsUser: Bool {
         switch self {
-        case .waitForCameraOrMicrophone, .waitWhileConnecting: return false
+        case .waitForCameraOrMicrophone, .waitWhileConnecting, .pressResume: return false
         default: return true
         }
     }
@@ -77,7 +78,10 @@ enum SessionBlockMove: String, Sendable, CaseIterable, Codable {
         case .waitWhileConnecting:
             return "iPhone Mirroring is still connecting. Wait a few seconds, then retry."
         case .pressResume:
-            return "Click Resume in the mirroring window, then retry."
+            return "An input tool presses Resume, and restarts iPhone Mirroring when that does "
+                + "not reconnect it. If it is still paused after one, call restart_mirroring once; "
+                + "if it pauses again, the iPhone needs the user (locked, nearby, Bluetooth and "
+                + "Wi-Fi on)."
         case .clearOnMac:
             return "Clear it in the iPhone Mirroring window on the Mac, then retry."
         case .unlockMac:

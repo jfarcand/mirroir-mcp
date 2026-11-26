@@ -27,7 +27,7 @@ final class MirroringRestartTests: XCTestCase {
     private static let frame = CGRect(x: 1293, y: 120, width: 410, height: 898)
 
     private let probe = ScriptedMirroringProbe()
-    private lazy var bridge = MirroringBridge(bundleID: "com.example.mirroring", probe: probe)
+    private lazy var bridge = MirroringBridge(bundleID: "com.example.mirroring", probe: probe, quitRecheckSeconds: 0)
     private let sleepLog = SleepLog()
     private var sleeps: [Double] { sleepLog.values }
     private lazy var timing = MirroringRestart.Timing(
@@ -52,6 +52,35 @@ final class MirroringRestartTests: XCTestCase {
                 AXNodeSnapshot(role: "AXStaticText", label: "Lock your iPhone to connect."),
                 AXNodeSnapshot(role: "AXButton", label: "Try Again"),
             ])), entries: entries(pid))
+    }
+
+    private func connectionPaused(_ pid: pid_t) {
+        probe.set(pid: pid, axWindow: MirroringAXWindow(
+            title: Self.title, frame: Self.frame,
+            hostingView: AXNodeSnapshot(role: "AXGroup", children: [
+                AXNodeSnapshot(role: "AXStaticText", label: "Connection Paused"),
+                AXNodeSnapshot(role: "AXButton", label: "Resume"),
+            ])), entries: entries(pid))
+    }
+
+    /// 2026-11-26: "Connection Paused" outlasted every Resume press; a restart cleared it.
+    func testAPausedSessionThatResumeCannotClearIsRestarted() {
+        connectionPaused(300)
+        probe.set(onQuit: { [probe] in probe.set(pid: nil, axWindow: nil, entries: []) })
+        probe.set(onLaunch: { [weak self] in self?.connected(301) })
+        let simulation = InputSimulation(bridge: bridge, keyboardLayouts: .usQWERTY)
+
+        simulation.restartIfResumeFailed(tag: "test")
+
+        XCTAssertEqual(probe.quitPIDs, [300])
+        XCTAssertEqual(bridge.getState(), .connected)
+    }
+
+    func testAnInterstitialThatNeedsTheUserIsNotRestarted() {
+        iPhoneInUse(300)
+        let simulation = InputSimulation(bridge: bridge, keyboardLayouts: .usQWERTY)
+        simulation.restartIfResumeFailed(tag: "test")
+        XCTAssertTrue(probe.quitPIDs.isEmpty, "locking the iPhone is the user's move")
     }
 
     func testARunningAppIsQuitOpenedAgainAndConnected() {

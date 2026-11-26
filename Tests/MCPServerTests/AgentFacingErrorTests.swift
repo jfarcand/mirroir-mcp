@@ -35,12 +35,15 @@ final class AgentFacingErrorTests: XCTestCase {
         }
     }
 
-    func testOnlyWaitingNeedsNoUser() {
+    /// The agent can wait, or restart iPhone Mirroring on a plain "Connection Paused";
+    /// every other block needs the user.
+    func testOnlyWaitingAndARestartNeedNoUser() {
         let agentMoves = SessionBlockMove.allCases.filter { !$0.needsUser }
-        XCTAssertEqual(Set(agentMoves), [.waitForCameraOrMicrophone, .waitWhileConnecting])
-        for move in agentMoves {
+        XCTAssertEqual(Set(agentMoves), [.waitForCameraOrMicrophone, .waitWhileConnecting, .pressResume])
+        for move in agentMoves where move != .pressResume {
             XCTAssertTrue(move.advice.contains("Wait"), "\(move): \(move.advice)")
         }
+        XCTAssertTrue(SessionBlockMove.pressResume.advice.contains("restart_mirroring"))
     }
 
     // MARK: - Connection refusals

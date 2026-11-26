@@ -39,7 +39,16 @@ final class ScriptedMirroringProbe: MirroringSystemProbing, @unchecked Sendable 
         }
     }
 
-    func processID(bundleID: String) -> pid_t? { lock.withLock { pid } }
+    func processID(bundleID: String) -> pid_t? {
+        lock.withLock {
+            if missedLookups > 0 { missedLookups -= 1; return nil }
+            return pid
+        }
+    }
+
+    /// Lookups that miss the running app before it is found again.
+    private var missedLookups = 0
+    func set(missedLookups: Int) { lock.withLock { self.missedLookups = missedLookups } }
 
     func mainWindow(pid requested: pid_t) -> MirroringAXWindow? {
         lock.withLock { requested == pid ? axWindow : nil }
@@ -153,7 +162,8 @@ final class MirroringBridgeLiveStateTests: XCTestCase {
     private static let menuSliver = CGRect(x: 0, y: 0, width: 1710, height: 34)
 
     private let probe = ScriptedMirroringProbe()
-    private lazy var bridge = MirroringBridge(bundleID: "com.example.mirroring", probe: probe)
+    private lazy var bridge = MirroringBridge(
+        bundleID: "com.example.mirroring", probe: probe, quitRecheckSeconds: 0)
 
     /// A connected mirroring window: the hosting view has no children.
     private func liveWindow(_ frame: CGRect) -> MirroringAXWindow {
@@ -214,6 +224,23 @@ final class MirroringBridgeLiveStateTests: XCTestCase {
         XCTAssertEqual(bridge.getState(), .connected)
         XCTAssertFalse(bridge.wasQuit)
         XCTAssertNil(bridge.sessionBlock())
+    }
+
+    /// Seen 2026-11-26: a swipe was refused as "the app is gone" while iPhone Mirroring
+    /// ran under one PID throughout. One missed lookup is not a quit.
+    func testALookupThatMissesOnceIsNotAQuit() {
+        show(pid: 300, frame: Self.portrait)
+        XCTAssertEqual(bridge.getState(), .connected)
+
+        probe.set(missedLookups: 1)
+        XCTAssertFalse(bridge.wasQuit)
+        probe.set(missedLookups: 1)
+        XCTAssertEqual(bridge.getState(), .connected)
+        probe.set(missedLookups: 1)
+        XCTAssertNil(bridge.sessionBlock())
+
+        probe.set(pid: nil, axWindow: nil, entries: [])
+        XCTAssertTrue(bridge.wasQuit, "an app gone on both lookups was quit")
     }
 
     func testActivateRaisesTheLiveProcessWindow() {

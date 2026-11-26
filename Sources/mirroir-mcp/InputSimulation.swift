@@ -235,8 +235,25 @@ final class InputSimulation: Sendable {
             _ = freePausedSession(tag: tag)
             // A Connect press leaves the window reading "Connecting to".
             waitForConnection(tag: tag)
+            restartIfResumeFailed(tag: tag)
         }
         return checkMirroringConnected(tag: tag)
+    }
+
+    /// A plain "Connection Paused" that pressing Resume did not clear: quit and reopen
+    /// iPhone Mirroring, which does (measured 2026-11-26, connected again in 4 s). Only
+    /// that overlay: an interstitial that needs the user (iPhone in use, Mac locked) is
+    /// left for them.
+    func restartIfResumeFailed(tag: String) {
+        guard bridge.getState() == .paused,
+              let menuBridge = bridge as? MenuActionCapable,
+              menuBridge.sessionBlock()?.move == .pressResume,
+              let restartable = bridge as? any MirroringRestartable else { return }
+        DebugLog.persist(tag, "Resume did not reconnect; restarting iPhone Mirroring")
+        var timing = MirroringRestart.Timing()
+        timing.connectSeconds = 30
+        let outcome = restartable.restart(timing: timing)
+        DebugLog.persist(tag, outcome.message(targetName: bridge.targetName))
     }
 
     /// Common preamble for pointing operations (tap, swipe, drag, long press, double tap).

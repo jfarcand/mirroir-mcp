@@ -76,12 +76,17 @@ final class MirroringBridge: Sendable {
     /// it has, its absence means someone quit it, and a quit is honoured.
     private let hasBeenRunning = OSAllocatedUnfairLock(initialState: false)
 
+    /// How long to wait before looking the process up again when it seems gone.
+    private let quitRecheckSeconds: Double
+
     init(targetName: String = "iphone",
          bundleID: String? = nil,
-         probe: any MirroringSystemProbing = LiveMirroringProbe()) {
+         probe: any MirroringSystemProbing = LiveMirroringProbe(),
+         quitRecheckSeconds: Double = 0.5) {
         self.targetName = targetName
         self.bundleIdentifier = bundleID ?? EnvConfig.mirroringBundleID
         self.probe = probe
+        self.quitRecheckSeconds = quitRecheckSeconds
     }
 
     /// PID of the iPhone Mirroring process right now, or nil when not running.
@@ -93,8 +98,16 @@ final class MirroringBridge: Sendable {
 
     /// Whether the app ran during this server's life and is gone now: the
     /// user quit it (or it died), and that is a stop, not a state to repair.
+    ///
+    /// A lookup can miss a running app once (seen 2026-11-26 while it ran under
+    /// one PID throughout), so a miss is looked up again after a short wait
+    /// before it counts as a quit.
     var wasQuit: Bool {
-        processID == nil && hasBeenRunning.withLock { $0 }
+        guard processID == nil, hasBeenRunning.withLock({ $0 }) else { return false }
+        if quitRecheckSeconds > 0 { Thread.sleep(forTimeInterval: quitRecheckSeconds) }
+        let stillGone = processID == nil
+        if !stillGone { DebugLog.log("launch", "\(bundleIdentifier) lookup missed once; it is running") }
+        return stillGone
     }
 
     /// Find the iPhone Mirroring process.
@@ -122,7 +135,9 @@ final class MirroringBridge: Sendable {
 
     /// Detect the current mirroring connection state.
     func getState() -> MirroringState {
-        guard let pid = processID else { return .notRunning }
+        // A single missed lookup of a running app is not "not running" (see wasQuit).
+        guard let pid = processID ?? (hasBeenRunning.withLock({ $0 }) && !wasQuit ? processID : nil)
+        else { return .notRunning }
         guard let window = probe.mainWindow(pid: pid) else {
             // A minimized window is no longer the app's main window, so it reads
             // like a closed one unless the window list is asked.
