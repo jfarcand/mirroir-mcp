@@ -111,6 +111,7 @@ final class ScreenDescriber: Sendable {
     func describe(frame: CaptureResult) -> DescribeResult? {
         let info = frame.info
         let data = frame.data
+        WindowSizeLedger.record(target: bridge.targetName, size: info.size)
 
         // Create CGImage for text recognition (OCR runs on the clean image, before grid overlay)
         guard let imageSource = CGImageSourceCreateWithData(data as CFData, nil),

@@ -58,6 +58,8 @@ All 43 tools exposed by the MCP server. Mutating tools require [permission](perm
 
 Coordinates are in points relative to the mirroring window's top-left corner. Use `describe_screen` to get exact tap coordinates — it detects both text (via Vision OCR) and icons (via YOLO CoreML, if a model is installed). The grid overlay helps target any remaining unlabeled elements. A raw `screenshot` is in pixels, and the factor between pixels and points is not fixed: it follows the display, the `scale` argument and the `region` crop. Each screenshot's reply states its pixel size and that factor. To tap something only the image shows, pass its position in the image to `tap` as `x` and `y` with `image_size` (and `image_region` when the screenshot was cropped), and the point is converted for you.
 
+Coordinates belong to the window size they were read at. When the window has changed size since the last `describe_screen` or `screenshot` of that target (resized by hand, or reopened at another size), a tap, swipe, drag, long press or double tap at coordinates is refused and nothing is sent: describe the screen again and use the new coordinates. A tap by `text` reads the screen itself and is never refused for this.
+
 ## Describe Screen
 
 `describe_screen` returns detected elements with their tap coordinates, plus a grid-overlaid screenshot for visual context. The backend depends on `screenDescriberMode`:

@@ -100,6 +100,7 @@ extension MirroirMCP {
                     return .error(ScreenReadFailure.message(
                         "Failed to capture screenshot.", targetName: ctx.name, state: bridge.getState()))
                 }
+                WindowSizeLedger.record(target: ctx.name, size: captured.info.size)
 
                 // Optional token lever: crop to a region and/or downscale before
                 // returning, so a caller (e.g. a kind:game scene loop) can trade

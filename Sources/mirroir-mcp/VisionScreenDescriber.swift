@@ -81,6 +81,7 @@ final class VisionScreenDescriber: @unchecked Sendable {
         ) else { return nil }
         let info = result.info
         var data = result.data
+        WindowSizeLedger.record(target: bridge.targetName, size: info.size)
 
         // A uniform frame has nothing to describe: report the transition
         // instead of paying the model to answer "blank screen". The pixel test

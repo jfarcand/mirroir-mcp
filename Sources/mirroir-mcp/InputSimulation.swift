@@ -273,6 +273,10 @@ final class InputSimulation: Sendable {
             DebugLog.log(tag, "ERROR: window not found")
             return (nil, false, "Target '\(bridge.targetName)' window not found", nil)
         }
+        if let resized = WindowSizeLedger.refusal(target: bridge.targetName, current: firstRead.size) {
+            DebugLog.log(tag, "REJECTED: window resized since the last read")
+            return (nil, false, resized, nil)
+        }
 
         let bounded = windowContaining(x: x, y: y, info: firstRead, tag: tag)
         guard var info = bounded.info else {

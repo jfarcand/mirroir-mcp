@@ -118,6 +118,12 @@ extension MirroirMCP {
                 if let refusal = BlockedAppTapGuard.refusal(at: point, ctx: ctx, policy: policy) {
                     return .error(refusal)
                 }
+                // Checked before the read this tap takes for its own report, which would
+                // record the new size and hide the resize from the input path (carnet#106).
+                if args["image_size"] == nil, let size = ctx.bridge.getWindowInfo()?.size,
+                   let resized = WindowSizeLedger.refusal(target: ctx.name, current: size) {
+                    return .error(resized)
+                }
                 let outcome = PointTapReport.run(
                     described: "Tapped at (\(ScreenshotGeometry.whole(point.x)), "
                         + "\(ScreenshotGeometry.whole(point.y)))\(origin)",
