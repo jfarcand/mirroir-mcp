@@ -102,7 +102,7 @@ Env-var names are derived from the camelCase key by inserting `_` before every u
 
 | Setting | Default | Description |
 |---------|---------|-------------|
-| `keyboardLayout` | `""` | iPhone hardware-keyboard layout; `type_text` presses the key that types each character on it (e.g. `"Canadian-CSA"`, `"French"`). Empty or `"US"` = US QWERTY. A list (`["Canadian-CSA", "US"]`) for iPhones with different keyboards on one Mac: see [limitations](limitations.md#iphones-with-different-keyboards-on-one-mac). `IPHONE_KEYBOARD_LAYOUT` takes a comma-separated list |
+| `keyboardLayout` | `""` | iPhone hardware-keyboard layout; `type_text` presses the key that types each character on it (e.g. `"Canadian-CSA"`, `"French"`, `"SwissGerman"`); the name macOS shows (`"Swiss German"`) works too. Empty or `"US"` = US QWERTY. A name no macOS layout answers to is left out, and `check_health` fails on it. A list (`["Canadian-CSA", "US"]`) for iPhones with different keyboards on one Mac: see [limitations](limitations.md#iphones-with-different-keyboards-on-one-mac). `IPHONE_KEYBOARD_LAYOUT` takes a comma-separated list |
 
 ## App Identity
 

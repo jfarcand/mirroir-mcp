@@ -65,6 +65,13 @@ struct KeyboardLayoutSet: Sendable {
         return set
     }
 
+    /// The names in `names` that no macOS keyboard layout answers to: typing
+    /// leaves them out, so a phone with that layout gets other characters.
+    static func unknownNames(_ names: [String] = EnvConfig.keyboardLayouts,
+                             resolve: (String) -> Bool = { IPhoneKeyboardLayout.named($0) != nil }) -> [String] {
+        names.filter { !resolve($0) }
+    }
+
     var names: [String] { layouts.map(\.name) }
 
     /// The layout named `name` (case ignored), or nil when it is not one of these.

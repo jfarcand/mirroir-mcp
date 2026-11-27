@@ -47,3 +47,36 @@ final class KeyboardLayoutNamesTests: XCTestCase {
         XCTAssertEqual(EnvConfig.layoutNames(setting: ["US", "US", "Canadian-CSA"], env: nil), ["US", "Canadian-CSA"])
     }
 }
+
+/// A layout written as macOS shows it resolves to its installed source ID.
+final class InstalledLayoutNameTests: XCTestCase {
+
+    private let installed = [
+        LayoutMapper.InstalledLayout(sourceID: "com.apple.keylayout.SwissGerman", name: "Swiss German"),
+        LayoutMapper.InstalledLayout(sourceID: "com.apple.keylayout.Canadian-CSA", name: "Canadian – CSA"),
+        LayoutMapper.InstalledLayout(sourceID: "com.apple.keylayout.Italian-Pro", name: "Italian"),
+    ]
+
+    func testANameWithASpaceIsTheSourceIDWithout() {
+        XCTAssertEqual(LayoutMapper.installedSourceID(forLayout: "Swiss German", installed: installed),
+                       "com.apple.keylayout.SwissGerman")
+        XCTAssertEqual(LayoutMapper.installedSourceID(forLayout: "swiss german ", installed: installed),
+                       "com.apple.keylayout.SwissGerman")
+    }
+
+    func testTheDisplayNameFindsItsLayout() {
+        XCTAssertEqual(LayoutMapper.installedSourceID(forLayout: "Canadian – CSA", installed: installed),
+                       "com.apple.keylayout.Canadian-CSA")
+    }
+
+    func testTheSourceIDWinsOverADisplayName() {
+        let both = installed + [LayoutMapper.InstalledLayout(sourceID: "com.apple.keylayout.Italian", name: "Italian – QZERTY")]
+        XCTAssertEqual(LayoutMapper.installedSourceID(forLayout: "Italian", installed: both),
+                       "com.apple.keylayout.Italian")
+    }
+
+    func testAnUnknownOrEmptyNameHasNoLayout() {
+        XCTAssertNil(LayoutMapper.installedSourceID(forLayout: "Klingon", installed: installed))
+        XCTAssertNil(LayoutMapper.installedSourceID(forLayout: "  ", installed: installed))
+    }
+}

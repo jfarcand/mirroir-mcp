@@ -57,6 +57,16 @@ struct LayoutMapperTests {
         return data
     }
 
+    // MARK: - Layout names
+
+    @Test("A layout written as macOS shows it (\"Swiss German\") finds the SwissGerman layout")
+    func displayNameFindsTheLayout() {
+        let found = LayoutMapper.findNonUSLayout(layout: "Swiss German")
+        #expect(found?.sourceID == "com.apple.keylayout.SwissGerman")
+        #expect(LayoutMapper.findNonUSLayout(layout: "SwissGerman")?.sourceID == "com.apple.keylayout.SwissGerman")
+        #expect(LayoutMapper.findNonUSLayout(layout: "No Such Layout") == nil)
+    }
+
     // MARK: - Layout Data
 
     @Test("US QWERTY layout data is accessible")

@@ -27,7 +27,7 @@ enum ConfigureCommand {
     /// Known keyboard layouts with display names.
     /// The value is the macOS TIS source ID suffix (e.g., "Canadian-CSA"
     /// resolves to "com.apple.keylayout.Canadian-CSA").
-    private static let layouts: [(name: String, description: String)] = [
+    static let layouts: [(name: String, description: String)] = [
         ("US", "US QWERTY (default)"),
         ("Canadian-CSA", "French (Canada)"),
         ("French-PC", "French (France)"),
@@ -35,8 +35,8 @@ enum ConfigureCommand {
         ("Spanish-ISO", "Spanish"),
         ("British", "British"),
         ("Italian", "Italian"),
-        ("Swiss French", "Swiss French"),
-        ("Swiss German", "Swiss German"),
+        ("SwissFrench", "Swiss French"),
+        ("SwissGerman", "Swiss German"),
         ("Portuguese", "Portuguese"),
     ]
 
@@ -67,7 +67,11 @@ enum ConfigureCommand {
         fputs("  \(layouts.count + 1)) Other (enter layout name)\n", stderr)
         fputs("\nEnter choice [1]: ", stderr)
 
-        let input = readLine()?.trimmingCharacters(in: .whitespaces) ?? ""
+        guard let line = readLine() else {
+            fputs("\nNo answer (no terminal input); nothing was saved.\n", stderr)
+            return 1
+        }
+        let input = line.trimmingCharacters(in: .whitespaces)
 
         let layoutName: String
         if input.isEmpty {
@@ -81,13 +85,7 @@ enum ConfigureCommand {
                 fputs("No layout name entered.\n", stderr)
                 return 1
             }
-            // Verify the layout exists on this Mac
-            let fullID = LayoutMapper.sourceID(forLayout: custom)
-            if LayoutMapper.layoutData(forSourceID: fullID) == nil {
-                fputs("Warning: layout '\(fullID)' not found on this Mac.\n", stderr)
-                fputs("Saving anyway — it may be available on other systems.\n", stderr)
-            }
-            layoutName = custom
+            layoutName = savedName(forCustomLayout: custom)
         } else {
             fputs("Invalid choice: '\(input)'\n", stderr)
             return 1
@@ -106,6 +104,22 @@ enum ConfigureCommand {
             fputs("Failed to save settings.\n", stderr)
             return 1
         }
+    }
+
+    /// The name to save for a layout typed at the "Other" prompt: its
+    /// source-ID suffix when this Mac has it under that name or display name
+    /// ("Swiss German" saves "SwissGerman"), otherwise the name as typed,
+    /// with a warning.
+    static func savedName(forCustomLayout custom: String,
+                          installed: [LayoutMapper.InstalledLayout] = LayoutMapper.installedLayouts()) -> String {
+        let fullID = LayoutMapper.sourceID(forLayout: custom)
+        if installed.contains(where: { $0.sourceID == fullID }) { return custom }
+        if let match = LayoutMapper.installedSourceID(forLayout: custom, installed: installed) {
+            return String(match.dropFirst("com.apple.keylayout.".count))
+        }
+        fputs("Warning: layout '\(fullID)' not found on this Mac.\n", stderr)
+        fputs("Saving anyway — it may be available on other systems.\n", stderr)
+        return custom
     }
 
     // MARK: - Settings File

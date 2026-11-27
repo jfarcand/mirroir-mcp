@@ -87,7 +87,10 @@ public enum LayoutMapper {
     public static func findNonUSLayout(layout: String) -> (sourceID: String, layoutData: Data)? {
         guard !isUSLayout(layout) else { return nil }
         let fullID = sourceID(forLayout: layout)
-        return layoutData(forSourceID: fullID).map { (fullID, $0) }
+        if let data = layoutData(forSourceID: fullID) { return (fullID, data) }
+        guard let installedID = installedSourceID(forLayout: layout, installed: installedLayouts()),
+              installedID != fullID, installedID != usSourceID else { return nil }
+        return layoutData(forSourceID: installedID).map { (installedID, $0) }
     }
 
     /// Build the table of single keystrokes that type each character on a layout.

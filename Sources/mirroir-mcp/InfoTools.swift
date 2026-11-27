@@ -65,7 +65,7 @@ extension MirroirMCP {
             description: """
                 Run a comprehensive health check of the iPhone Mirroring setup. \
                 Checks mirroring window state, screen capture availability, \
-                and accessibility permissions. \
+                accessibility permissions and the keyboardLayout setting. \
                 Use this to diagnose setup issues in a single call.
                 """,
             inputSchema: [
@@ -144,6 +144,15 @@ extension MirroirMCP {
                     checks.append("[ok] Text recognition working (\(ms) ms)")
                 case .failed(let reason):
                     checks.append("[FAIL] Text recognition failed — \(reason)")
+                    allOk = false
+                }
+
+                // 5. Keyboard layouts: a name macOS does not know is left out,
+                // and typing then uses another layout's keys.
+                for name in KeyboardLayoutSet.unknownNames() {
+                    checks.append("[FAIL] keyboardLayout '\(name)' is not a macOS keyboard layout, so "
+                        + "typing ignores it. Run `mirroir-mcp configure`, or set the layout's "
+                        + "source ID name (e.g. SwissGerman) in ~/.mirroir-mcp/settings.json")
                     allOk = false
                 }
 
