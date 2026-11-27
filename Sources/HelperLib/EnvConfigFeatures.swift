@@ -468,4 +468,13 @@ extension EnvConfig {
     public static var cursorFreeInput: Bool {
         readBool("cursorFreeInput", envVar: "MIRROIR_CURSOR_FREE", default: false)
     }
+
+    /// launch_app on iPhone Mirroring opens the app from Mac Spotlight's
+    /// "<name>.app — From iPhone" row first (macOS 27), and searches the
+    /// iPhone's own Spotlight only when that row is not there. Off by default:
+    /// it shows Spotlight and clicks on the Mac, and adds seconds to every
+    /// launch of an app without that row.
+    public static var macSpotlightLaunch: Bool {
+        readBool("macSpotlightLaunch", envVar: "MIRROIR_MAC_SPOTLIGHT_LAUNCH", default: false)
+    }
 }

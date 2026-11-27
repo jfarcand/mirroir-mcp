@@ -139,6 +139,14 @@ public enum EnvConfig {
         readUInt32("searchResultsPopulateUs", default: TimingConstants.searchResultsPopulateUs)
     }
 
+    public static var macSpotlightResultsTimeoutUs: UInt32 {
+        readUInt32("macSpotlightResultsTimeoutUs", default: TimingConstants.macSpotlightResultsTimeoutUs)
+    }
+
+    public static var macSpotlightOpenTimeoutUs: UInt32 {
+        readUInt32("macSpotlightOpenTimeoutUs", default: TimingConstants.macSpotlightOpenTimeoutUs)
+    }
+
     public static var launchVerifySettleUs: UInt32 {
         readUInt32("launchVerifySettleUs", default: TimingConstants.launchVerifySettleUs)
     }

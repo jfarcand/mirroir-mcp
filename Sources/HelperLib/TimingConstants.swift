@@ -48,6 +48,15 @@ public enum TimingConstants {
     /// screen to confirm Spotlight closed (microseconds).
     public static let launchVerifySettleUs: UInt32 = 1_200_000
 
+    /// How long launch_app waits for Mac Spotlight to list the iPhone app's
+    /// "From iPhone" row after setting the query (microseconds).
+    public static let macSpotlightResultsTimeoutUs: UInt32 = 3_000_000
+
+    /// How long launch_app waits, after clicking that row, for the iPhone
+    /// screen to change before it searches the iPhone's own Spotlight instead
+    /// (microseconds).
+    public static let macSpotlightOpenTimeoutUs: UInt32 = 5_000_000
+
     /// Delay for Safari to fully load after launch (microseconds).
     public static let safariLoadUs: UInt32 = 1_500_000
 

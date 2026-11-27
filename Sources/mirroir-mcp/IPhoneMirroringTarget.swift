@@ -76,7 +76,20 @@ enum IPhoneMirroringTarget {
     ) -> InputSimulation {
         InputSimulation(bridge: bridge, cursorMode: profile.cursorMode,
                         pasteVerifier: pasteVerifier,
-                        windowPoster: WindowInputPolicy.livePoster)
+                        windowPoster: WindowInputPolicy.livePoster,
+                        macLauncher: macLauncher(for: bridge))
+    }
+
+    /// The bundle of Apple's iPhone Mirroring app.
+    static let realMirroringBundleID = "com.apple.ScreenContinuity"
+
+    /// Mac Spotlight opens apps on the iPhone that the real iPhone Mirroring
+    /// shows; a stand-in app (FakeMirroring) has no such iPhone behind it.
+    static func macLauncher(for bridge: MirroringBridge,
+                            enabled: Bool = EnvConfig.macSpotlightLaunch) -> (any MacAppLaunching)? {
+        guard enabled,
+              bridge.bundleIdentifier == realMirroringBundleID else { return nil }
+        return MacSpotlightLauncher()
     }
 
     /// Build a fully-wired TargetContext for iPhone Mirroring.

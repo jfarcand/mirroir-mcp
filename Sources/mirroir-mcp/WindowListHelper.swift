@@ -108,6 +108,19 @@ enum WindowListHelper {
         return false
     }
 
+    /// The process owning the front-most window under `point`, reading
+    /// `entries` front to back. The menu bar, the Dock and overlays above it
+    /// are skipped: a click on the point lands on the window below them only
+    /// where they do not reach, and they never cover a floating panel's middle.
+    static func topmostWindowOwnerPID(at point: CGPoint, entries: [WindowListEntry]) -> pid_t? {
+        entries.first { $0.layer < mainMenuLayer && $0.bounds.contains(point) }?.ownerPID
+    }
+
+    /// `topmostWindowOwnerPID(at:entries:)` over the on-screen windows now.
+    static func topmostWindowOwnerPID(at point: CGPoint) -> pid_t? {
+        topmostWindowOwnerPID(at: point, entries: windowEntries(onScreenOnly: true))
+    }
+
     /// Whether two geometries are the same within `geometryMatchTolerance`.
     static func matches(_ a: CGFloat, _ b: CGFloat) -> Bool {
         abs(a - b) < geometryMatchTolerance

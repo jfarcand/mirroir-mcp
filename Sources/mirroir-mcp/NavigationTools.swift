@@ -30,7 +30,10 @@ extension MirroirMCP {
             name: "launch_app",
             description: """
                 Launch an app on the mirrored iPhone by name using Spotlight search. \
-                Opens Spotlight, types the app name, confirms by OCR that the name \
+                With macSpotlightLaunch on (macOS 27), it first opens the app from the Mac's Spotlight, whose \
+                "<name>.app — From iPhone" row it clicks only when the name matches \
+                whole, and confirms the iPhone screen changed; a Mac app with the same \
+                name hides that row. Otherwise it opens the iPhone's Spotlight, types the app name, confirms by OCR that the name \
                 appeared, and opens the top result only when it is an app, tapping its \
                 tile; with no app behind the name (not installed) it fails without \
                 opening anything. If Spotlight never shows the typed name (on iOS 26 \

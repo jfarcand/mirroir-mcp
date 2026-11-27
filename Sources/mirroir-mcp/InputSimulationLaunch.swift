@@ -69,6 +69,11 @@ extension InputSimulation {
             return stateError
         }
         DebugLog.log("launchApp", "launching '\(name)'")
+        switch launchThroughMacSpotlight(name: name) {
+        case .launched: return nil
+        case .refused(let message): return message
+        case .fallBack: break
+        }
 
         // Step 1: Open Spotlight via menu action (requires MenuActionCapable). The
         // screen before it is kept to tell when Spotlight has opened. It is read

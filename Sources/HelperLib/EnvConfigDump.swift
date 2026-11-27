@@ -46,6 +46,8 @@ extension EnvConfig {
                 ("spotlightAppearanceUs", "\(spotlightAppearanceUs)"),
                 ("searchResultsPopulateUs", "\(searchResultsPopulateUs)"),
                 ("launchVerifySettleUs", "\(launchVerifySettleUs)"),
+                ("macSpotlightResultsTimeoutUs", "\(macSpotlightResultsTimeoutUs)"),
+                ("macSpotlightOpenTimeoutUs", "\(macSpotlightOpenTimeoutUs)"),
                 ("safariLoadUs", "\(safariLoadUs)"),
                 ("addressBarActivateUs", "\(addressBarActivateUs)"),
                 ("preReturnUs", "\(preReturnUs)"),

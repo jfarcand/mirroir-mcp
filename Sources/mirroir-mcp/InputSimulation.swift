@@ -88,6 +88,9 @@ final class InputSimulation: Sendable {
     let windowPoster: (any WindowEventPosting)?
     /// The Mac's front app and pointer, which a swipe or drag borrows and returns.
     let macFront: MacFront
+    /// Opens an iPhone app from Mac Spotlight before launch_app searches the
+    /// iPhone's own. Nil for every target but the real iPhone Mirroring.
+    let macLauncher: (any MacAppLaunching)?
     /// The target's PID right now, or nil when the target is not running.
     ///
     /// Resolved on every read rather than captured at init: the target can
@@ -115,8 +118,10 @@ final class InputSimulation: Sendable {
          keyPoster: any KeyEventPosting = CGEventKeyPoster(),
          pasteboard: any PasteboardAccessing = GeneralPasteboard(),
          windowPoster: (any WindowEventPosting)? = nil,
-         macFront: MacFront = .live) {
+         macFront: MacFront = .live,
+         macLauncher: (any MacAppLaunching)? = nil) {
         self.bridge = bridge
+        self.macLauncher = macLauncher
         self.windowPoster = windowPoster
         self.macFront = macFront
         // Every read behind a paste check or a Spotlight launch is one the
