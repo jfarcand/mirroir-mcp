@@ -1,6 +1,6 @@
 {
   "name": "mirroir-openclaw",
-  "version": "0.51.0",
+  "version": "0.52.0",
   "description": "OpenClaw plugin for mirroir: the mirroir MCP server, its operating manual, and an owner approval before every call that can change the iPhone.",
   "type": "module",
   "license": "Apache-2.0",
