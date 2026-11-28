@@ -56,7 +56,14 @@ fi
 
 echo ""
 echo "=== Configuring ==="
-"$MCP_FULL_PATH" configure
+# configure asks a question: with no terminal to answer it (CI, a piped
+# install) it would save nothing and fail, so the step is skipped instead.
+if [ -t 0 ]; then
+    "$MCP_FULL_PATH" configure
+else
+    echo "No terminal to answer the keyboard layout question: skipped."
+    echo "  Typing uses US QWERTY until you run: mirroir configure"
+fi
 
 # --- Step 4: Install agent profiles ---
 
